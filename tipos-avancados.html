@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Tipos Avançados — union, ?int, mixed, never, DNF e strict_types | Guia PHP</title>
+<meta name="description" content="Tipos avançados no PHP 8: union types (int|float), nullable (?int), mixed, never, intersection types (A&amp;B), DNF types ((A&amp;B)|null), true, false e null como tipos, static como retorno e declare(strict_types=1) em profundidade, com os TypeError reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Tipos Avançados</span></h1>
+
+<p class="intro">Na aula <a href="tipos-retorno.html">Tipos e Retorno</a>, você colocou um tipo em cada parâmetro: <code>int $quantidade</code>, <code>string $nome</code>. Mas a vida real nem sempre cabe num tipo só: um preço pode ser inteiro <strong>ou</strong> decimal; uma busca pode achar um número <strong>ou</strong> nada. O PHP 8 trouxe uma "gramática" para descrever esses casos com precisão, e um modo estrito, o <code>strict_types</code>, que proíbe conversões escondidas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li><strong>Union types</strong> (<code>int|float</code>): "este <strong>ou</strong> aquele". <span class="versao">PHP 8.0+</span></li>
+  <li><strong>Nullable</strong> (<code>?int</code>): "isto ou <code>null</code>", e o aviso novo sobre <code>= null</code>.</li>
+  <li><code>mixed</code> (qualquer coisa) <span class="versao">PHP 8.0+</span> e <code>never</code> (nunca volta) <span class="versao">PHP 8.1+</span>.</li>
+  <li><strong>Intersection types</strong> (<code>Countable&amp;ArrayAccess</code>): "este <strong>e</strong> aquele". <span class="versao">PHP 8.1+</span></li>
+  <li><strong>DNF types</strong> (<code>(A&amp;B)|null</code>) e <code>true</code>, <code>false</code>, <code>null</code> como tipos. <span class="versao">PHP 8.2+</span></li>
+  <li><code>static</code> como tipo de retorno.</li>
+  <li><code>declare(strict_types=1)</code> em profundidade: o que muda, onde vale, o que não muda.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: a etiqueta da caixa</h2>
+<p>Um tipo é a etiqueta de uma caixa: "aqui só entra <strong>parafuso</strong>". Até agora, cada caixa tinha uma etiqueta simples. Os tipos avançados permitem etiquetas mais ricas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etiqueta</th><th>Escrita</th><th>Exemplo da vida</th></tr>
+<tr><td>Este <strong>ou</strong> aquele</td><td><code>int|float</code></td><td>"Pague em dinheiro ou cartão"</td></tr>
+<tr><td>Isto ou <strong>nada</strong></td><td><code>?string</code></td><td>"Apelido (opcional)"</td></tr>
+<tr><td>Qualquer coisa</td><td><code>mixed</code></td><td>A caixa de "achados e perdidos"</td></tr>
+<tr><td>Este <strong>e</strong> aquele ao mesmo tempo</td><td><code>Countable&amp;ArrayAccess</code></td><td>"Vaga para quem fala inglês <strong>e</strong> espanhol"</td></tr>
+<tr><td>Nunca devolve nada (nem volta)</td><td><code>never</code></td><td>A porta de saída de emergência</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Union types: <code>int|float</code> <span class="versao">PHP 8.0+</span></h2>
+<p>A barra vertical <code>|</code> (lê-se "ou") junta vários tipos. O valor precisa ser de <strong>pelo menos um</strong> deles:</p>
+
+<pre class="file" data-file="uniao.php">&lt;?php
+function dobro(int|float $n): int|float
+{
+    return $n * 2;
+}
+
+var_dump(dobro(5));
+var_dump(dobro(2.5));
+var_dump(dobro("3"));
+var_dump(dobro("três"));
+</pre>
+
+<dl class="anatomy">
+  <dt>int|float $n</dt><dd>O parâmetro aceita um inteiro ou um decimal.</dd>
+  <dt>: int|float</dt><dd>O retorno também pode ser um ou outro.</dd>
+</dl>
+
+<pre class="term">$ php uniao.php
+int(10)
+float(5)
+int(6)             « "3" foi convertido para int (o arquivo não está no modo estrito)
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int|float, string given, called in /home/ana/tipos/uniao.php on line 10 and defined in /home/ana/tipos/uniao.php:2
+Stack trace:
+#0 /home/ana/tipos/uniao.php(10): dobro('tr\xC3\xAAs')
+#1 {main}
+  thrown in /home/ana/tipos/uniao.php on line 2</pre>
+
+<p>Repare em duas coisas. Primeiro: o tipo é preservado: <code>dobro(5)</code> devolveu <code>int(10)</code> e <code>dobro(2.5)</code> devolveu <code>float(5)</code>. Segundo: <code>"três"</code> não é número de jeito nenhum, e o PHP recusou com um <code>TypeError</code> ("erro de tipo"): "o argumento 1 (<code>$n</code>) precisa ser <code>int|float</code>, veio uma <code>string</code>". O <code>tr\xC3\xAAs</code> no rastro é a palavra "três" com o <code>ê</code> mostrado byte a byte (veja <a href="mbstring.html">Acentos e mbstring</a>).</p>
+
+<p>Antes do PHP 8.0, a única forma de dizer "int ou float" era não pôr tipo nenhum e escrever no comentário <code>@param int|float $n</code>. Se você vir isso em código antigo, já sabe traduzir.</p>
+
+<h3>Regras dos union types</h3>
+<ul>
+  <li>Um tipo não pode se repetir: <code>int|string|int</code> dá <code>Fatal error: Duplicate type int is redundant</code>.</li>
+  <li><code>void</code> não entra em união (não faz sentido "devolve nada ou um int").</li>
+  <li>Use com moderação: <code>int|string|array|bool</code> geralmente indica uma função fazendo coisas demais.</li>
+</ul>
+
+<hr>
+
+<h2>Nullable: <code>?int</code> e <code>int|null</code></h2>
+<p>O caso de união mais comum é "um tipo <strong>ou</strong> <code>null</code>" (<a href="null.html">null</a> = "nada", "sem valor"). Ele tem um atalho: o ponto de interrogação na frente. <code>?float</code> é exatamente o mesmo que <code>float|null</code>.</p>
+
+<pre class="file" data-file="nullable2.php">&lt;?php
+function buscarPreco(string $produto): ?float
+{
+    $tabela = ["Caneca" =&gt; 19.9, "Camiseta" =&gt; 49.9];
+    return $tabela[$produto] ?? null;
+}
+
+var_dump(buscarPreco("Caneca"));
+var_dump(buscarPreco("Boné"));
+</pre>
+
+<pre class="term">$ php nullable2.php
+float(19.9)
+NULL               « "não achei"</pre>
+
+<p>Quem chama a função precisa tratar os dois casos: <code>$preco = buscarPreco($p) ?? 0.0;</code> ou um <code>if ($preco === null)</code>. Esse é o valor do tipo: ele <strong>avisa</strong> que o <code>null</code> pode vir.</p>
+
+<h3>Nullable não é opcional</h3>
+<p><code>?string</code> quer dizer "aceito <code>null</code>", não "pode deixar de passar":</p>
+
+<pre class="file" data-file="nullable.php">&lt;?php
+function saudacao(?string $nome): string
+{
+    return $nome === null ? "Olá, visitante!" : "Olá, $nome!";
+}
+
+echo saudacao("Ana"), "\n";
+echo saudacao(null), "\n";
+echo saudacao(), "\n";
+</pre>
+
+<pre class="term">$ php nullable.php
+Olá, Ana!
+Olá, visitante!
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function saudacao(), 0 passed in /home/ana/tipos/nullable.php on line 9 and exactly 1 expected in /home/ana/tipos/nullable.php:2
+Stack trace:
+#0 /home/ana/tipos/nullable.php(9): saudacao()
+#1 {main}
+  thrown in /home/ana/tipos/nullable.php on line 2</pre>
+
+<p>"Poucos argumentos: 0 passados, exatamente 1 esperado". Para o parâmetro ser opcional, dê um valor padrão: <code>?string $nome = null</code>.</p>
+
+<div class="warning">
+<strong>Cuidado com <code>string $nome = null</code> (sem o <code>?</code>)</strong>
+<p>Código antigo escrevia <code>function f(string $nome = null)</code>, e o PHP transformava o tipo em <code>?string</code> por baixo dos panos. Desde o PHP 8.4 isso dá aviso:</p>
+<pre class="term">$ php nullable2.php        « com a linha: function implicito(string $nome = null) {}
+
+Deprecated: implicito(): Implicitly marking parameter $nome as nullable is deprecated, the explicit nullable type must be used instead in /home/ana/tipos/nullable2.php on line 11
+float(19.9)
+NULL</pre>
+<p>"Marcar o parâmetro como <em>nullable</em> implicitamente está obsoleto; use o tipo <em>nullable</em> explícito". O aviso aparece antes de qualquer saída, porque é dado quando o arquivo é compilado. Conserto: <code>?string $nome = null</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:R$ 19\,90,out:sem preço,out:R$ 50\,00,semerro">
+<p class="try-task"><strong>Missão:</strong> a função <code>formatarPreco</code> só aceita <code>float</code>. Mude o tipo do parâmetro para aceitar <code>int</code>, <code>float</code> <strong>ou</strong> <code>null</code> (use <code>int|float|null</code>) e faça ela devolver <code>"sem preço"</code> quando receber <code>null</code>. A saída deve ter <code>R$ 19,90</code>, <code>sem preço</code> e <code>R$ 50,00</code>.</p>
+<pre class="script">&lt;?php
+function formatarPreco(float $valor): string
+{
+    return "R$ " . number_format($valor, 2, ",", ".");
+}
+
+echo formatarPreco(19.9), "\n";
+echo formatarPreco(null), "\n";
+echo formatarPreco(50), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function formatarPreco(int|float|null $valor): string
+{
+    if ($valor === null) {
+        return "sem preço";
+    }
+    return "R$ " . number_format($valor, 2, ",", ".");
+}
+
+echo formatarPreco(19.9), "\n";
+echo formatarPreco(null), "\n";
+echo formatarPreco(50), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2><code>mixed</code>: qualquer coisa <span class="versao">PHP 8.0+</span></h2>
+<p><code>mixed</code> ("misturado") aceita qualquer valor: número, texto, array, objeto, <code>null</code>. É o mesmo que <code>array|bool|callable|int|float|null|object|resource|string</code>.</p>
+
+<pre class="file" data-file="mixed.php">&lt;?php
+function descrever(mixed $valor): string
+{
+    return get_debug_type($valor);
+}
+
+foreach ([42, 3.14, "oi", true, null, [1, 2], new DateTime()] as $v) {
+    echo descrever($v), "\n";
+}
+</pre>
+
+<pre class="term">$ php mixed.php
+int
+float
+string
+bool
+null
+array
+DateTime</pre>
+
+<p>A função <code>get_debug_type()</code> diz o tipo de qualquer valor (inclusive o nome da classe de um objeto). E se <code>mixed</code> aceita tudo, para que escrever? Para dizer que <strong>foi de propósito</strong>: um parâmetro sem tipo pode ser esquecimento; <code>mixed</code> é uma decisão. Use em funções realmente genéricas (como <code>descrever</code> ou um <code>var_dump</code> caseiro); no resto, prefira um tipo preciso.</p>
+<p>Como <code>mixed</code> já inclui <code>null</code>, <code>?mixed</code> dá erro:</p>
+
+<pre class="term">$ php mixed2.php
+
+Fatal error: Type mixed cannot be marked as nullable since mixed already includes null in /home/ana/tipos/mixed2.php on line 2
+Stack trace:
+#0 {main}</pre>
+
+<hr>
+
+<h2><code>never</code>: a função que nunca volta <span class="versao">PHP 8.1+</span></h2>
+<p><code>void</code> quer dizer "termina normalmente, mas não devolve valor". <code>never</code> quer dizer mais: "esta função <strong>nunca termina normalmente</strong>": ou ela encerra o programa (<code>exit</code>), ou lança uma exceção, ou fica num laço eterno.</p>
+
+<pre class="file" data-file="never.php">&lt;?php
+function abortar(string $motivo): never
+{
+    echo "Erro: $motivo\n";
+    exit(1);
+}
+
+function buscar(array $estoque, string $item): int
+{
+    if (!isset($estoque[$item])) {
+        abortar("$item não existe");
+    }
+    return $estoque[$item];
+}
+
+$estoque = ["Caneca" =&gt; 3];
+echo buscar($estoque, "Caneca"), "\n";
+echo buscar($estoque, "Boné"), "\n";
+echo "nunca chega aqui\n";
+</pre>
+
+<pre class="term">$ php never.php; echo "código: $?"
+3
+Erro: Boné não existe
+código: 1          « o exit(1) encerrou o programa</pre>
+
+<p>Para que serve? Para quem lê (e para ferramentas de análise): depois de <code>abortar(…)</code>, o código "acabou". Exemplos reais: uma função <code>redirecionar(string $url): never</code> que faz <code>header("Location: …")</code> e <code>exit</code> (veja <a href="redirecionar.html">header e Redirecionamento</a>), ou <code>falhar(): never</code> que sempre lança uma exceção.</p>
+<p>O PHP confere a promessa. Se a função terminar normalmente:</p>
+
+<pre class="file" data-file="never2.php">&lt;?php
+function abortar(string $motivo): never
+{
+    echo "Erro: $motivo\n";
+}
+
+abortar("teste");
+</pre>
+
+<pre class="term">$ php never2.php
+Erro: teste
+
+Fatal error: Uncaught TypeError: abortar(): never-returning function must not implicitly return in /home/ana/tipos/never2.php:5
+Stack trace:
+#0 /home/ana/tipos/never2.php(7): abortar('teste')
+#1 {main}
+  thrown in /home/ana/tipos/never2.php on line 5</pre>
+
+<p>"Uma função <code>never</code> não pode retornar implicitamente" (chegar ao <code>}</code> final). Um <code>return;</code> escrito dentro dela é pego antes mesmo de rodar: <code>Fatal error: A never-returning function must not return</code>.</p>
+
+<hr>
+
+<h2>Intersection types: <code>A&amp;B</code> <span class="versao">PHP 8.1+</span></h2>
+<p>O <code>&amp;</code> (lê-se "e") exige que o objeto seja de <strong>todos</strong> os tipos ao mesmo tempo. Só faz sentido com <a href="interfaces.html">interfaces</a> e classes: um objeto pode implementar várias interfaces.</p>
+<p>Exemplo: a função quer "algo que dê para contar (<code>count()</code>) <strong>e</strong> acessar com colchetes (<code>$x[0]</code>)". O PHP tem uma interface para cada coisa: <code>Countable</code> e <code>ArrayAccess</code>. A classe <code>ArrayObject</code> implementa as duas.</p>
+
+<pre class="file" data-file="intersecao.php">&lt;?php
+function resumo(Countable&amp;ArrayAccess $lista): string
+{
+    return count($lista) . " itens; o primeiro é " . $lista[0];
+}
+
+$itens = new ArrayObject(["Caneca", "Camiseta", "Boné"]);
+echo resumo($itens), "\n";
+echo resumo(["Caneca", "Camiseta"]), "\n";
+</pre>
+
+<pre class="term">$ php intersecao.php
+3 itens; o primeiro é Caneca
+
+Fatal error: Uncaught TypeError: resumo(): Argument #1 ($lista) must be of type Countable&amp;ArrayAccess, array given, called in /home/ana/tipos/intersecao.php on line 9 and defined in /home/ana/tipos/intersecao.php:2
+Stack trace:
+#0 /home/ana/tipos/intersecao.php(9): resumo(Array)
+#1 {main}
+  thrown in /home/ana/tipos/intersecao.php on line 2</pre>
+
+<p>O <code>ArrayObject</code> passou. O array comum, não: arrays não são objetos e não implementam interfaces, mesmo funcionando com <code>count()</code> e colchetes. Tipos de interseção não aceitam tipos simples (<code>int&amp;string</code> não existe: nada é as duas coisas).</p>
+
+<hr>
+
+<h2>DNF types: <code>(A&amp;B)|null</code> <span class="versao">PHP 8.2+</span></h2>
+<p>E se a função quiser aceitar "um objeto contável e acessável, <strong>ou</strong> um array comum, <strong>ou</strong> <code>null</code>"? É preciso misturar <code>&amp;</code> e <code>|</code>. O PHP 8.2 permite, desde que as interseções fiquem <strong>entre parênteses</strong>. O nome técnico é <strong>DNF</strong> (<em>Disjunctive Normal Form</em>, "forma normal disjuntiva"): uma lista de alternativas (<code>|</code>), onde cada alternativa pode ser um grupo <code>(A&amp;B)</code>.</p>
+
+<pre class="file" data-file="dnf.php">&lt;?php
+function resumo((Countable&amp;ArrayAccess)|array|null $lista): string
+{
+    if ($lista === null) {
+        return "lista vazia";
+    }
+    return count($lista) . " itens; o primeiro é " . $lista[0];
+}
+
+echo resumo(new ArrayObject(["Caneca", "Camiseta", "Boné"])), "\n";
+echo resumo(["Caneca", "Camiseta"]), "\n";
+echo resumo(null), "\n";
+</pre>
+
+<pre class="term">$ php dnf.php
+3 itens; o primeiro é Caneca
+2 itens; o primeiro é Caneca
+lista vazia</pre>
+
+<p>Sem os parênteses, o PHP nem entende a linha:</p>
+
+<pre class="term">$ php dnf-erro.php        « function f(Countable&amp;ArrayAccess|null $x) {}
+
+Parse error: syntax error, unexpected token "|", expecting variable in /home/ana/tipos/dnf-erro.php on line 2</pre>
+
+<p>Na prática, DNF aparece mais em bibliotecas do que em código do dia a dia. O importante é saber ler: <strong>parênteses agrupam o "e"; a barra separa os "ou"</strong>.</p>
+
+<hr>
+
+<h2><code>true</code>, <code>false</code> e <code>null</code> como tipos <span class="versao">PHP 8.2+</span></h2>
+<p>Várias funções do PHP devolvem "um valor <strong>ou</strong> <code>false</code>" quando falham: <code>array_search</code>, <code>strpos</code>, <code>file_get_contents</code>. Para descrever isso, existe o tipo <code>false</code> (desde o 8.0 em uniões; sozinho desde o 8.2). O 8.2 também trouxe <code>true</code> e <code>null</code> como tipos próprios.</p>
+
+<pre class="file" data-file="literais.php">&lt;?php
+function salvar(string $texto): true
+{
+    file_put_contents('/tmp/nota.txt', $texto);
+    return true;
+}
+
+function procurar(array $lista, string $item): int|false
+{
+    return array_search($item, $lista, true);
+}
+
+function nada(): null
+{
+    return null;
+}
+
+var_dump(salvar("oi"));
+var_dump(procurar(["a", "b"], "b"));
+var_dump(procurar(["a", "b"], "z"));
+var_dump(nada());
+</pre>
+
+<pre class="term">$ php literais.php
+bool(true)
+int(1)
+bool(false)
+NULL</pre>
+
+<dl class="anatomy">
+  <dt>: true</dt><dd>Só pode devolver <code>true</code>. Útil quando a função sempre dá certo (e lança exceção quando dá errado), mas precisa manter a "cara" de uma função que devolve <code>bool</code>.</dd>
+  <dt>: int|false</dt><dd>O padrão "achou a posição ou <code>false</code>", o mesmo de <code>array_search</code>.</dd>
+  <dt>: null</dt><dd>Só pode devolver <code>null</code> (raro; aparece ao estender classes).</dd>
+</dl>
+
+<pre class="term">$ php literais-erro.php     « function salvar(): true { return false; }
+
+Fatal error: Uncaught TypeError: salvar(): Return value must be of type true, false returned in /home/ana/tipos/literais-erro.php:4
+Stack trace:
+#0 /home/ana/tipos/literais-erro.php(6): salvar()
+#1 {main}
+  thrown in /home/ana/tipos/literais-erro.php on line 4
+$ php literais-erro2.php    « function f(): true|false {}
+
+Fatal error: Type contains both true and false, bool must be used instead in /home/ana/tipos/literais-erro2.php on line 2
+Stack trace:
+#0 {main}</pre>
+
+<p>A segunda mensagem é um conselho: "o tipo contém <code>true</code> e <code>false</code>; use <code>bool</code>".</p>
+
+<hr>
+
+<h2><code>static</code> como tipo de retorno</h2>
+<p>Algumas classes permitem encadear chamadas (<code>$c-&gt;onde(…)-&gt;ordenarPor(…)</code>), devolvendo o próprio objeto em cada método (<code>return $this;</code>). Qual tipo de retorno escrever? <code>static</code> quer dizer "um objeto da <strong>classe de quem chamou</strong>", que pode ser uma classe filha.</p>
+
+<pre class="file" data-file="estatico.php">&lt;?php
+class Consulta
+{
+    protected array $partes = [];
+
+    public static function nova(): static
+    {
+        return new static();
+    }
+
+    public function onde(string $condicao): static
+    {
+        $this-&gt;partes[] = "WHERE $condicao";
+        return $this;
+    }
+
+    public function sql(): string
+    {
+        return "SELECT * FROM produtos " . implode(" ", $this-&gt;partes);
+    }
+}
+
+class ConsultaOrdenada extends Consulta
+{
+    public function ordenarPor(string $campo): static
+    {
+        $this-&gt;partes[] = "ORDER BY $campo";
+        return $this;
+    }
+}
+
+$c = ConsultaOrdenada::nova()-&gt;onde("preco &lt; 50")-&gt;ordenarPor("nome");
+echo get_class($c), "\n";
+echo $c-&gt;sql(), "\n";
+</pre>
+
+<pre class="term">$ php estatico.php
+ConsultaOrdenada
+SELECT * FROM produtos WHERE preco &lt; 50 ORDER BY nome</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Retorno</th><th>Promete</th><th>No exemplo, chamado em <code>ConsultaOrdenada</code></th></tr>
+<tr><td><code>self</code></td><td>"Um objeto da classe <strong>onde o método foi escrito</strong>" (ou filha)</td><td>Promete só uma <code>Consulta</code>: o editor não sugere <code>ordenarPor()</code> depois de <code>onde()</code></td></tr>
+<tr><td><code>static</code></td><td>"Um objeto da classe <strong>de quem chamou</strong>"</td><td>Promete uma <code>ConsultaOrdenada</code>: o encadeamento é entendido inteiro</td></tr>
+</table>
+</div>
+
+<p>Com <code>self</code>, o exemplo também roda (o objeto é uma <code>ConsultaOrdenada</code>, que é uma <code>Consulta</code>), mas a promessa é mais fraca. Com <code>static</code>, o PHP cobra a promessa mais forte. Se o método criar o objeto com <code>new self()</code> em vez de <code>new static()</code>:</p>
+
+<pre class="term">$ php static-erro.php      « nova(): static { return new self(); }
+
+Fatal error: Uncaught TypeError: Consulta::nova(): Return value must be of type ConsultaOrdenada, Consulta returned in /home/ana/tipos/static-erro.php:6
+Stack trace:
+#0 /home/ana/tipos/static-erro.php(11): Consulta::nova()
+#1 {main}
+  thrown in /home/ana/tipos/static-erro.php on line 6</pre>
+
+<p>Repare que a mensagem já mostra o <code>static</code> "resolvido": <code>ConsultaOrdenada</code>. Mais sobre <code>self</code> e <code>static</code> em <a href="static.html">static</a> e <a href="heranca.html">Herança</a>.</p>
+
+<hr>
+
+<h2><code>declare(strict_types=1)</code> em profundidade</h2>
+<p>Você já viu essa linha no topo dos arquivos modernos. Ela liga o <strong>modo estrito de tipos</strong>. Para entender o que muda, compare os dois modos com a mesma função.</p>
+
+<h3>Modo padrão (coercivo): o PHP tenta converter</h3>
+<pre class="file" data-file="fraco.php">&lt;?php
+function total(int $quantidade, float $preco): float
+{
+    return $quantidade * $preco;
+}
+
+var_dump(total(3, 10.5));
+var_dump(total("3", "10.5"));
+var_dump(total(3.0, 20));
+var_dump(total(true, 10));
+var_dump(total(2.5, 10));
+var_dump(total("3 canecas", 10));
+</pre>
+
+<pre class="term">$ php fraco.php
+float(31.5)
+float(31.5)        « "3" e "10.5" viraram números
+float(60)          « 3.0 virou 3 (sem parte decimal, sem problema)
+float(10)          « true virou 1 (!)
+
+Deprecated: Implicit conversion from float 2.5 to int loses precision in /home/ana/tipos/fraco.php on line 2
+float(20)          « 2.5 virou 2: meia caneca sumiu, com um aviso
+
+Fatal error: Uncaught TypeError: total(): Argument #1 ($quantidade) must be of type int, string given, called in /home/ana/tipos/fraco.php on line 12 and defined in /home/ana/tipos/fraco.php:2
+Stack trace:
+#0 /home/ana/tipos/fraco.php(12): total('3 canecas', 10)
+#1 {main}
+  thrown in /home/ana/tipos/fraco.php on line 2</pre>
+
+<p>No modo padrão, o tipo funciona como um <strong>conversor</strong>: o PHP converte o que der (<code>"3"</code> → <code>3</code>, <code>true</code> → <code>1</code>) e só recusa o que não dá (<code>"3 canecas"</code>). É confortável, mas esconde erros: <code>total(true, 10)</code> provavelmente é um engano, e o <code>2.5</code> perdeu metade.</p>
+
+<h3>Modo estrito: o tipo tem que bater</h3>
+<pre class="file" data-file="forte.php">&lt;?php
+declare(strict_types=1);
+
+function total(int $quantidade, float $preco): float
+{
+    return $quantidade * $preco;
+}
+
+var_dump(total(3, 10.5));
+var_dump(total(3, 20));
+var_dump(total("3", "10.5"));
+</pre>
+
+<pre class="term">$ php forte.php
+float(31.5)
+float(60)          « int → float é a única conversão permitida
+
+Fatal error: Uncaught TypeError: total(): Argument #1 ($quantidade) must be of type int, string given, called in /home/ana/tipos/forte.php on line 11 and defined in /home/ana/tipos/forte.php:4
+Stack trace:
+#0 /home/ana/tipos/forte.php(11): total('3', '10.5')
+#1 {main}
+  thrown in /home/ana/tipos/forte.php on line 4</pre>
+
+<p>No modo estrito, <code>"3"</code> não é <code>int</code>: é <code>string</code>, e pronto. A <strong>única</strong> exceção é passar um <code>int</code> onde se espera <code>float</code> (o <code>20</code> virou <code>20.0</code>), porque isso nunca perde informação.</p>
+
+<h3>As cinco regras do <code>strict_types</code></h3>
+<ol class="passo">
+  <li><strong>Vale por arquivo.</strong> Cada arquivo escolhe o seu modo. Não existe "ligar para o projeto todo"; por isso a linha vai no topo de <strong>todos</strong> os arquivos.</li>
+  <li><strong>Vale para as chamadas feitas <em>naquele</em> arquivo.</strong> O que conta é o arquivo de quem <strong>chama</strong> a função, não o de quem a declarou (veja abaixo).</li>
+  <li><strong>Vale também para os retornos</strong> das funções declaradas no arquivo: com o modo estrito, <code>function preco(): int { return "10"; }</code> dá <code>TypeError</code>; sem ele, devolve <code>int(10)</code>.</li>
+  <li><strong>Vale para as funções do PHP</strong>: com o modo estrito, <code>strlen(12345)</code> dá <code>TypeError</code>; sem ele, devolve <code>5</code>.</li>
+  <li><strong>Precisa ser a primeira instrução do arquivo</strong>: só o <code>&lt;?php</code> e comentários podem vir antes.</li>
+</ol>
+
+<p>A regra 2 é a que mais confunde. A Ana tem uma biblioteca no modo estrito e dois arquivos que a usam:</p>
+
+<pre class="file" data-file="biblioteca.php">&lt;?php
+declare(strict_types=1);
+
+function dobrar(int $n): int
+{
+    return $n * 2;
+}
+</pre>
+
+<pre class="file" data-file="chamador.php">&lt;?php
+// este arquivo NÃO tem strict_types
+require 'biblioteca.php';
+
+var_dump(dobrar("21"));
+</pre>
+
+<pre class="term">$ php chamador.php
+int(42)            « quem chamou está no modo padrão: "21" foi convertido
+$ php chamador2.php        « o mesmo, mas com declare(strict_types=1) no topo
+
+Fatal error: Uncaught TypeError: dobrar(): Argument #1 ($n) must be of type int, string given, called in /home/ana/tipos/chamador2.php on line 6 and defined in /home/ana/tipos/biblioteca.php:4
+Stack trace:
+#0 /home/ana/tipos/chamador2.php(6): dobrar('21')
+#1 {main}
+  thrown in /home/ana/tipos/biblioteca.php on line 4</pre>
+
+<p>A biblioteca é a mesma; o que mudou foi o arquivo que <strong>chamou</strong>. A ideia é: cada arquivo decide o quanto confia nos próprios valores. E as regras 3 e 4, conferidas:</p>
+
+<pre class="term">$ php forte-retorno.php    « strict_types + function preco(): int { return "10"; }
+
+Fatal error: Uncaught TypeError: preco(): Return value must be of type int, string returned in /home/ana/tipos/forte-retorno.php:6
+Stack trace:
+#0 /home/ana/tipos/forte-retorno.php(9): preco()
+#1 {main}
+  thrown in /home/ana/tipos/forte-retorno.php on line 6
+$ php fraco-retorno.php    « a mesma função, sem strict_types
+int(10)
+$ php interna.php          « strict_types + var_dump(strlen(12345));
+
+Fatal error: Uncaught TypeError: strlen(): Argument #1 ($string) must be of type string, int given in /home/ana/tipos/interna.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/tipos/interna.php on line 4
+$ php interna-fraco.php    « sem strict_types: strlen(12345) e str_repeat("ab", "3")
+int(5)
+string(6) "ababab"</pre>
+
+<h3>O que o <code>strict_types</code> <strong>não</strong> muda</h3>
+<ul>
+  <li>Operadores continuam convertendo: <code>"3" + 2</code> dá <code>5</code>, <code>"10" == 10</code> dá <code>true</code>. Para comparações, use <code>===</code> (veja <a href="operadores-comparacao.html">Comparação</a>).</li>
+  <li>Propriedades tipadas de classes seguem o modo do arquivo onde a <strong>atribuição</strong> é feita.</li>
+  <li>Dados de formulário (<code>$_POST</code>, <code>$_GET</code>) <strong>sempre</strong> chegam como <code>string</code>. No modo estrito, você converte explicitamente (<code>(int) $_POST['quantidade']</code>, ou melhor, com <a href="validacao.html">validação</a>) antes de passar para funções tipadas. É isso que a missão final treina.</li>
+</ul>
+
+<div class="tip">
+<strong>Qual modo usar?</strong>
+<p>Em código novo, <strong>sempre</strong> <code>declare(strict_types=1);</code>. Os erros aparecem na hora, na linha certa, em vez de virarem um valor errado lá na frente (a meia caneca que sumiu). É uma das recomendações de <a href="boas-praticas.html">Boas Práticas</a>.</p>
+</div>
+
+<hr>
+
+<h2>Todos os tipos, num quadro</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Aceita</th><th>Desde</th></tr>
+<tr><td><code>int</code>, <code>float</code>, <code>string</code>, <code>bool</code>, <code>array</code></td><td>O tipo simples</td><td>7.0 (<code>array</code> já existia antes)</td></tr>
+<tr><td><code>?T</code></td><td><code>T</code> ou <code>null</code></td><td>7.1</td></tr>
+<tr><td><code>void</code></td><td>(retorno) não devolve nada</td><td>7.1</td></tr>
+<tr><td><code>object</code>, <code>iterable</code>, <code>callable</code></td><td>Qualquer objeto; array ou <code>Traversable</code>; algo chamável</td><td>7.x</td></tr>
+<tr><td><code>A|B</code></td><td><code>A</code> ou <code>B</code></td><td>8.0</td></tr>
+<tr><td><code>mixed</code></td><td>Qualquer valor</td><td>8.0</td></tr>
+<tr><td><code>static</code></td><td>(retorno) a classe de quem chamou</td><td>8.0</td></tr>
+<tr><td><code>never</code></td><td>(retorno) nunca volta</td><td>8.1</td></tr>
+<tr><td><code>A&amp;B</code></td><td>Objeto que é <code>A</code> e <code>B</code></td><td>8.1</td></tr>
+<tr><td><code>(A&amp;B)|C</code></td><td>DNF: grupos com "e", separados por "ou"</td><td>8.2</td></tr>
+<tr><td><code>true</code>, <code>false</code>, <code>null</code></td><td>Só esse valor</td><td>8.2 (<code>false</code> em união desde 8.0)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>TypeError: … must be of type int, string given</strong>
+<p><strong>O que significa:</strong> o valor não é do tipo pedido. A mensagem diz a função, o número e o nome do argumento, o tipo esperado, o tipo recebido, a linha que chamou (<em>called in</em>) e a linha onde a função foi declarada (<em>defined in</em>). O erro está quase sempre em <em>called in</em>.</p>
+<p><strong>Como consertar:</strong> converta ou valide o valor antes de chamar (dados de formulário são sempre <code>string</code>), ou amplie o tipo com <code>|</code>, se a função realmente deve aceitar os dois.</p>
+</div>
+
+<div class="cenario">
+<strong>Deprecated: Implicitly marking parameter $x as nullable is deprecated</strong>
+<p><strong>O que significa:</strong> <code>string $x = null</code>, sem o <code>?</code>. Funcionou por anos; desde o PHP 8.4, avisa.</p>
+<p><strong>Como consertar:</strong> <code>?string $x = null</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Too few arguments … exactly 1 expected</strong>
+<p><strong>O que significa:</strong> você achou que <code>?string</code> tornava o parâmetro opcional. Não torna.</p>
+<p><strong>Como consertar:</strong> acrescente o valor padrão: <code>?string $nome = null</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>strict_types declaration must be the very first statement in the script</strong>
+<pre class="term">$ php lugar.php
+
+Fatal error: strict_types declaration must be the very first statement in the script in /home/ana/tipos/lugar.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> havia código (aqui, um <code>echo</code>) antes do <code>declare</code>.</p>
+<p><strong>Como consertar:</strong> <code>&lt;?php</code>, depois <code>declare(strict_types=1);</code>, depois o <code>namespace</code>, depois o resto.</p>
+</div>
+
+<div class="cenario">
+<strong>Parse error: syntax error, unexpected token "|"</strong>
+<p><strong>O que significa:</strong> você misturou <code>&amp;</code> e <code>|</code> sem parênteses, ou está num PHP anterior ao 8.0 (sem union types) ou ao 8.2 (sem DNF).</p>
+<p><strong>Como consertar:</strong> <code>(A&amp;B)|null</code>; confira a versão com <code>php -v</code>.</p>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O atalho por extenso</h3>
+<p><code>?int</code> é um atalho. Complete a forma por extenso, com union type:</p>
+<div class="ex-code">function mostrarCodigo(int|<input data-answer="null" aria-label="tipo que falta"> $codigo): void</div>
+</div>
+
+<div class="exercise">
+<h3>2. Talvez um objeto</h3>
+<p>Escreva o retorno "um <code>Produto</code> ou <code>null</code>" usando o atalho:</p>
+<div class="ex-code">function buscar(int $id): <input data-answer="?Produto" aria-label="tipo de retorno"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A primeira linha</h3>
+<p>Escreva a linha que liga o modo estrito de tipos:</p>
+<div class="ex-code">&lt;?php<br><input data-answer="declare(strict_types=1);" aria-label="declaração"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Com <code>declare(strict_types=1)</code>, qual destas chamadas a <code>function f(float $x)</code> funciona?</p>
+<label><input type="radio" name="q4"> <code>f("2.5")</code></label>
+<label><input type="radio" name="q4"> <code>f(true)</code></label>
+<label><input type="radio" name="q4"> <code>f(2)</code></label>
+<label><input type="radio" name="q4"> <code>f(null)</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual a diferença entre <code>void</code> e <code>never</code>?</p>
+<label><input type="radio" name="q5"> <code>void</code> termina sem devolver valor; <code>never</code> nunca termina normalmente (sai ou lança exceção)</label>
+<label><input type="radio" name="q5"> Nenhuma; são sinônimos</label>
+<label><input type="radio" name="q5"> <code>never</code> devolve <code>null</code></label>
+<label><input type="radio" name="q5"> <code>void</code> só existe em métodos</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O arquivo <code>a.php</code> tem <code>strict_types=1</code> e declara <code>function f(int $n)</code>. O arquivo <code>b.php</code>, sem <code>strict_types</code>, chama <code>f("5")</code>. O que acontece?</p>
+<label><input type="radio" name="q6"> <code>TypeError</code>, porque <code>f</code> foi declarada no modo estrito</label>
+<label><input type="radio" name="q6"> Parse error</label>
+<label><input type="radio" name="q6"> <code>Deprecated</code> e depois funciona</label>
+<label><input type="radio" name="q6"> Funciona: vale o modo do arquivo que chama, e <code>"5"</code> vira <code>5</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Total: R$ 31\,50,src:declare\(strict_types=1\),semerro">
+<p class="try-task"><strong>Missão final:</strong> este arquivo está no modo estrito, e os dados chegaram de um formulário, como texto. Rode e leia o <code>TypeError</code>. Conserte <strong>sem tirar</strong> o <code>declare(strict_types=1)</code>: converta os valores antes de chamar a função (dica: <code>(int)</code> e <code>(float)</code>, veja <a href="conversao-tipos.html">Conversão de Tipos</a>). A saída deve ser <code>Total: R$ 31,50</code>.</p>
+<pre class="script">&lt;?php
+declare(strict_types=1);
+
+function total(int $quantidade, float $preco): float
+{
+    return $quantidade * $preco;
+}
+
+// valores que vieram de um formulário: sempre texto
+$form = ['quantidade' =&gt; '3', 'preco' =&gt; '10.5'];
+
+$valor = total($form['quantidade'], $form['preco']);
+echo "Total: R$ ", number_format($valor, 2, ",", "."), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+declare(strict_types=1);
+
+function total(int $quantidade, float $preco): float
+{
+    return $quantidade * $preco;
+}
+
+// valores que vieram de um formulário: sempre texto
+$form = ['quantidade' =&gt; '3', 'preco' =&gt; '10.5'];
+
+$valor = total((int) $form['quantidade'], (float) $form['preco']);
+echo "Total: R$ ", number_format($valor, 2, ",", "."), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>A|B</code>: um ou outro. <code>?T</code> = <code>T|null</code>, mas não torna o parâmetro opcional; use <code>?T $x = null</code> (nunca <code>T $x = null</code>, obsoleto no 8.4).</li>
+  <li><code>mixed</code>: qualquer coisa, de propósito. <code>never</code>: a função nunca volta (<code>exit</code> ou exceção).</li>
+  <li><code>A&amp;B</code>: objeto que é os dois; <code>(A&amp;B)|null</code>: DNF, com parênteses obrigatórios.</li>
+  <li><code>true</code>, <code>false</code>, <code>null</code> podem ser tipos; <code>int|false</code> é o padrão "achou ou falhou".</li>
+  <li><code>static</code> no retorno: "a classe de quem chamou"; combine com <code>new static()</code>.</li>
+  <li><code>declare(strict_types=1)</code>: primeira linha, vale por arquivo, para chamadas feitas nele (inclusive às funções do PHP) e para os retornos das funções dele; só <code>int</code> → <code>float</code> é aceito. Use sempre em código novo.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
