@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP int e float — números inteiros e decimais | Guia PHP</title>
+<meta name="description" content="Números em PHP para quem nunca programou: int e float, o maior inteiro (PHP_INT_MAX) e o estouro que vira float, a imprecisão de 0.1 + 0.2, round, notações hexadecimal, octal, binária e 1_000_000, intdiv, %, fdiv, is_int, is_float, is_numeric e o DivisionByZeroError, com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">int e float</span></h1>
+
+<p class="intro">A lojinha da Ana vive de números: quantos cadernos tem no estoque, quanto custa cada um, quanto o cliente vai pagar. O PHP tem dois tipos de número: <strong><code>int</code></strong>, para inteiros (3 cadernos), e <strong><code>float</code></strong>, para números com casas decimais (R$ 12,90). Nesta aula você aprende a escrever os dois, o que acontece quando um número fica grande demais, por que <code>0.1 + 0.2</code> não dá exatamente <code>0.3</code> e o que o PHP faz quando alguém tenta dividir por zero.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <code>int</code> e <code>float</code>, e quando cada um aparece.</li>
+  <li>O maior inteiro do PHP (<code>PHP_INT_MAX</code>) e o que acontece depois dele.</li>
+  <li>Por que floats são "quase exatos" e como lidar com isso (<code>round</code>).</li>
+  <li>Outras formas de escrever números: hexadecimal, octal, binário e <code>1_000_000</code>.</li>
+  <li>As três divisões: <code>/</code>, <code>intdiv</code> e <code>%</code> (o resto), e o <code>fdiv</code>.</li>
+  <li>Como testar se algo é número: <code>is_int</code>, <code>is_float</code>, <code>is_numeric</code>.</li>
+  <li>O erro <code>DivisionByZeroError</code>.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> (64 bits) na máquina fictícia da Ana, na pasta <code>~/site</code>. As contas em si (<code>+</code>, <code>-</code>, <code>*</code>, <code>**</code>, incremento) estão em <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</p>
+
+<hr>
+
+<h2>A ideia: contar e medir</h2>
+<p>Pense em duas perguntas do dia a dia: "<strong>quantos</strong> ovos tem na caixa?" e "<strong>quanto</strong> pesa esse queijo?". Ovos você <strong>conta</strong>: 1, 2, 12, nunca 2,7 ovos. O queijo você <strong>mede</strong>: 0,350 kg, 1,2 kg.</p>
+
+<ul>
+  <li><code>int</code> (de <em>integer</em>, "inteiro") é para <strong>contar</strong>: quantidade, idade, ano, número de páginas. Sem casas decimais.</li>
+  <li><code>float</code> é para <strong>medir</strong>: peso, altura, média, porcentagem. Tem casas decimais.</li>
+</ul>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+$ovos = 12;
+$queijo = 0.35;
+$inteiroComPonto = 10.0;
+var_dump($ovos, $queijo, $inteiroComPonto, 5 + 2.0);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php tipos.php
+int(12)
+float(0.35)
+float(10)               « 10.0 tem ponto: é float, mesmo sem parte decimal
+float(7)                « int + float dá float</pre>
+
+<p>Duas regras importantes: <strong>o separador decimal é o ponto</strong> (<code>0.35</code>, nunca <code>0,35</code>), e <strong>basta um float na conta para o resultado ser float</strong>. Para mostrar <code>0,35</code> com vírgula ao usuário, use <code>number_format</code> (aula <a href="number-format.html">Formatar Números</a>).</p>
+
+<hr>
+
+<h2>1. <code>int</code>: números inteiros</h2>
+<p>Inteiros podem ser positivos, negativos ou zero: <code>29</code>, <code>-5</code>, <code>0</code>. Mas não são infinitos: o PHP guarda cada inteiro em 8 bytes (64 bits), o que dá um limite. O PHP oferece <strong>constantes</strong> (valores prontos, com nome em maiúsculas; aula <a href="constantes.html">Constantes</a>) para você consultar esse limite:</p>
+
+<pre class="file" data-file="limites.php">&lt;?php
+var_dump(PHP_INT_MAX);
+var_dump(PHP_INT_MIN);
+var_dump(PHP_INT_SIZE);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php limites.php
+int(9223372036854775807)        « o maior int: uns 9,2 quintilhões
+int(-9223372036854775808)       « o menor int
+int(8)                          « cada int ocupa 8 bytes</pre>
+
+<p>É um número enorme: dá para contar os segundos de quase 300 bilhões de anos. Na prática, você raramente encosta nele. Mas o que acontece se passar?</p>
+
+<h3>Passou do limite: o int vira float</h3>
+
+<pre class="file" data-file="estouro.php">&lt;?php
+var_dump(PHP_INT_MAX + 1);
+var_dump(PHP_INT_MAX * 2);
+var_dump(is_float(PHP_INT_MAX + 1));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php estouro.php
+float(9.223372036854776E+18)    « não deu erro: virou float
+float(1.8446744073709552E+19)
+bool(true)</pre>
+
+<p>Em muitas linguagens, passar do maior inteiro faz o número "dar a volta" e virar negativo (o <em>overflow</em>, "transbordamento"). O PHP faz diferente: <strong>converte o resultado para float</strong>, sem aviso. O <code>E+18</code> é a notação científica: <code>9.22...E+18</code> quer dizer 9,22 × 10<sup>18</sup>.</p>
+
+<p>O preço disso: um float tem cerca de 15 a 17 dígitos significativos, então os últimos algarismos do número se perdem. Para contas com números gigantes e exatos, o PHP tem as extensões <code>bcmath</code> e <code>gmp</code>, assunto avançado.</p>
+
+<hr>
+
+<h2>2. Outras formas de escrever um inteiro</h2>
+<p>Além do jeito normal (decimal), o PHP aceita outras <strong>bases</strong> numéricas. Você vai encontrá-las em cores (<code>0xFF</code>), permissões de arquivo (<code>0o755</code>) e configurações:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Notação</th><th>Começa com</th><th>Exemplo</th><th>Vale (decimal)</th></tr>
+<tr><td>Decimal</td><td>1–9</td><td><code>26</code></td><td>26</td></tr>
+<tr><td>Hexadecimal (base 16)</td><td><code>0x</code></td><td><code>0x1A</code></td><td>26</td></tr>
+<tr><td>Octal (base 8) <span class="versao">PHP 8.1+</span></td><td><code>0o</code></td><td><code>0o17</code></td><td>15</td></tr>
+<tr><td>Octal (forma antiga)</td><td><code>0</code></td><td><code>017</code></td><td>15</td></tr>
+<tr><td>Binário (base 2)</td><td><code>0b</code></td><td><code>0b1010</code></td><td>10</td></tr>
+<tr><td>Com separador <span class="versao">PHP 7.4+</span></td><td>—</td><td><code>1_000_000</code></td><td>1000000</td></tr>
+<tr><td>Notação científica (float)</td><td>—</td><td><code>1.5e3</code>, <code>2E-3</code></td><td>1500.0, 0.002</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="notacoes.php">&lt;?php
+var_dump(0x1A, 0o17, 017, 0b1010, 1_000_000, 1.5e3, 2E-3);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php notacoes.php
+int(26)
+int(15)
+int(15)
+int(10)
+int(1000000)
+float(1500)
+float(0.002)</pre>
+
+<p>Repare: o PHP guarda e mostra tudo em decimal. A notação é só o jeito de <strong>escrever</strong> no código. O sublinhado em <code>1_000_000</code> serve apenas para os olhos (como o ponto em "1.000.000" no português) e some.</p>
+
+<div class="warning">
+<strong>Zero à esquerda muda o número!</strong>
+<p>Por causa da forma antiga de octal, <code>017</code> <strong>não</strong> é dezessete: é quinze. Nunca escreva zeros à esquerda em números (como num CEP ou num código de produto). Se o "número" tem zeros que importam, ele é texto: <code>"01310-100"</code>. Um <code>08</code> ou <code>09</code> nem é aceito, porque 8 e 9 não existem na base 8:</p>
+<pre class="term" data-cwd="~/site">$ cat zero-esquerda.php
+&lt;?php
+var_dump(08);
+$ php zero-esquerda.php
+
+Parse error: Invalid numeric literal in /home/ana/site/zero-esquerda.php on line 2</pre>
+<p><em>Invalid numeric literal</em> = "número escrito de forma inválida". Prefira sempre <code>0o17</code> quando quiser octal: é impossível confundir.</p>
+</div>
+
+<hr>
+
+<h2>3. <code>float</code>: números com casas decimais</h2>
+<p>Qualquer número com ponto ou com <code>e</code> (notação científica) é um float: <code>4.5</code>, <code>-0.25</code>, <code>10.0</code>, <code>1.5e3</code>. O nome vem de <em>floating point</em> ("ponto flutuante"): o computador guarda os algarismos e, separado, a posição do ponto, que pode "flutuar". Isso permite guardar números muito grandes e muito pequenos, mas com uma limitação.</p>
+
+<h3>A surpresa: <code>0.1 + 0.2</code></h3>
+
+<pre class="file" data-file="precisao.php">&lt;?php
+var_dump(0.1 + 0.2);
+var_dump(0.1 + 0.2 == 0.3);
+echo 0.1 + 0.2, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php precisao.php
+float(0.30000000000000004)     « não é exatamente 0.3!
+bool(false)                    « por isso a comparação dá falso
+0.3                            « o echo arredonda para mostrar e esconde o problema</pre>
+
+<p>Não é um defeito do PHP: acontece em JavaScript, Python, Java, em praticamente toda linguagem. O computador guarda os floats em <strong>binário</strong> (base 2), e alguns números simples em decimal, como 0,1, viram dízimas infinitas em binário, do mesmo jeito que 1/3 vira 0,3333… em decimal. O computador guarda um valor muito próximo, mas não exato. Somando dois "quase", sobra um errinho na 17ª casa.</p>
+
+<p>Repare também na diferença entre <code>var_dump</code> e <code>echo</code>: o <code>var_dump</code> mostra o valor com todos os dígitos necessários; o <code>echo</code> mostra no máximo 14 algarismos significativos, e por isso exibe <code>0.3</code>. A configuração <code>precision</code> do PHP controla isso. Não confie no <code>echo</code> para investigar floats.</p>
+
+<p>O errinho pode virar um erro grande quando o float é cortado para inteiro:</p>
+
+<pre class="file" data-file="corte.php">&lt;?php
+var_dump((0.1 + 0.7) * 10);
+var_dump((int) ((0.1 + 0.7) * 10));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php corte.php
+float(7.999999999999999)
+int(7)                         « era para ser 8! o (int) corta, não arredonda</pre>
+
+<p>(O <code>(int)</code> converte para inteiro jogando fora a parte decimal; veja <a href="conversao-tipos.html">Conversão de Tipos</a>.)</p>
+
+<h3>Como conviver com isso</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que fazer</th></tr>
+<tr><td>Mostrar um resultado</td><td>Arredonde: <code>round($x, 2)</code> ou formate com <code>number_format</code>.</td></tr>
+<tr><td>Comparar dois floats</td><td>Arredonde os dois antes (<code>round($a, 2) == round($b, 2)</code>) ou veja se a diferença é minúscula: <code>abs($a - $b) &lt; PHP_FLOAT_EPSILON</code>.</td></tr>
+<tr><td>Dinheiro</td><td>Guarde em <strong>centavos</strong>, como <code>int</code>: R$ 12,90 vira <code>1290</code>. Some e multiplique inteiros e só divida por 100 na hora de mostrar.</td></tr>
+<tr><td>Converter para inteiro</td><td>Arredonde primeiro: <code>(int) round($x)</code>.</td></tr>
+</table>
+</div>
+
+<h3>Arredondar: <code>round</code>, <code>floor</code>, <code>ceil</code></h3>
+
+<pre class="file" data-file="arredondar.php">&lt;?php
+var_dump(round(0.1 + 0.2, 2));
+var_dump(round(0.1 + 0.2, 2) == 0.3);
+var_dump(round(3.14159, 2));
+var_dump(round(2.5));
+var_dump(round(-2.5));
+var_dump(round(1234.5678, -2));
+var_dump(floor(4.9));
+var_dump(ceil(4.1));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php arredondar.php
+float(0.3)
+bool(true)                     « depois de arredondar, a comparação funciona
+float(3.14)                    « 2 casas decimais
+float(3)                       « .5 arredonda para longe do zero…
+float(-3)                      « …nos dois sentidos
+float(1200)                    « casas negativas: arredonda para centenas
+float(4)                       « floor ("chão"): sempre para baixo
+float(5)                       « ceil ("teto"): sempre para cima</pre>
+
+<dl class="anatomy">
+  <dt>round($x, casas)</dt><dd>Arredonda para o número de casas pedido (o padrão é 0). O meio (<code>.5</code>) vai para longe do zero, como na escola.</dd>
+  <dt>floor($x)</dt><dd>"Chão": o maior inteiro menor ou igual (<code>4.9</code> → <code>4</code>).</dd>
+  <dt>ceil($x)</dt><dd>"Teto" (de <em>ceiling</em>): o menor inteiro maior ou igual (<code>4.1</code> → <code>5</code>). Útil para "quantas caixas preciso?".</dd>
+</dl>
+
+<p>As três devolvem <strong>float</strong>, mesmo quando o resultado é redondo. Se precisar de int, converta: <code>(int) round($x)</code>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque <code>0.1</code> e <code>0.2</code> por outros valores (<code>0.5 + 0.25</code>, <code>1.1 + 2.2</code>, <code>19.99 * 3</code>). Quais dão um resultado "torto" no <code>var_dump</code>? O <code>round</code> conserta?</p>
+<pre class="script">&lt;?php
+$a = 0.1;
+$b = 0.2;
+$soma = $a + $b;
+var_dump($soma);
+echo $soma, "\n";
+var_dump(round($soma, 2));
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Dividir: <code>/</code>, <code>intdiv</code>, <code>%</code> e <code>fdiv</code></h2>
+<p>A Ana tem 17 balas para dividir entre 5 crianças. Dependendo da pergunta, a resposta é diferente:</p>
+
+<ul>
+  <li>"Quanto dá 17 dividido por 5?" → <strong>3,4</strong> (a divisão comum, <code>/</code>).</li>
+  <li>"Quantas balas inteiras cada criança recebe?" → <strong>3</strong> (a divisão inteira, <code>intdiv</code>).</li>
+  <li>"Quantas sobram?" → <strong>2</strong> (o resto, <code>%</code>).</li>
+</ul>
+
+<pre class="file" data-file="dividir.php">&lt;?php
+var_dump(17 / 5);
+var_dump(intdiv(17, 5));
+var_dump(17 % 5);
+var_dump(10 / 2);
+var_dump(10 / 3);
+echo 10 / 3, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php dividir.php
+float(3.4)
+int(3)                         « intdiv: só a parte inteira
+int(2)                         « %: o resto (17 = 5 × 3 + 2)
+int(5)                         « divisão exata entre ints dá int…
+float(3.3333333333333335)      « …senão, float
+3.3333333333333                « o echo mostra só 14 algarismos</pre>
+
+<dl class="anatomy">
+  <dt>$a / $b</dt><dd>Divisão comum. Dá <code>int</code> se a conta for exata entre inteiros; senão, <code>float</code>.</dd>
+  <dt>intdiv($a, $b)</dt><dd>"Divisão inteira": só a parte inteira do resultado, sempre <code>int</code>. Só aceita inteiros.</dd>
+  <dt>$a % $b</dt><dd>O "módulo": o <strong>resto</strong> da divisão inteira. Clássico para saber se um número é par (<code>$n % 2 == 0</code>). Para floats, use <code>fmod(10.5, 3)</code> (dá <code>1.5</code>).</dd>
+</dl>
+
+<p>O sinal do resto segue o <strong>primeiro</strong> número: <code>-10 % 3</code> dá <code>-1</code>, e <code>10 % -3</code> dá <code>1</code>. Mais detalhes em <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</p>
+
+<div class="tryphp" data-goal="out:Cada criança: 3,out:Sobram: 2,semerro,src:intdiv,src:%">
+<p class="try-task"><strong>Missão:</strong> complete o programa usando <code>intdiv</code> e <code>%</code> com as variáveis (não digite 3 e 2 à mão) para mostrar <code>Cada criança: 3</code> e <code>Sobram: 2</code>. Depois teste com outros valores de <code>$balas</code>.</p>
+<pre class="script">&lt;?php
+$balas = 17;
+$criancas = 5;
+$cada = 0;    // calcule aqui
+$sobra = 0;   // e aqui
+echo "Cada criança: $cada\n";
+echo "Sobram: $sobra\n";
+</pre>
+<pre class="solucao">&lt;?php
+$balas = 17;
+$criancas = 5;
+$cada = intdiv($balas, $criancas);
+$sobra = $balas % $criancas;
+echo "Cada criança: $cada\n";
+echo "Sobram: $sobra\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Dividir por zero</h2>
+<p>Na matemática, dividir por zero não tem resposta. No PHP 8, é um <strong>erro que para o programa</strong>:</p>
+
+<pre class="file" data-file="zero.php">&lt;?php
+echo "Antes\n";
+echo 10 / 0;
+echo "Depois\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php zero.php
+Antes
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/site/zero.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/zero.php on line 3
+$ echo $?
+255                            « o "Depois" nunca apareceu</pre>
+
+<dl class="anatomy">
+  <dt>Fatal error</dt><dd>Erro fatal: o programa parou aqui.</dd>
+  <dt>Uncaught</dt><dd>"Não capturado". O PHP lançou um erro e ninguém o tratou. É possível tratar com <code>try</code>/<code>catch</code> (aula <a href="excecoes.html">Exceções</a>).</dd>
+  <dt>DivisionByZeroError</dt><dd>O nome do erro: "erro de divisão por zero".</dd>
+  <dt>Division by zero</dt><dd>A mensagem.</dd>
+  <dt>zero.php:3 … on line 3</dt><dd>Arquivo e linha.</dd>
+  <dt>Stack trace</dt><dd>"Rastro da pilha": o caminho de chamadas até o erro. Aqui, só o programa principal (<code>{main}</code>).</dd>
+</dl>
+
+<p>O resto e a divisão inteira também dão o mesmo erro, com mensagens um pouco diferentes:</p>
+
+<pre class="term" data-cwd="~/site">$ php resto-zero.php           « echo 10 % 0;
+
+Fatal error: Uncaught DivisionByZeroError: Modulo by zero in /home/ana/site/resto-zero.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/resto-zero.php on line 2
+$ php intdiv-zero.php          « echo intdiv(10, 0);
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/site/intdiv-zero.php:2
+Stack trace:
+#0 /home/ana/site/intdiv-zero.php(2): intdiv(10, 0)
+#1 {main}
+  thrown in /home/ana/site/intdiv-zero.php on line 2</pre>
+
+<p>A forma de evitar é conferir o divisor antes, com um <a href="if-else.html">if</a>: "se o número de crianças for zero, avise; senão, divida".</p>
+
+<h3><code>fdiv</code>: a divisão que não dá erro <span class="versao">PHP 8.0+</span></h3>
+<p>Para cálculos científicos, o PHP tem <code>fdiv</code> (de <em>float division</em>), que segue a regra dos floats: dividir por zero dá "infinito" (<code>INF</code>) ou "não é um número" (<code>NAN</code>):</p>
+
+<pre class="file" data-file="fdiv.php">&lt;?php
+var_dump(fdiv(10, 0));
+var_dump(fdiv(-1, 0));
+var_dump(fdiv(0, 0));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php fdiv.php
+float(INF)                     « infinito
+float(-INF)                    « menos infinito
+float(NAN)                     « Not A Number: "não é um número"</pre>
+
+<p>Num sistema de loja, você quase nunca quer <code>INF</code> como preço. Prefira conferir o divisor.</p>
+
+<hr>
+
+<h2>6. É número? <code>is_int</code>, <code>is_float</code>, <code>is_numeric</code></h2>
+
+<pre class="file" data-file="testar.php">&lt;?php
+var_dump(is_int(5));
+var_dump(is_int(5.0));
+var_dump(is_float(5.0));
+var_dump(is_numeric("12"));
+var_dump(is_numeric("12.5"));
+var_dump(is_numeric("1e3"));
+var_dump(is_numeric(" 12"));
+var_dump(is_numeric("12 "));
+var_dump(is_numeric("12abc"));
+var_dump(is_numeric("0x1A"));
+var_dump(is_numeric(""));
+var_dump(is_numeric("1_000"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php testar.php
+bool(true)
+bool(false)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(false)
+bool(false)
+bool(false)
+bool(false)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Teste</th><th>Resultado</th><th>Por quê</th></tr>
+<tr><td><code>is_int(5)</code></td><td><code>true</code></td><td>5 é int</td></tr>
+<tr><td><code>is_int(5.0)</code></td><td><code>false</code></td><td>5.0 é float, mesmo "redondo"</td></tr>
+<tr><td><code>is_float(5.0)</code></td><td><code>true</code></td><td></td></tr>
+<tr><td><code>is_numeric("12")</code>, <code>("12.5")</code>, <code>("1e3")</code></td><td><code>true</code></td><td>texto com cara de número</td></tr>
+<tr><td><code>is_numeric(" 12")</code>, <code>("12 ")</code></td><td><code>true</code></td><td>espaços nas pontas são tolerados</td></tr>
+<tr><td><code>is_numeric("12abc")</code></td><td><code>false</code></td><td>tem letras depois</td></tr>
+<tr><td><code>is_numeric("0x1A")</code>, <code>("1_000")</code></td><td><code>false</code></td><td>as notações do código não valem em texto</td></tr>
+<tr><td><code>is_numeric("")</code></td><td><code>false</code></td><td>texto vazio não é número</td></tr>
+</table>
+</div>
+
+<p>O <code>is_numeric</code> é o teste certo para o que vem de formulários, porque tudo chega como texto. Para validar com mais rigor ("um inteiro entre 1 e 120"), existe o <code>filter_var</code>, em <a href="validacao.html">Validar Dados</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught DivisionByZeroError: Division by zero</code></strong>
+<p><strong>O que significa:</strong> o divisor (o número depois do <code>/</code>, do <code>%</code> ou o segundo do <code>intdiv</code>) valia zero. Muitas vezes é uma variável vazia: uma <code>Undefined variable</code> ou um campo de formulário em branco vira zero numa conta.</p>
+<p><strong>Como consertar:</strong> mostre o divisor com <code>var_dump</code> antes da linha. Confira com <code>if</code> antes de dividir.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected token ","</code></strong>
+<pre class="term" data-cwd="~/site">$ cat virgula.php
+&lt;?php
+$preco = 4,5;
+$ php virgula.php
+
+Parse error: syntax error, unexpected token "," in /home/ana/site/virgula.php on line 2</pre>
+<p><strong>O que significa:</strong> você escreveu um número com vírgula. Para o PHP, a vírgula separa coisas, não casas decimais.</p>
+<p><strong>Como consertar:</strong> use ponto: <code>$preco = 4.5;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A comparação de floats dá <code>false</code> sem motivo</strong>
+<p><strong>O que significa:</strong> é a imprecisão dos floats: <code>0.1 + 0.2 == 0.3</code> é <code>false</code>.</p>
+<p><strong>Como consertar:</strong> arredonde antes de comparar (<code>round($x, 2) == 0.3</code>) ou trabalhe com inteiros (centavos).</p>
+</div>
+
+<div class="cenario">
+<strong>O número "perdeu" uma unidade ao virar int</strong>
+<p><strong>O que significa:</strong> <code>(int)</code> e <code>intval</code> cortam a parte decimal. Se a conta deu <code>7.999999999999999</code>, o corte dá <code>7</code>.</p>
+<p><strong>Como consertar:</strong> <code>(int) round($x)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>O que é / faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>PHP_INT_MAX</code>, <code>PHP_INT_MIN</code></td><td>Maior e menor int</td><td><code>9223372036854775807</code></td></tr>
+<tr><td><code>PHP_FLOAT_EPSILON</code></td><td>Menor diferença entre floats perto de 1</td><td><code>2.220446049250313E-16</code></td></tr>
+<tr><td><code>round($x, $casas)</code></td><td>Arredonda</td><td><code>round(3.14159, 2)</code> → <code>3.14</code></td></tr>
+<tr><td><code>floor($x)</code> / <code>ceil($x)</code></td><td>Para baixo / para cima</td><td><code>floor(4.9)</code> → <code>4</code></td></tr>
+<tr><td><code>$a / $b</code></td><td>Divisão</td><td><code>17 / 5</code> → <code>3.4</code></td></tr>
+<tr><td><code>intdiv($a, $b)</code></td><td>Divisão inteira</td><td><code>intdiv(17, 5)</code> → <code>3</code></td></tr>
+<tr><td><code>$a % $b</code></td><td>Resto (inteiros)</td><td><code>17 % 5</code> → <code>2</code></td></tr>
+<tr><td><code>fmod($a, $b)</code></td><td>Resto (floats)</td><td><code>fmod(10.5, 3)</code> → <code>1.5</code></td></tr>
+<tr><td><code>fdiv($a, $b)</code></td><td>Divisão sem erro no zero</td><td><code>fdiv(10, 0)</code> → <code>INF</code></td></tr>
+<tr><td><code>is_int</code>, <code>is_float</code></td><td>Testa o tipo</td><td><code>is_int(5.0)</code> → <code>false</code></td></tr>
+<tr><td><code>is_numeric($x)</code></td><td>Número ou texto numérico</td><td><code>is_numeric("12.5")</code> → <code>true</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O resto</h3>
+<p>Complete para mostrar o resto de 20 dividido por 6 (que é 2):</p>
+<div class="ex-code">echo 20 <input data-answer="%" aria-label="operador"> 6;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Duas casas</h3>
+<p>Complete para arredondar <code>$media</code> com 2 casas decimais:</p>
+<div class="ex-code">echo <input data-answer="round" aria-label="função">($media, 2);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Qual é o tipo de <code>10 / 4</code>?</p>
+<label><input type="radio" name="q3"> <code>int</code>, porque 10 e 4 são inteiros</label>
+<label><input type="radio" name="q3"> <code>string</code></label>
+<label><input type="radio" name="q3"> <code>float</code> (2.5), porque a divisão não é exata</label>
+<label><input type="radio" name="q3"> Dá erro</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quanto vale <code>017</code> no PHP?</p>
+<label><input type="radio" name="q4"> 17</label>
+<label><input type="radio" name="q4"> 15, porque o zero na frente indica octal</label>
+<label><input type="radio" name="q4"> Dá Parse error</label>
+<label><input type="radio" name="q4"> 0.17</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece com <code>PHP_INT_MAX + 1</code>?</p>
+<label><input type="radio" name="q5"> Vira o menor número negativo</label>
+<label><input type="radio" name="q5"> Dá um Fatal error</label>
+<label><input type="radio" name="q5"> Continua um int, só que maior</label>
+<label><input type="radio" name="q5"> Vira um float</label>
+</div>
+
+<h3>Missão final: a média da turma</h3>
+
+<div class="tryphp" data-goal="out:Média: 8.2,semerro,src:round">
+<p class="try-task"><strong>Missão:</strong> o programa calcula a média de três notas, mas mostra <code>Média: 8.2333333333333</code>. Use <code>round</code> para mostrar a média com <strong>uma</strong> casa decimal: <code>Média: 8.2</code>.</p>
+<pre class="script">&lt;?php
+$nota1 = 7.5;
+$nota2 = 8;
+$nota3 = 9.2;
+$media = ($nota1 + $nota2 + $nota3) / 3;
+echo "Média: $media\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nota1 = 7.5;
+$nota2 = 8;
+$nota3 = 9.2;
+$media = round(($nota1 + $nota2 + $nota3) / 3, 1);
+echo "Média: $media\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>int</code> conta (sem casas decimais); <code>float</code> mede (com ponto). Um float na conta torna o resultado float.</li>
+  <li>O maior int é <code>PHP_INT_MAX</code>; passar dele transforma o resultado em float, sem aviso.</li>
+  <li>Inteiros podem ser escritos em hexadecimal (<code>0x</code>), octal (<code>0o</code>), binário (<code>0b</code>) e com <code>_</code> como separador. Cuidado com zeros à esquerda.</li>
+  <li>Floats são aproximados: <code>0.1 + 0.2</code> dá <code>0.30000000000000004</code>. Arredonde com <code>round</code>, compare com cuidado e guarde dinheiro em centavos.</li>
+  <li><code>/</code> divide; <code>intdiv</code> dá a parte inteira; <code>%</code> dá o resto; <code>fdiv</code> divide sem erro no zero.</li>
+  <li>Dividir por zero com <code>/</code>, <code>%</code> ou <code>intdiv</code> dá <code>DivisionByZeroError</code> e para o programa.</li>
+  <li><code>is_int</code> e <code>is_float</code> testam o tipo; <code>is_numeric</code> aceita texto numérico.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
