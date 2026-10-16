@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP CSV — ler e gravar planilhas com fgetcsv e fputcsv | Guia PHP</title>
+<meta name="description" content="Arquivos CSV no PHP: fgetcsv e fputcsv com o separador ponto e vírgula do Brasil e com vírgula, o aviso Deprecated do parâmetro $escape, cabeçalho com array_combine, str_getcsv, aspas dentro dos campos, notas com vírgula decimal e uma tabela HTML gerada a partir do CSV.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">CSV</span></h1>
+
+<p class="intro">CSV é o formato mais simples de planilha: um arquivo de texto em que cada linha é uma linha da tabela e os campos são separados por um caractere, como <code>;</code> ou <code>,</code>. Toda planilha (Excel, LibreOffice Calc, Google Planilhas) abre e salva CSV, e muitos sistemas exportam dados assim: extratos de banco, listas de alunos, cadastros de produtos. Nesta aula o PHP vai ler e gravar CSV do jeito certo, inclusive os casos que quebram as soluções "caseiras".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como é um arquivo CSV por dentro, e por que no Brasil ele costuma usar <code>;</code>.</li>
+  <li>Ler linha a linha com <code>fgetcsv</code>, e por que passar os quatro argumentos (o aviso <code>Deprecated</code> do PHP 8.4+).</li>
+  <li>Usar a primeira linha como cabeçalho, com <code>array_combine</code>.</li>
+  <li>Converter notas e preços com vírgula decimal (<code>9,5</code>) em números.</li>
+  <li>Gravar com <code>fputcsv</code>, que cuida das aspas sozinho.</li>
+  <li>Quebrar uma única linha com <code>str_getcsv</code>, e por que <code>explode</code> não serve.</li>
+  <li>Gerar uma tabela HTML a partir de um CSV.</li>
+</ul>
+</div>
+
+<p>Esta aula usa o que você viu em <a href="arquivos.html">Ler e Escrever Arquivos</a> (<code>fopen</code>, <code>fgets</code>, <code>fclose</code>). CSV quer dizer <em>Comma-Separated Values</em>, "valores separados por vírgula".</p>
+
+<hr>
+
+<h2>A ideia: uma planilha em texto puro</h2>
+<p>A Ana dá aulas de reforço e guarda as notas da turma numa planilha. Ela salvou a planilha como CSV, e o arquivo <code>alunos.csv</code> ficou assim:</p>
+
+<pre class="term">$ cd csv
+$ cat alunos.csv
+nome;turma;nota
+Ana Souza;3A;9,5
+Bruno Lima;3A;7
+Carla Dias;3B;8,25
+Diego "Didi" Alves;3B;6,5</pre>
+
+<p>Repare em três coisas:</p>
+<ol>
+  <li>A <strong>primeira linha é o cabeçalho</strong>: os nomes das colunas.</li>
+  <li>O separador é o <strong>ponto e vírgula</strong>. Por quê? Porque no Brasil a vírgula já é o separador decimal (<code>9,5</code>). Se o separador fosse a vírgula, <code>9,5</code> viraria dois campos. Por isso, as planilhas em português salvam CSV com <code>;</code>. Em inglês, onde o decimal é <code>9.5</code>, o comum é <code>,</code>.</li>
+  <li>Um nome tem <strong>aspas</strong> dentro (<code>"Didi"</code>). Aspas são especiais em CSV, e a gente vai ver como tratá-las.</li>
+</ol>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>nome</th><th>turma</th><th>nota</th></tr>
+<tr><td>Ana Souza</td><td>3A</td><td>9,5</td></tr>
+<tr><td>Bruno Lima</td><td>3A</td><td>7</td></tr>
+<tr><td>Carla Dias</td><td>3B</td><td>8,25</td></tr>
+<tr><td>Diego "Didi" Alves</td><td>3B</td><td>6,5</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Ler uma linha com <code>fgetcsv</code></h2>
+<p><code>fgetcsv</code> ("pegar CSV do arquivo") funciona como o <code>fgets</code>: lê a próxima linha de um arquivo aberto com <code>fopen</code>. A diferença é que ela já devolve a linha <strong>quebrada em campos</strong>, num array. Primeiro, a tentativa mais curta:</p>
+
+<pre class="file" data-file="ler1.php">&lt;?php
+$f = fopen('alunos.csv', 'r');
+$linha = fgetcsv($f, null, ';');
+var_dump($linha);
+fclose($f);
+</pre>
+
+<pre class="term">$ php ler1.php
+
+Deprecated: fgetcsv(): the $escape parameter must be provided as its default value will change in /home/ana/csv/ler1.php on line 3
+array(3) {
+  [0]=&gt;
+  string(4) "nome"
+  [1]=&gt;
+  string(5) "turma"
+  [2]=&gt;
+  string(4) "nota"
+}</pre>
+
+<p>Funcionou (o cabeçalho veio em três campos), mas com um aviso <code>Deprecated</code> ("obsoleto"): "<em>o parâmetro $escape precisa ser informado, porque o valor padrão dele vai mudar</em>". Desde o <span class="versao">PHP 8.4+</span>, as funções de CSV pedem que você diga explicitamente qual é o caractere de escape. A resposta recomendada é <code>''</code> (nenhum), que faz o PHP seguir o padrão oficial do CSV, o mesmo das planilhas. Então a chamada completa tem quatro argumentos depois do arquivo:</p>
+
+<pre class="file" data-file="ler2.php">&lt;?php
+$f = fopen('alunos.csv', 'r');
+while (($campos = fgetcsv($f, null, ';', '"', '')) !== false) {
+    echo implode(' | ', $campos), "\n";
+}
+fclose($f);
+</pre>
+
+<dl class="anatomy">
+  <dt>$f</dt><dd>O arquivo aberto com <code>fopen(…, 'r')</code>.</dd>
+  <dt>null</dt><dd>O tamanho máximo da linha. <code>null</code> = sem limite (em código antigo você vai ver <code>1000</code> ou <code>0</code>).</dd>
+  <dt>';'</dt><dd>O <strong>separador</strong> de campos. O padrão do PHP é <code>','</code>; para planilhas brasileiras, <code>';'</code>.</dd>
+  <dt>'"'</dt><dd>O caractere que <strong>envolve</strong> campos com caracteres especiais (aspas duplas, o padrão).</dd>
+  <dt>''</dt><dd>O caractere de <strong>escape</strong>: nenhum. Dentro de um campo entre aspas, uma aspa se escreve dobrada (<code>""</code>), como manda o padrão.</dd>
+  <dt>!== false</dt><dd>No fim do arquivo, <code>fgetcsv</code> devolve <code>false</code>, e o <code>while</code> para (mesma ideia do <code>fgets</code>).</dd>
+</dl>
+
+<pre class="term">$ php ler2.php
+nome | turma | nota
+Ana Souza | 3A | 9,5
+Bruno Lima | 3A | 7
+Carla Dias | 3B | 8,25
+Diego "Didi" Alves | 3B | 6,5</pre>
+
+<div class="tip">
+<strong>Com argumentos nomeados fica mais legível</strong>
+<p>Desde o <span class="versao">PHP 8.0+</span>, você pode dizer o nome do argumento (veja <a href="parametros.html">Parâmetros</a>) e pular os que quer deixar no padrão. Esta linha faz o mesmo, sem o aviso:</p>
+<pre class="file" data-file="nomeado.php">while (($campos = fgetcsv($f, separator: ';', escape: '')) !== false) {
+</pre>
+</div>
+
+<h3>E se o separador estiver errado?</h3>
+<p>Se você ler um CSV de <code>;</code> dizendo que o separador é <code>,</code>, não há erro: a linha inteira vira <strong>um</strong> campo só.</p>
+
+<pre class="term">$ php ler-virgula.php     « fgetcsv($f, null, ',', '"', '')
+array(1) {
+  [0]=&gt;
+  string(15) "nome;turma;nota"
+}</pre>
+
+<p>Esse é o sintoma clássico: <code>array(1)</code> quando você esperava várias colunas. Abra o arquivo com <code>cat</code> (ou num editor de texto) e confira qual é o separador.</p>
+
+<div class="tryphp" data-goal="out:Ana Souza: 9\,5,out:Diego &quot;Didi&quot; Alves: 6\,5,semerro">
+<p class="try-task"><strong>Missão:</strong> mostre cada aluno no formato <code>Nome: nota</code> (por exemplo, <code>Ana Souza: 9,5</code>), sem mostrar a linha do cabeçalho e sem nenhum aviso <code>Deprecated</code>. Dica: leia o cabeçalho com um <code>fgetcsv</code> antes do laço e ignore o resultado.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$f = fopen('alunos.csv', 'r');
+while (($campos = fgetcsv($f, null, ';')) !== false) {
+    echo implode(' | ', $campos), "\n";
+}
+fclose($f);
+</pre>
+<pre class="script" data-file="alunos.csv">nome;turma;nota
+Ana Souza;3A;9,5
+Bruno Lima;3A;7
+Carla Dias;3B;8,25
+Diego "Didi" Alves;3B;6,5
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$f = fopen('alunos.csv', 'r');
+fgetcsv($f, null, ';', '"', '');          // pula o cabeçalho
+while (($campos = fgetcsv($f, null, ';', '"', '')) !== false) {
+    echo $campos[0] . ": " . $campos[2] . "\n";
+}
+fclose($f);
+</pre>
+</div>
+
+<hr>
+
+<h2>Usar o cabeçalho: <code>array_combine</code></h2>
+<p>Escrever <code>$campos[2]</code> funciona, mas quem lê o código não sabe que o 2 é a nota, e se alguém mudar a ordem das colunas na planilha, o programa quebra em silêncio. Melhor transformar cada linha num <a href="arrays-associativos.html">array associativo</a>, usando o cabeçalho como chaves. A função <code>array_combine</code> ("combinar arrays") faz isso: o primeiro array dá as chaves, o segundo dá os valores.</p>
+
+<pre class="file" data-file="cabecalho.php">&lt;?php
+$f = fopen('alunos.csv', 'r');
+$cabecalho = fgetcsv($f, null, ';', '"', '');
+$alunos = [];
+while (($campos = fgetcsv($f, null, ';', '"', '')) !== false) {
+    $alunos[] = array_combine($cabecalho, $campos);
+}
+fclose($f);
+print_r($alunos[0]);
+$soma = 0;
+foreach ($alunos as $a) {
+    $nota = (float) str_replace(',', '.', $a['nota']);
+    $soma += $nota;
+    printf("%-20s %s %5.2f\n", $a['nome'], $a['turma'], $nota);
+}
+echo "Média: " . number_format($soma / count($alunos), 2, ',', '.') . "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$cabecalho = fgetcsv(…);</code></td><td>A primeira linha: <code>['nome', 'turma', 'nota']</code>.</td></tr>
+<tr><td><code>$alunos[] = array_combine($cabecalho, $campos);</code></td><td>Junta <code>['nome','turma','nota']</code> com <code>['Ana Souza','3A','9,5']</code> e acrescenta <code>['nome' =&gt; 'Ana Souza', 'turma' =&gt; '3A', 'nota' =&gt; '9,5']</code> à lista.</td></tr>
+<tr><td><code>str_replace(',', '.', $a['nota'])</code></td><td>Tudo o que vem de um CSV é <strong>texto</strong>. O PHP só entende números com ponto, então trocamos a vírgula: <code>'9,5'</code> → <code>'9.5'</code>.</td></tr>
+<tr><td><code>(float)</code></td><td><a href="conversao-tipos.html">Converte</a> o texto <code>'9.5'</code> no número <code>9.5</code>.</td></tr>
+<tr><td><code>printf("%-20s %s %5.2f\n", …)</code></td><td>Alinha em colunas: nome em 20 posições à esquerda, nota com 2 casas (veja <a href="sprintf.html">printf</a>).</td></tr>
+<tr><td><code>number_format(…, 2, ',', '.')</code></td><td>Mostra a média do jeito brasileiro (veja <a href="number-format.html">Formatar Números</a>).</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php cabecalho.php
+Array
+(
+    [nome] =&gt; Ana Souza
+    [turma] =&gt; 3A
+    [nota] =&gt; 9,5            « ainda é texto, com vírgula
+)
+Ana Souza            3A  9.50       « printf usa ponto, sempre
+Bruno Lima           3A  7.00
+Carla Dias           3B  8.25
+Diego "Didi" Alves   3B  6.50
+Média: 7,81                         « number_format com vírgula</pre>
+
+<div class="warning">
+<strong>Não faça <code>(float) '9,5'</code></strong>
+<p>A conversão do PHP lê o começo do texto até onde der e para na vírgula: <code>(float) '9,5'</code> vale <code>9</code> (o <code>var_dump</code> mostra <code>float(9)</code>), sem aviso nenhum. As médias ficariam erradas e ninguém perceberia. Troque a vírgula por ponto antes.</p>
+</div>
+
+<hr>
+
+<h2>Gravar com <code>fputcsv</code></h2>
+<p><code>fputcsv</code> ("pôr CSV no arquivo") recebe um array e grava uma linha, com os separadores e as aspas no lugar certo. A Ana quer exportar a lista de produtos da lojinha:</p>
+
+<pre class="file" data-file="escrever.php">&lt;?php
+$produtos = [
+    ['produto', 'preco', 'obs'],
+    ['Bolo de cenoura', '35,00', 'com cobertura'],
+    ['Torta "da vó"', '48,50', 'sob encomenda; 2 dias'],
+    ['Brigadeiro', '2,50', ''],
+];
+$f = fopen('produtos.csv', 'w');
+foreach ($produtos as $linha) {
+    fputcsv($f, $linha, ';', '"', '');
+}
+fclose($f);
+echo file_get_contents('produtos.csv');
+</pre>
+
+<pre class="term">$ php escrever.php
+produto;preco;obs
+"Bolo de cenoura";35,00;"com cobertura"
+"Torta ""da vó""";48,50;"sob encomenda; 2 dias"
+Brigadeiro;2,50;</pre>
+
+<p>Veja o que o <code>fputcsv</code> decidiu sozinho:</p>
+<ul>
+  <li>Campos com <strong>espaço</strong> foram colocados entre aspas (<code>"Bolo de cenoura"</code>). Não era obrigatório, mas não faz mal: toda planilha entende.</li>
+  <li><code>sob encomenda; 2 dias</code> tem um <code>;</code> dentro. Entre aspas, ele <strong>não</strong> separa campos.</li>
+  <li><code>Torta "da vó"</code> tem aspas dentro. Elas foram <strong>dobradas</strong> (<code>""da vó""</code>) e o campo foi envolvido por aspas. É assim que o CSV "escapa" aspas.</li>
+  <li>O campo vazio virou nada depois do último <code>;</code>.</li>
+</ul>
+
+<p>Com o separador vírgula (para um sistema em inglês), é o mesmo, trocando o terceiro argumento. Note que aí os preços precisam usar ponto:</p>
+
+<pre class="term">$ php escrever-virg.php    « fputcsv($f, ['Torta, de limão', '48.50'], ',', '"', '')
+"Bolo de cenoura",35.00
+"Torta, de limão",48.50</pre>
+
+<div class="note">
+<strong>Acentos no Excel: o BOM</strong>
+<p>O LibreOffice e o Google Planilhas abrem CSV em UTF-8 sem problema. O Excel, no Windows, às vezes mostra <code>PÃ£o</code> no lugar de <code>Pão</code>. O truque é gravar, antes de tudo, a "marca de ordem de bytes" (BOM), três bytes invisíveis que avisam "isto é UTF-8":</p>
+<pre class="file" data-file="bom.php">&lt;?php
+$f = fopen('para-excel.csv', 'w');
+fwrite($f, "\u{FEFF}");              // o BOM
+fputcsv($f, ['produto', 'preço'], ';', '"', '');
+fputcsv($f, ['Pão de mel', '4,00'], ';', '"', '');
+fclose($f);
+</pre>
+<pre class="term">$ php bom.php
+$ head -c 16 para-excel.csv | od -c | head -2
+0000000 357 273 277   p   r   o   d   u   t   o   ;   p   r   e 303 247
+0000020</pre>
+<p>Os três primeiros bytes (<code>357 273 277</code>, em octal) são o BOM. Ao <strong>ler</strong> um CSV que veio do Excel com BOM, o primeiro nome do cabeçalho chega como <code>"\u{FEFF}nome"</code>; tire com <code>ltrim($cabecalho[0], "\u{FEFF}")</code>.</p>
+</div>
+
+<hr>
+
+<h2>Uma linha só: <code>str_getcsv</code></h2>
+<p>Quando a linha CSV já está numa variável (veio de um formulário, de uma API, de <code>file()</code>), use <code>str_getcsv</code> ("CSV de uma string"). Os argumentos são os mesmos, sem o arquivo:</p>
+
+<pre class="file" data-file="strget.php">&lt;?php
+$linha = 'Torta "da vó";48,50;"sob encomenda; 2 dias"';
+print_r(str_getcsv($linha, ';', '"', ''));
+$linha2 = '"Torta ""da vó""";48,50';
+print_r(str_getcsv($linha2, ';', '"', ''));
+</pre>
+
+<pre class="term">$ php strget.php
+Array
+(
+    [0] =&gt; Torta "da vó"
+    [1] =&gt; 48,50
+    [2] =&gt; sob encomenda; 2 dias        « o ; entre aspas não separou
+)
+Array
+(
+    [0] =&gt; Torta "da vó"                « as aspas dobradas voltaram a ser uma
+    [1] =&gt; 48,50
+)</pre>
+
+<h3>Por que não usar <code>explode(';', $linha)</code>?</h3>
+<p>Parece igual, e funciona até o dia em que um campo tem <code>;</code> ou aspas:</p>
+
+<pre class="term">$ php explode.php      « print_r(explode(';', '"Torta ""da vó""";48,50;"sob encomenda; 2 dias"'));
+Array
+(
+    [0] =&gt; "Torta ""da vó"""        « as aspas ficaram
+    [1] =&gt; 48,50
+    [2] =&gt; "sob encomenda           « um campo virou dois
+    [3] =&gt;  2 dias"
+)</pre>
+
+<p><code>explode</code> corta em <strong>todo</strong> <code>;</code>, sem saber nada de aspas. Para CSV, use sempre as funções de CSV.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Ler um arquivo CSV, linha a linha</td><td><code>fopen</code> + <code>fgetcsv</code> num <code>while</code></td></tr>
+<tr><td>Gravar um arquivo CSV</td><td><code>fopen(…, 'w')</code> + <code>fputcsv</code> para cada linha</td></tr>
+<tr><td>Uma linha CSV que já está numa string</td><td><code>str_getcsv</code></td></tr>
+<tr><td>Texto simples, sem aspas possíveis (como <code>"a,b,c"</code> que você mesmo montou)</td><td><code>explode</code> serve</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Do CSV para uma tabela HTML (modo web)</h2>
+<p>Agora o CSV vira página: um cabeçalho <code>&lt;th&gt;</code> com os nomes das colunas e uma linha <code>&lt;tr&gt;</code> por aluno. Cada valor passa por <code>htmlspecialchars</code>, porque o CSV pode ter vindo de qualquer lugar (e o Diego tem aspas no nome).</p>
+
+<pre class="file" data-file="tabela.php">&lt;?php
+$f = fopen(__DIR__ . '/alunos.csv', 'r');
+$cabecalho = fgetcsv($f, null, ';', '"', '');
+?&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;
+&lt;?php foreach ($cabecalho as $titulo): ?&gt;
+    &lt;th&gt;&lt;?= htmlspecialchars(ucfirst($titulo)) ?&gt;&lt;/th&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/tr&gt;
+&lt;?php while (($campos = fgetcsv($f, null, ';', '"', '')) !== false): ?&gt;
+  &lt;tr&gt;
+&lt;?php foreach ($campos as $valor): ?&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($valor) ?&gt;&lt;/td&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/tr&gt;
+&lt;?php endwhile; fclose($f); ?&gt;
+&lt;/table&gt;
+</pre>
+
+<pre class="term">$ php tabela.php
+&lt;table border="1"&gt;
+  &lt;tr&gt;
+    &lt;th&gt;Nome&lt;/th&gt;
+    &lt;th&gt;Turma&lt;/th&gt;
+    &lt;th&gt;Nota&lt;/th&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Ana Souza&lt;/td&gt;
+    &lt;td&gt;3A&lt;/td&gt;
+    &lt;td&gt;9,5&lt;/td&gt;
+  &lt;/tr&gt;
+  …                                       « (Bruno e Carla)
+  &lt;tr&gt;
+    &lt;td&gt;Diego &amp;quot;Didi&amp;quot; Alves&lt;/td&gt;    « as aspas viraram &amp;quot;
+    &lt;td&gt;3B&lt;/td&gt;
+    &lt;td&gt;6,5&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</pre>
+
+<p>O código usa a <a href="php-e-html.html">sintaxe alternativa</a> (<code>foreach (…):</code> … <code>endforeach;</code>), que fica mais legível no meio do HTML.</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Diego &quot;Didi&quot; Alves,html:Situação,html:aprovado,html:recuperação,src:htmlspecialchars">
+<p class="try-task"><strong>Missão:</strong> a tabela já mostra o CSV. Acrescente uma quarta coluna, <code>Situação</code>, que mostra <code>aprovado</code> quando a nota for 7 ou mais e <code>recuperação</code> quando for menor. Lembre de converter a nota (<code>'6,5'</code>) em número antes de comparar. Veja o resultado na aba <strong>Resultado</strong>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$f = fopen(__DIR__ . '/alunos.csv', 'r');
+$cabecalho = fgetcsv($f, null, ';', '"', '');
+?&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;
+&lt;?php foreach ($cabecalho as $titulo): ?&gt;
+    &lt;th&gt;&lt;?= htmlspecialchars(ucfirst($titulo)) ?&gt;&lt;/th&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/tr&gt;
+&lt;?php while (($campos = fgetcsv($f, null, ';', '"', '')) !== false): ?&gt;
+  &lt;tr&gt;
+&lt;?php foreach ($campos as $valor): ?&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($valor) ?&gt;&lt;/td&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/tr&gt;
+&lt;?php endwhile; fclose($f); ?&gt;
+&lt;/table&gt;
+</pre>
+<pre class="script" data-file="alunos.csv">nome;turma;nota
+Ana Souza;3A;9,5
+Bruno Lima;3A;7
+Carla Dias;3B;8,25
+Diego "Didi" Alves;3B;6,5
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$f = fopen(__DIR__ . '/alunos.csv', 'r');
+$cabecalho = fgetcsv($f, null, ';', '"', '');
+?&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;
+&lt;?php foreach ($cabecalho as $titulo): ?&gt;
+    &lt;th&gt;&lt;?= htmlspecialchars(ucfirst($titulo)) ?&gt;&lt;/th&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;th&gt;Situação&lt;/th&gt;
+  &lt;/tr&gt;
+&lt;?php while (($campos = fgetcsv($f, null, ';', '"', '')) !== false): ?&gt;
+&lt;?php $nota = (float) str_replace(',', '.', $campos[2]); ?&gt;
+  &lt;tr&gt;
+&lt;?php foreach ($campos as $valor): ?&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($valor) ?&gt;&lt;/td&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;td&gt;&lt;?= $nota &gt;= 7 ? 'aprovado' : 'recuperação' ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endwhile; fclose($f); ?&gt;
+&lt;/table&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Deprecated: fgetcsv(): the $escape parameter must be provided"</strong>
+<pre class="term">Deprecated: fgetcsv(): the $escape parameter must be provided as its default value will change in /home/ana/csv/ler1.php on line 3</pre>
+<p><strong>O que significa:</strong> desde o PHP 8.4, chamar <code>fgetcsv</code>, <code>fputcsv</code> ou <code>str_getcsv</code> sem dizer o caractere de escape gera este aviso (o programa continua). O mesmo vale para <code>str_getcsv</code>: <code>Deprecated: str_getcsv(): the $escape parameter must be provided as its default value will change</code>.</p>
+<p><strong>Como consertar:</strong> passe os quatro argumentos, <code>fgetcsv($f, null, ';', '"', '')</code>, ou use nomes: <code>fgetcsv($f, separator: ';', escape: '')</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Tudo numa coluna só (<code>array(1)</code>)</strong>
+<p><strong>O que significa:</strong> o separador informado não é o do arquivo (leu com <code>,</code> um CSV de <code>;</code>, ou o contrário).</p>
+<p><strong>Como consertar:</strong> olhe o arquivo com <code>cat</code> ou <code>head -3</code> e use o separador certo.</p>
+</div>
+
+<div class="cenario">
+<strong>Linha em branco vira <code>[null]</code></strong>
+<pre class="term">$ php vazia.php       « o arquivo tem uma linha vazia entre Ana e Bia
+…
+array(2) {
+  [0]=&gt;
+  string(3) "Ana"
+  [1]=&gt;
+  string(1) "9"
+}
+array(1) {
+  [0]=&gt;
+  NULL                « a linha vazia
+}
+array(2) {
+  [0]=&gt;
+  string(3) "Bia"
+…</pre>
+<p><strong>O que significa:</strong> para uma linha em branco, <code>fgetcsv</code> devolve um array com um único <code>null</code>. Se você fizer <code>array_combine</code> com ela, vem o erro do próximo cenário.</p>
+<p><strong>Como consertar:</strong> pule essas linhas no começo do laço: <code>if ($campos === [null]) { continue; }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"array_combine(): Argument #1 ($keys) and argument #2 ($values) must have the same number of elements"</strong>
+<pre class="term">$ php combine-erro.php     « cabeçalho com 3 colunas, linha com só 2 campos
+
+Fatal error: Uncaught ValueError: array_combine(): Argument #1 ($keys) and argument #2 ($values) must have the same number of elements in /home/ana/csv/combine-erro.php:4
+Stack trace:
+#0 /home/ana/csv/combine-erro.php(4): array_combine(Array, Array)
+#1 {main}
+  thrown in /home/ana/csv/combine-erro.php on line 4</pre>
+<p><strong>O que significa:</strong> uma linha do CSV tem mais ou menos campos que o cabeçalho (um campo faltando, um <code>;</code> a mais, uma linha vazia).</p>
+<p><strong>Como consertar:</strong> confira antes: <code>if (count($campos) !== count($cabecalho)) { echo "Linha com problema\n"; continue; }</code>. Para saber o número da linha problemática, conte as linhas no laço.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th></tr>
+<tr><td><code>fgetcsv($f, null, ';', '"', '')</code></td><td>Lê a próxima linha do arquivo e devolve os campos num array (<code>false</code> no fim; <code>[null]</code> numa linha vazia).</td></tr>
+<tr><td><code>fputcsv($f, $array, ';', '"', '')</code></td><td>Grava o array como uma linha CSV (põe aspas e dobra as aspas internas quando preciso). Devolve o número de bytes.</td></tr>
+<tr><td><code>str_getcsv($texto, ';', '"', '')</code></td><td>Quebra uma linha CSV que está numa string.</td></tr>
+<tr><td><code>array_combine($chaves, $valores)</code></td><td>Junta cabeçalho e campos num array associativo.</td></tr>
+<tr><td><code>str_replace(',', '.', $t)</code> + <code>(float)</code></td><td>Converte <code>'9,5'</code> em <code>9.5</code>.</td></tr>
+<tr><td><code>"\u{FEFF}"</code></td><td>O BOM do UTF-8, para o Excel reconhecer os acentos.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O separador brasileiro</h3>
+<p>Complete para ler um CSV exportado de uma planilha em português:</p>
+<div class="ex-code">$campos = fgetcsv($f, null, '<input data-answer=";" aria-label="separador" size="3">', '"', '');</div>
+</div>
+
+<div class="exercise">
+<h3>2. Cabeçalho como chaves</h3>
+<p>Complete para transformar a linha num array associativo:</p>
+<div class="ex-code">$aluno = <input data-answer="array_combine" aria-label="função">($cabecalho, $campos);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Gravar uma linha</h3>
+<p>Complete para gravar <code>$linha</code> no arquivo <code>$f</code>, separando com <code>;</code>:</p>
+<div class="ex-code"><input data-answer="fputcsv" aria-label="função">($f, $linha, ';', '"', '');</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Como o campo <code>Torta "da vó"</code> aparece no arquivo gravado por <code>fputcsv</code>?</p>
+<label><input type="radio" name="q4"> <code>Torta \"da vó\"</code></label>
+<label><input type="radio" name="q4"> <code>"Torta ""da vó"""</code></label>
+<label><input type="radio" name="q4"> <code>Torta 'da vó'</code></label>
+<label><input type="radio" name="q4"> <code>Torta da vó</code> (as aspas são removidas)</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Quanto vale <code>(float) '8,25'</code>?</p>
+<label><input type="radio" name="q5"> <code>8.25</code></label>
+<label><input type="radio" name="q5"> <code>825</code></label>
+<label><input type="radio" name="q5"> <code>8</code> (<code>float(8)</code>), sem aviso</label>
+<label><input type="radio" name="q5"> Um erro fatal</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que <code>explode(';', $linha)</code> não serve para ler CSV?</p>
+<label><input type="radio" name="q6"> Porque corta também nos <code>;</code> que estão dentro de aspas e não trata as aspas dobradas.</label>
+<label><input type="radio" name="q6"> Porque <code>explode</code> não aceita <code>;</code>.</label>
+<label><input type="radio" name="q6"> Porque é mais lento.</label>
+<label><input type="radio" name="q6"> Porque devolve uma string.</label>
+</div>
+
+<div class="tryphp" data-goal="out:nome;turma;nota,out:&quot;Ana Souza&quot;;3A;9\,5,out:&quot;Carla Dias&quot;;3B;8\,25,semerro">
+<p class="try-task"><strong>Missão final:</strong> leia o <code>alunos.csv</code> e grave um novo arquivo, <code>aprovados.csv</code>, com o mesmo cabeçalho e só os alunos com nota 7 ou mais (separador <code>;</code>). No fim, mostre o conteúdo de <code>aprovados.csv</code> com <code>file_get_contents</code> (os nomes vão aparecer entre aspas, porque têm espaço: é o <code>fputcsv</code> trabalhando). Nenhum <code>Deprecated</code> pode aparecer.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$entrada = fopen(__DIR__ . '/alunos.csv', 'r');
+$saida = fopen(__DIR__ . '/aprovados.csv', 'w');
+
+</pre>
+<pre class="script" data-file="alunos.csv">nome;turma;nota
+Ana Souza;3A;9,5
+Bruno Lima;3A;7
+Carla Dias;3B;8,25
+Diego "Didi" Alves;3B;6,5
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$entrada = fopen(__DIR__ . '/alunos.csv', 'r');
+$saida = fopen(__DIR__ . '/aprovados.csv', 'w');
+
+$cabecalho = fgetcsv($entrada, null, ';', '"', '');
+fputcsv($saida, $cabecalho, ';', '"', '');
+
+while (($campos = fgetcsv($entrada, null, ';', '"', '')) !== false) {
+    $aluno = array_combine($cabecalho, $campos);
+    $nota = (float) str_replace(',', '.', $aluno['nota']);
+    if ($nota &gt;= 7) {
+        fputcsv($saida, $campos, ';', '"', '');
+    }
+}
+fclose($entrada);
+fclose($saida);
+
+echo file_get_contents(__DIR__ . '/aprovados.csv');
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>CSV é uma planilha em texto: uma linha por registro, campos separados por <code>;</code> (Brasil) ou <code>,</code>, primeira linha com o cabeçalho.</li>
+  <li>Leia com <code>fgetcsv($f, null, ';', '"', '')</code> num <code>while (… !== false)</code>; grave com <code>fputcsv</code>; uma linha solta, com <code>str_getcsv</code>.</li>
+  <li>Passe sempre o <code>$escape</code> (<code>''</code>): sem ele, o PHP 8.4+ mostra <code>Deprecated</code>.</li>
+  <li><code>array_combine($cabecalho, $campos)</code> dá nomes às colunas.</li>
+  <li>Tudo vem como texto: troque a vírgula decimal por ponto antes de converter para número.</li>
+  <li>As funções de CSV cuidam das aspas (dobradas) e dos separadores dentro dos campos; <code>explode</code>, não.</li>
+  <li>Ao mostrar dados do CSV numa página, use <code>htmlspecialchars</code>.</li>
+</ul>
+
+<p>Próxima aula: <a href="json.html">JSON</a>, o formato de dados da web, que guarda listas e estruturas inteiras num arquivo.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
