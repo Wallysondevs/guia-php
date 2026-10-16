@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Traits — reaproveitar código entre classes sem herança | Guia PHP</title>
+<meta name="description" content="Traits no PHP explicados do zero: trait e use, reaproveitar métodos e propriedades em classes que não são parentes, vários traits na mesma classe, conflitos com insteadof e as, precedência, trait com interface e quando usar, com erros reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Traits</span></h1>
+
+<p class="intro">Na lojinha da Ana, o <strong>pedido</strong> e o <strong>produto</strong> precisam guardar um histórico ("criado", "pago", "preço alterado"). São coisas bem diferentes: um pedido não "é um tipo de" produto, nem o contrário, então <a href="heranca.html">herança</a> não serve. Copiar e colar os mesmos métodos nas duas classes funciona, mas qualquer correção precisa ser feita duas vezes. O <strong>trait</strong> (em inglês, "traço", "característica") é um pacote de métodos e propriedades que você <strong>encaixa</strong> em quantas classes quiser, com uma linha: <code>use</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um trait e como criar um com <code>trait</code>.</li>
+  <li>Como encaixar um trait numa classe com <code>use</code>.</li>
+  <li>Traits com propriedades, métodos abstratos e estáticos.</li>
+  <li>Vários traits na mesma classe e como resolver conflitos com <code>insteadof</code> e <code>as</code>.</li>
+  <li>Quem ganha quando a classe, o trait e a classe mãe têm o mesmo método.</li>
+  <li>Por que um trait não é um tipo, e como juntá-lo a uma interface.</li>
+  <li>Quando usar trait, herança ou outra solução.</li>
+</ul>
+</div>
+
+<p>Pré-requisitos: <a href="classes-objetos.html">classes e objetos</a>, <a href="heranca.html">herança</a>, <a href="abstratas.html">classes abstratas</a> e <a href="interfaces.html">interfaces</a>. Os exemplos rodam na máquina fictícia da Ana, na pasta <code>~/poo</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: o adesivo e a forma</h2>
+<p>Pense numa <strong>cartela de adesivos</strong>. O adesivo "à prova d'água" pode ser colado num celular, num relógio, numa mochila. Os três não têm nada em comum (não são "parentes"), mas todos ganham a mesma característica. O trait é esse adesivo: um conjunto de habilidades que você cola em classes diferentes.</p>
+<p>Compare com a herança: a herança é como a <strong>família</strong>. Uma classe só tem <strong>uma</strong> mãe no PHP (<code>extends</code> aceita uma classe só), e a filha "é um tipo" da mãe. O trait não cria parentesco nenhum: ele só <strong>copia</strong> código para dentro da classe.</p>
+
+<hr>
+
+<h2>1. O primeiro trait</h2>
+
+<pre class="file" data-file="historico.php">&lt;?php
+trait TemHistorico
+{
+    private array $historico = [];
+
+    public function registrar(string $mensagem): void
+    {
+        $this-&gt;historico[] = $mensagem;
+    }
+
+    public function historico(): array
+    {
+        return $this-&gt;historico;
+    }
+}
+
+class Pedido
+{
+    use TemHistorico;
+
+    public function __construct(public int $numero) {}
+}
+
+class Produto
+{
+    use TemHistorico;
+
+    public function __construct(public string $nome) {}
+}
+
+$pedido = new Pedido(1001);
+$pedido-&gt;registrar("Pedido criado");
+$pedido-&gt;registrar("Pagamento recebido");
+
+$caneca = new Produto("Caneca");
+$caneca-&gt;registrar("Preço alterado para R$ 25,90");
+
+print_r($pedido-&gt;historico());
+print_r($caneca-&gt;historico());
+</pre>
+
+<dl class="anatomy">
+  <dt>trait TemHistorico { … }</dt><dd>Cria o trait. Por dentro, parece uma classe: propriedades e métodos. Por costume, o nome descreve uma <strong>habilidade</strong> (<code>TemHistorico</code>, <code>PodeSerExportado</code>).</dd>
+  <dt>private array $historico = [];</dt><dd>Uma propriedade. Cada objeto que usa o trait ganha a <strong>sua própria</strong> lista.</dd>
+  <dt>$this-&gt;historico[] = $mensagem;</dt><dd>Dentro do trait, <code>$this</code> é o objeto da classe que usou o trait (o pedido, o produto).</dd>
+  <dt>use TemHistorico;</dt><dd>Dentro da classe, <code>use</code> "cola" o trait: é como se você tivesse escrito a propriedade e os dois métodos ali dentro.</dd>
+  <dt>$pedido-&gt;registrar(…)</dt><dd>Quem usa a classe nem sabe que o método veio de um trait.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/poo">$ php historico.php
+Array
+(
+    [0] =&gt; Pedido criado
+    [1] =&gt; Pagamento recebido
+)
+Array
+(
+    [0] =&gt; Preço alterado para R$ 25,90       « a lista do produto é separada
+)</pre>
+
+<div class="warning">
+<strong>Dois <code>use</code> diferentes</strong>
+<p>A palavra <code>use</code> aparece em dois lugares no PHP, com sentidos diferentes. <strong>Dentro</strong> de uma classe, <code>use TemHistorico;</code> cola um trait. <strong>No começo do arquivo</strong>, fora de classes, <code>use Loja\Produto;</code> importa um nome de outro namespace (veja <a href="namespaces.html">Namespaces</a>). E nas <a href="closures.html">funções anônimas</a>, <code>function () use ($x)</code> leva uma variável para dentro. Três usos, mesma palavra.</p>
+</div>
+
+<h3>Um trait não vive sozinho</h3>
+<p>O trait é um pedaço de código para ser colado; ele não é uma classe. Não dá para criar um objeto dele:</p>
+<pre class="file" data-file="new-trait.php">&lt;?php
+trait TemHistorico
+{
+    public function registrar(string $m): void {}
+}
+$t = new TemHistorico();
+</pre>
+<pre class="term" data-cwd="~/poo">$ php new-trait.php
+
+Fatal error: Uncaught Error: Cannot instantiate trait TemHistorico in /home/ana/poo/new-trait.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/new-trait.php on line 6</pre>
+<p>"Não é possível instanciar o trait". Sempre use o trait <strong>dentro</strong> de uma classe.</p>
+
+<div class="tryphp" data-goal="out:Caneca: 22.5,out:Frete: 18,src:use TemDesconto,semerro">
+<p class="try-task"><strong>Missão:</strong> o trait <code>TemDesconto</code> já está pronto, mas ninguém usa. Rode e veja o erro <code>Call to undefined method</code>. Depois cole o trait nas duas classes (<code>Produto</code> e <code>Servico</code>) com <code>use TemDesconto;</code>. A caneca de R$ 25 com 10% deve sair por <code>22.5</code> e o frete de R$ 20 por <code>18</code>.</p>
+<pre class="script">&lt;?php
+trait TemDesconto
+{
+    public function comDesconto(float $porcentagem): float
+    {
+        return $this-&gt;preco - $this-&gt;preco * $porcentagem / 100;
+    }
+}
+
+class Produto
+{
+    public function __construct(public string $nome, public float $preco) {}
+}
+
+class Servico
+{
+    public function __construct(public string $nome, public float $preco) {}
+}
+
+$caneca = new Produto("Caneca", 25);
+$frete = new Servico("Frete", 20);
+echo "$caneca-&gt;nome: ", $caneca-&gt;comDesconto(10), "\n";
+echo "$frete-&gt;nome: ", $frete-&gt;comDesconto(10), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+trait TemDesconto
+{
+    public function comDesconto(float $porcentagem): float
+    {
+        return $this-&gt;preco - $this-&gt;preco * $porcentagem / 100;
+    }
+}
+
+class Produto
+{
+    use TemDesconto;
+
+    public function __construct(public string $nome, public float $preco) {}
+}
+
+class Servico
+{
+    use TemDesconto;
+
+    public function __construct(public string $nome, public float $preco) {}
+}
+
+$caneca = new Produto("Caneca", 25);
+$frete = new Servico("Frete", 20);
+echo "$caneca-&gt;nome: ", $caneca-&gt;comDesconto(10), "\n";
+echo "$frete-&gt;nome: ", $frete-&gt;comDesconto(10), "\n";
+</pre>
+</div>
+
+<p>Repare que o trait usa <code>$this-&gt;preco</code>, mas não declara essa propriedade: ele <strong>conta</strong> que a classe terá uma. Funciona, mas é um combinado invisível. Logo abaixo você vai ver um jeito de deixar esse combinado explícito.</p>
+
+<hr>
+
+<h2>2. O que cabe num trait</h2>
+
+<h3>Métodos abstratos: o trait exige algo da classe</h3>
+<p>Um trait pode declarar um método <code>abstract</code> (veja <a href="abstratas.html">Classes Abstratas</a>): ele diz "quem me usar precisa ter este método". Assim o combinado deixa de ser invisível:</p>
+<pre class="file" data-file="abstrato.php">&lt;?php
+trait TemNome
+{
+    abstract public function nome(): string;
+
+    public function apresentar(): string
+    {
+        return "Eu sou " . $this-&gt;nome();
+    }
+}
+class Produto
+{
+    use TemNome;
+}
+</pre>
+<pre class="term" data-cwd="~/poo">$ php abstrato.php
+
+Fatal error: Class Produto contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Produto::nome) in /home/ana/poo/abstrato.php on line 11
+Stack trace:
+#0 {main}</pre>
+<p>"A classe Produto contém 1 método abstrato e precisa ser declarada abstrata ou implementar o método que falta (<code>Produto::nome</code>)". O PHP conferiu o combinado. Basta a classe ter <code>public function nome(): string { return $this-&gt;nome; }</code>.</p>
+
+<h3>Métodos e propriedades estáticos, constantes</h3>
+<p>Um trait pode ter membros <a href="static.html">static</a> e, desde o PHP 8.2, constantes. Detalhe importante: <strong>cada classe que usa o trait ganha a sua cópia</strong> da propriedade estática.</p>
+<pre class="file" data-file="contavel.php">&lt;?php
+trait Contavel
+{
+    private static int $criados = 0;
+    public const VERSAO = 2;
+
+    public static function criados(): int
+    {
+        return self::$criados;
+    }
+
+    public function contar(): void
+    {
+        self::$criados++;
+    }
+}
+class Pedido { use Contavel; }
+class Produto { use Contavel; }
+$a = new Pedido(); $a-&gt;contar();
+$b = new Pedido(); $b-&gt;contar();
+$c = new Produto(); $c-&gt;contar();
+echo Pedido::criados(), " ", Produto::criados(), " ", Pedido::VERSAO, "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php contavel.php
+2 1 2          « Pedido contou 2, Produto contou 1: contadores separados</pre>
+<p>Isso confirma a ideia do "copiar e colar": é como se cada classe tivesse escrito a sua própria <code>$criados</code>.</p>
+
+<h3><code>self</code> e <code>static</code> dentro do trait</h3>
+<p>Dentro de um trait, <code>self</code> e <code>__CLASS__</code> são a classe que usou o trait, não o trait. Para saber o nome do trait, use <code>__TRAIT__</code>:</p>
+<pre class="file" data-file="quem.php">&lt;?php
+trait Saudacao
+{
+    public function ola(): string
+    {
+        return "Olá do trait, eu sou " . self::class . " / " . static::class . " / " . __CLASS__ . " / " . __TRAIT__;
+    }
+}
+class Loja { use Saudacao; }
+class Filial extends Loja {}
+echo (new Loja())-&gt;ola(), "\n";
+echo (new Filial())-&gt;ola(), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php quem.php
+Olá do trait, eu sou Loja / Loja / Loja / Saudacao
+Olá do trait, eu sou Loja / Filial / Loja / Saudacao     « static:: é a classe do objeto</pre>
+
+<hr>
+
+<h2>3. Vários traits e conflitos</h2>
+<p>Uma classe pode usar quantos traits quiser, separados por vírgula: <code>use TemHistorico, TemDesconto;</code>. O problema aparece quando <strong>dois traits têm um método com o mesmo nome</strong>. O relatório da Ana sabe exportar em CSV e em JSON, e os dois traits chamam o método de <code>exportar()</code>:</p>
+
+<pre class="file" data-file="conflito.php">&lt;?php
+trait ExportaCsv
+{
+    public function exportar(): string
+    {
+        return "nome;preco";
+    }
+}
+
+trait ExportaJson
+{
+    public function exportar(): string
+    {
+        return '{"nome":"","preco":0}';
+    }
+}
+
+class Relatorio
+{
+    use ExportaCsv, ExportaJson;
+}
+
+echo (new Relatorio())-&gt;exportar(), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php conflito.php
+
+Fatal error: Trait method ExportaJson::exportar has not been applied as Relatorio::exportar, because of collision with ExportaCsv::exportar in /home/ana/poo/conflito.php on line 18
+Stack trace:
+#0 {main}</pre>
+
+<p>"O método <code>ExportaJson::exportar</code> não foi aplicado como <code>Relatorio::exportar</code> por causa de uma colisão com <code>ExportaCsv::exportar</code>". O PHP não escolhe sozinho: ele para e pede que <strong>você</strong> decida. Repare que o erro acontece antes de qualquer linha rodar (aponta a linha 18, a da classe).</p>
+
+<h3>Resolver com <code>insteadof</code> e <code>as</code></h3>
+<p>A decisão vai num bloco <code>{ }</code> depois do <code>use</code>:</p>
+
+<pre class="file" data-file="resolvido.php">&lt;?php
+trait ExportaCsv
+{
+    public function exportar(): string
+    {
+        return "nome;preco";
+    }
+}
+
+trait ExportaJson
+{
+    public function exportar(): string
+    {
+        return '{"nome":"","preco":0}';
+    }
+}
+
+class Relatorio
+{
+    use ExportaCsv, ExportaJson {
+        ExportaCsv::exportar insteadof ExportaJson;
+        ExportaJson::exportar as exportarJson;
+    }
+}
+
+$r = new Relatorio();
+echo $r-&gt;exportar(), "\n";
+echo $r-&gt;exportarJson(), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>use ExportaCsv, ExportaJson { … }</dt><dd>Usa os dois traits e abre um bloco de regras.</dd>
+  <dt>ExportaCsv::exportar insteadof ExportaJson;</dt><dd><code>insteadof</code> = "em vez de". "Para <code>exportar</code>, use o do <code>ExportaCsv</code> em vez do <code>ExportaJson</code>." Isso resolve a colisão.</dd>
+  <dt>ExportaJson::exportar as exportarJson;</dt><dd><code>as</code> = "como". "Traga também o <code>exportar</code> do <code>ExportaJson</code>, com o nome <code>exportarJson</code>." É um <strong>apelido</strong>: assim a versão JSON não se perde.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/poo">$ php resolvido.php
+nome;preco                 « exportar(): o do ExportaCsv
+{"nome":"","preco":0}      « exportarJson(): o do ExportaJson, pelo apelido</pre>
+
+<div class="tip">
+<strong><code>as</code> sozinho não resolve conflito</strong>
+<p>O <code>as</code> <strong>acrescenta</strong> um nome novo, mas o nome antigo continua existindo e continua em conflito. Por isso o par é sempre: <code>insteadof</code> para escolher quem fica com o nome, e <code>as</code> para dar outro nome ao que perdeu.</p>
+</div>
+
+<h3><code>as</code> para mudar a visibilidade</h3>
+<p>O <code>as</code> também muda a <a href="visibilidade.html">visibilidade</a> de um método do trait, só nesta classe. Pode até mudar a visibilidade e dar um apelido de uma vez:</p>
+<pre class="file" data-file="visibilidade-trait.php">&lt;?php
+trait TemHistorico
+{
+    public function registrar(string $m): void
+    {
+        echo "registrado: $m\n";
+    }
+}
+class Pedido
+{
+    use TemHistorico {
+        registrar as protected;
+        registrar as public anotar;
+    }
+}
+$p = new Pedido();
+$p-&gt;anotar("ok");
+$p-&gt;registrar("x");
+</pre>
+<pre class="term" data-cwd="~/poo">$ php visibilidade-trait.php
+registrado: ok
+
+Fatal error: Uncaught Error: Call to protected method Pedido::registrar() from global scope in /home/ana/poo/visibilidade-trait.php:18
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/visibilidade-trait.php on line 18</pre>
+<p><code>registrar as protected;</code> deixou o <code>registrar</code> protegido nesta classe; <code>registrar as public anotar;</code> criou o apelido público <code>anotar</code>. Chamar <code>registrar</code> de fora agora é recusado.</p>
+
+<hr>
+
+<h2>4. Quem ganha: classe, trait ou classe mãe?</h2>
+<p>Se o mesmo método existe em mais de um lugar, a regra de precedência é:</p>
+<ol class="passo">
+  <li><strong>A própria classe</strong> ganha de tudo.</li>
+  <li>Depois, o <strong>trait</strong>.</li>
+  <li>Por último, o que veio da <strong>classe mãe</strong> (herança). O trait substitui o método herdado.</li>
+</ol>
+
+<pre class="file" data-file="precedencia.php">&lt;?php
+class Base
+{
+    public function quemSou(): string
+    {
+        return "Base";
+    }
+}
+
+trait Falante
+{
+    public function quemSou(): string
+    {
+        return "Trait (antes era " . parent::quemSou() . ")";
+    }
+
+    public function oi(): string
+    {
+        return "oi do trait";
+    }
+}
+
+class Filha extends Base
+{
+    use Falante;
+
+    public function oi(): string
+    {
+        return "oi da classe";
+    }
+}
+
+$f = new Filha();
+echo $f-&gt;quemSou(), "\n";
+echo $f-&gt;oi(), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php precedencia.php
+Trait (antes era Base)     « o trait substituiu o método da mãe (e ainda chamou o dela com parent::)
+oi da classe               « o método da própria classe ganhou do trait</pre>
+
+<p>Isso é útil: a classe pode usar um trait e <strong>trocar</strong> só um dos métodos dele, escrevendo a sua versão.</p>
+
+<hr>
+
+<h2>5. Trait não é tipo: junte com uma interface</h2>
+<p>Como o trait só copia código, o objeto não "é" do trait. O <code>instanceof</code> responde <code>false</code> e um parâmetro com o tipo do trait recusa o objeto:</p>
+<pre class="file" data-file="tipo.php">&lt;?php
+trait TemHistorico
+{
+    public function registrar(string $m): void {}
+}
+class Pedido { use TemHistorico; }
+function salvar(TemHistorico $obj): void {}
+var_dump(new Pedido() instanceof TemHistorico);
+var_dump(class_uses(new Pedido()));
+salvar(new Pedido());
+</pre>
+<pre class="term" data-cwd="~/poo">$ php tipo.php
+bool(false)                « o Pedido não "é" um TemHistorico
+array(1) {
+  ["TemHistorico"]=&gt;
+  string(12) "TemHistorico"     « class_uses lista os traits usados
+}
+
+Fatal error: Uncaught TypeError: salvar(): Argument #1 ($obj) must be of type TemHistorico, Pedido given, called in /home/ana/poo/tipo.php on line 10 and defined in /home/ana/poo/tipo.php:7
+Stack trace:
+#0 /home/ana/poo/tipo.php(10): salvar(Object(Pedido))
+#1 {main}
+  thrown in /home/ana/poo/tipo.php on line 7</pre>
+
+<p>A solução clássica é a dupla <strong>interface + trait</strong>: a <a href="interfaces.html">interface</a> é o <strong>tipo</strong> ("todo Registravel tem estes métodos"), e o trait é uma <strong>implementação pronta</strong> desses métodos, para não reescrevê-los em cada classe.</p>
+
+<pre class="file" data-file="interface-trait.php">&lt;?php
+interface Registravel
+{
+    public function registrar(string $mensagem): void;
+    public function historico(): array;
+}
+
+trait TemHistorico
+{
+    private array $historico = [];
+
+    public function registrar(string $mensagem): void
+    {
+        $this-&gt;historico[] = $mensagem;
+    }
+
+    public function historico(): array
+    {
+        return $this-&gt;historico;
+    }
+}
+
+class Pedido implements Registravel
+{
+    use TemHistorico;
+}
+
+function mostrar(Registravel $coisa): void
+{
+    echo implode(" &gt; ", $coisa-&gt;historico()), "\n";
+}
+
+$p = new Pedido();
+$p-&gt;registrar("criado");
+$p-&gt;registrar("pago");
+mostrar($p);
+</pre>
+<pre class="term" data-cwd="~/poo">$ php interface-trait.php
+criado &gt; pago</pre>
+<p>O <code>Pedido</code> diz que <strong>é</strong> <code>Registravel</code> (<code>implements</code>) e cumpre a promessa com o trait (<code>use</code>). A função <code>mostrar</code> pede o tipo da interface, nunca o do trait.</p>
+
+<hr>
+
+<h2>Quando usar trait (e quando não)</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Melhor escolha</th></tr>
+<tr><td>A classe "é um tipo de" outra (<code>Gerente</code> é um <code>Funcionario</code>)</td><td><a href="heranca.html">Herança</a> (<code>extends</code>)</td></tr>
+<tr><td>Várias classes devem prometer os mesmos métodos, cada uma do seu jeito</td><td><a href="interfaces.html">Interface</a></td></tr>
+<tr><td>Classes sem parentesco precisam do <strong>mesmo código</strong> (histórico, desconto, data de criação)</td><td><strong>Trait</strong> (de preferência junto com uma interface)</td></tr>
+<tr><td>Uma classe precisa de um "ajudante" com estado e lógica próprios (enviar e-mail, gravar no banco)</td><td>Outro objeto passado no construtor (composição)</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Cuidado com o excesso</strong>
+<p>Traits são ótimos para pequenos pacotes de comportamento. Uma classe com cinco traits, cada um mexendo em propriedades que "contam" com as dos outros, vira um quebra-cabeça: para entender a classe, você precisa abrir seis arquivos. Se um trait começa a precisar de muita coisa da classe, provavelmente ele deveria ser um objeto separado.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Trait não encontrado</strong>
+<pre class="file" data-file="sem-trait.php">&lt;?php
+class Pedido
+{
+    use TemHistorico;
+}
+</pre>
+<pre class="term" data-cwd="~/poo">$ php sem-trait.php
+
+Fatal error: Uncaught Error: Trait "TemHistorico" not found in /home/ana/poo/sem-trait.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/sem-trait.php on line 2</pre>
+<p><strong>O que significa:</strong> "o trait <code>TemHistorico</code> não foi encontrado". O nome está errado ou o arquivo do trait não foi carregado.</p>
+<p><strong>Como consertar:</strong> confira o nome (maiúsculas contam para a leitura humana, mesmo que o PHP aceite diferenças) e carregue o arquivo com <a href="include-require.html">require</a> ou com <a href="autoload.html">autoload</a>. Traits são carregados pelo autoload do mesmo jeito que classes.</p>
+</div>
+
+<div class="cenario">
+<strong>A mesma propriedade, com valores diferentes</strong>
+<pre class="file" data-file="propriedade.php">&lt;?php
+trait Contador
+{
+    public int $total = 0;
+}
+class Carrinho
+{
+    use Contador;
+    public int $total = 10;
+}
+</pre>
+<pre class="term" data-cwd="~/poo">$ php propriedade.php
+
+Fatal error: Carrinho and Contador define the same property ($total) in the composition of Carrinho. However, the definition differs and is considered incompatible. Class was composed in /home/ana/poo/propriedade.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "Carrinho e Contador definem a mesma propriedade (<code>$total</code>)… a definição é diferente e incompatível". Para métodos, a classe pode substituir o do trait; para propriedades, não: o PHP só aceita se forem <strong>idênticas</strong> (mesma visibilidade, tipo e valor inicial).</p>
+<p><strong>Como consertar:</strong> declare a propriedade num lugar só (no trait <strong>ou</strong> na classe) ou use outro nome.</p>
+</div>
+
+<div class="cenario">
+<strong>Colisão de métodos</strong>
+<p>Dois traits com o mesmo método na mesma classe dão <code>Trait method … has not been applied as …, because of collision with …</code>, como você viu na seção 3. Resolva com <code>insteadof</code> (quem fica com o nome) e, se quiser manter os dois, <code>as</code> (apelido para o outro).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>trait Nome { … }</code></td><td>Declara um trait (propriedades, métodos, abstratos, estáticos, constantes)</td></tr>
+<tr><td><code>use Nome;</code> (dentro da classe)</td><td>Cola o trait na classe</td></tr>
+<tr><td><code>use A, B;</code></td><td>Usa vários traits</td></tr>
+<tr><td><code>A::m insteadof B;</code></td><td>Em caso de conflito, o <code>m</code> de <code>A</code> fica com o nome</td></tr>
+<tr><td><code>B::m as outroNome;</code></td><td>Apelido para um método do trait</td></tr>
+<tr><td><code>m as protected;</code></td><td>Muda a visibilidade nesta classe</td></tr>
+<tr><td><code>m as private apelido;</code></td><td>Apelido com outra visibilidade</td></tr>
+<tr><td><code>abstract public function x();</code> no trait</td><td>Exige que a classe tenha <code>x()</code></td></tr>
+<tr><td><code>class_uses($obj)</code></td><td>Lista os traits usados pela classe do objeto</td></tr>
+<tr><td><code>__TRAIT__</code></td><td>Nome do trait (dentro dele)</td></tr>
+<tr><td>Precedência</td><td>classe &gt; trait &gt; classe mãe</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Bom dia\, senhora Ana.,out:E aí\, Ana!,src:insteadof,src:as cumprimentarAmigo,semerro">
+<p class="try-task"><strong>Missão:</strong> a atendente da lojinha sabe cumprimentar de dois jeitos, mas os dois traits usam o mesmo nome de método, e o PHP reclama da colisão. Resolva: o <code>cumprimentar</code> deve ser o do <code>Formal</code> (<code>insteadof</code>), e o do <code>Informal</code> deve continuar disponível com o nome <code>cumprimentarAmigo</code> (<code>as</code>).</p>
+<pre class="script">&lt;?php
+trait Formal
+{
+    public function cumprimentar(string $nome): string
+    {
+        return "Bom dia, senhora $nome.";
+    }
+}
+
+trait Informal
+{
+    public function cumprimentar(string $nome): string
+    {
+        return "E aí, $nome!";
+    }
+}
+
+class Atendente
+{
+    use Formal, Informal;
+}
+
+$at = new Atendente();
+echo $at-&gt;cumprimentar("Ana"), "\n";
+echo $at-&gt;cumprimentarAmigo("Ana"), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+trait Formal
+{
+    public function cumprimentar(string $nome): string
+    {
+        return "Bom dia, senhora $nome.";
+    }
+}
+
+trait Informal
+{
+    public function cumprimentar(string $nome): string
+    {
+        return "E aí, $nome!";
+    }
+}
+
+class Atendente
+{
+    use Formal, Informal {
+        Formal::cumprimentar insteadof Informal;
+        Informal::cumprimentar as cumprimentarAmigo;
+    }
+}
+
+$at = new Atendente();
+echo $at-&gt;cumprimentar("Ana"), "\n";
+echo $at-&gt;cumprimentarAmigo("Ana"), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Colar o trait</h3>
+<p>Complete a linha, dentro da classe <code>Cliente</code>, que usa o trait <code>TemHistorico</code>:</p>
+<div class="ex-code"><input data-answer="use TemHistorico;|use TemHistorico" aria-label="linha"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Escolher no conflito</h3>
+<p>Os traits <code>A</code> e <code>B</code> têm o método <code>salvar()</code>. Complete para que fique o de <code>A</code>:</p>
+<div class="ex-code">A::salvar <input data-answer="insteadof" aria-label="palavra-chave"> B;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Apelido</h3>
+<p>Complete para que o <code>salvar()</code> do trait <code>B</code> continue disponível como <code>salvarCopia()</code>:</p>
+<div class="ex-code">B::salvar <input data-answer="as" aria-label="palavra-chave"> salvarCopia;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A classe <code>Filha</code> herda <code>oi()</code> da mãe, usa um trait que tem <code>oi()</code> e também escreve o seu próprio <code>oi()</code>. Qual roda em <code>$filha-&gt;oi()</code>?</p>
+<label><input type="radio" name="q4"> O da classe mãe.</label>
+<label><input type="radio" name="q4"> O do trait.</label>
+<label><input type="radio" name="q4"> O da própria classe <code>Filha</code>.</label>
+<label><input type="radio" name="q4"> Nenhum: dá erro de colisão.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. A classe <code>Pedido</code> usa o trait <code>TemHistorico</code>. O que <code>$pedido instanceof TemHistorico</code> devolve?</p>
+<label><input type="radio" name="q5"> <code>true</code></label>
+<label><input type="radio" name="q5"> <code>false</code></label>
+<label><input type="radio" name="q5"> Erro: traits não podem ser usados com <code>instanceof</code>.</label>
+<label><input type="radio" name="q5"> <code>null</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual é a principal diferença entre usar um trait e usar herança?</p>
+<label><input type="radio" name="q6"> Trait é mais rápido.</label>
+<label><input type="radio" name="q6"> Herança não permite métodos com corpo.</label>
+<label><input type="radio" name="q6"> Trait só aceita métodos estáticos.</label>
+<label><input type="radio" name="q6"> Trait copia código para classes sem criar parentesco, e uma classe pode usar vários; herança cria um tipo "pai" e só permite uma mãe.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Duas classes (<code>Pedido</code> e <code>Produto</code>) usam um trait com <code>private static int $criados</code>. Depois de criar 2 pedidos e 1 produto, contando cada um, quanto vale <code>Pedido::criados()</code>?</p>
+<label><input type="radio" name="q7"> 2, porque cada classe tem a sua cópia da propriedade estática.</label>
+<label><input type="radio" name="q7"> 3, porque a propriedade é do trait e é compartilhada.</label>
+<label><input type="radio" name="q7"> 1</label>
+<label><input type="radio" name="q7"> 0, porque propriedades estáticas não funcionam em traits.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>trait</strong> é um pacote de propriedades e métodos que você cola em classes com <code>use Nome;</code>, como se tivesse escrito o código ali.</li>
+  <li>Serve para reaproveitar código entre classes <strong>sem parentesco</strong>. Uma classe pode usar vários traits (a herança só permite uma mãe).</li>
+  <li>Trait não vira objeto (<code>Cannot instantiate trait</code>) nem tipo (<code>instanceof</code> dá <code>false</code>); junte-o a uma <strong>interface</strong> para ter um tipo.</li>
+  <li>Pode ter métodos abstratos (o trait exige algo da classe), estáticos e constantes; cada classe ganha a sua cópia das propriedades estáticas.</li>
+  <li>Dois traits com o mesmo método: <code>insteadof</code> escolhe quem fica com o nome, <code>as</code> dá apelido (e pode mudar a visibilidade).</li>
+  <li>Precedência: a classe ganha do trait, que ganha da classe mãe.</li>
+  <li>Use com moderação: muitos traits interdependentes deixam a classe difícil de entender.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
