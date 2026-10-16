@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções Anônimas e Arrow Functions — function () use e fn() =&gt; | Guia PHP</title>
+<meta name="description" content="Funções anônimas (closures) e arrow functions em PHP: guardar uma função numa variável, use ($x) e use (&amp;$x), fn($x) =&gt; $x * 2 com captura automática, passar funções para array_map e array_filter, o tipo callable e os erros reais (Undefined variable, Object of class Closure could not be converted to string).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções Anônimas e Arrow Functions</span></h1>
+
+<p class="intro">Até aqui, toda função tinha um nome: <code>function soma(…)</code>. Em PHP você também pode criar uma função <strong>sem nome</strong> e guardá-la numa variável, como se fosse um número ou um texto. Isso parece estranho até você ver para que serve: entregar um "pedaço de comportamento" para outra função usar, como "dobre cada preço" ou "fique só com as notas acima de 7".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma <strong>função anônima</strong> (<em>closure</em>) e como guardá-la numa variável e chamá-la.</li>
+  <li>Por que ela não enxerga as variáveis de fora, e como trazê-las com <code>use ($x)</code> e <code>use (&amp;$x)</code>.</li>
+  <li>As <strong>arrow functions</strong> <code>fn($x) =&gt; $x * 2</code>, curtas e com captura automática.</li>
+  <li>Como passar funções como argumento para <code>array_map</code> e <code>array_filter</code>, e como receber uma função com o tipo <code>callable</code>.</li>
+  <li>Os erros mais comuns, com as mensagens reais do PHP.</li>
+</ul>
+</div>
+
+<p>Esta aula usa <a href="funcoes.html">funções</a>, <a href="arrays.html">arrays</a> e o que você viu em <a href="escopo.html">Escopo</a> (uma função não enxerga as variáveis de fora). Os exemplos rodam na máquina da Ana, na pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: o bilhete com instruções</h2>
+<p>A Ana vai viajar e deixa a lojinha com o Bruno. Ela não sabe ainda <strong>quais</strong> produtos vão chegar, mas sabe <strong>o que fazer</strong> com cada um: "cole uma etiqueta com o preço em dobro". Ela escreve essa instrução num bilhete e entrega ao Bruno. O Bruno não precisa saber de onde veio a regra: ele pega cada produto e aplica o que está no bilhete.</p>
+<p>Uma função anônima é esse bilhete: um conjunto de instruções que você <strong>guarda</strong> e <strong>entrega</strong> para outra parte do programa executar quando precisar. O PHP tem funções prontas (como <code>array_map</code>, o "Bruno") que recebem esse bilhete e o aplicam a cada item de um array.</p>
+
+<hr>
+
+<h2>Função anônima: uma função guardada numa variável</h2>
+
+<pre class="file" data-file="anonima.php">&lt;?php
+$dobro = function ($x) {
+    return $x * 2;
+};
+
+echo $dobro(5), "\n";
+echo $dobro(21), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>$dobro =</dt><dd>Uma variável comum, que vai guardar a função.</dd>
+  <dt>function ($x)</dt><dd>A palavra <code>function</code> <strong>sem nome</strong> logo depois: por isso "anônima". O resto é igual a uma função normal: parâmetros entre parênteses…</dd>
+  <dt>{ return $x * 2; }</dt><dd>…e o corpo entre chaves.</dd>
+  <dt>;</dt><dd>O ponto e vírgula depois da <code>}</code> é <strong>obrigatório</strong>. A linha inteira é uma atribuição (<code>$dobro = …;</code>), e toda atribuição termina com <code>;</code>. Numa função com nome, não há <code>;</code> depois da chave.</dd>
+  <dt>$dobro(5)</dt><dd>Para chamar, use a variável seguida de parênteses com os argumentos.</dd>
+</dl>
+
+<pre class="term">$ php anonima.php
+10
+42</pre>
+
+<p>O que tem dentro de <code>$dobro</code>? Um <strong>objeto</strong> da classe <code>Closure</code> (você vai ver objetos e classes no Nível 3). O <a href="var-dump.html">var_dump</a> mostra:</p>
+
+<pre class="term">$ php -r '$dobro = function ($x) { return $x * 2; }; var_dump($dobro);'
+object(Closure)#1 (4) {
+  ["name"]=&gt;
+  string(29) "{closure:Command line code:1}"
+  ["file"]=&gt;
+  string(17) "Command line code"
+  ["line"]=&gt;
+  int(1)
+  ["parameter"]=&gt;
+  array(1) {
+    ["$x"]=&gt;
+    string(10) "&lt;required&gt;"
+  }
+}</pre>
+
+<p>Por isso as funções anônimas também são chamadas de <strong>closures</strong> (o nome da classe; em inglês, <em>closure</em> é "fechamento", porque a função pode "fechar" variáveis de fora dentro dela, como você vai ver no <code>use</code>). O nome que o PHP inventa para ela, <code>{closure:arquivo:linha}</code>, aparece nas mensagens de erro <span class="versao">PHP 8.4+</span>; nas versões antigas aparecia só <code>{closure}</code>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e depois crie uma função anônima <code>$triplo</code> logo abaixo da <code>$dobro</code> e mostre <code>$triplo(7)</code>. Tente também <code>echo $dobro($dobro(3));</code> (a função usada duas vezes).</p>
+<pre class="script">&lt;?php
+$dobro = function ($x) {
+    return $x * 2;
+};
+
+echo $dobro(5), "\n";
+echo $dobro(21), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Passar uma função para outra: <code>array_map</code></h2>
+<p>Guardar uma função numa variável só fica útil quando você a <strong>entrega</strong> a alguém. O exemplo mais comum é <code>array_map</code> ("mapear o array"): ele recebe uma função e um array, chama a função para <strong>cada elemento</strong> e devolve um array novo com os resultados.</p>
+
+<pre class="file" data-file="map.php">&lt;?php
+$precos = [10, 25, 4.5];
+
+$dobrados = array_map(function ($p) {
+    return $p * 2;
+}, $precos);
+
+print_r($dobrados);
+</pre>
+
+<dl class="anatomy">
+  <dt>array_map(</dt><dd>A função pronta do PHP. O primeiro argumento é a função a aplicar; o segundo, o array.</dd>
+  <dt>function ($p) { return $p * 2; }</dt><dd>A função anônima, escrita <strong>direto no lugar do argumento</strong>, sem guardar numa variável. O <code>array_map</code> vai chamá-la três vezes: com 10, com 25 e com 4.5.</dd>
+  <dt>, $precos)</dt><dd>O array original. Ele <strong>não muda</strong>: o resultado vem num array novo, guardado em <code>$dobrados</code>.</dd>
+</dl>
+
+<pre class="term">$ php map.php
+Array
+(
+    [0] =&gt; 20
+    [1] =&gt; 50
+    [2] =&gt; 9
+)</pre>
+
+<p>O mesmo resultado com um <a href="foreach.html">foreach</a> exigiria criar o array vazio, percorrer e acrescentar. Com <code>array_map</code>, você diz só <strong>o que</strong> fazer com cada item. Funções de array que recebem outras funções aparecem muito: <code>array_map</code> (transformar), <code>array_filter</code> (filtrar, mais abaixo), <code>usort</code> (ordenar com uma regra sua, veja <a href="ordenar-arrays.html">Ordenar Arrays</a>).</p>
+
+<div class="tip">
+<strong>Funções com nome também podem ser entregues</strong>
+<p>No lugar da função anônima, você pode passar o <strong>nome</strong> de uma função existente, entre aspas: <code>array_map('ucfirst', ["ana", "bruno"])</code> devolve <code>["Ana", "Bruno"]</code>. Tudo o que pode ser chamado assim (uma closure, o nome de uma função…) se chama <strong>callable</strong> ("chamável"). A forma moderna de fazer isso, <code>ucfirst(...)</code>, está em <a href="callables.html">Callables de Primeira Classe</a>.</p>
+</div>
+
+<hr>
+
+<h2>A closure não enxerga as variáveis de fora</h2>
+<p>A Ana quer acrescentar uma taxa de 10% em cada preço. A taxa está numa variável, fora da função:</p>
+
+<pre class="file" data-file="semuse.php">&lt;?php
+$taxa = 0.1;
+
+$comTaxa = function ($preco) {
+    return $preco + $preco * $taxa;
+};
+
+echo $comTaxa(50), "\n";
+</pre>
+
+<pre class="term">$ php semuse.php
+
+Warning: Undefined variable $taxa in /home/ana/site/semuse.php on line 5
+50                      « a taxa valeu null, e 50 + 50 × null = 50</pre>
+
+<p>"Variável indefinida $taxa". Como qualquer função (veja <a href="escopo.html">Escopo</a>), a closure tem o seu próprio "mundo" de variáveis: o <code>$taxa</code> lá de fora não existe aqui dentro. O PHP avisa, usa <code>null</code> no lugar e o programa continua com o resultado errado.</p>
+
+<h3><code>use ($taxa)</code>: levar uma cópia para dentro</h3>
+<p>A palavra <code>use</code> ("usar"), escrita depois dos parâmetros, diz quais variáveis de fora a closure deve <strong>levar junto</strong>:</p>
+
+<pre class="file" data-file="use.php">&lt;?php
+$taxa = 0.1;
+
+$comTaxa = function ($preco) use ($taxa) {
+    return $preco + $preco * $taxa;
+};
+
+echo $comTaxa(50), "\n";
+
+$taxa = 0.5;
+echo $comTaxa(50), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>function ($preco)</dt><dd>O parâmetro: o valor que muda a cada chamada.</dd>
+  <dt>use ($taxa)</dt><dd>A variável de fora que a closure leva. Várias, separadas por vírgula: <code>use ($taxa, $frete)</code>.</dd>
+</dl>
+
+<pre class="term">$ php use.php
+55
+55              « mudar $taxa para 0.5 depois NÃO mudou a closure</pre>
+
+<p>Repare na segunda linha. O <code>use</code> copia o <strong>valor</strong> da variável <strong>no momento em que a closure é criada</strong> (a linha 4), como tirar uma foto. Mudar <code>$taxa</code> depois não altera a foto que a closure guardou.</p>
+
+<div class="tryphp" data-goal="out:40\, 24\, 10,semerro,src:use\s*\(\s*\$desconto">
+<p class="try-task"><strong>Missão:</strong> a função anônima usa <code>$desconto</code>, mas não o enxerga: rode e veja os três avisos (um por preço). Acrescente o <code>use</code> certo para a saída ser <code>40, 24, 10</code>, sem avisos.</p>
+<pre class="script">&lt;?php
+$desconto = 0.2;
+$precos = [50, 30, 12.5];
+
+$comDesconto = array_map(function ($p) {
+    return $p - $p * $desconto;
+}, $precos);
+
+echo implode(", ", $comDesconto), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$desconto = 0.2;
+$precos = [50, 30, 12.5];
+
+$comDesconto = array_map(function ($p) use ($desconto) {
+    return $p - $p * $desconto;
+}, $precos);
+
+echo implode(", ", $comDesconto), "\n";
+</pre>
+</div>
+
+<p>Sem o <code>use</code>, o PHP real mostra o aviso três vezes, porque a função foi chamada uma vez para cada preço:</p>
+
+<pre class="term">$ php desconto.php
+
+Warning: Undefined variable $desconto in /home/ana/site/desconto.php on line 6
+
+Warning: Undefined variable $desconto in /home/ana/site/desconto.php on line 6
+
+Warning: Undefined variable $desconto in /home/ana/site/desconto.php on line 6
+50, 30, 12.5</pre>
+
+<h3><code>use (&amp;$total)</code>: mexer na variável de fora</h3>
+<p>Como o <code>use</code> leva uma cópia, mudar a variável <strong>dentro</strong> da closure também não afeta a de fora. Quando você precisa disso (um contador, um total acumulado), coloque <code>&amp;</code> antes do nome: a closure passa a usar <strong>a própria variável</strong>, e não uma cópia. Isso se chama passagem <strong>por referência</strong>.</p>
+
+<pre class="file" data-file="useref.php">&lt;?php
+$total = 0;
+
+$somar = function ($valor) use ($total) {
+    $total += $valor;
+};
+$somar(10);
+$somar(5);
+echo "Sem &amp;: $total\n";
+
+$somarDeVerdade = function ($valor) use (&amp;$total) {
+    $total += $valor;
+};
+$somarDeVerdade(10);
+$somarDeVerdade(5);
+echo "Com &amp;: $total\n";
+</pre>
+
+<pre class="term">$ php useref.php
+Sem &amp;: 0         « cada chamada somou na sua cópia, que foi jogada fora
+Com &amp;: 15        « a closure mexeu no $total de verdade</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que a closure recebe</th><th>Mudanças de fora, depois de criada</th><th>Mudanças de dentro</th></tr>
+<tr><td><code>use ($x)</code></td><td>Uma cópia do valor (a "foto")</td><td>Não aparecem dentro</td><td>Não saem para fora</td></tr>
+<tr><td><code>use (&amp;$x)</code></td><td>A própria variável</td><td>Aparecem dentro</td><td>Saem para fora</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Use o <code>&amp;</code> com moderação</strong>
+<p>Uma closure que muda variáveis de fora é mais difícil de entender: quem lê o código precisa procurar onde ela é chamada para saber o valor final. Quando der, prefira que a função <strong>devolva</strong> um valor com <code>return</code> e você mesmo o guarde. O mesmo conselho vale para o <code>global</code>, que você viu em <a href="escopo.html">Escopo</a>.</p>
+</div>
+
+<hr>
+
+<h2>Arrow functions: <code>fn($x) =&gt; …</code></h2>
+<p>Funções anônimas pequenas, de uma linha só, são tão comuns que o PHP 7.4 criou uma forma curta: a <strong>arrow function</strong> ("função seta", por causa do <code>=&gt;</code>).</p>
+
+<pre class="file" data-file="arrow.php">&lt;?php
+$dobro = fn($x) =&gt; $x * 2;
+echo $dobro(5), "\n";
+
+$taxa = 0.1;
+$comTaxa = fn($preco) =&gt; $preco + $preco * $taxa;
+echo $comTaxa(50), "\n";
+
+$precos = [10, 25, 4.5];
+print_r(array_map(fn($p) =&gt; $p * 2, $precos));
+</pre>
+
+<dl class="anatomy">
+  <dt>fn</dt><dd>Abreviação de <code>function</code>.</dd>
+  <dt>($x)</dt><dd>Os parâmetros, como sempre.</dd>
+  <dt>=&gt;</dt><dd>A "seta": separa os parâmetros do resultado.</dd>
+  <dt>$x * 2</dt><dd><strong>Uma única expressão</strong>, que é devolvida automaticamente. Não se escreve <code>return</code>, nem chaves.</dd>
+</dl>
+
+<pre class="term">$ php arrow.php
+10
+55                « a arrow function enxergou $taxa sozinha, sem use
+Array
+(
+    [0] =&gt; 20
+    [1] =&gt; 50
+    [2] =&gt; 9
+)</pre>
+
+<p>A grande vantagem aparece na segunda função: <strong>não precisou de <code>use</code></strong>. A arrow function captura automaticamente, por valor, todas as variáveis de fora que ela usa. É como se o PHP escrevesse o <code>use ($taxa)</code> por você. Compare as duas versões do mesmo código:</p>
+
+<pre class="file" data-file="comparacao.php">&lt;?php
+// função anônima: return, chaves, ponto e vírgula e use
+$comTaxa = function ($preco) use ($taxa) {
+    return $preco + $preco * $taxa;
+};
+
+// arrow function: uma linha
+$comTaxa = fn($preco) =&gt; $preco + $preco * $taxa;
+</pre>
+
+<h3>Os limites da arrow function</h3>
+<p>Como a captura é <strong>por valor</strong> (uma cópia), uma arrow function não consegue mudar variáveis de fora:</p>
+
+<pre class="file" data-file="arrowmuda.php">&lt;?php
+$contador = 0;
+$somaUm = fn() =&gt; $contador++;
+$somaUm();
+$somaUm();
+echo "contador = $contador\n";
+</pre>
+
+<pre class="term">$ php arrowmuda.php
+contador = 0       « cada chamada aumentou uma cópia</pre>
+
+<p>E ela só aceita <strong>uma expressão</strong>. Se precisar de várias linhas (um <code>if</code>, uma variável auxiliar, um <code>foreach</code>), use a função anônima completa. Tentar abrir chaves depois da seta dá erro de sintaxe (veja <a href="#erros">Quando dá errado</a>).</p>
+
+<hr>
+
+<h2>Filtrar com <code>array_filter</code></h2>
+<p><code>array_filter</code> ("filtrar o array") recebe um array e uma função que responde <code>true</code> ou <code>false</code> para cada elemento. Ficam só os elementos com <code>true</code>. A Ana quer saber quem passou de ano:</p>
+
+<pre class="file" data-file="filtrar.php">&lt;?php
+$notas = ["Ana" =&gt; 9.5, "Bruno" =&gt; 5.0, "Carla" =&gt; 8.5, "Diego" =&gt; 6.0];
+
+$aprovados = array_filter($notas, fn($nota) =&gt; $nota &gt;= 7);
+print_r($aprovados);
+
+$minima = 6;
+$recuperacao = array_filter($notas, fn($nota) =&gt; $nota &lt; 7 &amp;&amp; $nota &gt;= $minima);
+print_r($recuperacao);
+</pre>
+
+<pre class="term">$ php filtrar.php
+Array
+(
+    [Ana] =&gt; 9.5
+    [Carla] =&gt; 8.5
+)
+Array
+(
+    [Diego] =&gt; 6
+)</pre>
+
+<p>Repare na ordem dos argumentos: <code>array_filter($array, $funcao)</code>, ao contrário de <code>array_map($funcao, $array)</code>. É uma confusão famosa do PHP; na dúvida, consulte <a href="funcoes-array.html">Funções de Array</a>. E repare que as chaves (os nomes) foram mantidas.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> mude a nota mínima de aprovação para 8.5 e veja quem sobra. Depois crie <code>$nomes = array_map(fn($n) =&gt; strtoupper($n), array_keys($aprovados));</code> e mostre os nomes em maiúsculas com <code>print_r</code>.</p>
+<pre class="script">&lt;?php
+$notas = ["Ana" =&gt; 9.5, "Bruno" =&gt; 5.0, "Carla" =&gt; 8.5, "Diego" =&gt; 6.0];
+
+$aprovados = array_filter($notas, fn($nota) =&gt; $nota &gt;= 7);
+print_r($aprovados);
+</pre>
+</div>
+
+<hr>
+
+<h2>Outras formas de usar funções como valores</h2>
+
+<h3>Guardar funções num array</h3>
+<p>Funções são valores; então podem ficar dentro de um array. Uma calculadora sem nenhum <code>if</code>:</p>
+
+<pre class="file" data-file="calculadora.php">&lt;?php
+$operacoes = [
+    "+" =&gt; fn($a, $b) =&gt; $a + $b,
+    "-" =&gt; fn($a, $b) =&gt; $a - $b,
+    "*" =&gt; fn($a, $b) =&gt; $a * $b,
+    "/" =&gt; fn($a, $b) =&gt; $a / $b,
+];
+
+foreach ($operacoes as $sinal =&gt; $conta) {
+    echo "12 $sinal 4 = ", $conta(12, 4), "\n";
+}
+
+echo $operacoes["*"](6, 7), "\n";
+</pre>
+
+<pre class="term">$ php calculadora.php
+12 + 4 = 16
+12 - 4 = 8
+12 * 4 = 48
+12 / 4 = 3
+42</pre>
+
+<p><code>$operacoes["*"]</code> é a função de multiplicar; <code>(6, 7)</code> logo depois a chama. Você vai usar essa ideia no <a href="projeto-calculadora.html">projeto da calculadora</a>.</p>
+
+<h3>Receber uma função: o tipo <code>callable</code></h3>
+<p>Você também pode escrever as suas próprias funções que recebem funções. O tipo <code>callable</code> garante que o argumento pode ser chamado:</p>
+
+<pre class="file" data-file="aplicar.php">&lt;?php
+function aplicarEmTodos(array $lista, callable $funcao): array
+{
+    $resultado = [];
+    foreach ($lista as $item) {
+        $resultado[] = $funcao($item);
+    }
+    return $resultado;
+}
+
+$precos = [10, 25, 4.5];
+print_r(aplicarEmTodos($precos, fn($p) =&gt; $p * 2));
+print_r(aplicarEmTodos(["ana", "bruno"], 'strtoupper'));
+print_r(aplicarEmTodos($precos, "dobrar"));
+</pre>
+
+<pre class="term">$ php aplicar.php
+Array
+(
+    [0] =&gt; 20
+    [1] =&gt; 50
+    [2] =&gt; 9
+)
+Array
+(
+    [0] =&gt; ANA
+    [1] =&gt; BRUNO
+)
+
+Fatal error: Uncaught TypeError: aplicarEmTodos(): Argument #2 ($funcao) must be of type callable, string given, called in /home/ana/site/aplicar.php on line 14 and defined in /home/ana/site/aplicar.php:2
+Stack trace:
+#0 /home/ana/site/aplicar.php(14): aplicarEmTodos(Array, 'dobrar')
+#1 {main}
+  thrown in /home/ana/site/aplicar.php on line 2</pre>
+
+<p>Você acabou de escrever a sua própria versão do <code>array_map</code>. A última chamada falhou porque não existe função chamada <code>dobrar</code>: o texto <code>"dobrar"</code> não é "chamável", e o tipo <code>callable</code> barrou na entrada.</p>
+
+<h3>Uma função que devolve uma função</h3>
+<pre class="file" data-file="fabrica.php">&lt;?php
+function multiplicador(int $vezes): Closure
+{
+    return fn($x) =&gt; $x * $vezes;
+}
+
+$dobro = multiplicador(2);
+$triplo = multiplicador(3);
+echo $dobro(10), " ", $triplo(10), "\n";
+</pre>
+
+<pre class="term">$ php fabrica.php
+20 30</pre>
+
+<p><code>multiplicador</code> é uma "fábrica de funções": cada chamada cria uma arrow function que guardou o seu próprio <code>$vezes</code>. É a captura por valor trabalhando a seu favor.</p>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Função curta, uma expressão (transformar, comparar, filtrar)</td><td>Arrow function: <code>fn($x) =&gt; $x * 2</code></td></tr>
+<tr><td>Função com várias linhas, <code>if</code>, variáveis auxiliares</td><td>Função anônima: <code>function ($x) use ($y) { … }</code></td></tr>
+<tr><td>Precisa mudar uma variável de fora</td><td>Função anônima com <code>use (&amp;$x)</code> (com moderação)</td></tr>
+<tr><td>A função será usada em vários lugares do programa</td><td>Uma <a href="funcoes.html">função com nome</a>, passada como <code>'nome'</code> ou <code>nome(...)</code></td></tr>
+<tr><td>Fazer a mesma coisa com cada item e guardar o resultado</td><td><code>array_map</code> (ou um <code>foreach</code>, se ficar mais claro)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined variable $taxa</code> dentro da closure</strong>
+<pre class="term">$ php semuse.php
+
+Warning: Undefined variable $taxa in /home/ana/site/semuse.php on line 5
+50</pre>
+<p><strong>O que aconteceu:</strong> a função anônima usou uma variável de fora sem <code>use</code>. Ela não existe lá dentro, vale <code>null</code> e a conta sai errada.</p>
+<p><strong>Como consertar:</strong> <code>function ($preco) use ($taxa) { … }</code>, ou troque por uma arrow function, que captura sozinha: <code>fn($preco) =&gt; $preco + $preco * $taxa</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu o <code>;</code> depois da <code>}</code>: <code>unexpected token "echo"</code></strong>
+<pre class="file" data-file="semponto.php">&lt;?php
+$dobro = function ($x) {
+    return $x * 2;
+}
+
+echo $dobro(5), "\n";
+</pre>
+<pre class="term">$ php semponto.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/site/semponto.php on line 6</pre>
+<p><strong>O que significa:</strong> "erro de sintaxe, palavra <code>echo</code> inesperada na linha 6". O PHP ainda estava lendo a atribuição <code>$dobro = …</code> e esperava o <code>;</code>; encontrou <code>echo</code>. Repare que a linha indicada é a <strong>seguinte</strong> ao erro de verdade: o erro está na linha 4, onde falta o ponto e vírgula. Nenhuma linha do programa rodou.</p>
+<p><strong>Como consertar:</strong> <code>};</code>. Lembre: a função anônima é um <strong>valor</strong> numa atribuição.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Object of class Closure could not be converted to string</code></strong>
+<pre class="file" data-file="echofunc.php">&lt;?php
+$dobro = function ($x) {
+    return $x * 2;
+};
+
+echo $dobro, "\n";
+</pre>
+<pre class="term">$ php echofunc.php
+
+Fatal error: Uncaught Error: Object of class Closure could not be converted to string in /home/ana/site/echofunc.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/echofunc.php on line 6</pre>
+<p><strong>O que significa:</strong> "um objeto da classe Closure não pode ser convertido em texto". Sem os parênteses, <code>$dobro</code> é a função em si, e o <code>echo</code> não sabe escrever uma função.</p>
+<p><strong>Como consertar:</strong> chame a função: <code>echo $dobro(5);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Too few arguments to function {closure:…}()</code></strong>
+<pre class="term">$ php poucos.php      « echo $dobro(), "\n";
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function {closure:/home/ana/site/poucos.php:2}(), 0 passed in /home/ana/site/poucos.php on line 6 and exactly 1 expected in /home/ana/site/poucos.php:2
+Stack trace:
+#0 /home/ana/site/poucos.php(6): {closure:/home/ana/site/poucos.php:2}()
+#1 {main}
+  thrown in /home/ana/site/poucos.php on line 2</pre>
+<p><strong>O que significa:</strong> a função anônima criada na linha 2 esperava 1 argumento e recebeu 0. Como ela não tem nome, o PHP a chama de <code>{closure:arquivo:linha}</code>: a linha indicada é onde ela foi <strong>criada</strong>, o que ajuda a achá-la.</p>
+<p><strong>Como consertar:</strong> passe os argumentos que ela pede, ou dê um valor padrão ao parâmetro: <code>function ($x = 1)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Arrow function com chaves: <code>unexpected token "{"</code></strong>
+<pre class="file" data-file="arrowmulti.php">&lt;?php
+$comTaxa = fn($preco) =&gt; {
+    $taxa = 0.1;
+    return $preco + $preco * $taxa;
+};
+</pre>
+<pre class="term">$ php arrowmulti.php
+
+Parse error: syntax error, unexpected token "{" in /home/ana/site/arrowmulti.php on line 2</pre>
+<p><strong>O que significa:</strong> depois do <code>=&gt;</code> o PHP espera uma expressão (um valor, uma conta), e não um bloco de código.</p>
+<p><strong>Como consertar:</strong> se cabe numa expressão, escreva só ela: <code>fn($preco) =&gt; $preco * 1.1</code>. Se precisa de várias linhas, use <code>function ($preco) { … };</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A closure não mudou a variável (sem erro)</strong>
+<pre class="term">$ php arrowmuda.php
+contador = 0</pre>
+<p><strong>O que aconteceu:</strong> tanto <code>use ($x)</code> quanto a arrow function trabalham com uma <strong>cópia</strong>. O código é válido; ele só não faz o que você esperava.</p>
+<p><strong>Como consertar:</strong> faça a função devolver o novo valor (<code>$contador = $somaUm($contador);</code>) ou use uma função anônima com <code>use (&amp;$contador)</code>.</p>
+</div>
+
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que é</th><th>Exemplo</th></tr>
+<tr><td><code>function ($x) { … };</code></td><td>Função anônima (closure)</td><td><code>$f = function ($x) { return $x + 1; };</code></td></tr>
+<tr><td><code>$f(…)</code></td><td>Chamar a função guardada na variável</td><td><code>$f(5)</code> → 6</td></tr>
+<tr><td><code>use ($a, $b)</code></td><td>Leva cópias de variáveis de fora</td><td><code>function ($p) use ($taxa) { … }</code></td></tr>
+<tr><td><code>use (&amp;$a)</code></td><td>Leva a própria variável (pode mudá-la)</td><td><code>function ($v) use (&amp;$total) { $total += $v; }</code></td></tr>
+<tr><td><code>fn($x) =&gt; expr</code></td><td>Arrow function: uma expressão, captura automática por valor <span class="versao">PHP 7.4+</span></td><td><code>fn($x) =&gt; $x * 2</code></td></tr>
+<tr><td><code>array_map($f, $array)</code></td><td>Aplica <code>$f</code> a cada elemento; devolve um array novo</td><td><code>array_map(fn($p) =&gt; $p * 2, [1, 2])</code> → <code>[2, 4]</code></td></tr>
+<tr><td><code>array_filter($array, $f)</code></td><td>Fica com os elementos em que <code>$f</code> devolve <code>true</code></td><td><code>array_filter($notas, fn($n) =&gt; $n &gt;= 7)</code></td></tr>
+<tr><td><code>callable</code></td><td>Tipo de parâmetro: "algo que pode ser chamado"</td><td><code>function f(callable $g)</code></td></tr>
+<tr><td><code>Closure</code></td><td>A classe das funções anônimas (também usada como tipo)</td><td><code>function f(): Closure</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Arrow function</h3>
+<p>Complete a arrow function que devolve o quadrado de um número:</p>
+<div class="ex-code">$quadrado = <input data-answer="fn($x) =&gt; $x * $x|fn($x)=&gt;$x*$x|fn($x) =&gt; $x ** 2|fn($n) =&gt; $n * $n" aria-label="arrow function">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Levar a variável</h3>
+<p>Complete para a função anônima enxergar <code>$frete</code>:</p>
+<div class="ex-code">$total = function ($preco) <input data-answer="use ($frete)|use($frete)" aria-label="use"> { return $preco + $frete; };</div>
+</div>
+
+<div class="exercise">
+<h3>3. Transformar todos</h3>
+<p>Complete para obter os preços com 10% de aumento:</p>
+<div class="ex-code">$novos = <input data-answer="array_map" aria-label="função">(fn($p) =&gt; $p * 1.1, $precos);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que este código mostra? <code>$x = 1; $f = function () use ($x) { return $x; }; $x = 2; echo $f();</code></p>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> Nada, e um <code>Warning: Undefined variable $x</code></label>
+<label><input type="radio" name="q4"> 3</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Qual destas afirmações sobre <code>fn($x) =&gt; …</code> é verdadeira?</p>
+<label><input type="radio" name="q5"> Precisa de <code>use</code> para usar variáveis de fora.</label>
+<label><input type="radio" name="q5"> Pode ter várias linhas entre chaves.</label>
+<label><input type="radio" name="q5"> Consegue mudar variáveis de fora.</label>
+<label><input type="radio" name="q5"> Devolve automaticamente o valor da expressão depois da seta.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Você escreveu <code>echo $dobro;</code> e apareceu <code>Object of class Closure could not be converted to string</code>. O que faltou?</p>
+<label><input type="radio" name="q6"> Os parênteses da chamada: <code>$dobro(5)</code>.</label>
+<label><input type="radio" name="q6"> O <code>use</code>.</label>
+<label><input type="radio" name="q6"> O ponto e vírgula depois da <code>}</code>.</label>
+<label><input type="radio" name="q6"> Um <code>return</code>.</label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:pudim: R$ 13\,20,out:brigadeiro: R$ 2\,20,src:array_filter,src:array_map,src:fn\s*\(,semerro">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana vai dar destaque aos produtos baratos, com 10% de aumento. (1) Troque a primeira linha marcada por um <code>array_filter</code> com uma arrow function que deixe só os produtos com preço <strong>até <code>$limite</code></strong>. (2) Troque a segunda por um <code>array_map</code> com uma arrow function que multiplique cada preço por <code>1.1</code>. A saída deve ter só <code>pudim: R$ 13,20</code> e <code>brigadeiro: R$ 2,20</code>.</p>
+<pre class="script">&lt;?php
+$produtos = ["bolo" =&gt; 25, "pudim" =&gt; 12, "torta" =&gt; 40, "brigadeiro" =&gt; 2];
+$limite = 20;
+
+$baratos = $produtos;   // (1) troque por array_filter(…)
+$novos = $baratos;      // (2) troque por array_map(…)
+
+foreach ($novos as $nome =&gt; $preco) {
+    echo "$nome: R$ ", number_format($preco, 2, ",", "."), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$produtos = ["bolo" =&gt; 25, "pudim" =&gt; 12, "torta" =&gt; 40, "brigadeiro" =&gt; 2];
+$limite = 20;
+
+$baratos = array_filter($produtos, fn($preco) =&gt; $preco &lt;= $limite);
+$novos = array_map(fn($preco) =&gt; $preco * 1.1, $baratos);
+
+foreach ($novos as $nome =&gt; $preco) {
+    echo "$nome: R$ ", number_format($preco, 2, ",", "."), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma função anônima (<em>closure</em>) é uma função sem nome, guardada numa variável: <code>$f = function ($x) { … };</code> (com <code>;</code> no fim). Chame com <code>$f(…)</code>.</li>
+  <li>Ela não enxerga variáveis de fora. <code>use ($x)</code> leva uma cópia do valor no momento da criação; <code>use (&amp;$x)</code> leva a própria variável.</li>
+  <li>A arrow function <code>fn($x) =&gt; expressão</code> é a forma curta: uma expressão, <code>return</code> automático e captura automática por valor.</li>
+  <li>Funções são valores: podem ser passadas para <code>array_map</code>, <code>array_filter</code>, <code>usort</code>, guardadas em arrays e devolvidas por outras funções. O tipo do parâmetro é <code>callable</code> (ou <code>Closure</code>).</li>
+  <li>Erros comuns: <code>Undefined variable</code> (faltou <code>use</code>), <code>unexpected token</code> (faltou <code>;</code> ou chaves numa arrow function), <code>could not be converted to string</code> (faltaram os parênteses).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
