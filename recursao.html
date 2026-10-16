@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Recursão — funções que chamam a si mesmas | Guia PHP</title>
+<meta name="description" content="Recursão em PHP para quem está começando: caso base e passo recursivo, contagem regressiva, fatorial, a pilha de chamadas, percorrer menus e pastas (arrays aninhados), o que acontece sem caso base (Allowed memory size exhausted) e quando usar um laço no lugar.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Recursão</span></h1>
+
+<p class="intro">Uma função <strong>recursiva</strong> é uma função que chama <strong>a si mesma</strong>. Parece um truque de mágica (ou um jeito de travar o computador), mas é a forma mais natural de resolver problemas que têm "coisas dentro de coisas": pastas dentro de pastas, menus com submenus, comentários com respostas. Nesta aula você vai entender como isso funciona por dentro, quando usar e o que acontece quando dá errado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é recursão e as duas partes obrigatórias: o <strong>caso base</strong> e o <strong>passo recursivo</strong>.</li>
+  <li>A contagem regressiva e o fatorial, passo a passo.</li>
+  <li>O que é a <strong>pilha de chamadas</strong> e por que o código depois da chamada roda "na volta".</li>
+  <li>Como percorrer uma <strong>árvore</strong>: um menu com submenus e as pastas da Ana (arrays dentro de arrays).</li>
+  <li>O que acontece quando a recursão não para (<code>Allowed memory size … exhausted</code>) e os outros erros comuns.</li>
+  <li>Quando é melhor usar um <a href="for.html">laço</a> no lugar.</li>
+</ul>
+</div>
+
+<p>Antes, você precisa saber criar uma função com parâmetros e <code>return</code> (aula <a href="funcoes.html">Funções</a>) e percorrer um array com <a href="foreach.html">foreach</a>. Os exemplos rodam na máquina da Ana, dentro da pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: a fila do cinema</h2>
+<p>A Ana está numa fila enorme de cinema e quer saber em que posição está. Ela não consegue ver o começo da fila. Então ela pergunta para a pessoa da frente: <em>"Em que posição você está?"</em>. Essa pessoa também não sabe, e faz <strong>a mesma pergunta</strong> para quem está na frente dela. E assim por diante…</p>
+<p>…até chegar na primeira pessoa da fila. Ela <strong>não precisa perguntar a ninguém</strong>: responde "estou na posição 1". A resposta volta: quem estava atrás dela responde "então eu sou a 2", o próximo diz "3"… até a resposta chegar na Ana.</p>
+
+<p>Repare nas duas partes dessa história. Toda recursão tem exatamente essas duas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>Na fila do cinema</th><th>No código</th></tr>
+<tr><td><strong>Caso base</strong> (onde para)</td><td>A primeira pessoa sabe a resposta sem perguntar.</td><td>Um <code>if</code> que devolve a resposta direto, <strong>sem</strong> chamar a função de novo.</td></tr>
+<tr><td><strong>Passo recursivo</strong> (a pergunta para a frente)</td><td>"Pergunto para quem está na minha frente e somo 1."</td><td>A função chama a si mesma com um problema <strong>menor</strong> (mais perto do caso base).</td></tr>
+</table>
+</div>
+
+<p>Se faltar o caso base, a pergunta nunca para. Se o problema não diminuir, nunca se chega ao caso base. Os dois erros terminam do mesmo jeito, como você vai ver no fim da aula.</p>
+
+<hr>
+
+<h2>Primeira recursão: contagem regressiva</h2>
+<p>Vamos começar pelo exemplo mais simples possível: contar de 3 até 1 e dizer "Fogo!".</p>
+
+<pre class="file" data-file="contagem.php">&lt;?php
+function contagem(int $n): void
+{
+    if ($n === 0) {
+        echo "Fogo!\n";
+        return;
+    }
+    echo $n, "\n";
+    contagem($n - 1);
+}
+
+contagem(3);
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>function contagem(int $n): void</code></td><td>Cria a função. Ela recebe um número inteiro e não devolve nada (<code>void</code>, "vazio"; veja <a href="tipos-retorno.html">Tipos e Retorno</a>).</td></tr>
+<tr><td><code>if ($n === 0) { … return; }</code></td><td><strong>Caso base</strong>: quando chegar em zero, escreve "Fogo!" e <strong>sai</strong> da função. Aqui a recursão para.</td></tr>
+<tr><td><code>echo $n, "\n";</code></td><td>Escreve o número atual.</td></tr>
+<tr><td><code>contagem($n - 1);</code></td><td><strong>Passo recursivo</strong>: a função chama a si mesma com um número <strong>menor</strong>. Cada chamada chega mais perto do zero.</td></tr>
+<tr><td><code>contagem(3);</code></td><td>A primeira chamada, fora da função, que começa tudo.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php contagem.php
+3
+2
+1
+Fogo!</pre>
+
+<p>O que aconteceu, chamada por chamada:</p>
+<ol class="passo">
+  <li><code>contagem(3)</code>: 3 não é 0, escreve <code>3</code> e chama <code>contagem(2)</code>.</li>
+  <li><code>contagem(2)</code>: escreve <code>2</code> e chama <code>contagem(1)</code>.</li>
+  <li><code>contagem(1)</code>: escreve <code>1</code> e chama <code>contagem(0)</code>.</li>
+  <li><code>contagem(0)</code>: é o caso base. Escreve <code>Fogo!</code> e volta. Como não há mais nada depois das chamadas, todas terminam.</li>
+</ol>
+
+<div class="note">
+<strong>Cada chamada tem o seu próprio <code>$n</code></strong>
+<p>Quando <code>contagem(3)</code> chama <code>contagem(2)</code>, o <code>$n</code> valendo 3 <strong>não é apagado</strong>. Cada chamada da função ganha uma cópia nova e separada das suas variáveis (você vai ver isso em detalhe em <a href="escopo.html">Escopo</a>). Em certo momento existem quatro <code>$n</code> ao mesmo tempo: 3, 2, 1 e 0, cada um na sua chamada.</p>
+</div>
+
+<h3>A ida e a volta: a pilha de chamadas</h3>
+<p>Esse "cada chamada espera a próxima terminar" tem nome: <strong>pilha de chamadas</strong> (<em>call stack</em>). Pense numa pilha de pratos: cada chamada nova é um prato colocado <strong>em cima</strong>; quando uma chamada termina, o prato de cima sai, e quem estava embaixo <strong>continua de onde parou</strong>.</p>
+<p>Fica fácil de ver se colocarmos um <code>echo</code> <strong>depois</strong> da chamada recursiva:</p>
+
+<pre class="file" data-file="ida-e-volta.php">&lt;?php
+function idaEVolta(int $n): void
+{
+    if ($n === 0) {
+        echo "chegou ao fundo\n";
+        return;
+    }
+    echo "descendo: $n\n";
+    idaEVolta($n - 1);
+    echo "subindo: $n\n";
+}
+
+idaEVolta(3);
+</pre>
+
+<pre class="term">$ php ida-e-volta.php
+descendo: 3
+descendo: 2
+descendo: 1
+chegou ao fundo
+subindo: 1          « a chamada com $n = 1 continua depois que a de baixo terminou
+subindo: 2
+subindo: 3          « a primeira chamada é a última a terminar</pre>
+
+<p>A linha <code>echo "subindo: $n\n"</code> de cada chamada só roda quando a chamada de baixo termina. Por isso os números voltam <strong>ao contrário</strong>: 1, 2, 3. E repare que cada chamada se lembra do próprio <code>$n</code>, como dissemos.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode, depois troque <code>idaEVolta(3)</code> por <code>idaEVolta(5)</code>. Em seguida, apague a linha do <code>echo "descendo…"</code> e veja que a contagem passa a sair só "na volta", de 1 até 5.</p>
+<pre class="script">&lt;?php
+function idaEVolta(int $n): void
+{
+    if ($n === 0) {
+        echo "chegou ao fundo\n";
+        return;
+    }
+    echo "descendo: $n\n";
+    idaEVolta($n - 1);
+    echo "subindo: $n\n";
+}
+
+idaEVolta(3);
+</pre>
+</div>
+
+<hr>
+
+<h2>Uma recursão que devolve valor: o fatorial</h2>
+<p>O <strong>fatorial</strong> de um número (escrito com <code>!</code>) é a multiplicação dele por todos os inteiros menores até 1. Ele aparece em matemática para contar combinações: de quantas formas a Ana pode arrumar 5 livros na estante? <code>5! = 5 × 4 × 3 × 2 × 1 = 120</code>.</p>
+
+<p>Repare num detalhe: <code>5 × 4 × 3 × 2 × 1</code> é o mesmo que <code>5 × (4 × 3 × 2 × 1)</code>, ou seja, <code>5 × 4!</code>. O fatorial de 5 é 5 vezes o fatorial de 4. Isso é um problema definido por uma versão menor dele mesmo, o lugar perfeito para recursão:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Parte</th></tr>
+<tr><td><code>1! = 1</code> (e, por definição, <code>0! = 1</code>)</td><td>Caso base</td></tr>
+<tr><td><code>n! = n × (n − 1)!</code></td><td>Passo recursivo</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="fatorial.php">&lt;?php
+function fatorial(int $n): int
+{
+    if ($n &lt;= 1) {
+        return 1;
+    }
+    return $n * fatorial($n - 1);
+}
+
+echo fatorial(5), "\n";
+for ($i = 0; $i &lt;= 6; $i++) {
+    echo "$i! = ", fatorial($i), "\n";
+}
+echo fatorial(20), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>function fatorial(int $n): int</dt><dd>Recebe um inteiro e <strong>devolve</strong> um inteiro.</dd>
+  <dt>if ($n &lt;= 1) { return 1; }</dt><dd>Caso base. Usamos <code>&lt;= 1</code> (e não <code>=== 1</code>) para que <code>fatorial(0)</code> também pare aqui.</dd>
+  <dt>return $n * fatorial($n - 1);</dt><dd>Passo recursivo: para calcular a multiplicação, o PHP precisa primeiro do resultado de <code>fatorial($n - 1)</code>. Ele chama a função, <strong>espera</strong> a resposta, multiplica por <code>$n</code> e devolve.</dd>
+</dl>
+
+<pre class="term">$ php fatorial.php
+120
+0! = 1
+1! = 1
+2! = 2
+3! = 6
+4! = 24
+5! = 120
+6! = 720
+2432902008176640000          « 20!, já um número enorme</pre>
+
+<h3>Seguindo o <code>fatorial(4)</code> de perto</h3>
+<p>Na ida, cada chamada fica <strong>esperando</strong>. Na volta, cada uma recebe a resposta de baixo, faz a sua multiplicação e passa o resultado para cima:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th>Na ida (esperando)</th><th>Na volta (devolve)</th></tr>
+<tr><td><code>fatorial(4)</code></td><td><code>4 * fatorial(3)</code></td><td><code>4 * 6</code> = <strong>24</strong></td></tr>
+<tr><td><code>fatorial(3)</code></td><td><code>3 * fatorial(2)</code></td><td><code>3 * 2</code> = 6</td></tr>
+<tr><td><code>fatorial(2)</code></td><td><code>2 * fatorial(1)</code></td><td><code>2 * 1</code> = 2</td></tr>
+<tr><td><code>fatorial(1)</code></td><td>caso base, não chama ninguém</td><td>1</td></tr>
+</table>
+</div>
+
+<p>Leia a coluna "na volta" de baixo para cima: 1, 2, 6, 24. É a mesma fila do cinema, com multiplicação no lugar da soma.</p>
+
+<div class="tryphp" data-goal="out:4! = 24,out:5! = 120">
+<p class="try-task"><strong>Missão:</strong> o caso base devolve o valor errado, e tudo dá zero. Rode, veja o problema e corrija o <code>return</code> de dentro do <code>if</code> para que <code>4! = 24</code> e <code>5! = 120</code> apareçam.</p>
+<pre class="script">&lt;?php
+function fatorial(int $n): int
+{
+    if ($n === 0) {
+        return 0;
+    }
+    return $n * fatorial($n - 1);
+}
+
+echo "4! = ", fatorial(4), "\n";
+echo "5! = ", fatorial(5), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function fatorial(int $n): int
+{
+    if ($n === 0) {
+        return 1;
+    }
+    return $n * fatorial($n - 1);
+}
+
+echo "4! = ", fatorial(4), "\n";
+echo "5! = ", fatorial(5), "\n";
+</pre>
+</div>
+
+<p>Por que dava zero? O caso base devolvia <code>0</code>, e qualquer número multiplicado por zero é zero. O valor do caso base "contamina" todas as voltas: escolher o valor certo nele é tão importante quanto ter um.</p>
+
+<hr>
+
+<h2>Onde a recursão brilha: árvores</h2>
+<p>Contagem e fatorial são bons para aprender, mas, na prática, um <a href="for.html">for</a> resolve os dois (você vai ver isso daqui a pouco). A recursão fica <strong>insubstituível</strong> quando os dados têm uma forma de <strong>árvore</strong>: um item que tem itens dentro, que têm itens dentro… sem você saber quantos níveis existem.</p>
+
+<h3>Um menu com submenus</h3>
+<p>A Ana quer um menu para o site de receitas. Algumas seções têm subseções, que podem ter subseções também. Em PHP, isso é um <a href="arrays-associativos.html">array associativo</a> em que cada valor é <strong>outro array</strong> (os filhos), vazio quando não há filhos:</p>
+
+<pre class="file" data-file="menu.php">&lt;?php
+$menu = [
+    "Início"   =&gt; [],
+    "Receitas" =&gt; [
+        "Doces"    =&gt; [
+            "Bolos"  =&gt; [],
+            "Tortas" =&gt; [],
+        ],
+        "Salgados" =&gt; [],
+    ],
+    "Contato"  =&gt; [],
+];
+
+function mostrarMenu(array $itens, int $nivel = 0): void
+{
+    foreach ($itens as $nome =&gt; $filhos) {
+        echo str_repeat("    ", $nivel), "- ", $nome, "\n";
+        mostrarMenu($filhos, $nivel + 1);
+    }
+}
+
+mostrarMenu($menu);
+</pre>
+
+<dl class="anatomy">
+  <dt>array $itens, int $nivel = 0</dt><dd>A função recebe um pedaço do menu e o nível de profundidade, que começa em 0 se ninguém disser nada (valor padrão; veja <a href="parametros.html">Parâmetros</a>).</dd>
+  <dt>foreach ($itens as $nome =&gt; $filhos)</dt><dd>Para cada item deste nível: <code>$nome</code> é o texto ("Receitas") e <code>$filhos</code> é o array de dentro.</dd>
+  <dt>str_repeat("    ", $nivel)</dt><dd>Repete 4 espaços <code>$nivel</code> vezes: é o recuo que mostra a profundidade.</dd>
+  <dt>mostrarMenu($filhos, $nivel + 1)</dt><dd>Passo recursivo: "mostre os filhos deste item, um nível mais para dentro". O problema diminui porque <code>$filhos</code> é um pedaço menor da árvore.</dd>
+</dl>
+
+<pre class="term">$ php menu.php
+- Início
+- Receitas
+    - Doces
+        - Bolos
+        - Tortas
+    - Salgados
+- Contato</pre>
+
+<p><strong>Onde está o caso base?</strong> Ele está escondido: quando um item não tem filhos, <code>$filhos</code> é <code>[]</code> e o <code>foreach</code> de um array vazio não faz nenhuma volta. A função termina sem chamar mais ninguém. Todo array vazio é uma "folha" da árvore.</p>
+
+<p>O mais bonito: se a Ana acrescentar <code>"Brigadeiros" =&gt; []</code> dentro de <code>"Bolos"</code>, a função continua funcionando sem mudar uma vírgula. Ela não sabe quantos níveis existem, nem precisa.</p>
+
+<h3>O mesmo menu numa página web</h3>
+<p>No site, o menu vira listas HTML (<code>&lt;ul&gt;</code>) dentro de listas. A função agora <strong>devolve</strong> o HTML como texto em vez de escrevê-lo. Repare no <code>htmlspecialchars</code>: o nome de cada item vai para o HTML protegido, como deve ser com todo texto que vira página (veja <a href="escapar-saida.html">Escapar a Saída</a>).</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Pudins,src:&quot;Pudins&quot;">
+<p class="try-task"><strong>Missão:</strong> rode e veja o menu na aba <strong>Resultado</strong>. Depois acrescente o item <code>"Pudins"</code> dentro de <code>"Doces"</code>, ao lado de Bolos e Tortas. A função não precisa mudar.</p>
+<pre class="script">&lt;?php
+$menu = [
+    "Início"   =&gt; [],
+    "Receitas" =&gt; [
+        "Doces"    =&gt; [
+            "Bolos"  =&gt; [],
+            "Tortas" =&gt; [],
+        ],
+        "Salgados" =&gt; [],
+    ],
+    "Contato"  =&gt; [],
+];
+
+function menuHtml(array $itens): string
+{
+    if ($itens === []) {
+        return "";
+    }
+    $html = "&lt;ul&gt;\n";
+    foreach ($itens as $nome =&gt; $filhos) {
+        $html .= "&lt;li&gt;" . htmlspecialchars($nome) . menuHtml($filhos) . "&lt;/li&gt;\n";
+    }
+    return $html . "&lt;/ul&gt;\n";
+}
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Receitas da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Receitas da Ana&lt;/h1&gt;
+&lt;?= menuHtml($menu) ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$menu = [
+    "Início"   =&gt; [],
+    "Receitas" =&gt; [
+        "Doces"    =&gt; [
+            "Bolos"  =&gt; [],
+            "Tortas" =&gt; [],
+            "Pudins" =&gt; [],
+        ],
+        "Salgados" =&gt; [],
+    ],
+    "Contato"  =&gt; [],
+];
+
+function menuHtml(array $itens): string
+{
+    if ($itens === []) {
+        return "";
+    }
+    $html = "&lt;ul&gt;\n";
+    foreach ($itens as $nome =&gt; $filhos) {
+        $html .= "&lt;li&gt;" . htmlspecialchars($nome) . menuHtml($filhos) . "&lt;/li&gt;\n";
+    }
+    return $html . "&lt;/ul&gt;\n";
+}
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Receitas da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Receitas da Ana&lt;/h1&gt;
+&lt;?= menuHtml($menu) ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<p>Aqui o caso base é explícito: <code>if ($itens === []) return "";</code>. Sem ele, todo item sem filhos ganharia um <code>&lt;ul&gt;&lt;/ul&gt;</code> vazio no HTML. O código-fonte gerado pelo exemplo (antes da missão) é este; note como cada <code>&lt;ul&gt;</code> de dentro fica no meio de um <code>&lt;li&gt;</code>:</p>
+
+<pre class="term">$ php menu-web.php
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Receitas da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Receitas da Ana&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;Início&lt;/li&gt;
+&lt;li&gt;Receitas&lt;ul&gt;
+&lt;li&gt;Doces&lt;ul&gt;
+&lt;li&gt;Bolos&lt;/li&gt;
+&lt;li&gt;Tortas&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Salgados&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Contato&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<h3>As pastas da Ana: somar o que está dentro</h3>
+<p>Agora uma árvore em que a função precisa <strong>juntar</strong> respostas. A Ana representou as pastas do computador assim: um arquivo é <code>nome =&gt; tamanho em bytes</code>; uma pasta é <code>nome =&gt; [o que tem dentro]</code>. Quanto espaço tudo ocupa?</p>
+
+<pre class="file" data-file="pastas.php">&lt;?php
+// nome do arquivo =&gt; tamanho em bytes; nome da pasta =&gt; [o que tem dentro]
+$casa = [
+    "frutas.txt" =&gt; 47,
+    "Documentos" =&gt; [
+        "notas.txt"  =&gt; 69,
+        "alunos.csv" =&gt; 180,
+        "projetos"   =&gt; [
+            "site" =&gt; [
+                "index.php" =&gt; 340,
+                "ola.php"   =&gt; 26,
+            ],
+        ],
+    ],
+    "Música" =&gt; [],
+];
+
+function tamanhoTotal(array $pasta): int
+{
+    $total = 0;
+    foreach ($pasta as $nome =&gt; $conteudo) {
+        if (is_array($conteudo)) {
+            $total += tamanhoTotal($conteudo);   // é uma pasta: pergunte a ela
+        } else {
+            $total += $conteudo;                 // é um arquivo: some o tamanho
+        }
+    }
+    return $total;
+}
+
+echo "Tudo junto: ", tamanhoTotal($casa), " bytes\n";
+echo "Só Documentos: ", tamanhoTotal($casa["Documentos"]), " bytes\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$total = 0;</code></td><td>Cada chamada tem o seu próprio total, que começa em zero.</td></tr>
+<tr><td><code>is_array($conteudo)</code></td><td>"Isto é um array?" Se for, é uma pasta; se não, é o tamanho de um arquivo.</td></tr>
+<tr><td><code>$total += tamanhoTotal($conteudo);</code></td><td>Passo recursivo: pergunta à subpasta quanto ela ocupa e <strong>soma a resposta</strong> no total desta pasta.</td></tr>
+<tr><td><code>$total += $conteudo;</code></td><td>Caso base: um arquivo sabe o próprio tamanho, sem perguntar a ninguém.</td></tr>
+<tr><td><code>return $total;</code></td><td>Devolve a soma para quem perguntou (a pasta de cima, ou o <code>echo</code> no fim).</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php pastas.php
+Tudo junto: 662 bytes
+Só Documentos: 615 bytes</pre>
+
+<p>Confira de cabeça: <code>site</code> = 340 + 26 = 366; <code>projetos</code> = 366; <code>Documentos</code> = 69 + 180 + 366 = 615; tudo = 47 + 615 + 0 (a pasta <code>Música</code> está vazia) = 662. Cada pasta responde só por si e pergunta às de dentro, exatamente como as pessoas da fila.</p>
+
+<div class="tip">
+<strong>O PHP também tem funções prontas para árvores</strong>
+<p><code>array_walk_recursive()</code> visita todas as "folhas" de um array aninhado, e <code>count($array, COUNT_RECURSIVE)</code> conta os elementos de todos os níveis (pastas inclusive). Elas resolvem casos simples; quando você precisa saber o nível, o caminho ou montar HTML, escrever a sua função recursiva é o caminho. Veja <a href="funcoes-array.html">Funções de Array</a>.</p>
+</div>
+
+<hr>
+
+<h2>Recursão × laço</h2>
+<p>Tudo o que se faz com recursão dá para fazer com um laço, e vice-versa. O fatorial com um <a href="for.html">for</a> fica assim:</p>
+
+<pre class="file" data-file="fatorial-laco.php">&lt;?php
+function fatorial(int $n): int
+{
+    $resultado = 1;
+    for ($i = 2; $i &lt;= $n; $i++) {
+        $resultado *= $i;
+    }
+    return $resultado;
+}
+
+echo fatorial(5), "\n";
+</pre>
+
+<pre class="term">$ php fatorial-laco.php
+120</pre>
+
+<p>Mesmo resultado. Então, qual usar? Há uma diferença prática importante: cada chamada que fica esperando na pilha <strong>ocupa memória</strong>. Um laço de um milhão de voltas usa a mesma memória do começo ao fim; uma recursão de um milhão de níveis guarda um milhão de chamadas ao mesmo tempo. Veja a soma de 1 até <code>n</code> feita com recursão:</p>
+
+<pre class="file" data-file="somar.php">&lt;?php
+function somarAte(int $n): int
+{
+    if ($n === 0) {
+        return 0;
+    }
+    return $n + somarAte($n - 1);
+}
+
+echo somarAte(100), "\n";
+echo somarAte(100000), "\n";
+echo somarAte(1000000), "\n";
+</pre>
+
+<pre class="term">$ php somar.php | head -4
+5050
+5000050000
+
+Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 262144 bytes) in /home/ana/site/somar.php on line 7</pre>
+
+<p>Cem mil níveis funcionaram; um milhão, não: a memória que o PHP pode usar (128 MB, o padrão do <code>memory_limit</code>) acabou antes. O <code>| head -4</code> está ali porque, depois dessa linha, o PHP 8.5 mostra o caminho de todas as chamadas que estavam na pilha, mais de 700 mil linhas (mais sobre isso em <a href="#erros">Quando dá errado</a>). Com um laço, o mesmo cálculo para um milhão não tem problema nenhum.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Por quê</th></tr>
+<tr><td>Repetir algo N vezes, contar, somar uma lista</td><td>Laço (<code>for</code>, <code>foreach</code>, <code>while</code>)</td><td>Mais simples de ler e não gasta memória a cada volta.</td></tr>
+<tr><td>Dados em árvore: menus, pastas, categorias, comentários com respostas, JSON aninhado</td><td>Recursão</td><td>Você não sabe quantos níveis existem; um laço precisaria de uma "pilha" feita à mão.</td></tr>
+<tr><td>Problema definido por uma versão menor dele mesmo (fatorial, potência)</td><td>Os dois servem</td><td>A recursão fica parecida com a definição; o laço aguenta números maiores.</td></tr>
+<tr><td>Profundidade muito grande (dezenas de milhares de níveis ou mais)</td><td>Laço</td><td>A recursão pode esgotar a memória.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Árvores reais quase nunca são fundas</strong>
+<p>Um menu tem 3 ou 4 níveis; uma pasta de computador, raramente mais de 20. Nesses casos a memória nunca é problema, e a recursão é a escolha certa. O limite só preocupa quando a profundidade depende de um número grande, como no <code>somarAte(1000000)</code>.</p>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Sem caso base: <code>Allowed memory size of 134217728 bytes exhausted</code></strong>
+<pre class="file" data-file="infinita.php">&lt;?php
+function contagem(int $n): void
+{
+    echo $n, "\n";
+    contagem($n - 1);
+}
+
+contagem(3);
+</pre>
+<p>Não há nenhum <code>if</code> que pare a função. Ela conta 3, 2, 1, 0, −1, −2… e não para nunca. Como a saída é gigantesca, a Ana mandou tudo para um arquivo e olhou só os pedaços:</p>
+<pre class="term">$ php infinita.php &gt; saida.txt
+$ echo $?
+255                              « 255 = o PHP terminou com erro fatal
+$ grep -A4 "Fatal" saida.txt
+Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 262144 bytes) in /home/ana/site/infinita.php on line 5
+Stack trace:
+#0 /home/ana/site/infinita.php(5): contagem(-915005)
+#1 /home/ana/site/infinita.php(5): contagem(-915004)
+#2 /home/ana/site/infinita.php(5): contagem(-915003)
+$ tail -3 saida.txt
+#915007 /home/ana/site/infinita.php(5): contagem(2)
+#915008 /home/ana/site/infinita.php(8): contagem(3)
+#915009 {main}
+$ wc -l saida.txt
+1830022 saida.txt                « quase 2 milhões de linhas!</pre>
+<p><strong>O que significa:</strong> "o tamanho de memória permitido, de 134217728 bytes (128 MB), se esgotou (ao tentar reservar mais 262144 bytes)". A função chamou a si mesma cerca de 915 mil vezes; cada chamada que fica esperando ocupa um pouco de memória, até o limite. O <code>Stack trace</code> ("rastro da pilha") lista as chamadas que estavam na pilha, da mais recente (<code>#0</code>, com <code>$n</code> = −915005) até a primeira (<code>contagem(3)</code>, na linha 8). O PHP 8.5 passou a mostrar esse rastro também nos erros fatais como este <span class="versao">PHP 8.5+</span>; nas versões antigas aparecia só a linha do <code>Fatal error</code>.</p>
+<p><strong>Como consertar:</strong> toda função recursiva precisa de um caso base, um <code>if</code> que devolva a resposta <strong>sem</strong> chamar a função de novo. Quando vir <code>Allowed memory size … exhausted</code> e um stack trace em que a <strong>mesma função se repete</strong>, procure o caso base que falta ou que nunca é alcançado.</p>
+<p><strong>No editor do guia:</strong> o PHP do navegador tem outros limites de memória e de pilha, então o número de chamadas e a mensagem podem ser diferentes (e a página pode demorar). Prefira testar recursão infinita só na sua máquina, com <kbd>Ctrl</kbd>+<kbd>C</kbd> à mão.</p>
+</div>
+
+<div class="cenario">
+<strong>O caso base existe, mas nunca é alcançado</strong>
+<pre class="file" data-file="negativo.php">&lt;?php
+function fatorial(int $n): int
+{
+    if ($n === 0) {
+        return 1;
+    }
+    return $n * fatorial($n - 1);
+}
+
+echo fatorial(-1), "\n";
+</pre>
+<pre class="term">$ php negativo.php | head -3
+
+Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 262144 bytes) in /home/ana/site/negativo.php on line 7
+Stack trace:</pre>
+<p><strong>O que aconteceu:</strong> o caso base espera <code>$n === 0</code>, mas começando em −1 o <code>$n</code> só <strong>diminui</strong>: −2, −3, −4… nunca passa pelo zero. É o mesmo erro de não ter caso base.</p>
+<p><strong>Como consertar:</strong> use uma condição que cubra todos os casos "pequenos demais": <code>if ($n &lt;= 1)</code>. Melhor ainda, recuse entradas que não fazem sentido (fatorial de número negativo não existe); você vai aprender a fazer isso com exceções em <a href="excecoes.html">Exceções</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu o <code>return</code> na chamada recursiva: <code>none returned</code></strong>
+<pre class="file" data-file="sem-return.php">&lt;?php
+function fatorial(int $n): int
+{
+    if ($n &lt;= 1) {
+        return 1;
+    }
+    $n * fatorial($n - 1);
+}
+
+echo fatorial(5), "\n";
+</pre>
+<pre class="term">$ php sem-return.php
+
+Fatal error: Uncaught TypeError: fatorial(): Return value must be of type int, none returned in /home/ana/site/sem-return.php:8
+Stack trace:
+#0 /home/ana/site/sem-return.php(7): fatorial(2)
+#1 /home/ana/site/sem-return.php(7): fatorial(3)
+#2 /home/ana/site/sem-return.php(7): fatorial(4)
+#3 /home/ana/site/sem-return.php(10): fatorial(5)
+#4 {main}
+  thrown in /home/ana/site/sem-return.php on line 8</pre>
+<p><strong>O que significa:</strong> "o valor devolvido deve ser do tipo int, nenhum foi devolvido". A linha 7 calcula <code>$n * fatorial($n - 1)</code>, mas joga o resultado fora; a função chega ao <code>}</code> da linha 8 sem <code>return</code>. Quem quebrou foi <code>fatorial(2)</code>, a primeira a voltar depois do caso base: o stack trace mostra que ela tinha sido chamada por <code>fatorial(3)</code>, que foi chamada por <code>fatorial(4)</code>, que foi chamada na linha 10 com 5.</p>
+<p><strong>Como consertar:</strong> <code>return $n * fatorial($n - 1);</code>. O tipo de retorno <code>: int</code> foi o que denunciou o erro; sem ele, a função devolveria <code>null</code> em silêncio e o <code>echo</code> mostraria uma linha vazia. Mais um motivo para declarar tipos (aula <a href="tipos-retorno.html">Tipos e Retorno</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Chamou a recursão, mas esqueceu de usar a resposta (resultado errado, sem erro)</strong>
+<pre class="file" data-file="esqueceu-somar.php">&lt;?php
+$casa = [
+    "frutas.txt" =&gt; 47,
+    "Documentos" =&gt; [
+        "notas.txt"  =&gt; 69,
+        "alunos.csv" =&gt; 180,
+    ],
+];
+
+function tamanhoTotal(array $pasta): int
+{
+    $total = 0;
+    foreach ($pasta as $nome =&gt; $conteudo) {
+        if (is_array($conteudo)) {
+            tamanhoTotal($conteudo);
+        } else {
+            $total += $conteudo;
+        }
+    }
+    return $total;
+}
+
+echo tamanhoTotal($casa), " bytes\n";
+</pre>
+<pre class="term">$ php esqueceu-somar.php
+47 bytes                 « deveria ser 296: os arquivos de Documentos sumiram</pre>
+<p><strong>O que aconteceu:</strong> a função perguntou à pasta <code>Documentos</code> quanto ela ocupa (a chamada calculou 249 direitinho), mas <strong>não guardou</strong> a resposta. Cada chamada tem o seu próprio <code>$total</code>; o da subpasta não é o mesmo da pasta de cima. Nenhum aviso aparece, porque o código é válido: ele só não faz o que você queria.</p>
+<p><strong>Como consertar:</strong> <code>$total += tamanhoTotal($conteudo);</code>. Regra prática: numa função recursiva que devolve valor, a chamada recursiva quase sempre aparece num <code>return</code>, numa conta ou numa atribuição, nunca sozinha na linha.</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado ficou grande demais: <code>float returned</code></strong>
+<pre class="term">$ php fatorial.php       « o mesmo fatorial.php, com echo fatorial(21) no fim
+…
+2432902008176640000
+
+Fatal error: Uncaught TypeError: fatorial(): Return value must be of type int, float returned in /home/ana/site/fatorial.php:7
+Stack trace:
+#0 /home/ana/site/fatorial.php(15): fatorial(21)
+#1 {main}
+  thrown in /home/ana/site/fatorial.php on line 7</pre>
+<p><strong>O que aconteceu:</strong> não é um erro da recursão. <code>21!</code> passa do maior inteiro que o PHP guarda (<code>PHP_INT_MAX</code>, 9223372036854775807); a conta vira um <code>float</code> e o tipo de retorno <code>int</code> recusa (veja <a href="numeros.html">int e float</a>). O erro só aparece na última volta, em <code>fatorial(21)</code>, que é quem faz <code>21 * 20!</code>.</p>
+<p><strong>Como consertar:</strong> para números tão grandes, devolva <code>float</code> (perdendo precisão) ou use a extensão <code>bcmath</code>, que faz contas com quantos dígitos você quiser.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo / recurso</th><th>O que é</th></tr>
+<tr><td>Função recursiva</td><td>Uma função que chama a si mesma, direta ou indiretamente (<code>a()</code> chama <code>b()</code>, que chama <code>a()</code>).</td></tr>
+<tr><td>Caso base</td><td>A situação em que a função responde <strong>sem</strong> se chamar. Obrigatório.</td></tr>
+<tr><td>Passo recursivo</td><td>A chamada a si mesma com um problema <strong>menor</strong>, mais perto do caso base.</td></tr>
+<tr><td>Pilha de chamadas (<em>call stack</em>)</td><td>As chamadas que começaram e ainda esperam terminar. A última a entrar é a primeira a sair.</td></tr>
+<tr><td><code>Stack trace</code></td><td>A lista dessas chamadas que o PHP mostra num erro, da mais recente (<code>#0</code>) até o <code>{main}</code> (o programa principal).</td></tr>
+<tr><td><code>is_array($x)</code></td><td>"É um array?" Separa pasta de arquivo, galho de folha.</td></tr>
+<tr><td><code>memory_limit</code></td><td>Memória máxima de um script (padrão 128 MB). Esgotá-la gera <code>Allowed memory size of … bytes exhausted</code>.</td></tr>
+<tr><td><code>array_walk_recursive()</code></td><td>Função pronta que visita todas as folhas de um array aninhado.</td></tr>
+<tr><td><code>count($a, COUNT_RECURSIVE)</code></td><td>Conta os elementos de todos os níveis.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O caso base</h3>
+<p>Complete a condição para a contagem parar quando chegar em zero:</p>
+<div class="ex-code">if ($n <input data-answer="=== 0|== 0|&lt;= 0|&lt; 1" aria-label="condição">) { echo "Fogo!"; return; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. O passo recursivo</h3>
+<p>Complete a linha do fatorial:</p>
+<div class="ex-code">return $n * <input data-answer="fatorial($n - 1)|fatorial($n-1)" aria-label="chamada recursiva">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Folha ou galho?</h3>
+<p>Complete o teste que separa uma pasta (um array) de um arquivo:</p>
+<div class="ex-code">if (<input data-answer="is_array($conteudo)" aria-label="teste">) { $total += tamanhoTotal($conteudo); }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>idaEVolta(2)</code> mostra?</p>
+<label><input type="radio" name="q4"> descendo: 2, descendo: 1, subindo: 2, subindo: 1, chegou ao fundo</label>
+<label><input type="radio" name="q4"> descendo: 2, subindo: 2, descendo: 1, subindo: 1, chegou ao fundo</label>
+<label><input type="radio" name="q4"> descendo: 2, descendo: 1, chegou ao fundo, subindo: 1, subindo: 2</label>
+<label><input type="radio" name="q4"> chegou ao fundo, descendo: 2, descendo: 1, subindo: 1, subindo: 2</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Uma função recursiva terminou com <code>Fatal error: Allowed memory size of 134217728 bytes exhausted</code> e o stack trace repete a mesma função milhares de vezes. O que verificar primeiro?</p>
+<label><input type="radio" name="q5"> Aumentar o <code>memory_limit</code>.</label>
+<label><input type="radio" name="q5"> Se existe um caso base e se o passo recursivo chega até ele.</label>
+<label><input type="radio" name="q5"> Se a função tem tipo de retorno.</label>
+<label><input type="radio" name="q5"> Se faltou <code>htmlspecialchars</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Em qual destes casos a recursão é a escolha mais natural?</p>
+<label><input type="radio" name="q6"> Mostrar os números de 1 a 100.</label>
+<label><input type="radio" name="q6"> Somar os preços de uma lista de compras.</label>
+<label><input type="radio" name="q6"> Repetir uma pergunta até o usuário digitar "sair".</label>
+<label><input type="radio" name="q6"> Mostrar comentários que têm respostas, que têm respostas…</label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:A Ana tem 6 arquivos.,semerro">
+<p class="try-task"><strong>Missão:</strong> complete a função <code>contarArquivos</code> para contar <strong>quantos arquivos</strong> existem em todas as pastas (as pastas não contam). Se o conteúdo for um array, some o que a subpasta responder; se não for, conte mais um. A resposta certa é <code>A Ana tem 6 arquivos.</code></p>
+<pre class="script">&lt;?php
+$casa = [
+    "frutas.txt" =&gt; 47,
+    "Documentos" =&gt; [
+        "notas.txt"  =&gt; 69,
+        "alunos.csv" =&gt; 180,
+        "projetos"   =&gt; [
+            "site" =&gt; [
+                "index.php" =&gt; 340,
+                "ola.php"   =&gt; 26,
+            ],
+        ],
+    ],
+    "Música" =&gt; [
+        "forro.mp3" =&gt; 4100000,
+    ],
+];
+
+function contarArquivos(array $pasta): int
+{
+    $quantos = 0;
+    foreach ($pasta as $conteudo) {
+        // complete aqui
+    }
+    return $quantos;
+}
+
+echo "A Ana tem ", contarArquivos($casa), " arquivos.\n";
+</pre>
+<pre class="solucao">&lt;?php
+$casa = [
+    "frutas.txt" =&gt; 47,
+    "Documentos" =&gt; [
+        "notas.txt"  =&gt; 69,
+        "alunos.csv" =&gt; 180,
+        "projetos"   =&gt; [
+            "site" =&gt; [
+                "index.php" =&gt; 340,
+                "ola.php"   =&gt; 26,
+            ],
+        ],
+    ],
+    "Música" =&gt; [
+        "forro.mp3" =&gt; 4100000,
+    ],
+];
+
+function contarArquivos(array $pasta): int
+{
+    $quantos = 0;
+    foreach ($pasta as $conteudo) {
+        if (is_array($conteudo)) {
+            $quantos += contarArquivos($conteudo);
+        } else {
+            $quantos++;
+        }
+    }
+    return $quantos;
+}
+
+echo "A Ana tem ", contarArquivos($casa), " arquivos.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma função recursiva chama a si mesma. Ela precisa de um <strong>caso base</strong> (responde sem se chamar) e de um <strong>passo recursivo</strong> (se chama com um problema menor).</li>
+  <li>Cada chamada tem as suas próprias variáveis. As chamadas ficam empilhadas esperando; o código depois da chamada recursiva roda "na volta", em ordem contrária.</li>
+  <li>Numa recursão que devolve valor, use a resposta da chamada: <code>return $n * fatorial($n - 1);</code>, <code>$total += tamanhoTotal($sub);</code>.</li>
+  <li>A recursão brilha em <strong>árvores</strong>: menus, pastas, categorias, comentários com respostas. Para contar e repetir, prefira um laço.</li>
+  <li>Sem caso base (ou com um caso base inalcançável), o PHP esgota a memória: <code>Fatal error: Allowed memory size of … bytes exhausted</code>, seguido de um stack trace com a mesma função repetida.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
