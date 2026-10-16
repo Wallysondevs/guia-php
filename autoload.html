@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Autoload e PSR-4 — spl_autoload_register e vendor/autoload.php | Guia PHP</title>
+<meta name="description" content="Autoload no PHP: o problema dos muitos require, como o spl_autoload_register carrega classes sob demanda, um autoloader PSR-4 escrito à mão (namespace vira pasta) e o autoload do Composer com vendor/autoload.php e dump-autoload, com saídas e erros reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Autoload e PSR-4</span></h1>
+
+<p class="intro">Num projeto com 50 classes, cada arquivo que usa outras classes precisaria de uma pilha de <code>require</code> no topo. Esqueceu um? Erro. Incluiu um a mais? Desperdício. O <strong>autoload</strong> ("carregamento automático") inverte o jogo: você ensina ao PHP <strong>onde</strong> as classes moram, e ele carrega cada arquivo sozinho, só quando a classe for usada pela primeira vez.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que muitos <code>require</code> viram um problema.</li>
+  <li>Como o <code>spl_autoload_register</code> funciona: o PHP "pede socorro" quando não conhece uma classe.</li>
+  <li>A escrever um autoloader de verdade, de dez linhas.</li>
+  <li>A regra <strong>PSR-4</strong>: o namespace vira o caminho da pasta.</li>
+  <li>O autoload do Composer: <code>vendor/autoload.php</code> e <code>composer dump-autoload</code>.</li>
+</ul>
+</div>
+
+<p>Antes, veja <a href="namespaces.html">Namespaces</a>: o autoload depende da regra "uma classe por arquivo, pastas iguais ao namespace" que aparece lá.</p>
+
+<hr>
+
+<h2>O problema: a pilha de <code>require</code></h2>
+<p>A lojinha da Ana já tem três classes, cada uma no seu arquivo:</p>
+
+<pre>auto/
+├── antes.php
+└── src/
+    ├── Carrinho.php         « Loja\Carrinho
+    ├── Produto.php          « Loja\Produto
+    └── Pagamento/
+        └── Pix.php          « Loja\Pagamento\Pix</pre>
+
+<pre class="file" data-file="src/Produto.php">&lt;?php
+namespace Loja;
+
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {}
+}
+</pre>
+
+<pre class="file" data-file="src/Carrinho.php">&lt;?php
+namespace Loja;
+
+class Carrinho
+{
+    /** @var Produto[] */
+    private array $itens = [];
+
+    public function adicionar(Produto $p): void
+    {
+        $this-&gt;itens[] = $p;
+    }
+
+    public function total(): float
+    {
+        return array_sum(array_map(fn(Produto $p) =&gt; $p-&gt;preco, $this-&gt;itens));
+    }
+}
+</pre>
+
+<pre class="file" data-file="src/Pagamento/Pix.php">&lt;?php
+namespace Loja\Pagamento;
+
+class Pix
+{
+    public function pagar(float $valor): string
+    {
+        return "Pix de R$ " . number_format($valor, 2, ",", ".") . " gerado";
+    }
+}
+</pre>
+
+<p>O programa principal precisa de um <code>require</code> para cada uma:</p>
+
+<pre class="file" data-file="antes.php">&lt;?php
+require __DIR__ . '/src/Produto.php';
+require __DIR__ . '/src/Carrinho.php';
+require __DIR__ . '/src/Pagamento/Pix.php';
+
+use Loja\Carrinho;
+use Loja\Produto;
+use Loja\Pagamento\Pix;
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(new Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Produto("Camiseta", 49.9));
+echo (new Pix())-&gt;pagar($carrinho-&gt;total()), "\n";
+</pre>
+
+<pre class="term">$ php antes.php
+Pix de R$ 69,80 gerado</pre>
+
+<p>Funciona. Mas imagine o projeto crescendo:</p>
+<ul>
+  <li>Cada página nova copia a mesma pilha de <code>require</code>, e cada classe nova obriga a mexer em todas as páginas.</li>
+  <li>A <strong>ordem</strong> importa em alguns casos: uma classe que herda de outra (<code>class Pix extends Pagamento</code>) só pode ser carregada depois da classe-mãe.</li>
+  <li>Carrega-se tudo, mesmo o que a página não usa: a página do blog carregaria a classe do Pix.</li>
+  <li>Bibliotecas de terceiros têm centenas de arquivos. Ninguém escreveria esses <code>require</code> à mão.</li>
+</ul>
+
+<hr>
+
+<h2>A ideia: o PHP pede ajuda</h2>
+<p>Pense numa biblioteca: você não carrega todos os livros para a mesa "por precaução". Quando precisa de um, pede ao bibliotecário, que sabe em que estante ele está. O autoload é esse bibliotecário.</p>
+<p>Funciona assim: quando o PHP encontra uma classe que ainda não conhece (por exemplo, em <code>new Loja\Produto</code>), em vez de dar erro na hora, ele chama uma função sua e diz "preciso da classe <code>Loja\Produto</code>, você sabe onde ela está?". A sua função faz o <code>require</code> do arquivo certo, e o PHP continua como se nada tivesse acontecido. Se ninguém resolver, aí sim vem o erro <code>Class "…" not found</code>.</p>
+<p>Você registra essa função com <code>spl_autoload_register</code> (<em>SPL</em> é a "Standard PHP Library", a biblioteca padrão; <em>register</em> = "registrar").</p>
+
+<h3>Espiando os pedidos do PHP</h3>
+<p>Primeiro, um autoloader que não carrega nada: ele só mostra o que o PHP pediu.</p>
+
+<pre class="file" data-file="espiao.php">&lt;?php
+spl_autoload_register(function (string $classe) {
+    echo "[autoload] o PHP pediu: $classe\n";
+});
+
+echo "Começo\n";
+$existe = class_exists('Loja\Produto');
+var_dump($existe);
+echo Loja\Produto::class, "\n";
+new Loja\Produto("Caneca", 19.9);
+</pre>
+
+<dl class="anatomy">
+  <dt>spl_autoload_register(…)</dt><dd>Registra a função que o PHP vai chamar quando não conhecer uma classe.</dd>
+  <dt>function (string $classe)</dt><dd>Uma <a href="closures.html">função anônima</a>. O PHP passa a ela o <strong>nome completo</strong> da classe, com namespace e sem a barra da frente.</dd>
+  <dt>class_exists('Loja\Produto')</dt><dd>"Essa classe existe?". Para responder, o PHP tenta o autoload.</dd>
+  <dt>Loja\Produto::class</dt><dd>Só monta o texto com o nome. Não precisa da classe, então não chama o autoload.</dd>
+  <dt>new Loja\Produto(…)</dt><dd>Precisa da classe de verdade: chama o autoload.</dd>
+</dl>
+
+<pre class="term">$ php espiao.php
+Começo
+[autoload] o PHP pediu: Loja\Produto       « pedido do class_exists
+bool(false)                                « ninguém carregou: "não existe"
+Loja\Produto                               « ::class não chamou o autoload
+[autoload] o PHP pediu: Loja\Produto       « pedido do new
+
+Fatal error: Uncaught Error: Class "Loja\Produto" not found in /home/ana/auto/espiao.php:10
+Stack trace:
+#0 {main}
+  thrown in /home/ana/auto/espiao.php on line 10</pre>
+
+<p>Repare: o autoloader foi chamado, não fez <code>require</code> nenhum, e o PHP, sem a classe, deu o erro de sempre. Agora vamos fazer a função trabalhar.</p>
+
+<hr>
+
+<h2>Um autoloader que carrega de verdade</h2>
+<p>A regra que a Ana segue é simples: a classe <code>Loja\Produto</code> está em <code>src/Produto.php</code>; a classe <code>Loja\Pagamento\Pix</code>, em <code>src/Pagamento/Pix.php</code>. Ou seja: tire o <code>Loja\</code> do começo, troque as barras invertidas <code>\</code> por barras normais <code>/</code> e acrescente <code>.php</code>.</p>
+
+<pre class="file" data-file="falante.php">&lt;?php
+spl_autoload_register(function (string $classe): void {
+    echo "  [autoload] carregando $classe\n";
+    require __DIR__ . '/src/' . str_replace(['Loja\\', '\\'], ['', '/'], $classe) . '.php';
+});
+
+echo "1. criando o carrinho\n";
+$carrinho = new Loja\Carrinho();
+echo "2. criando dois produtos\n";
+$carrinho-&gt;adicionar(new Loja\Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Loja\Produto("Camiseta", 49.9));
+echo "3. total: ", $carrinho-&gt;total(), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>str_replace(['Loja\\', '\\'], ['', '/'], $classe)</dt><dd>Duas trocas de uma vez: <code>Loja\</code> vira nada, e cada <code>\</code> restante vira <code>/</code>. Dentro das aspas simples, <code>'\\'</code> é <strong>uma</strong> barra invertida (a primeira "escapa" a segunda).</dd>
+  <dt>__DIR__ . '/src/' . … . '.php'</dt><dd>Monta o caminho completo: <code>/home/ana/auto/src/Produto.php</code>. O <code>__DIR__</code> é a pasta do arquivo atual (veja <a href="include-require.html">include e require</a>).</dd>
+</dl>
+
+<pre class="term">$ php falante.php
+1. criando o carrinho
+  [autoload] carregando Loja\Carrinho
+2. criando dois produtos
+  [autoload] carregando Loja\Produto        « só na primeira vez
+3. total: 69.8</pre>
+
+<p>Três coisas importantes nessa saída:</p>
+<ol>
+  <li>Os arquivos foram carregados <strong>no momento do uso</strong>, não no começo.</li>
+  <li>O segundo <code>new Loja\Produto</code> não chamou o autoload: depois de carregada, a classe fica conhecida até o fim do programa.</li>
+  <li>A classe <code>Pix</code> nem foi carregada, porque este programa não a usa.</li>
+</ol>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja quando cada classe é carregada. Depois mude a ordem das linhas (crie um <code>Produto</code> antes do <code>Carrinho</code>) e rode de novo. Neste editor, os arquivos ficam todos na mesma pasta; por isso o autoloader só tira o <code>Loja\</code> do nome.</p>
+<pre class="script" data-file="index.php">&lt;?php
+spl_autoload_register(function (string $classe): void {
+    echo "  [autoload] carregando $classe\n";
+    require __DIR__ . '/' . str_replace('Loja\\', '', $classe) . '.php';
+});
+
+echo "1. criando o carrinho\n";
+$carrinho = new Loja\Carrinho();
+echo "2. criando dois produtos\n";
+$carrinho-&gt;adicionar(new Loja\Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Loja\Produto("Camiseta", 49.9));
+echo "3. total: ", $carrinho-&gt;total(), "\n";
+</pre>
+<pre class="script" data-file="Produto.php">&lt;?php
+namespace Loja;
+
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {}
+}
+</pre>
+<pre class="script" data-file="Carrinho.php">&lt;?php
+namespace Loja;
+
+class Carrinho
+{
+    private array $itens = [];
+
+    public function adicionar(Produto $p): void
+    {
+        $this-&gt;itens[] = $p;
+    }
+
+    public function total(): float
+    {
+        return array_sum(array_map(fn(Produto $p) =&gt; $p-&gt;preco, $this-&gt;itens));
+    }
+}
+</pre>
+</div>
+
+<h3>Deixando o autoloader educado</h3>
+<p>O autoloader acima tem um defeito: ele tenta carregar <strong>qualquer</strong> classe, até as que não são da loja e as que não existem. Veja o que ele faz com uma classe que ainda não foi criada:</p>
+
+<pre class="file" data-file="sem-if.php">&lt;?php
+spl_autoload_register(function (string $classe): void {
+    require __DIR__ . '/src/' . str_replace('Loja\\', '', $classe) . '.php';
+});
+
+$c = new Loja\Cupom("ANA10");
+</pre>
+
+<pre class="term">$ php sem-if.php
+
+Warning: require(/home/ana/auto/src/Cupom.php): Failed to open stream: No such file or directory in /home/ana/auto/sem-if.php on line 3
+
+Fatal error: Uncaught Error: Failed opening required '/home/ana/auto/src/Cupom.php' (include_path='.:') in /home/ana/auto/sem-if.php:3
+Stack trace:
+#0 /home/ana/auto/sem-if.php(6): {closure:/home/ana/auto/sem-if.php:2}('Loja\\Cupom')
+#1 {main}
+  thrown in /home/ana/auto/sem-if.php on line 3</pre>
+
+<p>O erro fala de <strong>arquivo</strong>, não de classe, o que confunde. Pior: num projeto com vários autoloaders (o seu e os das bibliotecas), o seu derrubaria o programa antes que o autoloader certo tivesse a chance de tentar. A regra de boa educação é: <strong>se a classe não é sua, ou o arquivo não existe, apenas volte (<code>return</code>) sem fazer nada</strong>. O PHP então pergunta ao próximo autoloader registrado, e, se ninguém achar, mostra o erro claro <code>Class "…" not found</code>.</p>
+
+<p>Este é o autoloader completo da Ana, num arquivo próprio:</p>
+
+<pre class="file" data-file="autoload.php">&lt;?php
+spl_autoload_register(function (string $classe): void {
+    $prefixo = 'Loja\\';
+    $pasta = __DIR__ . '/src/';
+
+    // A classe não é da loja? Não é comigo.
+    if (!str_starts_with($classe, $prefixo)) {
+        return;
+    }
+
+    // "Loja\Pagamento\Pix" -&gt; "Pagamento\Pix" -&gt; "Pagamento/Pix.php"
+    $relativo = substr($classe, strlen($prefixo));
+    $arquivo = $pasta . str_replace('\\', '/', $relativo) . '.php';
+
+    if (is_file($arquivo)) {
+        require $arquivo;
+    }
+});
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$prefixo = 'Loja\\';</code></td><td>O começo do namespace que este autoloader atende: <code>Loja\</code>.</td></tr>
+<tr><td><code>$pasta = __DIR__ . '/src/';</code></td><td>A pasta onde esse namespace começa.</td></tr>
+<tr><td><code>str_starts_with($classe, $prefixo)</code></td><td>"O nome começa com <code>Loja\</code>?" (<code>str_starts_with</code> existe desde o PHP 8.0). Se não, <code>return</code>.</td></tr>
+<tr><td><code>substr($classe, strlen($prefixo))</code></td><td>Corta o prefixo: <code>Loja\Pagamento\Pix</code> → <code>Pagamento\Pix</code>.</td></tr>
+<tr><td><code>str_replace('\\', '/', $relativo)</code></td><td>Troca as barras: <code>Pagamento/Pix</code>.</td></tr>
+<tr><td><code>is_file($arquivo)</code></td><td>Só faz o <code>require</code> se o arquivo existir. Se não existir, a função termina sem fazer nada.</td></tr>
+</table>
+</div>
+
+<p>Com ele, o programa principal troca a pilha de <code>require</code> por um só:</p>
+
+<pre class="file" data-file="depois.php">&lt;?php
+require __DIR__ . '/autoload.php';
+
+use Loja\Carrinho;
+use Loja\Produto;
+use Loja\Pagamento\Pix;
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(new Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Produto("Camiseta", 49.9));
+echo (new Pix())-&gt;pagar($carrinho-&gt;total()), "\n";
+
+print_r(array_map(fn($f) =&gt; basename($f), get_included_files()));
+</pre>
+
+<pre class="term">$ php depois.php
+Pix de R$ 69,80 gerado
+Array
+(
+    [0] =&gt; depois.php
+    [1] =&gt; autoload.php
+    [2] =&gt; Carrinho.php       « carregados pelo autoload,
+    [3] =&gt; Produto.php        « na ordem em que foram usados
+    [4] =&gt; Pix.php
+)</pre>
+
+<p>A função <code>get_included_files()</code> lista todos os arquivos que o PHP abriu; o <code>basename</code> deixa só o nome de cada um. E agora a classe que não existe dá o erro certo:</p>
+
+<pre class="term">$ php cupom.php
+
+Fatal error: Uncaught Error: Class "Loja\Cupom" not found in /home/ana/auto/cupom.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/auto/cupom.php on line 4</pre>
+
+<p>Para criar a classe <code>Loja\Cupom</code>, basta criar o arquivo <code>src/Cupom.php</code>. Nenhum outro arquivo precisa mudar.</p>
+
+<hr>
+
+<h2>PSR-4: a regra que todo mundo segue</h2>
+<p>A regra que a Ana inventou não é dela: é a <strong>PSR-4</strong>, uma recomendação da comunidade PHP adotada por praticamente todas as bibliotecas e frameworks (PSR quer dizer <em>PHP Standards Recommendation</em>, "recomendação de padrão do PHP"; veja <a href="psr.html">Padrões PSR</a>). Em palavras simples:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra da PSR-4</th><th>No exemplo da Ana</th></tr>
+<tr><td>Um <strong>prefixo de namespace</strong> corresponde a uma <strong>pasta base</strong></td><td><code>Loja\</code> → <code>src/</code></td></tr>
+<tr><td>O resto do namespace vira subpastas</td><td><code>Loja\Pagamento\</code> → <code>src/Pagamento/</code></td></tr>
+<tr><td>O nome da classe vira o nome do arquivo, com <code>.php</code></td><td><code>Pix</code> → <code>Pix.php</code></td></tr>
+<tr><td>Maiúsculas e minúsculas têm que bater exatamente</td><td><code>Produto.php</code>, e não <code>produto.php</code></td></tr>
+<tr><td>Um autoloader nunca dá erro: se não achar, só não carrega</td><td>O <code>return</code> e o <code>is_file</code></td></tr>
+</table>
+</div>
+
+<p>Exemplos de nome completo e arquivo, com o prefixo <code>AnaSilva\Blog\</code> apontando para a pasta <code>src/</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Classe</th><th>Arquivo</th></tr>
+<tr><td><code>AnaSilva\Blog\Post</code></td><td><code>src/Post.php</code></td></tr>
+<tr><td><code>AnaSilva\Blog\Comentario\Moderador</code></td><td><code>src/Comentario/Moderador.php</code></td></tr>
+<tr><td><code>AnaSilva\Blog\Http\Controller\PostController</code></td><td><code>src/Http/Controller/PostController.php</code></td></tr>
+</table>
+</div>
+
+<p>Repare que o prefixo <strong>não</strong> vira pasta (não existe <code>src/AnaSilva/Blog/</code>). Isso deixa as pastas curtas: só a parte "interna" do namespace aparece.</p>
+
+<div class="warning">
+<strong>Maiúsculas no Linux</strong>
+<p>Para o PHP, nomes de classe não diferenciam maiúsculas: <code>new loja\produto</code> e <code>new Loja\Produto</code> são a mesma classe, <strong>se ela já estiver carregada</strong>. Mas o autoload transforma o nome em caminho de arquivo, e no Linux <code>produto.php</code> e <code>Produto.php</code> são arquivos diferentes:</p>
+<pre class="term">$ php minuscula.php
+
+Fatal error: Uncaught Error: Class "Loja\produto" not found in /home/ana/auto/minuscula.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/auto/minuscula.php on line 4</pre>
+<p>No Windows e no macOS (que, por padrão, não diferenciam maiúsculas nos nomes de arquivo), o mesmo código funciona, e o erro só aparece quando o site vai para o servidor Linux. Escreva sempre o nome exatamente como no arquivo.</p>
+</div>
+
+<hr>
+
+<h2>O autoload do Composer</h2>
+<p>Na prática, quase ninguém escreve o próprio autoloader: o <a href="composer.html">Composer</a>, o gerenciador de pacotes do PHP, gera um pronto. Você só descreve a regra num arquivo <code>composer.json</code>:</p>
+
+<pre class="file" data-file="composer.json">{
+    "autoload": {
+        "psr-4": {
+            "Loja\\": "src/"
+        }
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>"autoload"</dt><dd>A seção que configura o carregamento automático.</dd>
+  <dt>"psr-4"</dt><dd>"Use a regra PSR-4."</dd>
+  <dt>"Loja\\": "src/"</dt><dd>O prefixo <code>Loja\</code> fica na pasta <code>src/</code>. Em JSON, a barra invertida também precisa ser dobrada; o prefixo termina sempre com <code>\\</code>.</dd>
+</dl>
+
+<p>O <code>index.php</code> agora carrega o autoloader do Composer, que fica na pasta <code>vendor/</code>:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Loja\Carrinho;
+use Loja\Produto;
+use Loja\Pagamento\Pix;
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(new Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Produto("Camiseta", 49.9));
+echo (new Pix())-&gt;pagar($carrinho-&gt;total()), "\n";
+</pre>
+
+<p>Rodando antes de gerar o autoloader:</p>
+
+<pre class="term">$ php index.php
+
+Warning: require(/home/ana/auto-composer/vendor/autoload.php): Failed to open stream: No such file or directory in /home/ana/auto-composer/index.php on line 2
+
+Fatal error: Uncaught Error: Failed opening required '/home/ana/auto-composer/vendor/autoload.php' (include_path='.:') in /home/ana/auto-composer/index.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/auto-composer/index.php on line 2</pre>
+
+<p>A pasta <code>vendor/</code> ainda não existe. Quem a cria é o comando <code>composer dump-autoload</code> ("despejar o autoload", ou seja, gerar os arquivos):</p>
+
+<pre class="term">$ composer dump-autoload
+Generating autoload files
+Generated autoload files
+$ find vendor | sort
+vendor
+vendor/autoload.php                       « o único arquivo que você inclui
+vendor/composer
+vendor/composer/autoload_classmap.php
+vendor/composer/autoload_namespaces.php
+vendor/composer/autoload_psr4.php         « a sua regra Loja\ → src/
+vendor/composer/autoload_real.php
+vendor/composer/autoload_static.php
+vendor/composer/ClassLoader.php           « o autoloader de verdade
+vendor/composer/LICENSE
+$ php index.php
+Pix de R$ 69,80 gerado</pre>
+
+<p>Dá para ver a sua regra dentro de um dos arquivos gerados:</p>
+
+<pre class="term">$ cat vendor/composer/autoload_psr4.php
+&lt;?php
+
+// autoload_psr4.php @generated by Composer
+
+$vendorDir = dirname(__DIR__);
+$baseDir = dirname($vendorDir);
+
+return array(
+    'Loja\\' =&gt; array($baseDir . '/src'),
+);</pre>
+
+<p>Por dentro, o <code>ClassLoader.php</code> faz o mesmo que o autoloader da Ana: registra uma função com <code>spl_autoload_register</code> e transforma nomes em caminhos. A vantagem é que ele também carrega todas as bibliotecas que você instalar com o Composer, cada uma com a sua regra, com <strong>um único</strong> <code>require</code>.</p>
+
+<h3>Quando rodar <code>dump-autoload</code> de novo</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você fez</th><th>Precisa de <code>composer dump-autoload</code>?</th></tr>
+<tr><td>Criou uma classe nova numa pasta já mapeada (ex.: <code>src/Cupom.php</code>)</td><td><strong>Não.</strong> A regra PSR-4 acha o arquivo sozinha</td></tr>
+<tr><td>Mudou a seção <code>autoload</code> do <code>composer.json</code> (novo prefixo, outra pasta)</td><td><strong>Sim</strong></td></tr>
+<tr><td>Apagou a pasta <code>vendor/</code></td><td>Sim (ou <code>composer install</code>, que também gera)</td></tr>
+<tr><td>Vai publicar o site e quer o máximo de velocidade</td><td><code>composer dump-autoload --optimize</code>: gera uma lista pronta classe → arquivo (<em>classmap</em>)</td></tr>
+</table>
+</div>
+
+<p>Conferindo a primeira linha da tabela, com a classe <code>Cupom</code> criada depois do <code>dump-autoload</code>:</p>
+
+<pre class="term">$ php cupom.php
+ANA10</pre>
+
+<hr>
+
+<h2>Formas de carregar classes: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Quando usar</th></tr>
+<tr><td><code>require</code> de cada arquivo</td><td>Scripts pequenos, com 1 ou 2 arquivos. Aulas e testes rápidos.</td></tr>
+<tr><td><code>spl_autoload_register</code> próprio</td><td>Para entender como funciona; projetos sem Composer (hospedagem muito limitada).</td></tr>
+<tr><td>Composer, <code>"psr-4"</code> + <code>vendor/autoload.php</code></td><td><strong>O padrão</strong> em qualquer projeto de verdade.</td></tr>
+<tr><td>Composer, <code>"files"</code></td><td>Arquivos só com funções (sem classes), que precisam ser carregados sempre: funções não têm autoload.</td></tr>
+<tr><td><code>__autoload()</code></td><td><strong>Nunca.</strong> Forma antiga, removida no PHP 8.0. Se você encontrar em tutorial velho, troque por <code>spl_autoload_register</code>.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Funções e constantes não têm autoload</strong>
+<p>O autoload só existe para classes, interfaces, traits e enums. Um arquivo só com funções (como o <code>funcoes.php</code> da aula de <a href="namespaces.html">Namespaces</a>) ainda precisa de <code>require</code>, ou da seção <code>"files"</code> do Composer. É um dos motivos pelos quais o PHP moderno usa tanto classes com métodos estáticos.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Class "Loja\Cupom" not found, mesmo com autoload</strong>
+<p><strong>O que significa:</strong> o autoloader rodou e não achou o arquivo. Verifique, nesta ordem: (1) o arquivo existe no caminho que a regra PSR-4 calcula? (2) As maiúsculas batem (<code>Cupom.php</code>, não <code>cupom.php</code>)? (3) O <code>namespace</code> dentro do arquivo está certo? (4) O nome da classe dentro do arquivo é o mesmo do arquivo?</p>
+<p><strong>Dica:</strong> coloque temporariamente um <code>echo</code> no seu autoloader, como no <code>falante.php</code>, para ver o nome e o caminho calculado.</p>
+</div>
+
+<div class="cenario">
+<strong>Failed opening required '…/src/Cupom.php'</strong>
+<p><strong>O que significa:</strong> o autoloader fez <code>require</code> de um arquivo que não existe. O erro aponta para a linha do autoloader, não para a linha que usou a classe; o <em>stack trace</em> mostra a linha de verdade (<code>#0 … sem-if.php(6)</code>).</p>
+<p><strong>Como consertar:</strong> verifique o arquivo com <code>is_file</code> antes do <code>require</code> e devolva sem fazer nada quando ele não existir.</p>
+</div>
+
+<div class="cenario">
+<strong>Failed opening required '…/vendor/autoload.php'</strong>
+<p><strong>O que significa:</strong> a pasta <code>vendor/</code> não existe. Acontece ao baixar um projeto do GitHub: a pasta <code>vendor/</code> não vai junto (ela é gerada).</p>
+<p><strong>Como consertar:</strong> rode <code>composer install</code> (se o projeto tiver dependências) ou <code>composer dump-autoload</code> na pasta onde está o <code>composer.json</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Funciona no meu computador, mas não no servidor</strong>
+<p><strong>O que significa:</strong> quase sempre é maiúscula/minúscula. No Windows/macOS, <code>produto.php</code> e <code>Produto.php</code> são o mesmo arquivo; no servidor Linux, não.</p>
+<p><strong>Como consertar:</strong> renomeie o arquivo para ter exatamente o nome da classe.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que faz</th></tr>
+<tr><td><code>spl_autoload_register(callable $f)</code></td><td>Registra um autoloader; pode haver vários, chamados em ordem</td></tr>
+<tr><td><code>spl_autoload_functions()</code></td><td>Lista os autoloaders registrados</td></tr>
+<tr><td><code>spl_autoload_unregister($f)</code></td><td>Remove um autoloader</td></tr>
+<tr><td><code>class_exists('Nome')</code></td><td>"A classe existe?" (tenta o autoload; <code>class_exists('Nome', false)</code> não tenta)</td></tr>
+<tr><td><code>get_included_files()</code></td><td>Lista os arquivos já carregados</td></tr>
+<tr><td><code>"autoload": {"psr-4": {"Loja\\": "src/"}}</code></td><td>Regra PSR-4 no <code>composer.json</code></td></tr>
+<tr><td><code>"autoload": {"files": ["src/funcoes.php"]}</code></td><td>Arquivos que o Composer carrega sempre</td></tr>
+<tr><td><code>require __DIR__ . '/vendor/autoload.php';</code></td><td>Liga o autoload do Composer</td></tr>
+<tr><td><code>composer dump-autoload</code></td><td>Gera de novo os arquivos de autoload</td></tr>
+<tr><td><code>composer dump-autoload --optimize</code></td><td>Gera um mapa classe → arquivo (mais rápido em produção)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O arquivo da classe</h3>
+<p>Com a regra <code>"Loja\\": "src/"</code>, em qual arquivo fica a classe <code>Loja\Pagamento\Boleto</code>?</p>
+<div class="ex-code"><input data-answer="src/Pagamento/Boleto.php" aria-label="caminho do arquivo"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Registrar o autoloader</h3>
+<p>Complete o nome da função que registra um autoloader:</p>
+<div class="ex-code"><input data-answer="spl_autoload_register" aria-label="nome da função">(function (string $classe) { … });</div>
+</div>
+
+<div class="exercise">
+<h3>3. O arquivo que liga o Composer</h3>
+<p>Complete a linha que liga o autoload do Composer:</p>
+<div class="ex-code">require __DIR__ . '<input data-answer="/vendor/autoload.php" aria-label="caminho">';</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Você criou <code>src/Cupom.php</code> com a classe <code>Loja\Cupom</code>, num projeto que já tem a regra PSR-4 <code>Loja\</code> → <code>src/</code>. O que precisa fazer?</p>
+<label><input type="radio" name="q4"> <code>composer dump-autoload</code></label>
+<label><input type="radio" name="q4"> Um <code>require</code> no <code>index.php</code></label>
+<label><input type="radio" name="q4"> Nada: o autoload acha o arquivo sozinho</label>
+<label><input type="radio" name="q4"> <code>composer install</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Quando o PHP chama o autoloader?</p>
+<label><input type="radio" name="q5"> No começo do programa, para todas as classes</label>
+<label><input type="radio" name="q5"> Na primeira vez que precisa de uma classe que ainda não conhece</label>
+<label><input type="radio" name="q5"> Em todo <code>new</code>, mesmo de classes já carregadas</label>
+<label><input type="radio" name="q5"> Quando encontra um <code>use</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Um autoloader não encontrou o arquivo da classe. O que ele deve fazer?</p>
+<label><input type="radio" name="q6"> Lançar uma exceção</label>
+<label><input type="radio" name="q6"> Fazer <code>require</code> mesmo assim</label>
+<label><input type="radio" name="q6"> Chamar <code>exit</code></label>
+<label><input type="radio" name="q6"> Voltar sem fazer nada, para o próximo autoloader tentar</label>
+</div>
+
+<div class="tryphp" data-goal="out:Total: R$ 69\,80,src:spl_autoload_register,semerro">
+<p class="try-task"><strong>Missão final:</strong> o <code>index.php</code> não tem nenhum <code>require</code> e por isso não acha as classes. Escreva um autoloader com <code>spl_autoload_register</code> que transforme <code>Loja\Produto</code> em <code>Produto.php</code> (neste editor, todos os arquivos ficam na mesma pasta). Se a classe não começar com <code>Loja\</code> ou o arquivo não existir, ele não deve fazer nada. A saída deve ser <code>Total: R$ 69,80</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+// escreva o autoloader aqui
+
+
+use Loja\Carrinho;
+use Loja\Produto;
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(new Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Produto("Camiseta", 49.9));
+echo "Total: R$ ", number_format($carrinho-&gt;total(), 2, ",", "."), "\n";
+</pre>
+<pre class="script" data-file="Produto.php">&lt;?php
+namespace Loja;
+
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {}
+}
+</pre>
+<pre class="script" data-file="Carrinho.php">&lt;?php
+namespace Loja;
+
+class Carrinho
+{
+    private array $itens = [];
+
+    public function adicionar(Produto $p): void
+    {
+        $this-&gt;itens[] = $p;
+    }
+
+    public function total(): float
+    {
+        return array_sum(array_map(fn(Produto $p) =&gt; $p-&gt;preco, $this-&gt;itens));
+    }
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+spl_autoload_register(function (string $classe): void {
+    $prefixo = 'Loja\\';
+    if (!str_starts_with($classe, $prefixo)) {
+        return;
+    }
+    $arquivo = __DIR__ . '/' . substr($classe, strlen($prefixo)) . '.php';
+    if (is_file($arquivo)) {
+        require $arquivo;
+    }
+});
+
+use Loja\Carrinho;
+use Loja\Produto;
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(new Produto("Caneca", 19.9));
+$carrinho-&gt;adicionar(new Produto("Camiseta", 49.9));
+echo "Total: R$ ", number_format($carrinho-&gt;total(), 2, ",", "."), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Autoload = o PHP chama uma função sua quando encontra uma classe desconhecida; ela faz o <code>require</code> do arquivo certo.</li>
+  <li><code>spl_autoload_register(function (string $classe) { … })</code> registra essa função. Ela recebe o nome completo, com namespace.</li>
+  <li>Cada classe é carregada só quando é usada, e só uma vez.</li>
+  <li>Um bom autoloader não dá erro: se a classe não é dele ou o arquivo não existe, só volta.</li>
+  <li>PSR-4: prefixo de namespace → pasta base; o resto do nome vira subpastas e arquivo <code>.php</code>; maiúsculas contam.</li>
+  <li>Composer: regra no <code>composer.json</code>, <code>composer dump-autoload</code>, e um único <code>require __DIR__ . '/vendor/autoload.php';</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
