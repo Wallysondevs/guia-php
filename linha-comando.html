@@ -106,14 +106,27 @@ Anaana@notebook:~/cli$                « sem quebra de linha, o prompt grudou na
 <h2>3. <code>php -a</code>: o modo interativo</h2>
 <p>A opção <code>-a</code> (de <em>interactive</em>) abre uma "conversa" com o PHP: você digita uma instrução, aperta <kbd>Enter</kbd>, e ele executa na hora, sem arquivo. É ótimo para experimentar uma função.</p>
 
-<p>O modo interativo precisa da extensão <strong>readline</strong> (a que permite editar a linha e usar as setas). O PHP instalado pelo <code>apt</code> no Debian e no Ubuntu já vem com ela: o <code>php -a</code> abre um prompt <code>php &gt;</code>, onde cada instrução termina com <code>;</code>, como num arquivo, e você sai com <code>exit</code> ou <kbd>Ctrl</kbd>+<kbd>D</kbd>. O PHP do computador da Ana foi montado sem essa extensão, e quando ela falta o PHP diz exatamente isso:</p>
-
 <pre class="term">$ php -a
-Interactive shell (-a) requires the readline extension.
-$ echo $?
-1</pre>
+Interactive shell
 
-<p>Tradução: "o modo interativo (<code>-a</code>) precisa da extensão readline". Se aparecer no seu computador, instale o pacote da readline da sua versão do PHP (no Debian e no Ubuntu, <code>sudo apt install php-readline</code>) ou use as alternativas: <code>php -r</code> para uma linha, um arquivo para várias, e o editor do guia, onde você muda o código e clica em Rodar quantas vezes quiser.</p>
+php &gt; echo 10 / 3;
+3.3333333333333
+php &gt; $nome = "Ana";
+php &gt; echo "Olá, $nome!";
+Olá, Ana!
+php &gt; echo strtoupper($nome);
+ANA
+php &gt; exit</pre>
+
+<dl class="anatomy">
+  <dt>Interactive shell</dt><dd>"Modo interativo": o PHP avisa que entrou na conversa.</dd>
+  <dt>php &gt;</dt><dd>O prompt do PHP (não do terminal): ele está esperando uma instrução. Escreva sem <code>&lt;?php</code>, terminando com <code>;</code>, como num arquivo, e aperte <kbd>Enter</kbd>.</dd>
+  <dt>$nome = "Ana";</dt><dd>Criar uma variável não mostra nada, mas ela continua existindo nas linhas seguintes, até você sair.</dd>
+  <dt>echo "Olá, $nome!";</dt><dd>Repare que não foi preciso <code>\n</code>: o modo interativo pula a linha sozinho antes do próximo <code>php &gt;</code>.</dd>
+  <dt>exit</dt><dd>Sai do modo interativo e volta ao terminal (<kbd>Ctrl</kbd>+<kbd>D</kbd> também funciona).</dd>
+</dl>
+
+<p>As setas funcionam como no terminal: <kbd>↑</kbd> traz de volta a instrução anterior, para você corrigir e repetir. Quem cuida disso é a extensão <strong>readline</strong> ("ler linha"), que vem junto com o PHP nas instalações comuns. O que você faz no <code>php -a</code> some quando você sai; para guardar, use um arquivo. Para experimentar código deste guia, o editor das missões também serve: você muda o código e clica em Rodar quantas vezes quiser.</p>
 
 <div class="tip">
 <strong>Qual usar?</strong>
@@ -122,7 +135,7 @@ $ echo $?
 <tr><th>Você quer…</th><th>Use</th></tr>
 <tr><td>Um programa de verdade, para guardar e rodar de novo</td><td><code>php arquivo.php</code></td></tr>
 <tr><td>Uma conta ou uma função, uma vez só</td><td><code>php -r '…'</code></td></tr>
-<tr><td>Experimentar várias linhas seguidas, vendo cada resultado</td><td><code>php -a</code> (com readline) ou o editor do guia</td></tr>
+<tr><td>Experimentar várias linhas seguidas, vendo cada resultado</td><td><code>php -a</code> ou o editor do guia</td></tr>
 </table>
 </div>
 </div>
@@ -250,20 +263,20 @@ $nome = readline("Qual é o seu nome? ");
 echo "Olá, $nome!\n";
 </pre>
 
-<p>É mais curta, mas depende da mesma extensão readline do <code>php -a</code>. No PHP do apt ela existe; no PHP da Ana, não:</p>
+<pre class="term">$ php nome-readline.php
+Qual é o seu nome? Ana                « a Ana digitou Ana e Enter
+Olá, Ana!</pre>
+
+<p>Sem <code>trim</code>, e a exclamação ficou na mesma linha: o <code>readline</code> já devolve o texto sem o Enter. Como no <code>php -a</code>, a pessoa pode usar as setas para corrigir o que digitou antes de apertar Enter. Mas há um detalhe: quando a resposta não vem do teclado, e sim de um cano (<code>|</code>), a pergunta não aparece:</p>
 
 <pre class="term">$ echo Bruno | php nome-readline.php
-
-Fatal error: Uncaught Error: Call to undefined function readline() in /home/ana/cli/nome-readline.php:2
-Stack trace:
-#0 {main}
-  thrown in /home/ana/cli/nome-readline.php on line 2</pre>
+Olá, Bruno!</pre>
 
 <div class="table-wrap">
 <table class="ref">
 <tr><th>Forma</th><th>Vantagem</th><th>Cuidado</th></tr>
 <tr><td><code>trim(fgets(STDIN))</code></td><td>Funciona em qualquer PHP de terminal</td><td>Precisa do <code>trim</code> e de um <code>echo</code> antes para a pergunta</td></tr>
-<tr><td><code>readline("pergunta")</code></td><td>Mais curta; permite usar as setas para corrigir o que digitou</td><td>Só existe com a extensão readline</td></tr>
+<tr><td><code>readline("pergunta")</code></td><td>Mais curta; permite usar as setas para corrigir o que digitou</td><td>A pergunta não aparece quando a entrada vem de um cano (<code>|</code>)</td></tr>
 </table>
 </div>
 
@@ -443,14 +456,6 @@ Qual é o seu nome? Olá, Bruno
 </div>
 
 <div class="cenario">
-<strong>"Interactive shell (-a) requires the readline extension" ou "Call to undefined function readline()"</strong>
-<pre class="term">$ php -a
-Interactive shell (-a) requires the readline extension.</pre>
-<p><strong>O que significa:</strong> esse PHP não tem a extensão readline.</p>
-<p><strong>Como consertar:</strong> instale a extensão (no Debian e no Ubuntu, <code>sudo apt install php-readline</code>) ou troque <code>readline("…")</code> por <code>echo "…";</code> + <code>trim(fgets(STDIN))</code>.</p>
-</div>
-
-<div class="cenario">
 <strong>"Permissão negada" ao rodar <code>./arquivo</code></strong>
 <pre class="term">$ ./oi
 bash: ./oi: Permissão negada</pre>
@@ -486,14 +491,14 @@ echo "Venda registrada.\n";
 <tr><th>Comando ou recurso</th><th>O que faz</th><th>Exemplo</th></tr>
 <tr><td><code>php arquivo.php</code></td><td>Roda um arquivo</td><td><code>php ola.php</code></td></tr>
 <tr><td><code>php -r '…'</code></td><td>Roda código direto (sem <code>&lt;?php</code>; aspas simples por fora)</td><td><code>php -r 'echo 2 ** 10, "\n";'</code></td></tr>
-<tr><td><code>php -a</code></td><td>Modo interativo (precisa da readline)</td><td><code>php -a</code></td></tr>
+<tr><td><code>php -a</code></td><td>Modo interativo (prompt <code>php &gt;</code>; sai com <code>exit</code>)</td><td><code>php -a</code></td></tr>
 <tr><td><code>php -l arquivo.php</code></td><td>Confere a sintaxe sem rodar (veja <a href="erros.html">Erros</a>)</td><td><code>php -l ola.php</code></td></tr>
 <tr><td><code>php -S localhost:8000</code></td><td>Servidor web de teste (veja <a href="servidor-embutido.html">php -S</a>)</td><td></td></tr>
 <tr><td><code>php -v</code> / <code>php -m</code></td><td>Mostra a versão / as extensões instaladas</td><td><code>php -m</code></td></tr>
 <tr><td><code>$argv</code></td><td>Array: <code>[0]</code> = arquivo, <code>[1]</code> em diante = argumentos (sempre texto)</td><td><code>$argv[1] ?? "padrão"</code></td></tr>
 <tr><td><code>$argc</code></td><td>Quantos itens o <code>$argv</code> tem (inclui o arquivo)</td><td><code>php a.php x y</code> → <code>3</code></td></tr>
 <tr><td><code>trim(fgets(STDIN))</code></td><td>Lê uma linha digitada, sem o Enter</td><td><code>$nome = trim(fgets(STDIN));</code></td></tr>
-<tr><td><code>readline("…")</code></td><td>Pergunta e lê (precisa da readline)</td><td><code>$nome = readline("Nome: ");</code></td></tr>
+<tr><td><code>readline("…")</code></td><td>Pergunta e lê, já sem o Enter</td><td><code>$nome = readline("Nome: ");</code></td></tr>
 <tr><td><code>exit(N)</code> / <code>die(N)</code></td><td>Termina com o código N (0 = certo)</td><td><code>exit(1);</code></td></tr>
 <tr><td><code>exit("texto")</code></td><td>Mostra o texto e termina com código 0</td><td></td></tr>
 <tr><td><code>fwrite(STDERR, "…")</code></td><td>Escreve na saída de erros</td><td></td></tr>
@@ -560,9 +565,9 @@ echo "Venda registrada.\n";
 
 <h2>Resumo</h2>
 <ul>
-  <li><code>php arquivo.php</code> roda um arquivo; <code>php -r '…'</code> roda uma linha (sem <code>&lt;?php</code>, aspas simples por fora); <code>php -a</code> abre o modo interativo, se houver a extensão readline.</li>
+  <li><code>php arquivo.php</code> roda um arquivo; <code>php -r '…'</code> roda uma linha (sem <code>&lt;?php</code>, aspas simples por fora); <code>php -a</code> abre o modo interativo, com o prompt <code>php &gt;</code>.</li>
   <li><code>$argv</code> é a lista do que veio na linha de comando: <code>[0]</code> é o arquivo, os argumentos começam no <code>[1]</code>, e tudo chega como texto. <code>$argc</code> conta os itens.</li>
-  <li>Para ler o teclado: <code>trim(fgets(STDIN))</code>. <code>readline("…")</code> é mais curto, mas depende da extensão.</li>
+  <li>Para ler o teclado: <code>trim(fgets(STDIN))</code>. <code>readline("…")</code> é mais curto e já tira o Enter.</li>
   <li><code>exit(N)</code> termina o programa com o código N; <code>0</code> = certo, outro número = problema. No terminal, <code>echo $?</code> mostra o código.</li>
   <li>Mensagens de erro vão para <code>STDERR</code> com <code>fwrite(STDERR, "…")</code>.</li>
   <li><code>#!/usr/bin/env php</code> na linha 1 + <code>chmod +x</code> transformam o arquivo num comando: <code>./oi</code>.</li>
