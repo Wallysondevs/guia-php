@@ -601,7 +601,7 @@ ficha('Caio', '31/02/2026');
 </pre>
 </div>
 
-<p>Na solução aparecem dois detalhes novos: o <code>!</code> no começo do formato (<code>'!d/m/Y'</code>) zera a hora: sem ele, a data recebe a hora do momento em que o programa roda (quando a Ana testou, <code>createFromFormat('d/m/Y', '15/03/2027')</code> deu <code>15/03/2027 20:59:04</code>), e uma comparação como <code>$aniv &lt; $hoje</code> no próprio dia do aniversário daria o resultado errado, e <code>setDate(ano, mês, dia)</code> troca a data mantendo o resto. O <code>global</code> deixa a função usar as variáveis de fora (veja <a href="escopo.html">Escopo</a>); num programa maior, você passaria esses valores como parâmetros.</p>
+<p>Na solução aparecem dois detalhes novos: o <code>!</code> no começo do formato (<code>'!d/m/Y'</code>) zera a hora: sem ele, a data recebe a hora do momento em que o programa roda (quando a Ana testou, <code>createFromFormat('d/m/Y', '15/03/2027')</code> deu <code>15/03/2027 20:59:04</code>); misturar datas com e sem hora deixa comparações como <code>$aniv &lt; $hoje</code> difíceis de prever, e <code>setDate(ano, mês, dia)</code> troca a data mantendo o resto. O <code>global</code> deixa a função usar as variáveis de fora (veja <a href="escopo.html">Escopo</a>); num programa maior, você passaria esses valores como parâmetros.</p>
 
 <hr>
 
