@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP JSON — json_encode, json_decode e json_validate | Guia PHP</title>
+<meta name="description" content="JSON no PHP: transformar arrays em JSON com json_encode (JSON_PRETTY_PRINT, JSON_UNESCAPED_UNICODE e o ç sem a flag), ler com json_decode (objeto ou array com true), tratar erros com json_last_error_msg e JSON_THROW_ON_ERROR, json_validate do PHP 8.3 e guardar dados num arquivo .json.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">JSON</span></h1>
+
+<p class="intro">JSON é a língua que os programas usam para trocar dados. Quando um aplicativo de celular pede a lista de produtos a um site, quando o site consulta o CEP num serviço dos Correios, quando você salva as configurações de um programa: quase sempre os dados viajam em JSON. O PHP transforma qualquer array em JSON com uma função, e qualquer JSON de volta em dados com outra. Nesta aula você vai usar as duas, com as bandeiras que deixam o resultado legível, e vai aprender a não se enganar com um JSON quebrado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é JSON e como ele se parece com os arrays do PHP.</li>
+  <li><code>json_encode</code>: array → texto JSON, com <code>JSON_PRETTY_PRINT</code> e <code>JSON_UNESCAPED_UNICODE</code> (sem ela, <code>ç</code> vira <code>ç</code>).</li>
+  <li><code>json_decode</code>: texto JSON → dados, como objeto ou como array (com <code>true</code>).</li>
+  <li>Descobrir que um JSON está errado: <code>json_last_error_msg</code>, <code>JSON_THROW_ON_ERROR</code> e <code>json_validate</code> (<span class="versao">PHP 8.3+</span>).</li>
+  <li>Guardar e ler dados num arquivo <code>.json</code>.</li>
+</ul>
+</div>
+
+<p>Para esta aula, você precisa conhecer <a href="arrays-associativos.html">arrays associativos</a> e <a href="arquivos.html">ler e escrever arquivos</a>.</p>
+
+<hr>
+
+<h2>A ideia: uma ficha que qualquer programa entende</h2>
+<p>JSON (<em>JavaScript Object Notation</em>, "notação de objetos do JavaScript", pronuncia-se "jêison") nasceu no JavaScript, mas hoje toda linguagem lê e escreve JSON. É texto puro, com poucas regras. Veja a ficha de um produto da lojinha da Ana, em JSON:</p>
+
+<pre class="file" data-file="produto.json">{
+    "nome": "Pão de mel",
+    "preco": 4.5,
+    "estoque": 30,
+    "vegano": false,
+    "sabores": ["chocolate", "doce de leite"],
+    "foto": null
+}
+</pre>
+
+<p>E a mesma ficha como array do PHP:</p>
+
+<pre class="file" data-file="produto.php">$produto = [
+    'nome'    =&gt; 'Pão de mel',
+    'preco'   =&gt; 4.5,
+    'estoque' =&gt; 30,
+    'vegano'  =&gt; false,
+    'sabores' =&gt; ['chocolate', 'doce de leite'],
+    'foto'    =&gt; null,
+];
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>JSON</th><th>PHP</th><th>Regra do JSON</th></tr>
+<tr><td><code>{ "chave": valor, … }</code> (objeto)</td><td>array associativo <code>['chave' =&gt; valor]</code></td><td>Chaves sempre entre <strong>aspas duplas</strong>.</td></tr>
+<tr><td><code>[ valor, valor ]</code> (lista)</td><td>array indexado <code>[valor, valor]</code></td><td>Sem vírgula depois do último item.</td></tr>
+<tr><td><code>"texto"</code></td><td>string</td><td>Só aspas <strong>duplas</strong>; aspas simples não valem.</td></tr>
+<tr><td><code>4.5</code>, <code>30</code></td><td>float, int</td><td>Decimal com <strong>ponto</strong>.</td></tr>
+<tr><td><code>true</code>, <code>false</code></td><td>bool</td><td>Minúsculas.</td></tr>
+<tr><td><code>null</code></td><td><code>null</code></td><td>Minúsculas.</td></tr>
+</table>
+</div>
+
+<p>Transformar dados em texto para guardar ou enviar tem um nome: <strong>serializar</strong> (ou "codificar", <em>encode</em>). O caminho de volta é <strong>desserializar</strong> ("decodificar", <em>decode</em>). Daí os nomes das funções.</p>
+
+<hr>
+
+<h2><code>json_encode</code>: do PHP para o JSON</h2>
+
+<pre class="file" data-file="enc1.php">&lt;?php
+$produto = [
+    'nome'    =&gt; 'Pão de mel',
+    'preco'   =&gt; 4.5,
+    'estoque' =&gt; 30,
+    'vegano'  =&gt; false,
+    'sabores' =&gt; ['chocolate', 'doce de leite'],
+    'foto'    =&gt; null,
+];
+echo json_encode($produto), "\n";
+</pre>
+
+<pre class="term">$ cd json
+$ php enc1.php
+{"nome":"Pão de mel","preco":4.5,"estoque":30,"vegano":false,"sabores":["chocolate","doce de leite"],"foto":null}</pre>
+
+<p>Funcionou: é JSON válido, numa linha só, sem espaços (o formato mais econômico para enviar pela rede). Mas repare no nome: <code>Pão</code>. Por padrão, o <code>json_encode</code> troca toda letra fora do inglês básico por um <strong>código de escape</strong> <code>\uXXXX</code> (<code>ã</code> é o "ã"). Qualquer programa que ler esse JSON vai entender "Pão" direitinho, mas para gente é ilegível:</p>
+
+<pre class="term">$ php enc3.php      « três json_encode sem e com bandeiras
+{"cidade":"São José","site":"https:\/\/loja.example\/bolos"}
+{"cidade":"São José","site":"https://loja.example/bolos"}
+["açúcar","maçã"]</pre>
+
+<p>Na última linha, <code>açúcar</code> e <code>maçã</code> viraram <code>açúcar</code> e <code>maçã</code>: o <code>ç</code> é <code>ç</code>. E as barras de endereço viraram <code>\/</code>. A segunda linha foi gerada com duas <strong>bandeiras</strong> (<em>flags</em>) que desligam esses escapes.</p>
+
+<h3>As bandeiras mais úteis</h3>
+<p>O segundo argumento do <code>json_encode</code> aceita bandeiras, combinadas com <code>|</code> (como as do <code>file()</code>):</p>
+
+<pre class="file" data-file="enc2.php">&lt;?php
+// … o mesmo $produto …
+echo json_encode($produto, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), "\n";
+</pre>
+
+<pre class="term">$ php enc2.php
+{
+    "nome": "Pão de mel",
+    "preco": 4.5,
+    "estoque": 30,
+    "vegano": false,
+    "sabores": [
+        "chocolate",
+        "doce de leite"
+    ],
+    "foto": null
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Bandeira</th><th>Tradução</th><th>Efeito</th></tr>
+<tr><td><code>JSON_PRETTY_PRINT</code></td><td>"impressão bonita"</td><td>Quebra linhas e recua com 4 espaços. Ótimo para arquivos que pessoas vão ler.</td></tr>
+<tr><td><code>JSON_UNESCAPED_UNICODE</code></td><td>"Unicode sem escape"</td><td>Mantém <code>ã</code>, <code>ç</code>, <code>é</code> como são (em UTF-8), em vez de <code>ã</code>.</td></tr>
+<tr><td><code>JSON_UNESCAPED_SLASHES</code></td><td>"barras sem escape"</td><td>Mantém <code>/</code> em vez de <code>\/</code>.</td></tr>
+<tr><td><code>JSON_THROW_ON_ERROR</code></td><td>"lançar exceção no erro"</td><td>Se der errado, lança uma exceção em vez de devolver <code>false</code> (veja adiante).</td></tr>
+<tr><td><code>JSON_FORCE_OBJECT</code></td><td>"forçar objeto"</td><td>Gera <code>{}</code> mesmo para listas e arrays vazios.</td></tr>
+<tr><td><code>JSON_PRESERVE_ZERO_FRACTION</code></td><td>"manter o .0"</td><td>Grava <code>10.0</code> como <code>10.0</code>, e não <code>10</code>.</td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-goal="out:&quot;nome&quot;: &quot;Açúcar mascavo&quot;,out:&quot;cidade&quot;: &quot;São José&quot;,src:JSON_PRETTY_PRINT,src:JSON_UNESCAPED_UNICODE">
+<p class="try-task"><strong>Missão:</strong> rode e veja os <code>ç</code> e companhia. Depois acrescente as bandeiras para o JSON sair em várias linhas e com os acentos legíveis (<code>"nome": "Açúcar mascavo"</code>).</p>
+<pre class="script">&lt;?php
+$item = [
+    'nome'       =&gt; 'Açúcar mascavo',
+    'quantidade' =&gt; 2,
+    'unidade'    =&gt; 'kg',
+    'fornecedor' =&gt; ['cidade' =&gt; 'São José', 'contato' =&gt; null],
+];
+echo json_encode($item), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$item = [
+    'nome'       =&gt; 'Açúcar mascavo',
+    'quantidade' =&gt; 2,
+    'unidade'    =&gt; 'kg',
+    'fornecedor' =&gt; ['cidade' =&gt; 'São José', 'contato' =&gt; null],
+];
+echo json_encode($item, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), "\n";
+</pre>
+</div>
+
+<h3>Lista ou objeto? E outros detalhes</h3>
+<p>O PHP tem um tipo só (o array) para duas coisas que no JSON são diferentes (lista <code>[]</code> e objeto <code>{}</code>). Ele decide assim: se as chaves forem <code>0, 1, 2…</code>, em ordem e sem buracos, vira <strong>lista</strong>; senão, vira <strong>objeto</strong>.</p>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+echo json_encode([10, 10.0, 0.1 + 0.2, '42', true, null]), "\n";
+echo json_encode([]), "\n";
+echo json_encode(['a', 'b', 'c']), "\n";
+echo json_encode([1 =&gt; 'a', 2 =&gt; 'b']), "\n";
+$lista = ['a', 'b', 'c'];
+unset($lista[1]);
+echo json_encode($lista), "\n";
+echo json_encode(array_values($lista)), "\n";
+echo json_encode([], JSON_FORCE_OBJECT), "\n";
+echo json_encode('Ela disse "oi"'), "\n";
+</pre>
+
+<pre class="term">$ php tipos.php
+[10,10,0.30000000000000004,"42",true,null]      « 10.0 virou 10; '42' continua texto
+[]
+["a","b","c"]                                   « chaves 0,1,2: lista
+{"1":"a","2":"b"}                               « começa em 1: objeto
+{"0":"a","2":"c"}                               « o unset abriu um buraco: objeto!
+["a","c"]                                       « array_values renumera: lista de novo
+{}
+"Ela disse \"oi\""                              « aspas dentro do texto são escapadas</pre>
+
+<p>A quinta linha é uma armadilha comum: depois de remover um item com <code>unset</code> (ou filtrar com <code>array_filter</code>), as chaves ficam <code>0, 2</code>, e quem esperava uma lista recebe um objeto. Passe por <code>array_values</code> antes de codificar.</p>
+
+<div class="note">
+<strong>E objetos de classes?</strong>
+<p><code>json_encode</code> também aceita objetos: ele grava as propriedades <strong>públicas</strong> e ignora as privadas.</p>
+<pre class="term">$ php objeto.php     « classe Produto com $nome e $preco públicos e $custo privado
+{"nome":"Brigadeiro","preco":2.5}</pre>
+<p>Para escolher o que vai no JSON, a classe pode implementar a interface <code>JsonSerializable</code>. Você vai ver classes e interfaces no Nível 3 (<a href="classes-objetos.html">Classes e Objetos</a>, <a href="interfaces.html">Interfaces</a>).</p>
+</div>
+
+<hr>
+
+<h2><code>json_decode</code>: do JSON para o PHP</h2>
+<p>O caminho de volta. <code>json_decode</code> recebe o texto JSON e devolve os dados. Mas atenção ao formato que ele escolhe por padrão:</p>
+
+<pre class="file" data-file="dec1.php">&lt;?php
+$json = '{"nome":"Pão de mel","preco":4.5,"sabores":["chocolate","doce de leite"]}';
+$obj = json_decode($json);
+var_dump($obj);
+echo $obj-&gt;nome, "\n";
+echo $obj-&gt;sabores[0], "\n";
+</pre>
+
+<pre class="term">$ php dec1.php
+object(stdClass)#1 (3) {               « um OBJETO, não um array
+  ["nome"]=&gt;
+  string(11) "Pão de mel"
+  ["preco"]=&gt;
+  float(4.5)
+  ["sabores"]=&gt;
+  array(2) {                           « as listas viram arrays
+    [0]=&gt;
+    string(9) "chocolate"
+    [1]=&gt;
+    string(13) "doce de leite"
+  }
+}
+Pão de mel
+chocolate</pre>
+
+<p>Sem o segundo argumento, cada objeto JSON <code>{…}</code> vira um objeto da classe genérica <code>stdClass</code> ("classe padrão"), e você lê os campos com a <strong>seta</strong> <code>-&gt;</code>: <code>$obj-&gt;nome</code>. Passando <code>true</code> como segundo argumento ("associativo"), tudo vira array, e você usa colchetes como sempre:</p>
+
+<pre class="file" data-file="dec2.php">&lt;?php
+$json = '{"nome":"Pão de mel","preco":4.5,"sabores":["chocolate","doce de leite"]}';
+$arr = json_decode($json, true);
+var_dump($arr);
+echo $arr['nome'], "\n";
+echo $arr['sabores'][1], "\n";
+</pre>
+
+<pre class="term">$ php dec2.php
+array(3) {                             « agora um array associativo
+  ["nome"]=&gt;
+  string(11) "Pão de mel"
+  ["preco"]=&gt;
+  float(4.5)
+  ["sabores"]=&gt;
+  array(2) {
+    [0]=&gt;
+    string(9) "chocolate"
+    [1]=&gt;
+    string(13) "doce de leite"
+  }
+}
+Pão de mel
+doce de leite</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>json_decode($json)</code></th><th><code>json_decode($json, true)</code></th></tr>
+<tr><td>Objeto JSON vira</td><td>objeto <code>stdClass</code></td><td>array associativo</td></tr>
+<tr><td>Ler um campo</td><td><code>$d-&gt;nome</code></td><td><code>$d['nome']</code></td></tr>
+<tr><td>Funções de array (<code>count</code>, <code>foreach</code> com chave, <code>array_map</code>…)</td><td>só nas listas</td><td>em tudo</td></tr>
+<tr><td>Quando usar</td><td>Gosto pessoal; alguns frameworks preferem</td><td><strong>Recomendado para começar</strong>: é o que você já conhece</td></tr>
+</table>
+</div>
+
+<p>Neste guia, vamos usar <code>true</code> quase sempre. Misturar os dois estilos é o erro mais comum com JSON:</p>
+
+<pre class="term">$ php dec-erro-obj.php      « $obj = json_decode('{"nome":"Pão de mel"}'); echo $obj['nome'];
+
+Fatal error: Uncaught Error: Cannot use object of type stdClass as array in /home/ana/json/dec-erro-obj.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/json/dec-erro-obj.php on line 3
+$ php dec-erro-arr.php      « $arr = json_decode('{"nome":"Pão de mel"}', true); echo $arr-&gt;nome;
+
+Warning: Attempt to read property "nome" on array in /home/ana/json/dec-erro-arr.php on line 3</pre>
+
+<div class="tryphp" data-goal="out:Cliente: Bia,out:2 x Bolo de cenoura,out:Total: R$ 82\,00,semerro">
+<p class="try-task"><strong>Missão:</strong> um pedido chegou do site em JSON. Decodifique-o como array e mostre: <code>Cliente: Bia</code>, uma linha por item no formato <code>2 x Bolo de cenoura</code>, e o total (<code>quantidade × preco</code> somados) como <code>Total: R$ 82,00</code>.</p>
+<pre class="script">&lt;?php
+$json = '{
+  "cliente": "Bia",
+  "itens": [
+    {"produto": "Bolo de cenoura", "quantidade": 2, "preco": 35},
+    {"produto": "Brigadeiro", "quantidade": 4, "preco": 3}
+  ]
+}';
+
+$pedido = json_decode($json);
+var_dump($pedido);
+</pre>
+<pre class="solucao">&lt;?php
+$json = '{
+  "cliente": "Bia",
+  "itens": [
+    {"produto": "Bolo de cenoura", "quantidade": 2, "preco": 35},
+    {"produto": "Brigadeiro", "quantidade": 4, "preco": 3}
+  ]
+}';
+
+$pedido = json_decode($json, true);
+echo "Cliente: {$pedido['cliente']}\n";
+$total = 0;
+foreach ($pedido['itens'] as $item) {
+    echo "{$item['quantidade']} x {$item['produto']}\n";
+    $total += $item['quantidade'] * $item['preco'];
+}
+echo "Total: R$ " . number_format($total, 2, ',', '.') . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando o JSON está errado</h2>
+<p>JSON é rigoroso: uma vírgula a mais ou uma aspa simples e o texto inteiro deixa de ser JSON. E o pior: <code>json_decode</code> <strong>não mostra aviso nenhum</strong>. Ele só devolve <code>null</code>, em silêncio. Para saber o que houve, pergunte com <code>json_last_error()</code> (um número) e <code>json_last_error_msg()</code> (a mensagem):</p>
+
+<pre class="file" data-file="invalido.php">&lt;?php
+$textos = [
+    "{'nome': 'Ana'}",
+    '{"nome": "Ana",}',
+    '{"nome": "Ana"',
+    '',
+    'null',
+];
+foreach ($textos as $t) {
+    $r = json_decode($t, true);
+    echo str_pad($t, 18), " =&gt; ";
+    var_dump($r);
+    echo "   erro: ", json_last_error(), " - ", json_last_error_msg(), "\n";
+}
+</pre>
+
+<pre class="term">$ php invalido.php
+{'nome': 'Ana'}    =&gt; NULL                « aspas simples: proibidas no JSON
+   erro: 4 - Syntax error
+{"nome": "Ana",}   =&gt; NULL                « vírgula depois do último item
+   erro: 4 - Syntax error
+{"nome": "Ana"     =&gt; NULL                « faltou fechar a chave
+   erro: 4 - Syntax error
+                   =&gt; NULL                « texto vazio também não é JSON
+   erro: 4 - Syntax error
+null               =&gt; NULL                « este é JSON válido: o valor null!
+   erro: 0 - No error</pre>
+
+<p>A última linha mostra o problema de confiar no <code>null</code>: o texto <code>null</code> é um JSON perfeito, cujo valor é <code>null</code>. Só o <code>json_last_error()</code> (0 = "nenhum erro") separa os dois casos. <em>Syntax error</em> = "erro de sintaxe": o texto não segue as regras.</p>
+
+<h3>Melhor: <code>JSON_THROW_ON_ERROR</code></h3>
+<p>Ficar perguntando <code>json_last_error()</code> depois de cada chamada é fácil de esquecer. Com a bandeira <code>JSON_THROW_ON_ERROR</code>, um JSON inválido vira uma <strong>exceção</strong> (<code>JsonException</code>), que você captura com <code>try</code>/<code>catch</code> (aula <a href="excecoes.html">Exceções</a>):</p>
+
+<pre class="file" data-file="throw.php">&lt;?php
+$json = '{"nome": "Ana",}';
+try {
+    $dados = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+} catch (JsonException $e) {
+    echo "JSON inválido: ", $e-&gt;getMessage(), "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>json_decode($json, true, flags: JSON_THROW_ON_ERROR)</dt><dd>As bandeiras são o <strong>quarto</strong> argumento (o terceiro é a profundidade máxima, 512 por padrão). Com o argumento nomeado <code>flags:</code> você pula o terceiro. A forma sem nome é <code>json_decode($json, true, 512, JSON_THROW_ON_ERROR)</code>.</dd>
+  <dt>try { … }</dt><dd>"Tente": se algo lá dentro lançar uma exceção, o PHP pula para o <code>catch</code>.</dd>
+  <dt>catch (JsonException $e)</dt><dd>"Capture" exceções do tipo <code>JsonException</code>; <code>$e-&gt;getMessage()</code> traz a mensagem.</dd>
+</dl>
+
+<pre class="term">$ php throw.php
+JSON inválido: Syntax error</pre>
+
+<p>E sem o <code>try</code>, a exceção para o programa, com uma mensagem clara (o que é bem melhor do que seguir com <code>null</code> e quebrar dez linhas depois):</p>
+
+<pre class="term">$ php throw2.php     « json_decode('{"nome": "Ana",}', true, 512, JSON_THROW_ON_ERROR);
+
+Fatal error: Uncaught JsonException: Syntax error in /home/ana/json/throw2.php:2
+Stack trace:
+#0 /home/ana/json/throw2.php(2): json_decode('{"nome": "Ana",...', true, 512, 4194304)
+#1 {main}
+  thrown in /home/ana/json/throw2.php on line 2</pre>
+
+<p>(O <code>4194304</code> no rastro é o valor numérico da bandeira <code>JSON_THROW_ON_ERROR</code>.) A mesma bandeira funciona no <code>json_encode</code>.</p>
+
+<h3>Só conferir: <code>json_validate</code> <span class="versao">PHP 8.3+</span></h3>
+<p>Quando você só quer saber <strong>se</strong> o texto é JSON válido, sem usar os dados, <code>json_validate</code> responde <code>true</code> ou <code>false</code>, gastando menos memória que o <code>json_decode</code>:</p>
+
+<pre class="file" data-file="validate.php">&lt;?php
+var_dump(json_validate('{"nome": "Ana"}'));
+var_dump(json_validate('{"nome": "Ana",}'));
+echo json_last_error_msg(), "\n";
+</pre>
+
+<pre class="term">$ php validate.php
+bool(true)
+bool(false)
+Syntax error</pre>
+
+<p>Em versões antigas (antes do 8.3), use <code>json_decode</code> e confira <code>json_last_error() === JSON_ERROR_NONE</code>.</p>
+
+<h3>Erro no <code>json_encode</code>: texto que não é UTF-8</h3>
+<p>O JSON exige UTF-8. Se uma string veio de um arquivo antigo, gravado em outra codificação (Latin-1, comum em sistemas do Windows), o <code>json_encode</code> falha:</p>
+
+<pre class="file" data-file="utf8.php">&lt;?php
+$ruim = "P\xE3o";      // "Pão" em Latin-1: o ã é o byte E3
+var_dump(json_encode(['nome' =&gt; $ruim]));
+echo json_last_error_msg(), "\n";
+var_dump(json_encode(['nome' =&gt; $ruim], JSON_INVALID_UTF8_SUBSTITUTE));
+</pre>
+
+<pre class="term">$ php utf8.php
+bool(false)
+Malformed UTF-8 characters, possibly incorrectly encoded
+string(19) "{"nome":"P�o"}"         « o byte ruim virou o caractere de substituição</pre>
+
+<p>"<em>Caracteres UTF-8 malformados, possivelmente codificados de forma incorreta</em>". O conserto de verdade é converter o texto para UTF-8 antes (<code>mb_convert_encoding($ruim, 'UTF-8', 'ISO-8859-1')</code>, veja <a href="mbstring.html">mbstring</a>).</p>
+
+<div class="tryphp" data-goal="out:Pedido de Caio com 3 itens,out:JSON inválido: Syntax error,semerro,src:JSON_THROW_ON_ERROR">
+<p class="try-task"><strong>Missão:</strong> o programa lê dois pedidos, e o segundo está quebrado. Hoje ele mostra um <code>Warning</code> confuso. Use <code>JSON_THROW_ON_ERROR</code> com <code>try</code>/<code>catch (JsonException $e)</code> para que o segundo mostre <code>JSON inválido: Syntax error</code> e nenhum aviso apareça.</p>
+<pre class="script">&lt;?php
+$pedidos = [
+    '{"cliente": "Caio", "itens": 3}',
+    "{'cliente': 'Duda', 'itens': 1}",
+];
+foreach ($pedidos as $json) {
+    $p = json_decode($json, true);
+    echo "Pedido de {$p['cliente']} com {$p['itens']} itens\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$pedidos = [
+    '{"cliente": "Caio", "itens": 3}',
+    "{'cliente': 'Duda', 'itens': 1}",
+];
+foreach ($pedidos as $json) {
+    try {
+        $p = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        echo "Pedido de {$p['cliente']} com {$p['itens']} itens\n";
+    } catch (JsonException $e) {
+        echo "JSON inválido: ", $e-&gt;getMessage(), "\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>JSON num arquivo</h2>
+<p>Juntando com a aula de arquivos: um arquivo <code>.json</code> é um ótimo "banquinho de dados" para coisas pequenas (configurações, uma lista de produtos, um cache). O ciclo é sempre o mesmo: <strong>ler</strong> o arquivo e decodificar, <strong>mudar</strong> o array, <strong>codificar</strong> e gravar.</p>
+
+<pre class="file" data-file="arquivo.php">&lt;?php
+$arquivo = __DIR__ . '/produtos.json';
+$produtos = [
+    ['nome' =&gt; 'Bolo de cenoura', 'preco' =&gt; 35.0],
+    ['nome' =&gt; 'Torta de limão', 'preco' =&gt; 48.5],
+];
+file_put_contents($arquivo, json_encode($produtos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+$lidos = json_decode(file_get_contents($arquivo), true);
+$lidos[] = ['nome' =&gt; 'Brigadeiro', 'preco' =&gt; 2.5];
+file_put_contents($arquivo, json_encode($lidos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+foreach (json_decode(file_get_contents($arquivo), true) as $p) {
+    echo $p['nome'], ': R$ ', number_format($p['preco'], 2, ',', '.'), "\n";
+}
+</pre>
+
+<pre class="term">$ php arquivo.php
+Bolo de cenoura: R$ 35,00
+Torta de limão: R$ 48,50
+Brigadeiro: R$ 2,50
+$ cat produtos.json
+[
+    {
+        "nome": "Bolo de cenoura",
+        "preco": 35                       « o 35.0 foi gravado como 35
+    },
+    {
+        "nome": "Torta de limão",
+        "preco": 48.5
+    },
+    {
+        "nome": "Brigadeiro",
+        "preco": 2.5
+    }
+]$                                        « sem quebra de linha no fim do arquivo</pre>
+
+<p>Dois detalhes reais: o <code>35.0</code> virou <code>35</code> (ao ler de volta, ele chega como <code>int</code>; use <code>JSON_PRESERVE_ZERO_FRACTION</code> se isso importar), e o <code>json_encode</code> não põe quebra de linha no final, por isso o prompt do terminal grudou no <code>]</code>. Se quiser, grave <code>json_encode(…) . "\n"</code>.</p>
+
+<div class="tip">
+<strong>Arquivo JSON × banco de dados</strong>
+<p>Para poucos dados, lidos e gravados por uma pessoa por vez, um arquivo JSON resolve. Quando muita gente grava ao mesmo tempo, ou os dados crescem, use um banco de dados (veja <a href="banco-dados.html">Banco de Dados: o Básico</a>). E para enviar JSON como resposta de um site (uma API), você vai precisar do cabeçalho <code>Content-Type: application/json</code>; isso fica para a aula <a href="api-json.html">Criar uma API JSON</a>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>json_decode</code> devolveu <code>NULL</code></strong>
+<p><strong>O que significa:</strong> o texto não é JSON válido (aspas simples, vírgula sobrando, chave sem aspas, texto vazio porque o arquivo não foi lido…), ou o JSON era literalmente <code>null</code>.</p>
+<p><strong>Como consertar:</strong> mostre <code>json_last_error_msg()</code> logo depois, ou use <code>JSON_THROW_ON_ERROR</code>. Para achar o erro no texto, cole o JSON num validador ou confira com <code>json_validate</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Cannot use object of type stdClass as array"</strong>
+<pre class="term">Fatal error: Uncaught Error: Cannot use object of type stdClass as array in /home/ana/json/dec-erro-obj.php:3</pre>
+<p><strong>O que significa:</strong> você decodificou sem <code>true</code> (objeto) e tentou ler com colchetes (array).</p>
+<p><strong>Como consertar:</strong> <code>json_decode($json, true)</code>, ou leia com <code>$obj-&gt;campo</code>. O contrário (<code>-&gt;</code> num array) dá <code>Warning: Attempt to read property "nome" on array</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Malformed UTF-8 characters, possibly incorrectly encoded"</strong>
+<p><strong>O que significa:</strong> o <code>json_encode</code> devolveu <code>false</code> porque alguma string não está em UTF-8.</p>
+<p><strong>Como consertar:</strong> converta a origem para UTF-8 com <code>mb_convert_encoding</code>. Como paliativo, <code>JSON_INVALID_UTF8_SUBSTITUTE</code> troca os bytes ruins por <code>�</code> (o losango com interrogação).</p>
+</div>
+
+<div class="cenario">
+<strong>Esperava uma lista <code>[…]</code> e veio um objeto <code>{"0":…,"2":…}</code></strong>
+<p><strong>O que significa:</strong> as chaves do array não são 0, 1, 2… seguidas (depois de <code>unset</code> ou <code>array_filter</code>).</p>
+<p><strong>Como consertar:</strong> <code>json_encode(array_values($lista))</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função / bandeira</th><th>O que faz</th></tr>
+<tr><td><code>json_encode($dados, $flags)</code></td><td>Dados → texto JSON (ou <code>false</code> se falhar).</td></tr>
+<tr><td><code>json_decode($json, true)</code></td><td>Texto JSON → arrays (sem <code>true</code>: objetos <code>stdClass</code>); <code>null</code> se inválido.</td></tr>
+<tr><td><code>json_decode($json, true, 512, $flags)</code></td><td>Com profundidade máxima e bandeiras.</td></tr>
+<tr><td><code>json_last_error()</code> / <code>json_last_error_msg()</code></td><td>Código (0 = sem erro) e mensagem do último erro.</td></tr>
+<tr><td><code>json_validate($json)</code> <span class="versao">8.3+</span></td><td><code>true</code>/<code>false</code>: é JSON válido?</td></tr>
+<tr><td><code>JSON_PRETTY_PRINT</code></td><td>Várias linhas, recuado.</td></tr>
+<tr><td><code>JSON_UNESCAPED_UNICODE</code></td><td>Acentos legíveis (sem <code>ç</code>).</td></tr>
+<tr><td><code>JSON_UNESCAPED_SLASHES</code></td><td><code>/</code> sem <code>\/</code>.</td></tr>
+<tr><td><code>JSON_THROW_ON_ERROR</code></td><td>Erro vira <code>JsonException</code>.</td></tr>
+<tr><td><code>JSON_PRESERVE_ZERO_FRACTION</code></td><td><code>10.0</code> continua <code>10.0</code>.</td></tr>
+<tr><td><code>JSON_FORCE_OBJECT</code></td><td>Sempre <code>{}</code>.</td></tr>
+<tr><td><code>JSON_INVALID_UTF8_SUBSTITUTE</code></td><td>Troca bytes inválidos por <code>�</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Acentos legíveis</h3>
+<p>Complete para que <code>maçã</code> não vire <code>maçã</code>:</p>
+<div class="ex-code">echo json_encode($frutas, <input data-answer="JSON_UNESCAPED_UNICODE" aria-label="bandeira">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Array em vez de objeto</h3>
+<p>Complete para receber arrays associativos:</p>
+<div class="ex-code">$dados = json_decode($json, <input data-answer="true" aria-label="segundo argumento" size="6">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. A mensagem do erro</h3>
+<p>Complete para mostrar por que o último <code>json_decode</code> falhou:</p>
+<div class="ex-code">echo <input data-answer="json_last_error_msg()|json_last_error_msg" aria-label="função">;</div>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destes textos é JSON válido?</p>
+<label><input type="radio" name="q4"> <code>{'nome': 'Ana'}</code></label>
+<label><input type="radio" name="q4"> <code>{"nome": "Ana",}</code></label>
+<label><input type="radio" name="q4"> <code>{nome: "Ana"}</code></label>
+<label><input type="radio" name="q4"> <code>{"nome": "Ana", "idade": 29}</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. <code>$l = ['a', 'b', 'c']; unset($l[0]);</code> O que <code>json_encode($l)</code> mostra?</p>
+<label><input type="radio" name="q5"> <code>["b","c"]</code></label>
+<label><input type="radio" name="q5"> <code>{"1":"b","2":"c"}</code></label>
+<label><input type="radio" name="q5"> <code>false</code></label>
+<label><input type="radio" name="q5"> <code>[null,"b","c"]</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. O que <code>json_decode('{"x": 1,}')</code> faz?</p>
+<label><input type="radio" name="q6"> Mostra um Warning e devolve <code>[]</code>.</label>
+<label><input type="radio" name="q6"> Lança uma exceção sempre.</label>
+<label><input type="radio" name="q6"> Devolve <code>null</code> sem aviso; o motivo está em <code>json_last_error_msg()</code>.</label>
+<label><input type="radio" name="q6"> Ignora a vírgula e devolve o objeto.</label>
+</div>
+
+<div class="tryphp" data-goal="out:Vendido: Bolo de cenoura,out:&quot;estoque&quot;: 4,out:&quot;nome&quot;: &quot;Torta de limão&quot;,semerro">
+<p class="try-task"><strong>Missão final:</strong> o <code>estoque.json</code> (segunda aba) guarda os produtos. Leia o arquivo como array, diminua em 1 o <code>estoque</code> do <code>Bolo de cenoura</code>, mostre <code>Vendido: Bolo de cenoura</code>, grave o arquivo de volta (bonito e com acentos legíveis) e mostre o conteúdo novo. O bolo deve ficar com <code>"estoque": 4</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$arquivo = __DIR__ . '/estoque.json';
+
+</pre>
+<pre class="script" data-file="estoque.json">[
+    {"nome": "Bolo de cenoura", "estoque": 5},
+    {"nome": "Torta de limão", "estoque": 2}
+]
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$arquivo = __DIR__ . '/estoque.json';
+
+$produtos = json_decode(file_get_contents($arquivo), true, flags: JSON_THROW_ON_ERROR);
+foreach ($produtos as $i =&gt; $p) {
+    if ($p['nome'] === 'Bolo de cenoura') {
+        $produtos[$i]['estoque']--;
+        echo "Vendido: {$p['nome']}\n";
+    }
+}
+file_put_contents($arquivo, json_encode($produtos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n");
+echo file_get_contents($arquivo);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>JSON é texto com objetos <code>{}</code>, listas <code>[]</code>, textos em aspas duplas, números com ponto, <code>true</code>/<code>false</code>/<code>null</code>.</li>
+  <li><code>json_encode</code> transforma arrays em JSON; use <code>JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE</code> para gente ler (sem a segunda, <code>ç</code> vira <code>ç</code>).</li>
+  <li><code>json_decode($json, true)</code> devolve arrays; sem <code>true</code>, objetos <code>stdClass</code> (lidos com <code>-&gt;</code>).</li>
+  <li>JSON inválido não avisa: <code>json_decode</code> devolve <code>null</code>. Use <code>JSON_THROW_ON_ERROR</code> (ou <code>json_last_error_msg()</code>); para só conferir, <code>json_validate</code> (8.3+).</li>
+  <li>Arquivo JSON: <code>file_get_contents</code> + <code>json_decode</code> para ler, <code>json_encode</code> + <code>file_put_contents</code> para gravar.</li>
+  <li>Listas com buracos viram objetos: use <code>array_values</code>.</li>
+</ul>
+
+<p>Próxima aula: <a href="datas.html">Datas e Horas</a>.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
