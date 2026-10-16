@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Boas Práticas — checklist comentado e um código refatorado | Guia PHP</title>
+<meta name="description" content="Boas práticas de PHP para quem está começando: declare(strict_types=1), tipos, ===, escapar a saída, prepared statements, password_hash, esconder erros em produção, Composer e PSR-4, funções pequenas, nomes claros, PSR-12 e testes, com um código antes × depois refatorado passo a passo e saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Boas Práticas</span></h1>
+
+<p class="intro">Um programa pode funcionar hoje e ainda assim ser um problema amanhã: difícil de ler, fácil de quebrar, aberto a ataques. As <strong>boas práticas</strong> são hábitos que os programadores PHP foram juntando ao longo dos anos para evitar esses problemas. Esta aula é um <strong>checklist comentado</strong>: cada item diz o que fazer, por que, e onde ele foi ensinado no guia. No fim, você vai ver um código da lojinha da Ana sendo refatorado (reescrito sem mudar o resultado), uma mudança por vez.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os 12 hábitos que separam um script "que funciona" de um código profissional.</li>
+  <li>Como <code>declare(strict_types=1)</code> e os tipos fazem o erro aparecer <strong>cedo</strong>, na linha certa.</li>
+  <li>Por que comparar com <code>===</code>, escapar a saída e usar prepared statements sempre, sem exceção.</li>
+  <li>Como esconder os erros do visitante em produção sem deixar de vê-los.</li>
+  <li>O que são funções pequenas, nomes claros e o estilo PSR-12.</li>
+  <li>Como refatorar um código antigo passo a passo, conferindo que a saída continua a mesma.</li>
+</ul>
+</div>
+
+<p>Esta é a última aula do Nível 3. Quase tudo aqui já apareceu em alguma aula anterior; a novidade é ver tudo junto, como uma lista que você pode conferir antes de entregar qualquer código.</p>
+
+<hr>
+
+<h2>A ideia: a cozinha organizada</h2>
+<p>Pense numa cozinha de restaurante. Dá para cozinhar com a pia cheia, as facas misturadas e os temperos sem rótulo, e às vezes o prato até sai bom. Mas basta um dia corrido para alguém usar sal no lugar de açúcar. Por isso as cozinhas profissionais têm regras simples: cada coisa no seu lugar, tudo com etiqueta, lavar as mãos antes de começar, provar antes de servir.</p>
+<p>Com código é igual. As regras desta aula não deixam o programa "mais rápido" nem "mais bonito" por si só. Elas fazem três coisas:</p>
+<ul>
+  <li><strong>O erro aparece cedo</strong> (no seu computador, e não no do cliente).</li>
+  <li><strong>O ataque não passa</strong> (XSS, SQL injection, senhas vazadas).</li>
+  <li><strong>Outra pessoa entende</strong> o código, e essa outra pessoa costuma ser você mesmo, daqui a seis meses.</li>
+</ul>
+
+<hr>
+
+<h2>O checklist</h2>
+<p>Use esta tabela como resumo. Cada linha é explicada logo abaixo, com exemplo e saída real.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>#</th><th>Hábito</th><th>Evita</th><th>Aula</th></tr>
+<tr><td>1</td><td><code>declare(strict_types=1);</code> no topo de todo arquivo</td><td>Conversões silenciosas (<code>"21"</code> virando <code>21</code>)</td><td><a href="tipos-retorno.html">Tipos e Retorno</a></td></tr>
+<tr><td>2</td><td>Tipos em parâmetros, retornos e propriedades</td><td>Valor errado viajando pelo programa</td><td><a href="tipos-avancados.html">Tipos Avançados</a></td></tr>
+<tr><td>3</td><td>Comparar com <code>===</code> e <code>!==</code></td><td><code>"1" == "01"</code> ser verdadeiro</td><td><a href="operadores-comparacao.html">Comparação</a></td></tr>
+<tr><td>4</td><td>Escapar toda saída com <code>htmlspecialchars</code></td><td>XSS (script de outra pessoa na sua página)</td><td><a href="escapar-saida.html">Escapar a Saída</a></td></tr>
+<tr><td>5</td><td>Prepared statements no banco</td><td>SQL injection</td><td><a href="prepared-statements.html">Prepared Statements</a></td></tr>
+<tr><td>6</td><td><code>password_hash</code> / <code>password_verify</code></td><td>Senhas legíveis num vazamento</td><td><a href="senhas.html">Senhas</a></td></tr>
+<tr><td>7</td><td>Não mostrar erros em produção (mas registrá-los)</td><td>Mostrar caminhos e detalhes internos ao visitante</td><td><a href="tipos-erro.html">Tipos de Erro</a></td></tr>
+<tr><td>8</td><td>Composer + autoload PSR-4</td><td>Pilhas de <code>require</code> e bibliotecas copiadas à mão</td><td><a href="composer.html">Composer</a>, <a href="autoload.html">Autoload</a></td></tr>
+<tr><td>9</td><td>Funções pequenas, cada uma com uma tarefa</td><td>Funções de 200 linhas impossíveis de testar</td><td><a href="funcoes.html">Funções</a></td></tr>
+<tr><td>10</td><td>Nomes claros, sem "números mágicos"</td><td><code>$t</code>, <code>$f</code>, <code>0.1</code> sem explicação</td><td><a href="constantes.html">Constantes</a></td></tr>
+<tr><td>11</td><td>Estilo PSR-12</td><td>Cada arquivo num formato diferente</td><td><a href="psr.html">Padrões PSR</a></td></tr>
+<tr><td>12</td><td>Testes automatizados</td><td>"Arrumei uma coisa e quebrei outra"</td><td><a href="phpunit.html">PHPUnit</a></td></tr>
+</table>
+</div>
+
+<h3>1. <code>declare(strict_types=1)</code>: tipos levados a sério</h3>
+<p>Por padrão, o PHP é "bonzinho": se uma função pede um <code>int</code> e recebe o texto <code>"21"</code>, ele converte sozinho e segue em frente. Parece ajuda, mas esconde erros. A linha <code>declare(strict_types=1);</code> (em português, "declarar tipos estritos = ligado") desliga essa conversão <strong>no arquivo onde ela aparece</strong>: tipo errado vira erro na hora.</p>
+
+<pre class="file" data-file="strict.php">&lt;?php
+declare(strict_types=1);
+
+function dobro(int $n): int
+{
+    return $n * 2;
+}
+
+echo dobro(21), "\n";
+echo dobro("21"), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>declare(strict_types=1);</dt><dd>Precisa ser a <strong>primeira instrução</strong> do arquivo (logo depois do <code>&lt;?php</code>). Vale só para as chamadas feitas dentro deste arquivo.</dd>
+  <dt>int $n</dt><dd>O parâmetro aceita só números inteiros.</dd>
+  <dt>dobro("21")</dt><dd>Um texto, mesmo que pareça número. Com tipos estritos, não é aceito.</dd>
+</dl>
+
+<pre class="term">$ php strict.php
+42
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/loja/strict.php on line 10 and defined in /home/ana/loja/strict.php:4
+Stack trace:
+#0 /home/ana/loja/strict.php(10): dobro('21')
+#1 {main}
+  thrown in /home/ana/loja/strict.php on line 4</pre>
+
+<p>A primeira chamada funcionou. A segunda parou o programa com um <code>TypeError</code> ("erro de tipo"): "o argumento nº 1 (<code>$n</code>) precisa ser do tipo <code>int</code>, foi passada uma <code>string</code>, chamada na linha 10". Sem a linha do <code>declare</code>, o mesmo arquivo mostra:</p>
+
+<pre class="term">$ php sem-strict.php
+42
+42</pre>
+
+<p>Nenhum aviso. Neste exemplo pequeno, tanto faz. Num sistema de verdade, aquele <code>"21"</code> pode ter vindo de um formulário com <code>"21 unidades"</code> ou <code>"vinte e um"</code>, e você só descobriria lá na frente, com um total errado. <strong>Regra:</strong> todo arquivo novo começa com <code>&lt;?php</code>, uma linha em branco e <code>declare(strict_types=1);</code>.</p>
+
+<div class="tip"><strong>E os dados do formulário?</strong> Tudo o que chega em <code>$_GET</code> e <code>$_POST</code> é texto. Com tipos estritos você converte <strong>de propósito</strong>, num lugar só, depois de validar: <code>$qtd = filter_var($_POST['qtd'], FILTER_VALIDATE_INT);</code> (veja <a href="validacao.html">Validar Dados</a>). Assim a conversão fica visível, e não escondida.</div>
+
+<h3>2. Tipos em tudo: parâmetros, retornos e propriedades</h3>
+<p>Escreva o tipo de cada parâmetro, de cada retorno e de cada propriedade. Os tipos são uma <strong>documentação que o PHP confere</strong>: quem lê <code>function frete(float $valor): float</code> já sabe o que entra e o que sai, sem precisar ler o corpo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Em vez de…</th><th>Escreva…</th><th>Por quê</th></tr>
+<tr><td><code>function total($itens)</code></td><td><code>function total(array $itens): float</code></td><td>Diz o que entra e o que sai.</td></tr>
+<tr><td><code>public $preco;</code></td><td><code>public float $preco;</code></td><td>A propriedade nunca recebe um texto por engano.</td></tr>
+<tr><td><code>function buscar($id)</code> que às vezes devolve <code>false</code></td><td><code>function buscar(int $id): ?Produto</code></td><td><code>?Produto</code> = "um <code>Produto</code> ou <code>null</code>". Deixa claro que pode não achar.</td></tr>
+<tr><td>Uma função que só imprime</td><td><code>function mostrar(): void</code></td><td><code>void</code> = "não devolve nada".</td></tr>
+</table>
+</div>
+
+<h3>3. Comparar com <code>===</code></h3>
+<p>O <code>==</code> ("igual") converte os dois lados antes de comparar, e as regras de conversão surpreendem. O <code>===</code> ("idêntico") exige mesmo valor <strong>e</strong> mesmo tipo. Rode e veja:</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> cada linha mostra <code>bool(true)</code> ou <code>bool(false)</code>. Antes de clicar em Rodar, tente adivinhar. Depois troque <code>==</code> por <code>===</code> nas quatro primeiras e rode de novo.</p>
+<pre class="script">&lt;?php
+var_dump("1" == "01");
+var_dump("10" == "1e1");
+var_dump(100 == "1e2");
+var_dump(null == false);
+var_dump(0 == "");
+var_dump("abc" == 0);
+var_dump("1" === "01");
+var_dump(null === false);
+</pre>
+</div>
+
+<pre class="term">$ php compara.php
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(false)
+bool(false)
+bool(false)
+bool(false)</pre>
+
+<p>As quatro primeiras dão <code>true</code> porque, com <code>==</code>, dois textos que parecem números são comparados <strong>como números</strong> (<code>"01"</code> vira 1, <code>"1e1"</code> é 1 × 10¹ = 10) e <code>null</code> vira <code>false</code>. Imagine um cupom de desconto <code>"10"</code> aceitando o código <code>"010"</code>. As duas últimas, com <code>===</code>, fazem o que qualquer pessoa espera. <strong>Regra:</strong> use <code>===</code> e <code>!==</code> sempre; o <code>==</code> só quando você quiser a conversão e souber explicar por quê. O mesmo vale para <code>in_array($x, $lista, true)</code> e <code>array_search($x, $lista, true)</code>: o <code>true</code> no fim liga a comparação estrita.</p>
+
+<h3>4. Escapar a saída</h3>
+<p>Tudo o que veio de fora (formulário, banco, URL, arquivo) e vai para o HTML passa por <code>htmlspecialchars</code>, que troca os caracteres especiais do HTML por códigos inofensivos:</p>
+
+<pre class="file" data-file="esc.php">&lt;?php
+$comentario = '&lt;script&gt;alert("oi")&lt;/script&gt;';
+echo htmlspecialchars($comentario), "\n";
+</pre>
+
+<pre class="term">$ php esc.php
+&amp;lt;script&amp;gt;alert(&amp;quot;oi&amp;quot;)&amp;lt;/script&amp;gt;</pre>
+
+<p>O navegador mostra o texto <code>&lt;script&gt;…</code> na tela, em vez de executar o script. A regra é <strong>escapar na hora de mostrar</strong> (não na hora de guardar), em todo <code>echo</code> de dado externo. Muita gente cria um atalho, <code>function e(string $s): string { return htmlspecialchars($s); }</code>, para não ter preguiça de escrever. Detalhes em <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</p>
+
+<h3>5. Prepared statements, sempre</h3>
+<p>Nunca monte SQL juntando texto com dados do usuário. Use <code>prepare</code> e passe os valores separados:</p>
+
+<pre class="file" data-file="buscar.php">// ERRADO: o nome entra no meio do SQL (SQL injection)
+$sql = "SELECT * FROM clientes WHERE nome = '$nome'";
+$linhas = $pdo-&gt;query($sql)-&gt;fetchAll();
+
+// CERTO: o SQL tem um "buraco" (?) e o valor vai separado
+$consulta = $pdo-&gt;prepare('SELECT * FROM clientes WHERE nome = ?');
+$consulta-&gt;execute([$nome]);
+$linhas = $consulta-&gt;fetchAll();
+</pre>
+
+<p>Com o jeito errado, um "nome" como <code>x' OR '1'='1</code> devolve todos os clientes. Com o certo, ele é só um nome estranho que não existe. Não há exceção para "esse dado é confiável": o hábito de sempre usar <code>prepare</code> é o que protege. Veja a demonstração completa em <a href="prepared-statements.html">Prepared Statements e SQL Injection</a>.</p>
+
+<h3>6. Senhas com <code>password_hash</code></h3>
+<p>Senha nunca é guardada como texto, nem com <code>md5</code> ou <code>sha1</code>. Use <code>password_hash($senha, PASSWORD_DEFAULT)</code> para guardar e <code>password_verify($senha, $hash)</code> para conferir. A aula <a href="senhas.html">Senhas</a> mostra o hash real e explica por que <code>md5</code> não serve.</p>
+
+<h3>7. Erros: mostrar no seu computador, esconder em produção</h3>
+<p>Enquanto você programa, quer ver todo aviso. No site no ar (<strong>produção</strong>), as mensagens de erro entregam detalhes internos ao visitante. Veja esta página com um erro bobo, servida pelo <a href="servidor-embutido.html">servidor embutido</a>:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+echo "&lt;p&gt;Olá, $nome!&lt;/p&gt;\n";
+echo "&lt;p&gt;Bem-vinda à lojinha.&lt;/p&gt;\n";
+</pre>
+
+<p>Com o servidor ligado em outro terminal (<code>php -S localhost:8000</code>, dentro da pasta <code>loja</code>), a Ana pede a página com o <code>curl</code>, que mostra o HTML exatamente como o navegador recebe:</p>
+
+<pre class="term">$ curl -s localhost:8000/
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined variable $nome in &lt;b&gt;/home/ana/loja/index.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+&lt;p&gt;Olá, !&lt;/p&gt;
+&lt;p&gt;Bem-vinda à lojinha.&lt;/p&gt;</pre>
+
+<p>Qualquer visitante agora sabe que o site fica em <code>/home/ana/loja</code> e que o arquivo se chama <code>index.php</code>. Em erros de banco, a mensagem pode mostrar até o nome do banco e do usuário. A configuração de produção é: <strong>não mostrar</strong> (<code>display_errors=0</code>) e <strong>registrar num arquivo</strong> (<code>log_errors=1</code> + <code>error_log</code>). Desligue o servidor (<kbd>Ctrl</kbd>+<kbd>C</kbd>) e ligue de novo com essas opções (o <code>-d</code> muda uma configuração só nesta execução):</p>
+
+<pre class="term">$ php -S localhost:8000 -d display_errors=0 -d log_errors=1 -d error_log=/home/ana/loja/erros.log
+[Fri Oct 16 20:44:44 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>E no outro terminal:</p>
+
+<pre class="term">$ curl -s localhost:8000/
+&lt;p&gt;Olá, !&lt;/p&gt;
+&lt;p&gt;Bem-vinda à lojinha.&lt;/p&gt;
+$ cat erros.log
+[16-Oct-2026 23:44:45 UTC] PHP Warning:  Undefined variable $nome in /home/ana/loja/index.php on line 2</pre>
+
+<p>O visitante não vê nada de interno; você encontra o aviso completo, com data e hora, no <code>erros.log</code>. No servidor de verdade, essas linhas ficam no <code>php.ini</code> de produção:</p>
+
+<pre class="file" data-file="php.ini (produção)">display_errors = Off
+log_errors = On
+error_log = /var/log/php/erros.log
+error_reporting = E_ALL
+</pre>
+
+<p>Repare no <code>error_reporting = E_ALL</code>: em produção você continua <strong>registrando</strong> todos os erros; só deixa de <strong>mostrá-los</strong>. E nunca "resolva" um aviso escondendo-o com <code>@</code> (como em <code>@$x</code>): conserte a causa. Mais em <a href="tipos-erro.html">Tipos de Erro</a> e <a href="depuracao.html">Depurar</a>.</p>
+
+<h3>8. Composer e autoload PSR-4</h3>
+<p>Em vez de uma pilha de <code>require 'classes/Produto.php';</code> no topo de cada arquivo, deixe o Composer carregar as classes sozinho: uma classe por arquivo, o namespace espelhando as pastas (<code>Loja\Carrinho</code> em <code>src/Carrinho.php</code>) e um único <code>require __DIR__ . '/vendor/autoload.php';</code>. Bibliotecas de terceiros também vêm pelo Composer (<code>composer require …</code>), nunca copiadas à mão: assim dá para atualizar com um comando e o arquivo <code>composer.lock</code> garante a mesma versão em todos os computadores. Veja <a href="composer.html">Composer</a> e <a href="autoload.html">Autoload e PSR-4</a>.</p>
+
+<h3>9. Funções pequenas, cada uma com uma tarefa</h3>
+<p>Uma função boa faz <strong>uma coisa</strong> e dá para descrever o que ela faz numa frase curta, sem "e". "Calcula o frete" é uma boa função. "Calcula o total, aplica o cupom, decide o frete e imprime" são quatro funções escondidas numa. Funções pequenas são fáceis de ler, de reaproveitar e, principalmente, de <strong>testar</strong>: dá para conferir o frete sem montar um pedido inteiro.</p>
+<p>Um sinal de alerta: uma função que <strong>calcula e imprime</strong> ao mesmo tempo. Separe: uma função calcula e <code>return</code>; quem chama decide se imprime, salva ou envia como JSON.</p>
+
+<h3>10. Nomes claros, sem números mágicos</h3>
+<p>O nome deve dizer o que a coisa é. <code>$t</code> não diz nada; <code>$total</code> diz. <code>calc()</code> não diz nada; <code>calcularFrete()</code> diz. Funções e métodos costumam começar com um verbo (<code>calcular</code>, <code>buscar</code>, <code>formatar</code>); variáveis e classes são substantivos (<code>$carrinho</code>, <code>Produto</code>). Escolha um idioma e mantenha (no guia, português).</p>
+<p><strong>Número mágico</strong> é um número solto no código cujo significado ninguém sabe: por que <code>200</code>? por que <code>15</code>? Dê um nome a ele com uma <a href="constantes.html">constante</a>: <code>const FRETE_GRATIS_ACIMA_DE = 200.0;</code>. Além de explicar, quando o valor mudar você altera em um lugar só.</p>
+
+<h3>11. Estilo PSR-12</h3>
+<p>A <strong>PSR-12</strong> é o guia de estilo que a comunidade PHP combinou (veja <a href="psr.html">Padrões PSR</a>). As regras que mais aparecem:</p>
+<ul>
+  <li>Indentação com <strong>4 espaços</strong> (não tab).</li>
+  <li>A <code>{</code> de <strong>classes e funções</strong> vai na linha de baixo; a de <code>if</code>, <code>foreach</code>, <code>while</code> fica na mesma linha.</li>
+  <li><code>if</code> sempre com chaves, mesmo com uma linha só (<code>if ($x) return;</code> não).</li>
+  <li>Um espaço depois de <code>if</code>, <code>foreach</code> e em volta dos operadores: <code>if ($total &gt; 200) {</code>.</li>
+  <li>Arquivo só com PHP: <strong>sem</strong> o <code>?&gt;</code> no fim (evita espaços em branco extras enviados ao navegador).</li>
+  <li>Classes em <code>PascalCase</code> (<code>CarrinhoDeCompras</code>), métodos e variáveis em <code>camelCase</code> (<code>calcularFrete</code>), constantes em <code>MAIUSCULAS_COM_SUBLINHADO</code>.</li>
+</ul>
+<p>Você não precisa decorar: ferramentas como o <strong>PHP-CS-Fixer</strong> e o <strong>PHP_CodeSniffer</strong> (instaladas com o Composer) conferem e até corrigem o estilo sozinhas. O importante é que o projeto inteiro siga o mesmo padrão.</p>
+
+<h3>12. Testes automatizados</h3>
+<p>Um teste é um pequeno programa que confere se o seu código faz o que deveria: "um carrinho novo tem 0 itens", "com o cupom PROMO10, R$ 90,00 vira R$ 81,00". Você roda todos com um comando antes de publicar qualquer mudança. Se algo quebrou, o teste avisa antes do cliente. A ferramenta padrão do PHP para isso é o PHPUnit, ensinado em <a href="phpunit.html">Testes com PHPUnit</a>.</p>
+
+<hr>
+
+<h2>Antes × depois: refatorando o pedido da lojinha</h2>
+<p><strong>Refatorar</strong> é reescrever o código para ficar melhor <strong>sem mudar o que ele faz</strong>. A Ana escreveu, no começo do curso, este script que calcula o total de um pedido:</p>
+
+<pre class="file" data-file="pedido-antes.php">&lt;?php
+function calc($p, $c) {
+    $t = 0;
+    foreach ($p as $i) {
+        $t = $t + $i[1] * $i[2];
+    }
+    if ($c == "PROMO10") {
+        $t = $t - $t * 0.1;
+    }
+    if ($t &gt; 200) {
+        $f = 0;
+    } else {
+        $f = 15;
+    }
+    echo "Total: R$ " . number_format($t + $f, 2, ",", ".") . "\n";
+}
+
+calc([["Caderno", 25.5, 2], ["Caneta", "3.9", 10]], "PROMO10");
+</pre>
+
+<pre class="term">$ php pedido-antes.php
+Total: R$ 96,00</pre>
+
+<p>Funciona: 2 cadernos (R$ 51,00) + 10 canetas (R$ 39,00) = R$ 90,00; com 10% de desconto, R$ 81,00; mais R$ 15,00 de frete, R$ 96,00. Mas passe pelo checklist e conte os problemas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>Problema</th><th>Item</th></tr>
+<tr><td>1</td><td>Sem <code>declare(strict_types=1)</code>.</td><td>1</td></tr>
+<tr><td>2</td><td><code>calc</code>, <code>$p</code>, <code>$c</code>: nomes que não dizem nada. Nenhum tipo.</td><td>2, 10</td></tr>
+<tr><td>5</td><td><code>$i[1]</code> e <code>$i[2]</code>: quem lembra que 1 é o preço e 2 a quantidade?</td><td>10</td></tr>
+<tr><td>7</td><td><code>==</code> em vez de <code>===</code>.</td><td>3</td></tr>
+<tr><td>8, 10, 13</td><td>Números mágicos: <code>0.1</code>, <code>200</code>, <code>15</code>.</td><td>10</td></tr>
+<tr><td>2–16</td><td>Uma função faz quatro coisas (soma, desconto, frete, imprime). Não dá para testar o frete sozinho.</td><td>9, 12</td></tr>
+<tr><td>2</td><td>A <code>{</code> da função na mesma linha (PSR-12 pede na de baixo).</td><td>11</td></tr>
+<tr><td>18</td><td>O preço da caneta é o <strong>texto</strong> <code>"3.9"</code>, e ninguém percebe.</td><td>1, 2</td></tr>
+</table>
+</div>
+
+<p>O último problema parece inofensivo, porque <code>"3.9"</code> ainda é convertido certinho. Mas veja o que acontece se o preço vier de um formulário brasileiro, com vírgula (<code>"3,9"</code>):</p>
+
+<pre class="term">$ php pedido-antes.php
+
+Warning: A non-numeric value encountered in /home/ana/loja/pedido-antes.php on line 5
+Total: R$ 87,90</pre>
+
+<p>Um aviso que ninguém lê em produção (item 7) e um <strong>total errado</strong>: o PHP usou só o <code>3</code> antes da vírgula. A lojinha cobraria R$ 87,90 em vez de R$ 96,00, e o programa "funcionou".</p>
+
+<h3>O mesmo pedido, refatorado</h3>
+
+<pre class="file" data-file="pedido.php">&lt;?php
+
+declare(strict_types=1);
+
+const DESCONTO_PROMO10 = 0.10;
+const FRETE_PADRAO = 15.0;
+const FRETE_GRATIS_ACIMA_DE = 200.0;
+
+final readonly class Item
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $quantidade,
+    ) {
+    }
+}
+
+/** @param list&lt;Item&gt; $itens */
+function subtotal(array $itens): float
+{
+    $soma = 0.0;
+    foreach ($itens as $item) {
+        $soma += $item-&gt;preco * $item-&gt;quantidade;
+    }
+    return $soma;
+}
+
+function aplicarCupom(float $valor, ?string $cupom): float
+{
+    if ($cupom === 'PROMO10') {
+        return $valor * (1 - DESCONTO_PROMO10);
+    }
+    return $valor;
+}
+
+function calcularFrete(float $valor): float
+{
+    return $valor &gt; FRETE_GRATIS_ACIMA_DE ? 0.0 : FRETE_PADRAO;
+}
+
+function formatarReais(float $valor): string
+{
+    return 'R$ ' . number_format($valor, 2, ',', '.');
+}
+
+$itens = [
+    new Item('Caderno', 25.5, 2),
+    new Item('Caneta', 3.9, 10),
+];
+
+$comDesconto = aplicarCupom(subtotal($itens), 'PROMO10');
+$total = $comDesconto + calcularFrete($comDesconto);
+
+echo 'Total: ' . formatarReais($total) . "\n";
+</pre>
+
+<pre class="term">$ php pedido.php
+Total: R$ 96,00</pre>
+
+<p>O mesmo resultado, que é a primeira regra de uma refatoração. O código ficou maior, e isso é normal: cada linha extra é uma explicação que antes só existia na cabeça da Ana. Mudança por mudança:</p>
+
+<dl class="anatomy">
+  <dt>declare(strict_types=1);</dt><dd>Item 1. Tipos estritos no arquivo inteiro.</dd>
+  <dt>const DESCONTO_PROMO10 = 0.10; …</dt><dd>Item 10. Os números mágicos ganharam nome. Se o frete subir para R$ 18,00, muda uma linha.</dd>
+  <dt>final readonly class Item</dt><dd>Itens 2 e 10. No lugar de <code>["Caneta", "3.9", 10]</code> (posições sem nome), um objeto com <code>nome</code>, <code>preco</code> e <code>quantidade</code>, cada um com seu tipo. <code>readonly</code> (<span class="versao">PHP 8.2+</span>) impede que o item mude depois de criado; veja <a href="readonly-hooks.html">readonly</a>. O construtor usa a promoção de propriedades de <a href="construtores.html">Construtores</a>.</dd>
+  <dt>/** @param list&lt;Item&gt; $itens */</dt><dd>Um comentário de documentação: o PHP só sabe que é um <code>array</code>; o comentário diz a quem lê (e ao editor) que é uma lista de <code>Item</code>.</dd>
+  <dt>subtotal(), aplicarCupom(), calcularFrete(), formatarReais()</dt><dd>Item 9. Uma função por tarefa, cada uma com nome de verbo (item 10) e tipos (item 2). Nenhuma imprime nada: todas devolvem um valor.</dd>
+  <dt>?string $cupom</dt><dd>O cupom pode ser um texto ou <code>null</code> (sem cupom).</dd>
+  <dt>$cupom === 'PROMO10'</dt><dd>Item 3. Comparação estrita.</dd>
+  <dt>{ na linha de baixo, 4 espaços, aspas simples</dt><dd>Item 11. Estilo PSR-12. Aspas simples onde não há variável dentro do texto é um costume comum (não é regra da PSR-12).</dd>
+  <dt>echo só no fim</dt><dd>Item 9. Calcular e mostrar ficaram separados. Agora dá para testar <code>calcularFrete(201.0)</code> sozinho (item 12) ou mostrar o total numa página HTML ou numa <a href="api-json.html">API JSON</a> sem mudar nenhuma função.</dd>
+</dl>
+
+<p>E o preço como texto? Troque <code>3.9</code> por <code>"3.9"</code> na linha 49 e rode:</p>
+
+<pre class="term">$ php pedido.php
+
+Fatal error: Uncaught TypeError: Item::__construct(): Argument #2 ($preco) must be of type float, string given, called in /home/ana/loja/pedido.php on line 49 and defined in /home/ana/loja/pedido.php:13
+Stack trace:
+#0 /home/ana/loja/pedido.php(49): Item-&gt;__construct('Caneta', '3.9', 10)
+#1 {main}
+  thrown in /home/ana/loja/pedido.php on line 13</pre>
+
+<p>Agora o erro aparece <strong>na hora</strong>, apontando a linha 49 (onde o item foi criado) e dizendo qual argumento estava errado: o 2º, <code>$preco</code>. É isto que "o erro aparece cedo" quer dizer: em vez de um total errado no fim do mês, uma mensagem clara no primeiro teste.</p>
+
+<div class="tryphp" data-goal="erro:must be of type float,src:'3\.9'|&quot;3\.9&quot;">
+<p class="try-task"><strong>Missão:</strong> este é o pedido refatorado. Rode uma vez e confira o <code>Total: R$ 96,00</code>. Depois provoque o erro: troque o preço da caneta, <code>3.9</code>, pelo texto <code>"3.9"</code> (entre aspas) e rode de novo. Para comparar, apague também a linha do <code>declare</code> e veja o erro sumir.</p>
+<pre class="script">&lt;?php
+
+declare(strict_types=1);
+
+const DESCONTO_PROMO10 = 0.10;
+const FRETE_PADRAO = 15.0;
+const FRETE_GRATIS_ACIMA_DE = 200.0;
+
+final readonly class Item
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $quantidade,
+    ) {
+    }
+}
+
+/** @param list&lt;Item&gt; $itens */
+function subtotal(array $itens): float
+{
+    $soma = 0.0;
+    foreach ($itens as $item) {
+        $soma += $item-&gt;preco * $item-&gt;quantidade;
+    }
+    return $soma;
+}
+
+function aplicarCupom(float $valor, ?string $cupom): float
+{
+    if ($cupom === 'PROMO10') {
+        return $valor * (1 - DESCONTO_PROMO10);
+    }
+    return $valor;
+}
+
+function calcularFrete(float $valor): float
+{
+    return $valor &gt; FRETE_GRATIS_ACIMA_DE ? 0.0 : FRETE_PADRAO;
+}
+
+function formatarReais(float $valor): string
+{
+    return 'R$ ' . number_format($valor, 2, ',', '.');
+}
+
+$itens = [
+    new Item('Caderno', 25.5, 2),
+    new Item('Caneta', 3.9, 10),
+];
+
+$comDesconto = aplicarCupom(subtotal($itens), 'PROMO10');
+$total = $comDesconto + calcularFrete($comDesconto);
+
+echo 'Total: ' . formatarReais($total) . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+
+declare(strict_types=1);
+
+const DESCONTO_PROMO10 = 0.10;
+const FRETE_PADRAO = 15.0;
+const FRETE_GRATIS_ACIMA_DE = 200.0;
+
+final readonly class Item
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $quantidade,
+    ) {
+    }
+}
+
+/** @param list&lt;Item&gt; $itens */
+function subtotal(array $itens): float
+{
+    $soma = 0.0;
+    foreach ($itens as $item) {
+        $soma += $item-&gt;preco * $item-&gt;quantidade;
+    }
+    return $soma;
+}
+
+function aplicarCupom(float $valor, ?string $cupom): float
+{
+    if ($cupom === 'PROMO10') {
+        return $valor * (1 - DESCONTO_PROMO10);
+    }
+    return $valor;
+}
+
+function calcularFrete(float $valor): float
+{
+    return $valor &gt; FRETE_GRATIS_ACIMA_DE ? 0.0 : FRETE_PADRAO;
+}
+
+function formatarReais(float $valor): string
+{
+    return 'R$ ' . number_format($valor, 2, ',', '.');
+}
+
+$itens = [
+    new Item('Caderno', 25.5, 2),
+    new Item('Caneta', "3.9", 10),
+];
+
+$comDesconto = aplicarCupom(subtotal($itens), 'PROMO10');
+$total = $comDesconto + calcularFrete($comDesconto);
+
+echo 'Total: ' . formatarReais($total) . "\n";
+</pre>
+</div>
+
+<h3>Como refatorar sem quebrar</h3>
+<ol class="passo">
+  <li><strong>Anote a saída atual</strong> (aqui, <code>Total: R$ 96,00</code>). Melhor ainda: escreva um teste que confira essa saída.</li>
+  <li><strong>Faça uma mudança pequena</strong> (por exemplo, só renomear <code>$t</code> para <code>$total</code>).</li>
+  <li><strong>Rode de novo</strong> e compare. Mudou? Desfaça e tente menor.</li>
+  <li><strong>Repita</strong> até o checklist ficar verde.</li>
+</ol>
+<p>Não misture refatorar com mudar o comportamento. Se além de organizar você quiser mudar a regra do frete, faça isso <strong>depois</strong>, numa mudança separada. Assim, se o total mudar, você sabe exatamente por quê.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Fatal error: strict_types declaration must be the very first statement in the script"</strong>
+<pre class="file" data-file="erro.php">&lt;?php
+echo "Início\n";
+declare(strict_types=1);
+</pre>
+<pre class="term">$ php erro.php
+
+Fatal error: strict_types declaration must be the very first statement in the script in /home/ana/loja/erro.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que aconteceu:</strong> o <code>declare</code> veio depois de outra instrução. Ele precisa ser a primeira coisa do arquivo (comentários e linhas em branco antes dele podem). Repare que nem o <code>echo "Início"</code> rodou: o PHP confere o arquivo inteiro antes de executar a primeira linha.</p>
+<p><strong>Como consertar:</strong> mova o <code>declare(strict_types=1);</code> para logo depois do <code>&lt;?php</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Liguei o <code>strict_types</code> e apareceram vários <code>TypeError</code></strong>
+<p><strong>O que aconteceu:</strong> o código passava tipos errados o tempo todo e o PHP convertia em silêncio. O <code>declare</code> não criou os problemas: só os mostrou.</p>
+<p><strong>Como consertar:</strong> leia cada mensagem (ela diz a função, o número do argumento, o tipo esperado e o recebido) e converta o valor <strong>de propósito</strong> no lugar onde ele entra no sistema (por exemplo, <code>(int)</code> ou <code>filter_var</code> logo depois de ler o formulário). Num projeto grande, ligue arquivo por arquivo.</p>
+</div>
+
+<div class="cenario">
+<strong>Escondi os erros e agora a página fica em branco</strong>
+<p><strong>O que aconteceu:</strong> com <code>display_errors=0</code>, um erro fatal deixa a página vazia (ou com o código 500) e nada aparece na tela. Isso é o esperado em produção.</p>
+<p><strong>Como consertar:</strong> olhe o arquivo configurado em <code>error_log</code> (como o <code>erros.log</code> acima). No seu computador, deixe <code>display_errors=1</code>. Se não sabe onde está o log, <code>php -i | grep error_log</code> mostra a configuração.</p>
+</div>
+
+<div class="cenario">
+<strong>A refatoração mudou o resultado</strong>
+<p><strong>O que aconteceu:</strong> no caminho, alguma regra mudou sem querer. Exemplo comum: trocar <code>if ($t &gt; 200)</code> por <code>if ($t &gt;= 200)</code>, ou aplicar o frete antes do desconto.</p>
+<p><strong>Como consertar:</strong> volte para a última versão que dava o resultado certo e refaça em passos menores, rodando a cada passo. É para isso que os testes servem: eles conferem dezenas de casos em um segundo.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Prática</th><th>Como fica no código</th></tr>
+<tr><td>Tipos estritos</td><td><code>declare(strict_types=1);</code> na 1ª linha depois de <code>&lt;?php</code></td></tr>
+<tr><td>Tipos</td><td><code>function f(int $a, ?string $b = null): float</code>, <code>public float $preco;</code></td></tr>
+<tr><td>Comparação</td><td><code>===</code>, <code>!==</code>, <code>in_array($x, $lista, true)</code></td></tr>
+<tr><td>Saída no HTML</td><td><code>echo htmlspecialchars($texto);</code></td></tr>
+<tr><td>Banco</td><td><code>$st = $pdo-&gt;prepare('… WHERE id = ?'); $st-&gt;execute([$id]);</code></td></tr>
+<tr><td>Senhas</td><td><code>password_hash($senha, PASSWORD_DEFAULT)</code>, <code>password_verify($senha, $hash)</code></td></tr>
+<tr><td>Erros em produção</td><td><code>display_errors=Off</code>, <code>log_errors=On</code>, <code>error_log=…</code>, <code>error_reporting=E_ALL</code></td></tr>
+<tr><td>Dependências</td><td><code>composer require pacote</code>; <code>require __DIR__ . '/vendor/autoload.php';</code></td></tr>
+<tr><td>Nomes</td><td>Classes <code>PascalCase</code>, funções e variáveis <code>camelCase</code>, constantes <code>MAIUSCULAS</code></td></tr>
+<tr><td>Estilo</td><td>PSR-12: 4 espaços, <code>{</code> de classe/função na linha de baixo, sem <code>?&gt;</code> no fim</td></tr>
+<tr><td>Testes</td><td><code>vendor/bin/phpunit</code> antes de publicar</td></tr>
+<tr><td>Conferir a sintaxe sem rodar</td><td><code>php -l arquivo.php</code> → <code>No syntax errors detected in arquivo.php</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A primeira linha</h3>
+<p>Complete a linha que liga os tipos estritos no arquivo:</p>
+<div class="ex-code">declare(<input data-answer="strict_types=1" aria-label="diretiva">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Comparação estrita</h3>
+<p>Complete com o operador que compara valor <strong>e</strong> tipo:</p>
+<div class="ex-code">if ($cupom <input data-answer="===" aria-label="operador"> 'PROMO10') {</div>
+</div>
+
+<div class="exercise">
+<h3>3. Escondendo os erros do visitante</h3>
+<p>Complete a configuração de produção que <strong>não</strong> mostra os erros na página:</p>
+<div class="ex-code">display_errors = <input data-answer="Off|0|off" aria-label="valor"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>var_dump("1" == "01");</code> mostra no PHP 8.5?</p>
+<label><input type="radio" name="q4"> <code>bool(false)</code>, porque os textos são diferentes</label>
+<label><input type="radio" name="q4"> Um <code>TypeError</code></label>
+<label><input type="radio" name="q4"> <code>bool(true)</code>, porque os dois textos parecem números e são comparados como números</label>
+<label><input type="radio" name="q4"> <code>int(1)</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual destas funções segue melhor a ideia de "funções pequenas, uma tarefa"?</p>
+<label><input type="radio" name="q5"> <code>function processarPedido()</code> que lê o formulário, calcula, grava no banco e imprime a página</label>
+<label><input type="radio" name="q5"> <code>function calcularFrete(float $valor): float</code></label>
+<label><input type="radio" name="q5"> <code>function f($a, $b, $c)</code></label>
+<label><input type="radio" name="q5"> <code>function tudo(): void</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que <code>display_errors</code> deve ficar desligado no site em produção?</p>
+<label><input type="radio" name="q6"> Porque deixa o PHP mais lento.</label>
+<label><input type="radio" name="q6"> Porque os erros param de acontecer.</label>
+<label><input type="radio" name="q6"> Porque o PHP não grava logs com ele ligado.</label>
+<label><input type="radio" name="q6"> Porque as mensagens mostram ao visitante detalhes internos (caminhos, arquivos, às vezes dados do banco).</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Você refatorou um código e o resultado mudou. O que isso significa?</p>
+<label><input type="radio" name="q7"> Não foi só uma refatoração: algum comportamento mudou sem querer.</label>
+<label><input type="radio" name="q7"> É normal; refatorar sempre muda o resultado.</label>
+<label><input type="radio" name="q7"> O PHP está com defeito.</label>
+<label><input type="radio" name="q7"> Faltou o <code>declare(strict_types=1)</code>.</label>
+</div>
+
+<div class="tryphp" data-goal="out:Olá\, Ana!,out:Olá\, visitante!,src:declare\s*\(\s*strict_types\s*=\s*1\s*\),src:function\s+saudacao\s*\(\s*string\s+\$nome\s*\)\s*:\s*string,src:===,semerro">
+<p class="try-task"><strong>Missão final:</strong> refatore este código pelo checklist, sem mudar a saída (<code>Olá, Ana!</code> e <code>Olá, visitante!</code>): (1) ligue os tipos estritos; (2) renomeie a função para <code>saudacao</code> e o parâmetro para <code>$nome</code>; (3) dê os tipos <code>string</code> ao parâmetro e ao retorno; (4) troque <code>==</code> por <code>===</code>; (5) coloque chaves no <code>if</code>. Lembre de mudar também as chamadas lá embaixo.</p>
+<pre class="script">&lt;?php
+function f($n) {
+    if ($n == "") return "Olá, visitante!";
+    return "Olá, " . $n . "!";
+}
+echo f("Ana") . "\n";
+echo f("") . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+
+declare(strict_types=1);
+
+function saudacao(string $nome): string
+{
+    if ($nome === '') {
+        return 'Olá, visitante!';
+    }
+    return "Olá, $nome!";
+}
+
+echo saudacao('Ana') . "\n";
+echo saudacao('') . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Boas práticas fazem o erro aparecer cedo, barram ataques e deixam o código legível para os outros (e para você no futuro).</li>
+  <li><code>declare(strict_types=1)</code> + tipos em tudo: tipo errado vira <code>TypeError</code> na linha certa, em vez de um resultado errado lá na frente.</li>
+  <li><code>===</code> sempre; o <code>==</code> converte e surpreende (<code>"1" == "01"</code> é <code>true</code>).</li>
+  <li>Segurança não tem exceção: <code>htmlspecialchars</code> na saída, prepared statements no banco, <code>password_hash</code> nas senhas.</li>
+  <li>Em produção: <code>display_errors=Off</code> e <code>log_errors=On</code>. O visitante não vê; você lê no log.</li>
+  <li>Composer + PSR-4 para organizar; PSR-12 para o estilo; funções pequenas com nomes de verbo; constantes no lugar de números mágicos.</li>
+  <li>Refatorar = melhorar sem mudar o resultado, um passo pequeno por vez, conferindo a saída (de preferência com testes).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
