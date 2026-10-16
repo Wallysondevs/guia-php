@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Arrays Multidimensionais — arrays dentro de arrays | Guia PHP</title>
+<meta name="description" content="Arrays multidimensionais no PHP: um array de arrays, a tabela de alunos da Ana (nome, idade, cidade, nota), acessar com dois colchetes, mudar e acrescentar, percorrer com laços aninhados e gerar uma tabela HTML, com saídas reais e exercícios no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Arrays Multidimensionais</span></h1>
+
+<p class="intro">Um array pode guardar qualquer valor, e isso inclui <strong>outro array</strong>. Quando os itens de um array são arrays, ele vira uma espécie de <strong>tabela</strong>, com linhas e colunas. É assim que o PHP representa a lista de alunos de uma turma, os produtos de uma loja ou as linhas que vêm de um banco de dados. O nome assusta (<em>multidimensional</em> = "de várias dimensões"), mas a ideia é simples: <strong>uma gaveta que tem um armário dentro</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um array de arrays e como criá-lo.</li>
+  <li>Como ler e mudar um valor com dois colchetes: <code>$alunos[0]["nome"]</code>.</li>
+  <li>Como acrescentar uma linha inteira à tabela.</li>
+  <li>Como percorrer com um laço, e com <strong>laços aninhados</strong> (um dentro do outro).</li>
+  <li>Como transformar o array numa tabela HTML de verdade.</li>
+  <li>Os erros mais comuns ao errar o nível do array.</li>
+</ul>
+</div>
+
+<p>Antes, é bom ter feito <a href="arrays.html">Arrays Indexados</a>, <a href="arrays-associativos.html">Arrays Associativos</a> e <a href="foreach.html">foreach</a>: esta aula junta os três.</p>
+
+<hr>
+
+<h2>O mais simples: uma grade de jogo da velha</h2>
+<p>Um tabuleiro de jogo da velha tem 3 linhas, e cada linha tem 3 casas. Em PHP: um array com 3 itens, e cada item é um array com 3 casas.</p>
+
+<pre class="file" data-file="velha.php">&lt;?php
+$velha = [
+    ["X", "O", "X"],     // linha 0
+    [" ", "X", "O"],     // linha 1
+    ["O", " ", "X"],     // linha 2
+];
+echo "Centro: ", $velha[1][1], "\n";
+echo "Canto de baixo, à direita: ", $velha[2][2], "\n";
+$velha[1][0] = "O";      // a jogada do O na casa vazia da linha 1
+</pre>
+
+<dl class="anatomy">
+  <dt>$velha</dt><dd>O array de fora: tem 3 itens (índices 0, 1 e 2). Cada item é uma <strong>linha</strong>.</dd>
+  <dt>["X", "O", "X"]</dt><dd>Um array de dentro: uma linha, com 3 casas (índices 0, 1 e 2).</dd>
+  <dt>$velha[1]</dt><dd>A linha 1 inteira: o array <code>[" ", "X", "O"]</code>.</dd>
+  <dt>$velha[1][1]</dt><dd>Da linha 1, a casa 1: <code>"X"</code>. Leia da esquerda para a direita: primeiro escolhe a linha, depois a casa dentro dela.</dd>
+  <dt>$velha[1][0] = "O";</dt><dd>Muda uma casa só, com a mesma escrita.</dd>
+</dl>
+
+<p>Pense nos dois colchetes como um endereço: <strong>"rua 1, casa 1"</strong>. O primeiro número escolhe a rua (a linha); o segundo, a casa naquela rua (a coluna).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>coluna 0</th><th>coluna 1</th><th>coluna 2</th></tr>
+<tr><th>linha 0</th><td><code>[0][0]</code> X</td><td><code>[0][1]</code> O</td><td><code>[0][2]</code> X</td></tr>
+<tr><th>linha 1</th><td><code>[1][0]</code> (vazia → O)</td><td><code>[1][1]</code> X</td><td><code>[1][2]</code> O</td></tr>
+<tr><th>linha 2</th><td><code>[2][0]</code> O</td><td><code>[2][1]</code> (vazia)</td><td><code>[2][2]</code> X</td></tr>
+</table>
+</div>
+
+<h3>Mostrar a grade: um laço dentro do outro</h3>
+<p>Para passar por todas as casas, você precisa de <strong>dois laços</strong>: o de fora anda pelas linhas; o de dentro, pelas casas de cada linha. Isso se chama <strong>laços aninhados</strong> (um dentro do outro, como ninhos).</p>
+
+<pre class="file" data-file="velha.php (continuação)">for ($linha = 0; $linha &lt; 3; $linha++) {
+    for ($coluna = 0; $coluna &lt; 3; $coluna++) {
+        echo " ", $velha[$linha][$coluna], " ";
+        if ($coluna &lt; 2) {
+            echo "|";
+        }
+    }
+    echo "\n";
+    if ($linha &lt; 2) {
+        echo "---+---+---\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php velha.php
+Centro: X
+Canto de baixo, à direita: X
+ X | O | X
+---+---+---
+ O | X | O               « a casa [1][0] agora tem O
+---+---+---
+ O |   | X </pre>
+
+<p>Siga o caminho: com <code>$linha = 0</code>, o laço de dentro roda <strong>inteiro</strong> (colunas 0, 1 e 2) e só então a linha passa para 1, e o laço de dentro roda inteiro de novo. São 3 × 3 = 9 voltas no total. Os laços <code>for</code> estão explicados na aula <a href="for.html">for</a>.</p>
+
+<hr>
+
+<h2>A tabela de alunos da Ana</h2>
+<p>O caso mais comum no dia a dia é uma <strong>lista de fichas</strong>: um array indexado (a lista) em que cada item é um array associativo (a ficha). A Ana dá aulas de informática e guarda a turma assim:</p>
+
+<pre class="file" data-file="alunos.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",    "idade" =&gt; 29, "cidade" =&gt; "Recife",    "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno",  "idade" =&gt; 34, "cidade" =&gt; "Olinda",    "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla",  "idade" =&gt; 22, "cidade" =&gt; "Caruaru",   "nota" =&gt; 8.5],
+    ["nome" =&gt; "Diego",  "idade" =&gt; 41, "cidade" =&gt; "Petrolina", "nota" =&gt; 6.0],
+];
+echo $alunos[0]["nome"], "\n";
+echo $alunos[2]["cidade"], "\n";
+echo "Alunos: ", count($alunos), "\n";
+echo "Campos de cada aluno: ", count($alunos[0]), "\n";
+print_r($alunos[1]);
+</pre>
+
+<p>Veja como uma tabela no papel:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Índice</th><th>"nome"</th><th>"idade"</th><th>"cidade"</th><th>"nota"</th></tr>
+<tr><td>0</td><td>Ana</td><td>29</td><td>Recife</td><td>9.5</td></tr>
+<tr><td>1</td><td>Bruno</td><td>34</td><td>Olinda</td><td>7.0</td></tr>
+<tr><td>2</td><td>Carla</td><td>22</td><td>Caruaru</td><td>8.5</td></tr>
+<tr><td>3</td><td>Diego</td><td>41</td><td>Petrolina</td><td>6.0</td></tr>
+</table>
+</div>
+
+<p>Cada <strong>linha</strong> é um aluno (escolhida pelo número); cada <strong>coluna</strong> é um campo (escolhida pelo nome).</p>
+
+<dl class="anatomy">
+  <dt>$alunos[0]</dt><dd>A ficha inteira da Ana: <code>["nome" =&gt; "Ana", "idade" =&gt; 29, …]</code>.</dd>
+  <dt>$alunos[0]["nome"]</dt><dd>Da ficha 0, o campo <code>"nome"</code>: <code>"Ana"</code>.</dd>
+  <dt>count($alunos)</dt><dd>Conta só o nível de fora: quantas fichas (4).</dd>
+  <dt>count($alunos[0])</dt><dd>Conta os campos de uma ficha (4).</dd>
+</dl>
+
+<pre class="term">$ php alunos.php
+Ana
+Caruaru
+Alunos: 4
+Campos de cada aluno: 4
+Array
+(
+    [nome] =&gt; Bruno
+    [idade] =&gt; 34
+    [cidade] =&gt; Olinda
+    [nota] =&gt; 7              « 7.0 aparece como 7 no print_r
+)</pre>
+
+<h3>Mudar um campo, acrescentar um campo, acrescentar um aluno</h3>
+
+<pre class="file" data-file="alunos-mudar.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife", "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda", "nota" =&gt; 7.0],
+];
+$alunos[1]["nota"] = 7.5;                       // muda um campo de uma ficha
+$alunos[0]["email"] = "ana@exemplo.com";        // acrescenta um campo só na ficha 0
+$alunos[] = ["nome" =&gt; "Elisa", "idade" =&gt; 19, "cidade" =&gt; "Garanhuns", "nota" =&gt; 10.0];
+print_r($alunos);
+</pre>
+
+<pre class="term">$ php alunos-mudar.php
+Array
+(
+    [0] =&gt; Array
+        (
+            [nome] =&gt; Ana
+            [idade] =&gt; 29
+            [cidade] =&gt; Recife
+            [nota] =&gt; 9.5
+            [email] =&gt; ana@exemplo.com
+        )
+
+    [1] =&gt; Array
+        (
+            [nome] =&gt; Bruno
+            [idade] =&gt; 34
+            [cidade] =&gt; Olinda
+            [nota] =&gt; 7.5
+        )
+
+    [2] =&gt; Array
+        (
+            [nome] =&gt; Elisa
+            [idade] =&gt; 19
+            [cidade] =&gt; Garanhuns
+            [nota] =&gt; 10
+        )
+
+)</pre>
+
+<p>No <code>print_r</code>, cada nível de array ganha mais recuo, e o array de dentro aparece como <code>Array ( … )</code> no lugar do valor. A última linha do código usa o <code>[]</code> vazio que você conhece: acrescenta no fim do array de fora, e o que entra é uma ficha inteira.</p>
+
+<p>Repare também que a Ana agora tem um campo <code>"email"</code> e os outros não. O PHP permite: cada ficha é um array independente. Mas é fonte de avisos (veja <a href="#errado">Quando dá errado</a>); numa tabela, prefira que todas as fichas tenham os mesmos campos.</p>
+
+<hr>
+
+<h2>Percorrer a tabela</h2>
+
+<h3>Um <code>foreach</code>: uma ficha por volta</h3>
+<p>Na maior parte do tempo, um laço basta: a cada volta, a variável recebe uma ficha inteira, e você lê os campos dela pelo nome.</p>
+
+<pre class="file" data-file="alunos-foreach.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",    "idade" =&gt; 29, "cidade" =&gt; "Recife",    "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno",  "idade" =&gt; 34, "cidade" =&gt; "Olinda",    "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla",  "idade" =&gt; 22, "cidade" =&gt; "Caruaru",   "nota" =&gt; 8.5],
+    ["nome" =&gt; "Diego",  "idade" =&gt; 41, "cidade" =&gt; "Petrolina", "nota" =&gt; 6.0],
+];
+foreach ($alunos as $aluno) {
+    echo $aluno["nome"], " (", $aluno["cidade"], "): ", $aluno["nota"], "\n";
+}
+$soma = 0;
+foreach ($alunos as $aluno) {
+    $soma += $aluno["nota"];
+}
+echo "Média da turma: ", $soma / count($alunos), "\n";
+</pre>
+
+<pre class="term">$ php alunos-foreach.php
+Ana (Recife): 9.5
+Bruno (Olinda): 7
+Carla (Caruaru): 8.5
+Diego (Petrolina): 6
+Média da turma: 7.75</pre>
+
+<p>O nome no singular (<code>$aluno</code>) para o item e no plural (<code>$alunos</code>) para a lista é uma convenção que ajuda muito: dentro do laço, <code>$aluno["nome"]</code> se lê quase como português. Para pegar uma coluna inteira de uma vez (todas as notas, todos os nomes), existe a função <code>array_column</code>, na aula <a href="funcoes-array.html">Funções de Array</a>.</p>
+
+<div class="tryphp">
+<p class="try-task">Acrescente um aluno, mude a nota de outro e veja o resultado. Tente também mostrar a idade de cada um, ou só os alunos de uma cidade (com um <a href="if-else.html">if</a> dentro do <code>foreach</code>).</p>
+<pre class="script">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife",    "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda",    "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "cidade" =&gt; "Caruaru",   "nota" =&gt; 8.5],
+];
+
+$alunos[] = ["nome" =&gt; "Diego", "idade" =&gt; 41, "cidade" =&gt; "Petrolina", "nota" =&gt; 6.0];
+$alunos[1]["nota"] = 7.5;
+
+foreach ($alunos as $aluno) {
+    echo $aluno["nome"], " mora em ", $aluno["cidade"], " e tirou ", $aluno["nota"], "\n";
+}
+</pre>
+</div>
+
+<h3>Dois <code>foreach</code>: passar por todos os campos</h3>
+<p>Quando você não sabe (ou não quer escrever) o nome de cada campo, coloque um segundo <code>foreach</code> dentro do primeiro. O de fora pega cada ficha; o de dentro percorre os pares chave =&gt; valor daquela ficha.</p>
+
+<pre class="file" data-file="alunos-aninhado.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife", "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda", "nota" =&gt; 7.0],
+];
+foreach ($alunos as $numero =&gt; $aluno) {
+    echo "Aluno nº $numero\n";
+    foreach ($aluno as $campo =&gt; $valor) {
+        echo "  $campo: $valor\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php alunos-aninhado.php
+Aluno nº 0
+  nome: Ana
+  idade: 29
+  cidade: Recife
+  nota: 9.5
+Aluno nº 1
+  nome: Bruno
+  idade: 34
+  cidade: Olinda
+  nota: 7</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Laço</th><th>Percorre</th><th>A variável recebe</th></tr>
+<tr><td>de fora: <code>foreach ($alunos as $numero =&gt; $aluno)</code></td><td>a lista</td><td><code>$numero</code>: 0, 1…; <code>$aluno</code>: uma ficha (array)</td></tr>
+<tr><td>de dentro: <code>foreach ($aluno as $campo =&gt; $valor)</code></td><td>uma ficha</td><td><code>$campo</code>: "nome", "idade"…; <code>$valor</code>: o dado</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Use nomes diferentes nos dois laços</strong>
+<p>Se o laço de dentro reaproveitar a variável do de fora (por exemplo, <code>foreach ($aluno as $aluno)</code>), ele apaga a ficha que estava sendo usada. Dê a cada laço os seus próprios nomes.</p>
+</div>
+
+<hr>
+
+<h2>Mais níveis e outras combinações</h2>
+<p>Não existe limite de níveis, e qualquer combinação vale. Duas muito comuns:</p>
+
+<h3>Um campo que é uma lista</h3>
+
+<pre class="file" data-file="notas3.php">&lt;?php
+$aluna = [
+    "nome"  =&gt; "Ana",
+    "notas" =&gt; [9.0, 8.5, 10.0],
+];
+echo "Segunda nota: ", $aluna["notas"][1], "\n";
+echo "Quantidade de notas: ", count($aluna["notas"]), "\n";
+$aluna["notas"][] = 7.5;
+foreach ($aluna["notas"] as $n) {
+    echo $n, " ";
+}
+echo "\n";
+</pre>
+
+<pre class="term">$ php notas3.php
+Segunda nota: 8.5
+Quantidade de notas: 3
+9 8.5 10 7.5 </pre>
+
+<p><code>$aluna["notas"]</code> é um array comum: dá para usar <code>count</code>, <code>[]</code> e <code>foreach</code> nele. Uma turma inteira com várias notas por aluno teria <strong>três</strong> níveis: <code>$alunos[0]["notas"][1]</code> (aluno 0, campo notas, nota 1).</p>
+
+<h3>Grupos com nome</h3>
+
+<pre class="file" data-file="turmas.php">&lt;?php
+$turmas = [
+    "manhã" =&gt; ["Ana", "Bruno"],
+    "noite" =&gt; ["Carla", "Diego", "Elisa"],
+];
+foreach ($turmas as $turno =&gt; $nomes) {
+    echo "Turma da $turno (", count($nomes), "): ", implode(", ", $nomes), "\n";
+}
+echo $turmas["noite"][2], "\n";
+</pre>
+
+<pre class="term">$ php turmas.php
+Turma da manhã (2): Ana, Bruno
+Turma da noite (3): Carla, Diego, Elisa
+Elisa</pre>
+
+<p>Aqui o array de fora é associativo (chaves <code>"manhã"</code> e <code>"noite"</code>) e os de dentro são listas. O endereço <code>$turmas["noite"][2]</code> se lê "da turma da noite, o terceiro nome".</p>
+
+<div class="tip">
+<strong>Isto é JSON</strong>
+<p>Quase todo dado que circula pela internet tem esse formato de "listas de fichas", e o formato JSON é exatamente isso escrito como texto. Na aula <a href="json.html">JSON</a>, você vai transformar um array como <code>$alunos</code> em JSON e de volta com uma linha de código.</p>
+</div>
+
+<hr>
+
+<h2>Gerar uma tabela HTML</h2>
+<p>Este é o motivo pelo qual arrays multidimensionais aparecem em todo site em PHP: a lista de fichas vira, quase sem esforço, uma tabela na página. A Ana quer publicar a turma no site do curso.</p>
+
+<pre class="file" data-file="tabela.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife", "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda", "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "cidade" =&gt; "Caruaru", "nota" =&gt; 8.5],
+];
+?&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;Idade&lt;/th&gt;&lt;th&gt;Cidade&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($alunos as $aluno): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($aluno["nome"]) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= $aluno["idade"] ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($aluno["cidade"]) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= number_format($aluno["nota"], 1, ",", ".") ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>?&gt;</code> depois do array</td><td>Sai do modo PHP: o que vem depois é HTML, enviado como está (aula <a href="php-e-html.html">PHP Dentro do HTML</a>).</td></tr>
+<tr><td><code>&lt;?php foreach ($alunos as $aluno): ?&gt;</code></td><td>O <code>foreach</code> na <strong>sintaxe alternativa</strong>: dois-pontos no lugar de <code>{</code>. Tudo até o <code>endforeach</code> se repete uma vez por aluno, inclusive o HTML.</td></tr>
+<tr><td><code>&lt;?= … ?&gt;</code></td><td>Atalho para <code>&lt;?php echo … ?&gt;</code>: escreve o valor ali no meio do HTML.</td></tr>
+<tr><td><code>htmlspecialchars(…)</code></td><td>Protege a página: se um nome tiver <code>&lt;</code>, <code>&gt;</code> ou <code>&amp;</code>, eles aparecem como texto e não viram HTML. <strong>Sempre</strong> use em textos que vêm de dados (aula <a href="escapar-saida.html">Escapar a Saída</a>).</td></tr>
+<tr><td><code>number_format(…, 1, ",", ".")</code></td><td>Nota com uma casa e vírgula: <code>9,5</code>.</td></tr>
+<tr><td><code>&lt;?php endforeach; ?&gt;</code></td><td>Fecha o laço.</td></tr>
+</table>
+</div>
+
+<p>Rodando no terminal, você vê o HTML que o PHP gera, que é o que o navegador recebe:</p>
+
+<pre class="term">$ php tabela.php
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;Idade&lt;/th&gt;&lt;th&gt;Cidade&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Ana&lt;/td&gt;
+    &lt;td&gt;29&lt;/td&gt;
+    &lt;td&gt;Recife&lt;/td&gt;
+    &lt;td&gt;9,5&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Bruno&lt;/td&gt;
+    &lt;td&gt;34&lt;/td&gt;
+    &lt;td&gt;Olinda&lt;/td&gt;
+    &lt;td&gt;7,0&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Carla&lt;/td&gt;
+    &lt;td&gt;22&lt;/td&gt;
+    &lt;td&gt;Caruaru&lt;/td&gt;
+    &lt;td&gt;8,5&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</pre>
+
+<p>Três fichas no array, três <code>&lt;tr&gt;</code> no HTML. Se a Ana acrescentar um aluno ao array, a tabela ganha uma linha sem ela mexer em nada do HTML.</p>
+
+<h3>A outra forma: tudo com <code>echo</code> e dois laços</h3>
+<p>Também dá para gerar a tabela inteira de dentro do PHP. Com dois <code>foreach</code>, ela nem precisa saber o nome dos campos: o cabeçalho sai das chaves da primeira ficha (<code>array_keys</code> devolve a lista de chaves).</p>
+
+<pre class="file" data-file="tabela2.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife", "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda", "nota" =&gt; 7.0],
+];
+echo "&lt;table border=\"1\"&gt;\n";
+echo "  &lt;tr&gt;";
+foreach (array_keys($alunos[0]) as $campo) {
+    echo "&lt;th&gt;", htmlspecialchars($campo), "&lt;/th&gt;";
+}
+echo "&lt;/tr&gt;\n";
+foreach ($alunos as $aluno) {
+    echo "  &lt;tr&gt;";
+    foreach ($aluno as $valor) {
+        echo "&lt;td&gt;", htmlspecialchars((string) $valor), "&lt;/td&gt;";
+    }
+    echo "&lt;/tr&gt;\n";
+}
+echo "&lt;/table&gt;\n";
+</pre>
+
+<pre class="term">$ php tabela2.php
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;nome&lt;/th&gt;&lt;th&gt;idade&lt;/th&gt;&lt;th&gt;cidade&lt;/th&gt;&lt;th&gt;nota&lt;/th&gt;&lt;/tr&gt;
+  &lt;tr&gt;&lt;td&gt;Ana&lt;/td&gt;&lt;td&gt;29&lt;/td&gt;&lt;td&gt;Recife&lt;/td&gt;&lt;td&gt;9.5&lt;/td&gt;&lt;/tr&gt;
+  &lt;tr&gt;&lt;td&gt;Bruno&lt;/td&gt;&lt;td&gt;34&lt;/td&gt;&lt;td&gt;Olinda&lt;/td&gt;&lt;td&gt;7&lt;/td&gt;&lt;/tr&gt;
+&lt;/table&gt;</pre>
+
+<p>O <code>(string)</code> converte números em texto antes do <code>htmlspecialchars</code>, que só aceita strings (aula <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+
+<h3>Qual usar?</h3>
+<ul>
+  <li><strong>HTML com <code>&lt;?= ?&gt;</code> e <code>foreach: … endforeach</code></strong>: quando a página tem um formato definido (cabeçalhos em português, notas formatadas). O HTML fica legível e fácil de mudar. É a forma mais usada em sites.</li>
+  <li><strong>Tudo com <code>echo</code></strong>: para uma tabela "genérica", que mostra qualquer array sem conhecer os campos, por exemplo para depurar.</li>
+</ul>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Undefined array key 5</code> seguido de <code>Trying to access array offset on null</code></strong>
+<pre class="file" data-file="erro-multi.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "nota" =&gt; 7.0],
+];
+echo $alunos[5]["nome"], "\n";
+echo $alunos[0]["idade"], "\n";
+echo $alunos[0], "\n";
+</pre>
+<pre class="term">$ php erro-multi.php
+
+Warning: Undefined array key 5 in /home/ana/site/erro-multi.php on line 6
+
+Warning: Trying to access array offset on null in /home/ana/site/erro-multi.php on line 6
+
+
+Warning: Undefined array key "idade" in /home/ana/site/erro-multi.php on line 7
+
+
+Warning: Array to string conversion in /home/ana/site/erro-multi.php on line 8
+Array</pre>
+<p><strong>O que aconteceu, linha a linha:</strong></p>
+<ul>
+  <li><strong>Linha 6</strong>: não existe o aluno 5. <code>$alunos[5]</code> vale <code>null</code> (primeiro aviso), e pedir <code>["nome"]</code> de <code>null</code> gera o segundo aviso. Resolva o primeiro e o segundo some.</li>
+  <li><strong>Linha 7</strong>: o aluno 0 existe, mas não tem o campo <code>"idade"</code>. O aviso cita a chave que falta, então você sabe em que nível olhar.</li>
+  <li><strong>Linha 8</strong>: faltou o segundo colchete. <code>$alunos[0]</code> é uma ficha inteira (um array), e o <code>echo</code> não sabe escrevê-la.</li>
+</ul>
+<p><strong>Como resolver:</strong> faça <code>print_r</code> do array e confira cada nível do endereço. Se o dado pode faltar, <code>$alunos[5]["nome"] ?? "?"</code> resolve os dois níveis de uma vez, sem aviso.</p>
+</div>
+
+<div class="cenario">
+<strong><code>TypeError: Cannot access offset of type string on string</code></strong>
+<pre class="file" data-file="erro-string2.php">&lt;?php
+$aluno = ["nome" =&gt; "Ana", "nota" =&gt; 9.5];
+foreach ($aluno as $a) {
+    echo $a["nome"], "\n";
+}
+</pre>
+<pre class="term">$ php erro-string2.php
+
+Fatal error: Uncaught TypeError: Cannot access offset of type string on string in /home/ana/site/erro-string2.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/erro-string2.php on line 4</pre>
+<p><strong>O que aconteceu:</strong> o <code>foreach</code> foi feito sobre <strong>uma</strong> ficha, não sobre a lista. Então <code>$a</code> recebeu <code>"Ana"</code> (uma string), e o código tentou ler <code>["nome"]</code> de dentro de uma string. "Não dá para acessar uma posição do tipo string numa string." O mesmo erro aparece com um colchete a mais, como <code>$aluno["nome"]["nota"]</code>.</p>
+<p><strong>Como resolver:</strong> confira em que nível você está. O <code>foreach</code> que dá fichas é o que percorre a <strong>lista</strong> (<code>$alunos</code>); o que percorre uma ficha dá os valores soltos. Um <code>var_dump($a)</code> dentro do laço mostra na hora o que a variável recebeu.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th></tr>
+<tr><td>Criar uma lista de fichas</td><td><code>$alunos = [["nome" =&gt; "Ana", "nota" =&gt; 9.5], ["nome" =&gt; "Bruno", "nota" =&gt; 7.0]];</code></td></tr>
+<tr><td>Ler um campo</td><td><code>$alunos[0]["nome"]</code></td></tr>
+<tr><td>Ler uma ficha inteira</td><td><code>$alunos[0]</code></td></tr>
+<tr><td>Mudar um campo</td><td><code>$alunos[1]["nota"] = 8.0;</code></td></tr>
+<tr><td>Acrescentar uma ficha</td><td><code>$alunos[] = ["nome" =&gt; "Carla", "nota" =&gt; 8.5];</code></td></tr>
+<tr><td>Quantas fichas / quantos campos</td><td><code>count($alunos)</code> / <code>count($alunos[0])</code></td></tr>
+<tr><td>Percorrer as fichas</td><td><code>foreach ($alunos as $aluno) { … $aluno["nome"] … }</code></td></tr>
+<tr><td>Percorrer tudo</td><td><code>foreach ($alunos as $aluno) { foreach ($aluno as $campo =&gt; $valor) { … } }</code></td></tr>
+<tr><td>Grade com índices</td><td><code>for ($l…) { for ($c…) { $grade[$l][$c] } }</code></td></tr>
+<tr><td>Ler com valor padrão</td><td><code>$alunos[9]["nome"] ?? "?"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-modo="web" data-goal="html:Reprovado,html:Aprovado,html:Diego,src:foreach,src:htmlspecialchars,semerro">
+<p class="try-task"><strong>Missão:</strong> a página mostra a tabela da turma, mas só com o nome. Complete cada linha com mais duas células: a <strong>nota</strong> (com <code>number_format</code>, uma casa e vírgula) e a <strong>situação</strong>: <code>Aprovado</code> se a nota for 7 ou mais, <code>Reprovado</code> se for menor. Dica: o <a href="ternario.html">operador ternário</a> cabe dentro de um <code>&lt;?= ?&gt;</code>. Veja o resultado na aba <strong>Resultado</strong>.</p>
+<pre class="script">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife",    "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda",    "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "cidade" =&gt; "Caruaru",   "nota" =&gt; 8.5],
+    ["nome" =&gt; "Diego", "idade" =&gt; 41, "cidade" =&gt; "Petrolina", "nota" =&gt; 6.0],
+];
+?&gt;
+&lt;h1&gt;Notas da turma&lt;/h1&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($alunos as $aluno): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($aluno["nome"]) ?&gt;&lt;/td&gt;
+    &lt;!-- complete aqui: a nota e a situação --&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "cidade" =&gt; "Recife",    "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "cidade" =&gt; "Olinda",    "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "cidade" =&gt; "Caruaru",   "nota" =&gt; 8.5],
+    ["nome" =&gt; "Diego", "idade" =&gt; 41, "cidade" =&gt; "Petrolina", "nota" =&gt; 6.0],
+];
+?&gt;
+&lt;h1&gt;Notas da turma&lt;/h1&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($alunos as $aluno): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($aluno["nome"]) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= number_format($aluno["nota"], 1, ",", ".") ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= $aluno["nota"] &gt;= 7 ? "Aprovado" : "Reprovado" ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+</pre>
+</div>
+
+<p>No laboratório, a solução gera este HTML:</p>
+<pre class="term">$ php notas.php
+&lt;h1&gt;Notas da turma&lt;/h1&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Ana&lt;/td&gt;
+    &lt;td&gt;9,5&lt;/td&gt;
+    &lt;td&gt;Aprovado&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Bruno&lt;/td&gt;
+    &lt;td&gt;7,0&lt;/td&gt;
+    &lt;td&gt;Aprovado&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Carla&lt;/td&gt;
+    &lt;td&gt;8,5&lt;/td&gt;
+    &lt;td&gt;Aprovado&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Diego&lt;/td&gt;
+    &lt;td&gt;6,0&lt;/td&gt;
+    &lt;td&gt;Reprovado&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O endereço do dado</h3>
+<p>Complete para mostrar a cidade do segundo aluno da lista:</p>
+<div class="ex-code">echo $alunos<input data-answer="[1][&quot;cidade&quot;]|[1]['cidade']" aria-label="índices">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Uma ficha nova</h3>
+<p>Complete para acrescentar uma ficha no fim da lista:</p>
+<div class="ex-code">$alunos<input data-answer="[]" aria-label="colchetes"> = ["nome" =&gt; "Elisa", "nota" =&gt; 10.0];</div>
+</div>
+
+<div class="exercise">
+<h3>3. O laço de dentro</h3>
+<p>Complete o segundo <code>foreach</code> para percorrer os campos de cada ficha:</p>
+<div class="ex-code">foreach ($alunos as $aluno) {<br>&nbsp;&nbsp;foreach (<input data-answer="$aluno" aria-label="o que percorrer"> as $campo =&gt; $valor) { … }<br>}</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>$m = [[1, 2, 3], [4, 5, 6]];</code>, quanto vale <code>$m[1][0]</code>?</p>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 4</label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> 5</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. E <code>count($m)</code>, com o mesmo array?</p>
+<label><input type="radio" name="q5"> 6, o total de números.</label>
+<label><input type="radio" name="q5"> 3, o tamanho de cada linha.</label>
+<label><input type="radio" name="q5"> 2, o número de linhas (o nível de fora).</label>
+<label><input type="radio" name="q5"> Dá erro, porque o array tem dois níveis.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O código <code>echo $alunos[0];</code> mostra <code>Array</code> e um aviso. Por quê?</p>
+<label><input type="radio" name="q6"> O aluno 0 não existe.</label>
+<label><input type="radio" name="q6"> Faltou o <code>print</code> antes do <code>echo</code>.</label>
+<label><input type="radio" name="q6"> Arrays multidimensionais não podem ser lidos com índice.</label>
+<label><input type="radio" name="q6"> <code>$alunos[0]</code> é uma ficha inteira (um array); faltou dizer o campo, como <code>["nome"]</code>.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um array multidimensional é um array cujos itens são arrays. O formato mais comum é a <strong>lista de fichas</strong>: indexado por fora, associativo por dentro.</li>
+  <li>Cada par de colchetes desce um nível: <code>$alunos[0]["nome"]</code> = ficha 0, campo nome.</li>
+  <li>Mudar e acrescentar usam a mesma escrita: <code>$alunos[1]["nota"] = 8;</code> e <code>$alunos[] = [ … ];</code>.</li>
+  <li><code>count</code> conta só o nível em que você está.</li>
+  <li>Um <code>foreach</code> dá uma ficha por volta; dois <code>foreach</code> aninhados passam por todos os campos. Para grades com índices, dois <code>for</code>.</li>
+  <li>Para gerar HTML: <code>foreach: … endforeach</code> com <code>&lt;?= htmlspecialchars(…) ?&gt;</code>.</li>
+  <li>Erros de nível: <code>Array to string conversion</code> (faltou colchete), <code>Cannot access offset of type string on string</code> (colchete a mais ou laço no nível errado).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
