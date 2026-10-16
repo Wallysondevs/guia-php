@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Arrays Associativos — chave e valor | Guia PHP</title>
+<meta name="description" content="Arrays associativos no PHP: guardar dados com nomes (chave =&gt; valor), ler e mudar, isset × array_key_exists e o caso do null, percorrer com foreach, a conversão automática de &quot;1&quot; para 1 nas chaves e a ordem dos itens, com saídas reais e exercícios no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Arrays Associativos</span></h1>
+
+<p class="intro">Na aula <a href="arrays.html">Arrays Indexados</a>, cada gaveta do array tinha um <strong>número</strong>: 0, 1, 2… Isso é ótimo para listas, mas péssimo para uma ficha de cadastro: quem vai lembrar que a idade está na gaveta 1 e a cidade na 2? O <strong>array associativo</strong> troca os números por <strong>nomes</strong>. Você <em>associa</em> cada valor a uma etiqueta: <code>"nome"</code>, <code>"idade"</code>, <code>"cidade"</code>. É, de longe, o tipo de array mais usado no PHP: formulários, sessões, linhas do banco de dados e JSON chegam todos assim.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um par <strong>chave =&gt; valor</strong> e como criar um array associativo.</li>
+  <li>Como ler, mudar, acrescentar e apagar itens pelo nome.</li>
+  <li>Como saber se uma chave existe: <code>isset</code> × <code>array_key_exists</code> (e por que o <code>null</code> faz diferença).</li>
+  <li>Como percorrer o array com <code>foreach ($a as $chave =&gt; $valor)</code>.</li>
+  <li>Por que a chave <code>"1"</code> vira o número <code>1</code> sozinha, e outras surpresas das chaves.</li>
+  <li>Que o PHP guarda os itens na ordem em que você os colocou.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: uma ficha com campos</h2>
+<p>Pense numa ficha de matrícula em papel. Ela tem <strong>campos com nome</strong> e, ao lado de cada um, o que foi preenchido:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo (chave)</th><th>Preenchido (valor)</th></tr>
+<tr><td><code>"nome"</code></td><td><code>"Ana"</code></td></tr>
+<tr><td><code>"idade"</code></td><td><code>29</code></td></tr>
+<tr><td><code>"cidade"</code></td><td><code>"Recife"</code></td></tr>
+</table>
+</div>
+
+<p>Para saber a cidade, você não pergunta "o que está na linha 3?", e sim "o que está no campo <em>cidade</em>?". É exatamente assim que um array associativo funciona. Outros nomes que você vai encontrar para a mesma ideia: <strong>dicionário</strong> (Python), <strong>mapa</strong> (Java), <strong>objeto</strong> (JavaScript), <strong>hash</strong>.</p>
+
+<hr>
+
+<h2>Criar e ler</h2>
+
+<pre class="file" data-file="aluna.php">&lt;?php
+$aluna = [
+    "nome"   =&gt; "Ana",
+    "idade"  =&gt; 29,
+    "cidade" =&gt; "Recife",
+];
+echo $aluna["nome"], " tem ", $aluna["idade"], " anos e mora em ", $aluna["cidade"], ".\n";
+print_r($aluna);
+</pre>
+
+<dl class="anatomy">
+  <dt>[ … ]</dt><dd>Os colchetes criam o array, como antes.</dd>
+  <dt>"nome"</dt><dd>A <strong>chave</strong>: o nome do campo. Normalmente é uma string entre aspas.</dd>
+  <dt>=&gt;</dt><dd>A "setinha dupla" (sinal de igual e maior, sem espaço entre eles). Lê-se "aponta para": <code>"nome"</code> aponta para <code>"Ana"</code>.</dd>
+  <dt>"Ana"</dt><dd>O <strong>valor</strong> guardado naquela chave. Pode ser de qualquer tipo.</dd>
+  <dt>,</dt><dd>Separa um par do outro. A vírgula depois do último par é opcional (e prática).</dd>
+  <dt>$aluna["nome"]</dt><dd>Lê o valor da chave <code>"nome"</code>: o nome do array e, entre colchetes, a chave <strong>com aspas</strong>.</dd>
+</dl>
+
+<pre class="term">$ php aluna.php
+Ana tem 29 anos e mora em Recife.
+Array
+(
+    [nome] =&gt; Ana           « no lugar dos números, os nomes das chaves
+    [idade] =&gt; 29
+    [cidade] =&gt; Recife
+)</pre>
+
+<p>Alinhar as setas <code>=&gt;</code> com espaços, como no exemplo, é só estética: o PHP ignora esses espaços. Muita gente alinha porque fica mais fácil de ler.</p>
+
+<div class="tip">
+<strong>Indexado ou associativo?</strong>
+<p>Para o PHP, os dois são o mesmo tipo: <code>array</code>. A diferença está só nas chaves. Um array indexado é um array cujas chaves são 0, 1, 2… criadas automaticamente. Escrever <code>["arroz", "café"]</code> é o mesmo que escrever <code>[0 =&gt; "arroz", 1 =&gt; "café"]</code>. Use o indexado para <strong>listas de coisas do mesmo tipo</strong> (vários produtos) e o associativo para <strong>os dados de uma coisa</strong> (um produto: nome, preço, estoque).</p>
+</div>
+
+<hr>
+
+<h2>Mudar, acrescentar e apagar</h2>
+<p>Com chaves de nome, as três operações usam a mesma escrita: <code>$array["chave"] = valor;</code>. Se a chave já existe, o valor é <strong>trocado</strong>; se não existe, ela é <strong>criada</strong>.</p>
+
+<pre class="file" data-file="mudar-assoc.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "idade" =&gt; 29];
+$aluna["idade"] = 30;                    // a chave existe: troca
+$aluna["email"] = "ana@exemplo.com";     // a chave não existe: cria
+unset($aluna["nome"]);                   // apaga a chave e o valor
+print_r($aluna);
+echo count($aluna), "\n";
+</pre>
+
+<pre class="term">$ php mudar-assoc.php
+Array
+(
+    [idade] =&gt; 30
+    [email] =&gt; ana@exemplo.com
+)
+2</pre>
+
+<p>O <code>count</code> funciona igual: conta os pares. E o <code>$aluna[] = …</code> (colchetes vazios) também funciona aqui, mas cria uma chave <strong>numérica</strong>; você vai ver isso na seção sobre <a href="#chaves">chaves</a>.</p>
+
+<h3>Usar dentro de aspas duplas</h3>
+<p>Para colocar um valor no meio de um texto, há três jeitos:</p>
+
+<pre class="file" data-file="interp.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "idade" =&gt; 29];
+echo "Olá, $aluna[nome]!\n";
+echo "Olá, {$aluna['nome']}! Você tem {$aluna['idade']} anos.\n";
+echo "Olá, " . $aluna["nome"] . "!\n";
+</pre>
+
+<pre class="term">$ php interp.php
+Olá, Ana!
+Olá, Ana! Você tem 29 anos.
+Olá, Ana!</pre>
+
+<ul>
+  <li><code>"$aluna[nome]"</code>: dentro das aspas duplas, a chave vai <strong>sem aspas</strong>. Funciona, mas só nessa situação, e confunde.</li>
+  <li><code>"{$aluna['nome']}"</code>: com chaves <code>{ }</code> em volta, a chave vai com aspas simples, como no resto do código. <strong>É a forma recomendada</strong>.</li>
+  <li>A concatenação com <code>.</code> sempre funciona (aula <a href="operadores-string.html">Operadores de String</a>).</li>
+</ul>
+<p>O que <strong>não</strong> funciona é misturar: <code>"$aluna['nome']"</code>, com aspas e sem as chaves, é erro de sintaxe (veja <a href="#errado">Quando dá errado</a>). Os detalhes estão na aula <a href="interpolacao.html">Interpolação</a>.</p>
+
+<div class="tryphp">
+<p class="try-task">Crie a ficha de outra pessoa, acrescente uma chave <code>"profissao"</code> e mostre uma frase com os dados. Experimente também apagar uma chave com <code>unset</code> e ver o <code>print_r</code>.</p>
+<pre class="script">&lt;?php
+$pessoa = [
+    "nome"   =&gt; "Bruno",
+    "idade"  =&gt; 34,
+    "cidade" =&gt; "Olinda",
+];
+
+$pessoa["idade"] = 35;
+$pessoa["profissao"] = "padeiro";
+
+echo "{$pessoa['nome']} tem {$pessoa['idade']} anos e é {$pessoa['profissao']}.\n";
+print_r($pessoa);
+</pre>
+</div>
+
+<hr>
+
+<h2>Uma chave que não existe</h2>
+<p>Pedir uma chave que não existe dá o mesmo aviso dos arrays indexados, agora com o nome da chave entre aspas:</p>
+
+<pre class="file" data-file="chave-falta.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "idade" =&gt; 29];
+echo "E-mail: ", $aluna["email"], "\n";
+echo "E-mail: ", $aluna["email"] ?? "não informado", "\n";
+echo $aluna["Nome"], "\n";
+</pre>
+
+<pre class="term">$ php chave-falta.php
+E-mail:
+Warning: Undefined array key "email" in /home/ana/site/chave-falta.php on line 3
+
+E-mail: não informado
+
+Warning: Undefined array key "Nome" in /home/ana/site/chave-falta.php on line 5
+</pre>
+
+<ul>
+  <li>Linha 3: a chave <code>"email"</code> não existe. Aviso, e o valor vira <code>null</code>.</li>
+  <li>Linha 4: com o <code>??</code>, nenhum aviso: se a chave faltar, vale o texto da direita (aula <a href="null-coalescing.html">?? e ?-&gt;</a>).</li>
+  <li>Linha 5: <code>"Nome"</code> com N maiúsculo é <strong>outra chave</strong>. As chaves diferenciam maiúsculas de minúsculas.</li>
+</ul>
+
+<h2>Perguntar se a chave existe: <code>isset</code> e <code>array_key_exists</code></h2>
+<p>Muitas vezes você precisa decidir algo conforme a chave exista ou não: "se o formulário mandou o e-mail, faça isso". Há duas funções para perguntar, e elas <strong>quase</strong> sempre respondem igual:</p>
+
+<ul>
+  <li><code>isset($a["chave"])</code>: "está definido?" (<em>is set</em>). Responde <code>true</code> se a chave existe <strong>e</strong> o valor não é <code>null</code>.</li>
+  <li><code>array_key_exists("chave", $a)</code>: "a chave existe no array?". Responde <code>true</code> se a chave existe, <strong>seja qual for o valor</strong>, até <code>null</code>.</li>
+</ul>
+
+<p>A diferença só aparece quando o valor guardado é <code>null</code>. Veja com uma ficha em que o telefone foi deixado em branco de propósito:</p>
+
+<pre class="file" data-file="isset.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "telefone" =&gt; null];
+
+var_dump(isset($aluna["nome"]));
+var_dump(isset($aluna["email"]));
+var_dump(isset($aluna["telefone"]));
+
+var_dump(array_key_exists("nome", $aluna));
+var_dump(array_key_exists("email", $aluna));
+var_dump(array_key_exists("telefone", $aluna));
+
+var_dump($aluna["telefone"] ?? "sem telefone");
+</pre>
+
+<pre class="term">$ php isset.php
+bool(true)
+bool(false)
+bool(false)             « isset: a chave existe, mas vale null → false
+bool(true)
+bool(false)
+bool(true)              « array_key_exists: a chave existe → true
+string(12) "sem telefone"</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th><code>isset($a["k"])</code></th><th><code>array_key_exists("k", $a)</code></th><th><code>$a["k"] ?? "x"</code></th></tr>
+<tr><td>Chave existe, com valor (<code>"Ana"</code>, <code>0</code>, <code>""</code>, <code>false</code>)</td><td><code>true</code></td><td><code>true</code></td><td>o valor</td></tr>
+<tr><td>Chave existe, valor <code>null</code></td><td><strong><code>false</code></strong></td><td><strong><code>true</code></strong></td><td><code>"x"</code></td></tr>
+<tr><td>Chave não existe</td><td><code>false</code></td><td><code>false</code></td><td><code>"x"</code></td></tr>
+</table>
+</div>
+
+<h3>Qual usar?</h3>
+<ul>
+  <li><strong><code>isset</code></strong> no dia a dia: é curta, rápida e, na maioria dos casos, um valor <code>null</code> é mesmo "não tem nada". É a que você mais vai ver em formulários (<code>isset($_POST["email"])</code>, na aula <a href="get-post.html">$_GET e $_POST</a>).</li>
+  <li><strong><code>array_key_exists</code></strong> quando <code>null</code> tem significado e você precisa distinguir "o campo veio vazio" de "o campo nem veio".</li>
+  <li><strong><code>??</code></strong> quando você só quer um valor padrão. Ele segue a mesma regra do <code>isset</code>.</li>
+</ul>
+
+<div class="warning">
+<strong>Repare na ordem dos argumentos</strong>
+<p>No <code>isset</code> você escreve o acesso inteiro: <code>isset($aluna["email"])</code>. No <code>array_key_exists</code>, primeiro a chave, depois o array: <code>array_key_exists("email", $aluna)</code>. Trocar a ordem dá erro (veja <a href="#errado">Quando dá errado</a>).</p>
+</div>
+
+<hr>
+
+<h2>Percorrer com <code>foreach</code></h2>
+<p>O <a href="foreach.html">foreach</a> tem uma forma com <strong>duas</strong> variáveis, feita para arrays associativos: uma recebe a chave e a outra o valor, a cada volta. A Ana usa isso na tabela de preços da lojinha:</p>
+
+<pre class="file" data-file="foreach-assoc.php">&lt;?php
+$precos = [
+    "café"   =&gt; 18.9,
+    "pão"    =&gt; 0.75,
+    "leite"  =&gt; 5.49,
+];
+foreach ($precos as $produto =&gt; $preco) {
+    echo $produto, ": R$ ", number_format($preco, 2, ",", "."), "\n";
+}
+$total = 0;
+foreach ($precos as $preco) {
+    $total += $preco;
+}
+echo "Total: R$ ", number_format($total, 2, ",", "."), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>foreach ($precos as $produto =&gt; $preco)</dt><dd>"Para cada par de <code>$precos</code>, coloque a chave em <code>$produto</code> e o valor em <code>$preco</code>". A seta <code>=&gt;</code> aqui tem o mesmo sentido da criação: chave à esquerda, valor à direita. Os nomes <code>$produto</code> e <code>$preco</code> são escolha sua.</dd>
+  <dt>number_format($preco, 2, ",", ".")</dt><dd>Escreve o número com 2 casas, vírgula decimal e ponto de milhar (aula <a href="number-format.html">Formatar Números</a>).</dd>
+  <dt>foreach ($precos as $preco)</dt><dd>A forma curta, com uma variável só, recebe só os valores. Serve quando a chave não interessa, como na soma.</dd>
+</dl>
+
+<pre class="term">$ php foreach-assoc.php
+café: R$ 18,90
+pão: R$ 0,75
+leite: R$ 5,49
+Total: R$ 25,14</pre>
+
+<p>Repare que o <code>for</code> com <code>$i</code> de 0 a <code>count - 1</code>, que funcionava nos arrays indexados, <strong>não serve</strong> aqui: não existe <code>$precos[0]</code>. Para arrays associativos, o caminho é sempre o <code>foreach</code>. (Para somar, existe ainda <code>array_sum($precos)</code>, que você vai ver em <a href="funcoes-array.html">Funções de Array</a>, junto com <code>array_keys</code> e <code>array_values</code>, que pegam só as chaves ou só os valores.)</p>
+
+<hr>
+
+<h2 id="chaves">O que pode ser chave (e as conversões automáticas)</h2>
+<p>Uma chave só pode ser de <strong>dois tipos</strong>: <code>int</code> (número inteiro) ou <code>string</code> (texto). Se você usar outro tipo, ou uma string que "parece" um número inteiro, o PHP <strong>converte</strong> sozinho. Isso surpreende muita gente:</p>
+
+<pre class="file" data-file="chaves-conv.php">&lt;?php
+$a = [
+    "1"   =&gt; "um",
+    "01"  =&gt; "zero-um",
+    "1.5" =&gt; "um e meio",
+    "-5"  =&gt; "menos cinco",
+];
+var_dump($a);
+echo $a[1], " / ", $a["1"], "\n";
+</pre>
+
+<pre class="term">$ php chaves-conv.php
+array(4) {
+  [1]=&gt;                 « sem aspas: a string "1" virou o número 1
+  string(2) "um"
+  ["01"]=&gt;              « com aspas: continua string ("01" não é a forma normal de escrever 1)
+  string(7) "zero-um"
+  ["1.5"]=&gt;             « continua string: não é inteiro
+  string(9) "um e meio"
+  [-5]=&gt;                « "-5" virou o número -5
+  string(11) "menos cinco"
+}
+um / um                 « $a[1] e $a["1"] são a mesma gaveta</pre>
+
+<p>No <code>var_dump</code>, chave com aspas é string, chave sem aspas é número. A regra: uma string que é um inteiro escrito do jeito "normal" (sem zero à esquerda, sem <code>+</code>, sem espaço, sem ponto) vira <code>int</code>. Por isso <code>"1"</code> e <code>1</code> são <strong>a mesma chave</strong>, e o último a ser escrito vence:</p>
+
+<pre class="file" data-file="repetida.php">&lt;?php
+$a = ["cor" =&gt; "azul", "tamanho" =&gt; "M", "cor" =&gt; "verde"];
+print_r($a);
+$b = ["1" =&gt; "a", 1 =&gt; "b"];
+print_r($b);
+</pre>
+
+<pre class="term">$ php repetida.php
+Array
+(
+    [cor] =&gt; verde          « a chave "cor" apareceu duas vezes: ficou o último valor
+    [tamanho] =&gt; M
+)
+Array
+(
+    [1] =&gt; b                « "1" e 1 são a mesma chave
+)</pre>
+
+<p>Na prática, isso importa quando as chaves vêm de fora, como códigos de produto lidos de um formulário ou de um arquivo <a href="csv.html">CSV</a>: o código <code>"1042"</code> vira o número <code>1042</code>, mas o código <code>"0042"</code> continua texto.</p>
+
+<p>Os outros tipos também são convertidos, e o PHP 8.5 avisa nos casos mais perigosos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você usa como chave</th><th>Vira</th><th>Aviso no PHP 8.5</th></tr>
+<tr><td><code>"7"</code></td><td><code>7</code></td><td>nenhum</td></tr>
+<tr><td><code>"07"</code>, <code>"7.0"</code>, <code>" 7"</code></td><td>continuam strings</td><td>nenhum</td></tr>
+<tr><td><code>true</code> / <code>false</code></td><td><code>1</code> / <code>0</code></td><td>nenhum</td></tr>
+<tr><td><code>1.7</code> (float)</td><td><code>1</code> (corta as decimais)</td><td><code>Deprecated: Implicit conversion from float 1.7 to int loses precision</code></td></tr>
+<tr><td><code>null</code></td><td><code>""</code> (string vazia)</td><td><code>Deprecated: Using null as an array offset is deprecated, use an empty string instead</code></td></tr>
+<tr><td>um array ou um objeto</td><td>não pode</td><td>erro (<code>TypeError</code>)</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="chave-float.php">&lt;?php
+$a = [];
+$a[1.7] = "x";
+var_dump($a);
+</pre>
+
+<pre class="term">$ php chave-float.php
+
+Deprecated: Implicit conversion from float 1.7 to int loses precision in /home/ana/site/chave-float.php on line 3
+array(1) {
+  [1]=&gt;
+  string(1) "x"
+}</pre>
+
+<p><em>Deprecated</em> quer dizer "desaprovado": funciona hoje, mas pode virar erro numa versão futura. Corrija quando ver um (mais em <a href="tipos-erro.html">Tipos de Erro</a>). A regra prática é simples: <strong>use como chave só strings ou inteiros</strong>.</p>
+
+<h3>Misturando chaves com nome e números</h3>
+<p>Um mesmo array pode ter as duas coisas. Os colchetes vazios <code>[]</code>, e os itens sem chave, sempre pegam <strong>o maior número usado até ali + 1</strong> (ou 0, se ainda não houver nenhum número):</p>
+
+<pre class="file" data-file="misto.php">&lt;?php
+$a = [5 =&gt; "cinco", "nome" =&gt; "Ana", "seis?"];
+$a[] = "mais um";
+print_r($a);
+$b = ["a", "b"];
+$b["x"] = "xis";
+print_r($b);
+</pre>
+
+<pre class="term">$ php misto.php
+Array
+(
+    [5] =&gt; cinco
+    [nome] =&gt; Ana
+    [6] =&gt; seis?            « sem chave: maior número (5) + 1
+    [7] =&gt; mais um
+)
+Array
+(
+    [0] =&gt; a
+    [1] =&gt; b
+    [x] =&gt; xis
+)</pre>
+
+<p>Funciona, mas é raro ser uma boa ideia. Prefira arrays que sejam claramente uma coisa ou outra: <strong>lista</strong> (chaves 0, 1, 2…) ou <strong>ficha</strong> (chaves com nome).</p>
+
+<hr>
+
+<h2>A ordem é a da inserção</h2>
+<p>Em algumas linguagens, um "dicionário" não tem ordem garantida. No PHP tem: os itens ficam <strong>na ordem em que foram colocados</strong>. Trocar o valor de uma chave que já existe <strong>não</strong> a muda de lugar.</p>
+
+<pre class="file" data-file="ordem.php">&lt;?php
+$notas = [];
+$notas["Pedro"] = 7.5;
+$notas["Ana"] = 9.0;
+$notas["Carla"] = 8.0;
+$notas["Ana"] = 9.5;      // troca o valor; a Ana continua em 2º
+print_r($notas);
+</pre>
+
+<pre class="term">$ php ordem.php
+Array
+(
+    [Pedro] =&gt; 7.5
+    [Ana] =&gt; 9.5
+    [Carla] =&gt; 8              « 8.0 aparece como 8 no print_r
+)</pre>
+
+<p>O PHP <strong>não</strong> ordena nada sozinho: nem por chave, nem por valor. Para colocar em ordem alfabética ou da maior nota para a menor, use as funções da aula <a href="ordenar-arrays.html">Ordenar Arrays</a> (<code>ksort</code>, <code>arsort</code>…).</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key "email"</code></strong>
+<pre class="term">$ php chave-falta.php
+E-mail:
+Warning: Undefined array key "email" in /home/ana/site/chave-falta.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> a chave não existe no array. Pode ser um erro de digitação (<code>"emial"</code>), maiúscula trocada (<code>"Email"</code>) ou um dado que nem sempre vem, como um campo opcional de formulário.</p>
+<p><strong>Como resolver:</strong> confira as chaves que existem com <code>print_r</code>. Se o dado é opcional, use <code>$a["email"] ?? "padrão"</code> ou teste antes com <code>isset</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught Error: Undefined constant "nome"</code></strong>
+<pre class="file" data-file="semaspas.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana"];
+echo $aluna[nome];
+</pre>
+<pre class="term">$ php semaspas.php
+
+Fatal error: Uncaught Error: Undefined constant "nome" in /home/ana/site/semaspas.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/semaspas.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> fora das aspas duplas, uma palavra sem aspas e sem <code>$</code> é lida como o nome de uma <a href="constantes.html">constante</a>. Não existe constante <code>nome</code>, e o programa para. (Em PHPs muito antigos isso era só um aviso, por isso você ainda encontra <code>$a[nome]</code> em código velho.)</p>
+<p><strong>Como resolver:</strong> chave de texto sempre entre aspas: <code>$aluna["nome"]</code> ou <code>$aluna['nome']</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected string content ""</code></strong>
+<pre class="file" data-file="aspasinterp.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana"];
+echo "Olá, $aluna['nome']!\n";
+</pre>
+<pre class="term">$ php aspasinterp.php
+
+Parse error: syntax error, unexpected string content "", expecting "-" or identifier or variable or number in /home/ana/site/aspasinterp.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> dentro de aspas duplas, a forma simples (<code>$aluna[nome]</code>) não aceita aspas na chave. A mensagem é confusa: o PHP diz que esperava um nome (<em>identifier</em>), uma variável ou um número entre os colchetes.</p>
+<p><strong>Como resolver:</strong> envolva com chaves: <code>"Olá, {$aluna['nome']}!"</code>. Ou concatene: <code>"Olá, " . $aluna["nome"] . "!"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected token "="</code></strong>
+<pre class="file" data-file="igual.php">&lt;?php
+$aluna = ["nome" = "Ana"];
+</pre>
+<pre class="term">$ php igual.php
+
+Parse error: syntax error, unexpected token "=", expecting "]" in /home/ana/site/igual.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> dentro da criação do array, o que liga a chave ao valor é <code>=&gt;</code>, não <code>=</code>. Também acontece com <code>-&gt;</code> (seta simples, que é de objetos) ou com espaço no meio (<code>= &gt;</code>).</p>
+<p><strong>Como resolver:</strong> <code>["nome" =&gt; "Ana"]</code>. Lembre: <code>=</code> é para guardar numa variável; <code>=&gt;</code> é para ligar chave e valor.</p>
+</div>
+
+<div class="cenario">
+<strong><code>array_key_exists(): Argument #2 ($array) must be of type array, string given</code></strong>
+<pre class="file" data-file="existe.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana"];
+var_dump(array_key_exists($aluna, "email"));
+</pre>
+<pre class="term">$ php existe.php
+
+Fatal error: Uncaught TypeError: array_key_exists(): Argument #2 ($array) must be of type array, string given in /home/ana/site/existe.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/existe.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> os argumentos foram trocados. O argumento nº 2 (chamado <code>$array</code>) deve ser um array, mas recebeu a string <code>"email"</code>. <em>TypeError</em> é "erro de tipo": um valor do tipo errado foi passado a uma função (mais em <a href="tipos-retorno.html">Tipos e Retorno</a>).</p>
+<p><strong>Como resolver:</strong> <code>array_key_exists("email", $aluna)</code>: primeiro a chave, depois o array.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th></tr>
+<tr><td>Criar</td><td><code>$a = ["nome" =&gt; "Ana", "idade" =&gt; 29];</code></td></tr>
+<tr><td>Ler</td><td><code>$a["nome"]</code></td></tr>
+<tr><td>Ler com valor padrão</td><td><code>$a["email"] ?? "não informado"</code></td></tr>
+<tr><td>Mudar ou acrescentar</td><td><code>$a["idade"] = 30;</code></td></tr>
+<tr><td>Apagar</td><td><code>unset($a["idade"]);</code></td></tr>
+<tr><td>Existe e não é null?</td><td><code>isset($a["email"])</code></td></tr>
+<tr><td>Existe (mesmo que null)?</td><td><code>array_key_exists("email", $a)</code></td></tr>
+<tr><td>Quantos pares</td><td><code>count($a)</code></td></tr>
+<tr><td>Percorrer</td><td><code>foreach ($a as $chave =&gt; $valor) { … }</code></td></tr>
+<tr><td>Usar num texto</td><td><code>"Olá, {$a['nome']}"</code></td></tr>
+<tr><td>Só as chaves / só os valores</td><td><code>array_keys($a)</code> / <code>array_values($a)</code> (em <a href="funcoes-array.html">Funções de Array</a>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="out:açúcar: 7,out:leite: 15,out:Sem arroz no cadastro,semerro,src:foreach">
+<p class="try-task"><strong>Missão:</strong> o estoque da lojinha da Ana está num array associativo. (1) Acrescente o produto <code>"açúcar"</code> com 7 unidades. (2) Mude o <code>"leite"</code> para 15. (3) Complete o <code>foreach</code> para mostrar uma linha <code>produto: quantidade</code> para cada item. (4) A última parte usa <code>$estoque["arroz"]</code> e gera um aviso: troque o teste por <code>array_key_exists</code> (ou <code>isset</code>) para mostrar <code>Sem arroz no cadastro</code> sem aviso nenhum.</p>
+<pre class="script">&lt;?php
+$estoque = ["café" =&gt; 12, "pão" =&gt; 40, "leite" =&gt; 0];
+
+// (1) e (2) aqui
+
+
+foreach ($estoque as /* (3) */) {
+    echo "\n";
+}
+
+if ($estoque["arroz"]) {
+    echo "Tem arroz\n";
+} else {
+    echo "Sem arroz no cadastro\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$estoque = ["café" =&gt; 12, "pão" =&gt; 40, "leite" =&gt; 0];
+
+$estoque["açúcar"] = 7;
+$estoque["leite"] = 15;
+
+foreach ($estoque as $produto =&gt; $quantidade) {
+    echo "$produto: $quantidade\n";
+}
+
+if (array_key_exists("arroz", $estoque)) {
+    echo "Tem arroz\n";
+} else {
+    echo "Sem arroz no cadastro\n";
+}
+</pre>
+</div>
+
+<p>A saída esperada, no PHP de verdade:</p>
+<pre class="term">$ php estoque.php
+café: 12
+pão: 40
+leite: 15                « mudou de valor, mas continua no 3º lugar
+açúcar: 7                « o novo item entra no fim
+Sem arroz no cadastro</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A setinha</h3>
+<p>Complete o símbolo que liga a chave ao valor:</p>
+<div class="ex-code">$produto = ["nome" <input data-answer="=&gt;" aria-label="símbolo"> "café"];</div>
+</div>
+
+<div class="exercise">
+<h3>2. Chave e valor no foreach</h3>
+<p>Complete para <code>$campo</code> receber a chave e <code>$valor</code> o valor:</p>
+<div class="ex-code">foreach ($aluna as <input data-answer="$campo =&gt; $valor|$campo=&gt;$valor" aria-label="variáveis do foreach">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Existe, mesmo que vazio?</h3>
+<p>Complete com a função que responde <code>true</code> mesmo quando o valor guardado é <code>null</code>:</p>
+<div class="ex-code"><input data-answer="array_key_exists" aria-label="função">("telefone", $aluna)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>$a = ["x" =&gt; null];</code>, quanto vale <code>isset($a["x"])</code>?</p>
+<label><input type="radio" name="q4"> <code>true</code>, porque a chave existe.</label>
+<label><input type="radio" name="q4"> <code>false</code>, porque o valor é <code>null</code>.</label>
+<label><input type="radio" name="q4"> Dá <code>Warning: Undefined array key "x"</code>.</label>
+<label><input type="radio" name="q4"> <code>null</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Quantos itens tem <code>["1" =&gt; "a", 1 =&gt; "b", "01" =&gt; "c"]</code>?</p>
+<label><input type="radio" name="q5"> 1</label>
+<label><input type="radio" name="q5"> 3</label>
+<label><input type="radio" name="q5"> 2: <code>"1"</code> e <code>1</code> são a mesma chave; <code>"01"</code> é outra.</label>
+<label><input type="radio" name="q5"> Dá erro, porque há chaves repetidas.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual linha mostra <code>Olá, Ana</code> sem erro, sendo <code>$u = ["nome" =&gt; "Ana"]</code>?</p>
+<label><input type="radio" name="q6"> <code>echo "Olá, {$u['nome']}";</code></label>
+<label><input type="radio" name="q6"> <code>echo "Olá, $u['nome']";</code></label>
+<label><input type="radio" name="q6"> <code>echo "Olá, " . $u[nome];</code></label>
+<label><input type="radio" name="q6"> <code>echo "Olá, $u";</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>No array associativo, cada valor tem uma <strong>chave com nome</strong>: <code>["nome" =&gt; "Ana"]</code>. Leia com <code>$a["nome"]</code>.</li>
+  <li><code>$a["chave"] = valor;</code> troca (se existe) ou cria (se não existe). <code>unset</code> apaga.</li>
+  <li>Chave que não existe: <code>Warning: Undefined array key "…"</code>. As chaves diferenciam maiúsculas.</li>
+  <li><code>isset</code> é <code>false</code> para valor <code>null</code>; <code>array_key_exists</code> só olha se a chave existe.</li>
+  <li><code>foreach ($a as $chave =&gt; $valor)</code> percorre os pares, na ordem em que foram inseridos.</li>
+  <li>Chaves são só <code>int</code> ou <code>string</code>; <code>"1"</code> vira <code>1</code>, <code>true</code> vira <code>1</code>, e float e <code>null</code> geram <code>Deprecated</code>.</li>
+  <li>Em texto: <code>"{$a['nome']}"</code>. Fora dele, a chave sempre entre aspas.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
