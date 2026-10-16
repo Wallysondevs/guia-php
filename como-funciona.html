@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Como Funciona — do navegador ao servidor e de volta | Guia PHP</title>
+<meta name="description" content="O caminho de uma página PHP: navegador, servidor web, PHP e o HTML que volta. O que o navegador recebe (só o HTML, conferido com curl e php -S), PHP no servidor × JavaScript no navegador, e a diferença entre rodar o PHP no terminal (CLI) e na web.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Como Funciona</span></h1>
+
+<p class="intro">Quando você digita o endereço de um site e aperta <kbd>Enter</kbd>, muita coisa acontece em menos de um segundo. Nesta aula você vai seguir esse caminho de perto: o navegador faz um <strong>pedido</strong>, o servidor chama o PHP, o PHP roda o seu código e devolve <strong>HTML</strong>, e o navegador desenha a página. Entender esse caminho evita metade das confusões de quem começa.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Quem são os personagens: navegador, servidor web e PHP.</li>
+  <li>O caminho de um pedido (requisição) e da resposta, passo a passo.</li>
+  <li>O que o navegador realmente recebe, conferido com o <code>curl</code>.</li>
+  <li>A diferença entre o PHP (no servidor) e o JavaScript (no navegador).</li>
+  <li>Os dois jeitos de rodar o PHP: no terminal (CLI) e na web.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: um restaurante</h2>
+<p>Pense num restaurante. Você (o <strong>cliente</strong>) não entra na cozinha: faz o pedido ao <strong>garçom</strong>. O garçom leva o pedido à <strong>cozinha</strong>, o cozinheiro segue a receita e monta o prato, e o garçom traz o prato pronto até a mesa. Você come o prato; a receita fica na cozinha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No restaurante</th><th>Na web</th><th>O que faz</th></tr>
+<tr><td>Cliente</td><td><strong>Navegador</strong> (Chrome, Firefox, Safari…)</td><td>Pede uma página e mostra o resultado na tela.</td></tr>
+<tr><td>Garçom</td><td><strong>Servidor web</strong> (Apache, nginx ou o <code>php -S</code>)</td><td>Recebe os pedidos, decide quem cuida de cada um e devolve as respostas.</td></tr>
+<tr><td>Cozinheiro</td><td><strong>PHP</strong></td><td>Executa o código do arquivo <code>.php</code> e produz o HTML.</td></tr>
+<tr><td>Receita</td><td>O arquivo <code>.php</code></td><td>As instruções. Ficam no servidor.</td></tr>
+<tr><td>Prato pronto</td><td>O <strong>HTML</strong> gerado</td><td>É o que vai para o navegador.</td></tr>
+<tr><td>Despensa</td><td>Banco de dados, arquivos</td><td>De onde o PHP tira os "ingredientes" (produtos, usuários, notas).</td></tr>
+</table>
+</div>
+
+<p>Duas palavras vão aparecer o tempo todo no guia: o pedido do navegador se chama <strong>requisição</strong> (em inglês, <em>request</em>) e o que volta se chama <strong>resposta</strong> (<em>response</em>). A "língua" que os dois usam para conversar é o <strong>HTTP</strong> (é por isso que os endereços começam com <code>http://</code> ou <code>https://</code>; o <strong>s</strong> quer dizer que a conversa é criptografada).</p>
+
+<hr>
+
+<h2>O caminho, passo a passo</h2>
+<p>A Ana tem na pasta <code>site</code> este arquivo, a página inicial da lojinha dela:</p>
+
+<pre class="file" data-file="loja.php">&lt;?php
+// Este comentário fica no servidor.
+$senhaDoBanco = "segredo123";
+$produtos = 3 + 4;
+?&gt;
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos &lt;?= $produtos ?&gt; produtos.&lt;/p&gt;
+</pre>
+
+<p>O arquivo tem duas partes. Em cima, entre <code>&lt;?php</code> e <code>?&gt;</code>, código PHP: um comentário (uma anotação para humanos, que o PHP ignora), uma variável com uma senha e uma conta. Embaixo, HTML comum, com um <code>&lt;?= $produtos ?&gt;</code> no meio, que quer dizer "escreva aqui o valor de <code>$produtos</code>". Agora siga o que acontece quando alguém visita <code>http://localhost:8000/loja.php</code>:</p>
+
+<ol class="passo">
+  <li><strong>O navegador faz a requisição.</strong> Ele se conecta ao servidor <code>localhost</code> (o próprio computador) na porta <code>8000</code> e manda uma mensagem de texto: <code>GET /loja.php HTTP/1.1</code>, ou seja, "me dê o arquivo <code>/loja.php</code>".</li>
+  <li><strong>O servidor web recebe e decide.</strong> O arquivo termina em <code>.php</code>, então o servidor não o entrega como está: passa para o PHP.</li>
+  <li><strong>O PHP executa o arquivo de cima para baixo.</strong> Ignora o comentário, guarda a senha na variável, calcula <code>3 + 4</code> e guarda <code>7</code>. O HTML de fora das marcas vai sendo copiado para a resposta; no lugar do <code>&lt;?= $produtos ?&gt;</code>, ele escreve <code>7</code>.</li>
+  <li><strong>O PHP termina e entrega o resultado ao servidor.</strong> As variáveis são jogadas fora. A cada nova visita, tudo começa do zero.</li>
+  <li><strong>O servidor manda a resposta ao navegador</strong>: um "cabeçalho" com informações (deu certo? que tipo de conteúdo é?) e, depois, o HTML.</li>
+  <li><strong>O navegador desenha a página.</strong> Ele recebeu só HTML, e é isso que ele sabe mostrar.</li>
+</ol>
+
+<p>Em forma de desenho:</p>
+
+<pre class="file" data-file="o caminho de uma requisição">  NAVEGADOR                SERVIDOR WEB                 PHP
+     │                          │                         │
+     │  GET /loja.php  ───────▶ │                         │
+     │                          │  "é .php: sua vez" ───▶ │  roda loja.php
+     │                          │                         │  3 + 4 = 7
+     │                          │ ◀─────  HTML pronto     │
+     │ ◀──── 200 OK + HTML      │                         │
+     │                          │                         │
+  desenha a página
+</pre>
+
+<div class="tip">
+<strong>"Servidor" é um papel, não um tipo de máquina</strong>
+<p>Na internet, o servidor é um computador num centro de dados. Mas, enquanto você estuda, o servidor é o <strong>seu próprio computador</strong>: o endereço <code>localhost</code> quer dizer "esta máquina aqui". O navegador e o servidor rodam lado a lado, e o caminho é o mesmo. A aula <a href="servidor-embutido.html">O Servidor Embutido</a> ensina a ligar esse servidor de testes.</p>
+</div>
+
+<hr>
+
+<h2>O que o navegador realmente recebe</h2>
+<p>Dá para "ser o navegador" no terminal com o <code>curl</code>, um programa que faz requisições HTTP e mostra a resposta crua, sem desenhar nada. A Ana ligou o servidor de testes na pasta <code>site</code> (com <code>php -S localhost:8000</code>, em outro terminal) e pediu a página:</p>
+
+<pre class="term">$ curl localhost:8000/loja.php
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos 7 produtos.&lt;/p&gt;              « o 7 já veio calculado</pre>
+
+<p>Compare com o arquivo <code>loja.php</code>. Sumiram:</p>
+<ul>
+  <li>o <code>&lt;?php</code> e o <code>?&gt;</code>;</li>
+  <li>o comentário <code>// Este comentário fica no servidor.</code>;</li>
+  <li>a variável <code>$senhaDoBanco</code> e o valor dela;</li>
+  <li>a conta <code>3 + 4</code> (só o resultado, <code>7</code>, chegou).</li>
+</ul>
+<p>É <strong>exatamente</strong> isso que o navegador recebe, e é isso que aparece quando você usa "Exibir código-fonte da página". O código PHP nunca sai do servidor. É por isso que sites guardam a senha do banco de dados em arquivos PHP sem medo: quem visita não tem como lê-la.</p>
+
+<h3>Vendo a conversa inteira</h3>
+<p>Com a opção <code>-i</code> (de <em>include</em>, "incluir"), o <code>curl</code> mostra também o <strong>cabeçalho</strong> da resposta, a parte que o navegador lê mas não mostra:</p>
+
+<pre class="term">$ curl -i localhost:8000/loja.php
+HTTP/1.1 200 OK                         « 200 = deu certo
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:49:17 GMT     « data e hora da resposta (no fuso de Greenwich)
+Connection: close
+X-Powered-By: PHP/8.5.8                 « "feito com PHP 8.5.8"
+Content-type: text/html; charset=UTF-8  « o conteúdo é HTML, com acentos em UTF-8
+
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;                  « depois da linha em branco, o HTML
+&lt;p&gt;Temos 7 produtos.&lt;/p&gt;</pre>
+
+<dl class="anatomy">
+  <dt>HTTP/1.1 200 OK</dt><dd>A <strong>linha de status</strong>: a versão do HTTP e o código do resultado. <code>200</code> é sucesso; <code>404</code> é "não encontrado"; <code>500</code> é "erro no servidor".</dd>
+  <dt>X-Powered-By</dt><dd>Um aviso que o PHP acrescenta dizendo a versão. Em sites de verdade, costuma ser desligado (quanto menos um invasor souber, melhor).</dd>
+  <dt>Content-type</dt><dd>O tipo do conteúdo. O PHP manda <code>text/html</code> por padrão; uma API mandaria <code>application/json</code> (aula <a href="redirecionar.html">header e Redirecionamento</a>).</dd>
+  <dt>(linha em branco)</dt><dd>Separa o cabeçalho do <strong>corpo</strong>, que é o HTML.</dd>
+</dl>
+
+<p>E com <code>-v</code> (de <em>verbose</em>, "detalhado") você vê os dois lados: as linhas com <code>&gt;</code> são o que o <code>curl</code> <strong>mandou</strong> (a requisição); as linhas com <code>&lt;</code> são o que ele <strong>recebeu</strong>:</p>
+
+<pre class="term">$ curl -v localhost:8000/loja.php
+* Host localhost:8000 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+*   Trying [::1]:8000...
+* connect to ::1 port 8000 from ::1 port 51190 failed: Conexão recusada
+*   Trying 127.0.0.1:8000...
+* Established connection to localhost (127.0.0.1 port 8000) from 127.0.0.1 port 53484
+* using HTTP/1.x
+&gt; GET /loja.php HTTP/1.1                « a requisição: "me dê /loja.php"
+&gt; Host: localhost:8000
+&gt; User-Agent: curl/8.18.0               « quem está pedindo (num navegador, o nome dele)
+&gt; Accept: */*
+&gt;
+* Request completely sent off
+&lt; HTTP/1.1 200 OK                       « a resposta começa aqui
+&lt; Host: localhost:8000
+&lt; Date: Fri, 16 Oct 2026 23:49:17 GMT
+&lt; Connection: close
+&lt; X-Powered-By: PHP/8.5.8
+&lt; Content-type: text/html; charset=UTF-8
+&lt;
+{ [33 bytes data]
+* shutting down connection #0
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos 7 produtos.&lt;/p&gt;</pre>
+
+<p>As linhas com <code>*</code> são comentários do próprio <code>curl</code> (em inglês). Repare na quinta: o <code>localhost</code> tem dois endereços, <code>::1</code> (IPv6) e <code>127.0.0.1</code> (IPv4); o <code>curl</code> tentou o primeiro, a conexão foi recusada (o servidor da Ana só escuta no segundo) e ele passou para o outro sozinho. Você não precisa entender cada linha agora; o importante é ver que a requisição é uma mensagem de texto curta e que a resposta é cabeçalho + HTML.</p>
+
+<h3>Do lado do servidor</h3>
+<p>Enquanto isso, no terminal onde o <code>php -S</code> está rodando, o servidor anotou cada visita no seu <strong>registro</strong> (<em>log</em>):</p>
+
+<pre class="term">$ php -S localhost:8000
+[Fri Oct 16 20:49:16 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 20:49:17 2026] 127.0.0.1:53466 Accepted               « um cliente se conectou
+[Fri Oct 16 20:49:17 2026] 127.0.0.1:53466 [200]: GET /loja.php   « pediu /loja.php; resposta 200
+[Fri Oct 16 20:49:17 2026] 127.0.0.1:53466 Closing                « conversa encerrada</pre>
+
+<p>Cada requisição ocupa três linhas: a conexão aceita, o pedido com o código de resposta e o fechamento. O número depois de <code>127.0.0.1:</code> muda a cada conexão; é a "porta" do lado do cliente, escolhida ao acaso. (O horário do log está no fuso de Brasília, e o do cabeçalho <code>Date</code>, no de Greenwich: são o mesmo instante.)</p>
+
+<p>Experimente o mesmo arquivo no editor. A caixa está em <strong>modo web</strong>: ela faz o papel do servidor e do navegador ao mesmo tempo.</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Temos 12 produtos">
+<p class="try-task"><strong>Missão:</strong> a Ana recebeu mais mercadoria. Troque a conta para <code>7 + 5</code> e rode. Depois abra a aba <strong>Código-fonte HTML</strong> e procure a senha ou o comentário: eles não estão lá.</p>
+<pre class="script">&lt;?php
+// Este comentário fica no servidor.
+$senhaDoBanco = "segredo123";
+$produtos = 3 + 4;
+?&gt;
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos &lt;?= $produtos ?&gt; produtos.&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+// Este comentário fica no servidor.
+$senhaDoBanco = "segredo123";
+$produtos = 7 + 5;
+?&gt;
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos &lt;?= $produtos ?&gt; produtos.&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>PHP no servidor, JavaScript no navegador</h2>
+<p>Muitos sites usam as duas linguagens juntas, e elas rodam em lugares e momentos diferentes. Veja este arquivo, que tem uma conta em PHP e a mesma conta em JavaScript (o código entre <code>&lt;script&gt;</code> e <code>&lt;/script&gt;</code>):</p>
+
+<pre class="file" data-file="misto.php">&lt;p&gt;O PHP calculou: &lt;?= 10 * 3 ?&gt;&lt;/p&gt;
+&lt;script&gt;
+  document.write("O JavaScript calculou: " + (10 * 3));
+&lt;/script&gt;
+</pre>
+
+<p>O que chega ao navegador:</p>
+
+<pre class="term">$ curl localhost:8000/misto.php
+&lt;p&gt;O PHP calculou: 30&lt;/p&gt;                                « o PHP já fez a conta
+&lt;script&gt;
+  document.write("O JavaScript calculou: " + (10 * 3));  « o JavaScript chegou intacto
+&lt;/script&gt;</pre>
+
+<p>O PHP rodou no servidor e deixou só o resultado, <code>30</code>. O código JavaScript, para o PHP, é texto comum: ele passou sem ser tocado. Só <strong>depois</strong>, no computador de quem visita, o navegador executa o JavaScript e escreve a segunda frase. Por isso:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>PHP</th><th>JavaScript (no navegador)</th></tr>
+<tr><td>Onde roda</td><td>No servidor</td><td>No computador ou celular de quem visita</td></tr>
+<tr><td>Quando roda</td><td><strong>Antes</strong> de a página ser enviada</td><td><strong>Depois</strong> de a página chegar</td></tr>
+<tr><td>Quem vê o código</td><td>Só quem tem acesso ao servidor</td><td>Qualquer visitante (é só abrir o código-fonte)</td></tr>
+<tr><td>Bom para</td><td>Banco de dados, login, senhas, montar o HTML, regras do negócio</td><td>Menus, animações, reagir a cliques sem recarregar a página</td></tr>
+<tr><td>Pode confiar?</td><td>Sim: o visitante não consegue mudar o que o PHP faz</td><td>Não para segurança: o visitante pode alterar ou desligar o JavaScript</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>O PHP não "vê" cliques</strong>
+<p>Depois que a resposta foi enviada, o PHP já terminou. Ele não sabe se o visitante rolou a página ou clicou num botão. Para o PHP fazer algo de novo, o navegador precisa mandar <strong>outra requisição</strong>: clicar num link, enviar um formulário (aula <a href="formularios.html">Formulários HTML</a>) ou o JavaScript pedir dados ao servidor. E toda validação importante (preço, senha, permissões) deve ser feita no PHP, mesmo que o JavaScript também confira: o que roda no navegador pode ser burlado.</p>
+</div>
+
+<hr>
+
+<h2>Dois jeitos de rodar o PHP: CLI e web</h2>
+<p>O mesmo PHP pode trabalhar de dois jeitos. Na web, quem chama o PHP é o servidor, a cada requisição. No terminal, quem chama é você, com o comando <code>php</code>. Esse segundo jeito se chama <strong>CLI</strong> (<em>Command Line Interface</em>, "interface de linha de comando").</p>
+
+<p>O PHP sabe em qual modo está. A constante <code>PHP_SAPI</code> diz o nome do "encaixe" que o chamou (SAPI quer dizer <em>Server API</em>):</p>
+
+<pre class="file" data-file="quem.php">&lt;?php
+echo "Quem está rodando este código: " . PHP_SAPI . "\n";
+</pre>
+
+<pre class="term">$ php quem.php                         « no terminal
+Quem está rodando este código: cli
+$ curl localhost:8000/quem.php         « pelo servidor embutido
+Quem está rodando este código: cli-server</pre>
+
+<p>O código é o mesmo; quem o chamou, não. No terminal, a SAPI é <code>cli</code>; no servidor embutido, <code>cli-server</code>; num servidor de produção com nginx, seria <code>fpm-fcgi</code>; com o Apache e o módulo do PHP, <code>apache2handler</code>.</p>
+
+<p>E se você rodar a página da lojinha no terminal? O PHP faz o mesmo trabalho e escreve o HTML na tela, com as marcas e tudo, porque o terminal não sabe desenhar HTML:</p>
+
+<pre class="term">$ php loja.php
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos 7 produtos.&lt;/p&gt;</pre>
+
+<p>É a mesma saída do <code>curl</code>. Isso mostra uma coisa importante: o PHP não "desenha" páginas, ele só <strong>produz texto</strong>. Se esse texto vai para o terminal, você vê as marcas; se vai para o navegador, o navegador as transforma em títulos e parágrafos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>CLI (<code>php arquivo.php</code>)</th><th>Web (servidor + navegador)</th></tr>
+<tr><td>Quem chama o PHP</td><td>Você, no terminal</td><td>O servidor, a cada requisição</td></tr>
+<tr><td>Para onde vai a saída</td><td>A tela do terminal</td><td>A resposta HTTP, até o navegador</td></tr>
+<tr><td>Quebra de linha visível</td><td><code>"\n"</code></td><td><code>&lt;br&gt;</code> ou <code>&lt;p&gt;</code> (o <code>"\n"</code> vira só um espaço na página)</td></tr>
+<tr><td>Dados de entrada</td><td>Argumentos e teclado (<code>$argv</code>, <code>STDIN</code>)</td><td>Endereço e formulários (<code>$_GET</code>, <code>$_POST</code>)</td></tr>
+<tr><td>Limite de tempo</td><td>Nenhum (pode rodar por horas)</td><td>30 segundos por padrão</td></tr>
+<tr><td>Usado para</td><td>Aprender, scripts, tarefas agendadas, ferramentas (Composer, PHPUnit)</td><td>Sites, sistemas, APIs</td></tr>
+<tr><td>No editor do guia</td><td>Caixa padrão (saída em texto)</td><td>Caixa com <code>data-modo="web"</code> (abas Resultado e Código-fonte)</td></tr>
+</table>
+</div>
+
+<p>O guia usa os dois. As primeiras aulas são quase todas em CLI, porque a saída é mais simples de ler; a partir de <a href="php-e-html.html">PHP Dentro do HTML</a>, o modo web aparece cada vez mais. A aula <a href="linha-comando.html">PHP na Linha de Comando</a> aprofunda o modo CLI.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Failed to connect" / "Não é possível acessar esse site"</strong>
+<pre class="term">$ curl localhost:8000/loja.php
+curl: (7) Failed to connect to localhost port 8000 after 0 ms: Could not connect to server</pre>
+<p><strong>O que aconteceu:</strong> não há servidor nenhum escutando na porta 8000. Ninguém (nenhum "garçom") recebeu o pedido. No navegador, a mensagem é "Não é possível acessar esse site" ou "Conexão recusada".</p>
+<p><strong>Como resolver:</strong> ligue o servidor (<code>php -S localhost:8000</code>) num terminal e deixe-o aberto enquanto testa. Veja <a href="servidor-embutido.html">O Servidor Embutido</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>O navegador mostra o código PHP em vez da página</strong>
+<p><strong>O que aconteceu:</strong> o arquivo chegou ao navegador sem passar pelo PHP. As causas mais comuns: você abriu o arquivo com dois cliques (o endereço começa com <code>file://</code>), o arquivo não termina em <code>.php</code>, ou o servidor web (Apache, nginx) não está configurado para chamar o PHP.</p>
+<p><strong>Como resolver:</strong> abra pelo endereço do servidor (<code>http://localhost:8000/…</code>) e confira a extensão do arquivo.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudei o arquivo e a página continua igual</strong>
+<p><strong>O que aconteceu:</strong> o PHP lê o arquivo a cada requisição, então a mudança vale na hora, <strong>desde que você tenha salvo o arquivo</strong> e recarregado a página. Se ainda assim não mudou, o navegador pode estar mostrando uma cópia antiga guardada (o <em>cache</em>).</p>
+<p><strong>Como resolver:</strong> salve (<kbd>Ctrl</kbd>+<kbd>S</kbd>), recarregue com <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> (recarrega sem usar o cache) e confira se está editando o arquivo da pasta certa: o log do <code>php -S</code> mostra o caminho pedido.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>O que é</th></tr>
+<tr><td>Requisição (<em>request</em>)</td><td>O pedido que o navegador manda: método (<code>GET</code>, <code>POST</code>), caminho (<code>/loja.php</code>) e cabeçalhos.</td></tr>
+<tr><td>Resposta (<em>response</em>)</td><td>O que volta: linha de status (<code>200 OK</code>), cabeçalhos e corpo (o HTML).</td></tr>
+<tr><td>HTTP / HTTPS</td><td>A "língua" de navegadores e servidores; o HTTPS é a versão criptografada.</td></tr>
+<tr><td>Servidor web</td><td>O programa que recebe as requisições: Apache, nginx, o <code>php -S</code>.</td></tr>
+<tr><td><code>localhost</code></td><td>"Este computador". O mesmo que <code>127.0.0.1</code> (IPv4) ou <code>::1</code> (IPv6).</td></tr>
+<tr><td>Porta</td><td>Um número que separa os serviços de uma máquina. Sites usam 80 (HTTP) e 443 (HTTPS); para testes, usa-se 8000 ou 8080.</td></tr>
+<tr><td>Código de status</td><td><code>200</code> sucesso · <code>301</code>/<code>302</code> redirecionamento · <code>404</code> não encontrado · <code>500</code> erro no servidor.</td></tr>
+<tr><td>CLI</td><td>Rodar o PHP no terminal: <code>php arquivo.php</code>.</td></tr>
+<tr><td><code>PHP_SAPI</code></td><td>Constante com o modo atual: <code>cli</code>, <code>cli-server</code>, <code>fpm-fcgi</code>, <code>apache2handler</code>.</td></tr>
+<tr><td><code>curl URL</code> · <code>curl -i</code> · <code>curl -v</code></td><td>Faz a requisição no terminal; mostra só o corpo · com os cabeçalhos da resposta · a conversa inteira.</td></tr>
+</table>
+</div>
+
+<p>Para fechar, veja com os próprios olhos a diferença entre CLI e web. Esta caixa está em <strong>modo terminal</strong>: ela mostra o texto que o PHP produziu, sem desenhar o HTML.</p>
+
+<div class="tryphp" data-goal="out:&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;,out:Temos 12 produtos">
+<p class="try-task"><strong>Missão:</strong> rode e veja as marcas <code>&lt;h1&gt;</code> e <code>&lt;p&gt;</code> aparecendo como texto (no terminal ninguém desenha HTML). Depois troque a conta para que a página anuncie <code>Temos 12 produtos.</code></p>
+<pre class="script">&lt;?php
+$produtos = 3 + 4;
+?&gt;
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos &lt;?= $produtos ?&gt; produtos.&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$produtos = 6 + 6;
+?&gt;
+&lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+&lt;p&gt;Temos &lt;?= $produtos ?&gt; produtos.&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. Coloque na ordem: (a) o PHP executa o arquivo; (b) o navegador desenha a página; (c) o navegador faz a requisição; (d) o servidor devolve o HTML.</p>
+<label><input type="radio" name="q1"> a, c, d, b</label>
+<label><input type="radio" name="q1"> c, d, a, b</label>
+<label><input type="radio" name="q1"> c, a, d, b</label>
+<label><input type="radio" name="q1"> b, c, a, d</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Um arquivo PHP tem <code>$senha = "abc";</code> e escreve <code>&lt;p&gt;Oi&lt;/p&gt;</code>. O que o visitante vê ao abrir o código-fonte da página?</p>
+<label><input type="radio" name="q2"> <code>$senha = "abc";</code> e <code>&lt;p&gt;Oi&lt;/p&gt;</code></label>
+<label><input type="radio" name="q2"> Só <code>&lt;p&gt;Oi&lt;/p&gt;</code></label>
+<label><input type="radio" name="q2"> Só <code>abc</code></label>
+<label><input type="radio" name="q2"> Uma mensagem de erro</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. O que o código <code>404</code> numa resposta HTTP quer dizer?</p>
+<label><input type="radio" name="q3"> Deu tudo certo.</label>
+<label><input type="radio" name="q3"> Erro dentro do código PHP.</label>
+<label><input type="radio" name="q3"> A página mudou de endereço.</label>
+<label><input type="radio" name="q3"> O que foi pedido não foi encontrado.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Onde deve ficar a conferência do preço final de uma compra?</p>
+<label><input type="radio" name="q4"> No PHP, no servidor.</label>
+<label><input type="radio" name="q4"> Só no JavaScript, no navegador.</label>
+<label><input type="radio" name="q4"> No HTML.</label>
+<label><input type="radio" name="q4"> No cabeçalho <code>X-Powered-By</code>.</label>
+</div>
+
+<div class="exercise">
+<h3>5. O modo do PHP</h3>
+<p>Que valor <code>echo PHP_SAPI;</code> mostra quando o arquivo é rodado com <code>php arquivo.php</code> no terminal?</p>
+<div class="ex-code"><input data-answer="cli" aria-label="valor de PHP_SAPI"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Navegador (cliente) faz a <strong>requisição</strong>; o servidor web recebe; se o arquivo é <code>.php</code>, o PHP executa; o HTML gerado volta na <strong>resposta</strong>; o navegador desenha.</li>
+  <li>O navegador recebe <strong>só o HTML</strong>: comentários, variáveis e senhas do PHP ficam no servidor. Confira com <code>curl</code> ou "Exibir código-fonte".</li>
+  <li><code>curl -i</code> mostra o cabeçalho da resposta (<code>200 OK</code>, <code>Content-type</code>); <code>curl -v</code> mostra a conversa inteira.</li>
+  <li>O PHP roda <strong>antes</strong> de a página ser enviada; o JavaScript, <strong>depois</strong> que ela chega. Segurança é no PHP.</li>
+  <li>O PHP só produz texto. No terminal (CLI, <code>PHP_SAPI</code> = <code>cli</code>) você vê as marcas; no navegador, a página desenhada.</li>
+  <li>Próximo passo: <a href="versoes.html">Versões do PHP</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
