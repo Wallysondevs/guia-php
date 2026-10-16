@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP var_dump e print_r — inspecionar variáveis | Guia PHP</title>
+<meta name="description" content="Como ver o que tem dentro de uma variável em PHP: var_dump, print_r (e print_r com true), var_export e json_encode lado a lado, com strings, números, booleanos, null e arrays aninhados, saídas reais do PHP 8.5, o uso de pre no navegador e o aviso Array to string conversion.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">var_dump e print_r</span></h1>
+
+<p class="intro">Programar é, em boa parte, descobrir por que o programa não fez o que você esperava. E a primeira pergunta é sempre: <strong>o que tem dentro desta variável agora?</strong> O <code>echo</code> não serve para isso: ele esconde o tipo, não mostra <code>false</code> nem <code>null</code> e não sabe mostrar arrays. Nesta aula você conhece as quatro "lupas" do PHP (<code>var_dump</code>, <code>print_r</code>, <code>var_export</code> e <code>json_encode</code>) e vê, lado a lado, como cada uma mostra o mesmo valor.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A ler a saída do <code>var_dump</code>, a lupa mais completa.</li>
+  <li>Quando o <code>print_r</code> é mais confortável, e o truque <code>print_r($x, true)</code>.</li>
+  <li>O que o <code>var_export</code> e o <code>json_encode</code> fazem de diferente.</li>
+  <li>Como cada um mostra textos, números, booleanos, <code>null</code> e arrays dentro de arrays.</li>
+  <li>Por que, no navegador, a saída fica numa linha só, e como resolver com <code>&lt;pre&gt;</code>.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. Os arrays aparecem aqui só como "coisa para inspecionar"; você vai aprender a criá-los em <a href="arrays.html">Arrays Indexados</a> e <a href="arrays-associativos.html">Arrays Associativos</a>.</p>
+
+<hr>
+
+<h2>A ideia: quatro jeitos de fotografar uma caixa</h2>
+<p>Imagine que você precisa mostrar para alguém o que tem numa caixa de mudança. Dá para fazer de vários jeitos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito</th><th>Equivalente em PHP</th><th>Para quem</th></tr>
+<tr><td>Uma lista técnica com etiqueta, peso e tamanho de cada item</td><td><code>var_dump</code></td><td>Você, investigando um problema</td></tr>
+<tr><td>Uma lista simples, fácil de ler</td><td><code>print_r</code></td><td>Você, olhando arrays grandes</td></tr>
+<tr><td>Uma "receita" para montar a caixa de novo</td><td><code>var_export</code></td><td>Outro programa PHP</td></tr>
+<tr><td>Um formulário padrão, que qualquer transportadora entende</td><td><code>json_encode</code></td><td>Outros sistemas (JavaScript, APIs)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>1. <code>var_dump</code>: tipo, tamanho e valor</h2>
+<p><code>var_dump</code> (de <em>variable dump</em>, "despejar a variável") é a lupa mais completa. Ela mostra <strong>tudo</strong>: o tipo, o tamanho (para strings e arrays) e o valor, e aceita vários valores de uma vez, separados por vírgula:</p>
+
+<pre class="file" data-file="dump.php">&lt;?php
+var_dump("Ana", 29, 1.65, true, null);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php dump.php
+string(3) "Ana"
+int(29)
+float(1.65)
+bool(true)
+NULL</pre>
+
+<p>Com um array (uma lista de valores com etiquetas), o <code>var_dump</code> mostra a estrutura inteira, com recuo para o que está dentro:</p>
+
+<pre class="file" data-file="cliente.php">&lt;?php
+$cliente = [
+    "nome" =&gt; "Ana",
+    "idade" =&gt; 29,
+    "ativa" =&gt; true,
+    "compras" =&gt; ["pão", "café"],
+];
+var_dump($cliente);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php cliente.php
+array(4) {
+  ["nome"]=&gt;
+  string(3) "Ana"
+  ["idade"]=&gt;
+  int(29)
+  ["ativa"]=&gt;
+  bool(true)
+  ["compras"]=&gt;
+  array(2) {
+    [0]=&gt;
+    string(4) "pão"
+    [1]=&gt;
+    string(5) "café"
+  }
+}</pre>
+
+<dl class="anatomy">
+  <dt>array(4) {</dt><dd>Um array com 4 itens. Tudo até a <code>}</code> correspondente está dentro dele.</dd>
+  <dt>["nome"]=&gt;</dt><dd>A <strong>chave</strong> (a etiqueta do item). Na linha de baixo, o valor dessa chave.</dd>
+  <dt>string(3) "Ana"</dt><dd>O valor: string de 3 bytes.</dd>
+  <dt>["compras"]=&gt; array(2) {</dt><dd>Um array <strong>dentro</strong> do array (aninhado), com mais recuo.</dd>
+  <dt>[0]=&gt;</dt><dd>Chaves numéricas aparecem sem aspas. A contagem começa no 0.</dd>
+  <dt>string(4) "pão"</dt><dd>4, e não 3: o <code>ã</code> ocupa 2 bytes (veja <a href="strings.html">Strings</a>).</dd>
+</dl>
+
+<p>O <code>var_dump</code> <strong>escreve direto na saída</strong> e não devolve nada. Se você tentar guardar o resultado numa variável, ela recebe <code>null</code>. Para ter o texto numa variável, use as outras lupas com <code>true</code> (abaixo).</p>
+
+<hr>
+
+<h2>2. <code>print_r</code>: a leitura confortável</h2>
+<p><code>print_r</code> (de <em>print readable</em>, "imprimir legível") mostra só as chaves e os valores, sem tipos nem tamanhos:</p>
+
+<pre class="file" data-file="legivel.php">&lt;?php
+$cliente = [
+    "nome" =&gt; "Ana",
+    "idade" =&gt; 29,
+    "ativa" =&gt; true,
+    "compras" =&gt; ["pão", "café"],
+];
+print_r($cliente);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php legivel.php
+Array
+(
+    [nome] =&gt; Ana
+    [idade] =&gt; 29
+    [ativa] =&gt; 1             « true aparece como 1
+    [compras] =&gt; Array
+        (
+            [0] =&gt; pão
+            [1] =&gt; café
+        )
+
+)</pre>
+
+<p>É bem mais fácil de ler num array grande. O preço: o <code>print_r</code> mostra os valores como o <code>echo</code> mostraria. <code>true</code> vira <code>1</code>, e <code>false</code>, <code>null</code> e <code>""</code> viram… nada. Também não dá para saber se <code>29</code> é o número ou o texto <code>"29"</code>. Quando o tipo importa, volte para o <code>var_dump</code>.</p>
+
+<h3><code>print_r($x, true)</code>: o texto numa variável</h3>
+<p>Passando <code>true</code> como segundo argumento, o <code>print_r</code> não mostra nada: ele <strong>devolve</strong> o texto, para você guardar numa variável, juntar com outra string ou gravar num arquivo de registro (log):</p>
+
+<pre class="file" data-file="retorno.php">&lt;?php
+$compras = ["pão", "café"];
+$texto = print_r($compras, true);
+echo "A lista tem " . strlen($texto) . " bytes de texto:\n";
+echo $texto;
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php retorno.php
+A lista tem 43 bytes de texto:
+Array
+(
+    [0] =&gt; pão
+    [1] =&gt; café
+)</pre>
+
+<p>Um uso muito comum na web é <code>error_log(print_r($dados, true));</code>: grava o conteúdo no registro de erros do servidor, sem aparecer para o visitante (veja <a href="depuracao.html">Depurar</a>).</p>
+
+<div class="tryphp" data-goal="out:Dados do pedido: Array,semerro,src:print_r\(\s*\$pedido\s*\,\s*true\s*\)">
+<p class="try-task"><strong>Missão:</strong> o programa tenta juntar o texto <code>"Dados do pedido: "</code> com o conteúdo do array, mas o <code>print_r</code> escreve o array <strong>antes</strong> da frase, e a frase termina com um <code>1</code> perdido (<code>Dados do pedido: 1</code>). Use <code>print_r($pedido, true)</code> para que a saída comece com <code>Dados do pedido: Array</code>.</p>
+<pre class="script">&lt;?php
+$pedido = ["produto" =&gt; "caderno", "quantidade" =&gt; 3];
+echo "Dados do pedido: " . print_r($pedido) . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$pedido = ["produto" =&gt; "caderno", "quantidade" =&gt; 3];
+echo "Dados do pedido: " . print_r($pedido, true) . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>var_export</code>: o valor como código PHP</h2>
+<p><code>var_export</code> ("exportar a variável") mostra o valor <strong>escrito do jeito que você escreveria no código</strong>. Dá para copiar a saída e colar num programa PHP:</p>
+
+<pre class="file" data-file="exportar.php">&lt;?php
+$cliente = [
+    "nome" =&gt; "Ana",
+    "idade" =&gt; 29,
+    "ativa" =&gt; true,
+    "compras" =&gt; ["pão", "café"],
+];
+var_export($cliente);
+echo "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php exportar.php
+array (
+  'nome' =&gt; 'Ana',
+  'idade' =&gt; 29,
+  'ativa' =&gt; true,                « a palavra true, sem ambiguidade
+  'compras' =&gt;
+  array (
+    0 =&gt; 'pão',
+    1 =&gt; 'café',
+  ),
+)</pre>
+
+<p>Strings aparecem entre aspas simples, números sem aspas, e <code>true</code>, <code>false</code> e <code>NULL</code> por extenso. É ótimo para <strong>booleanos e null</strong>, que o <code>print_r</code> esconde. Repare que o <code>var_export</code> não pula linha no fim (por isso o <code>echo "\n"</code>). Ele também aceita <code>true</code> no segundo argumento para devolver o texto: <code>var_export($x, true)</code>.</p>
+
+<hr>
+
+<h2>4. <code>json_encode</code>: o formato que todo mundo entende</h2>
+<p><strong>JSON</strong> é um formato de texto para trocar dados entre sistemas, usado em toda a web (aula <a href="json.html">JSON</a>). <code>json_encode</code> transforma um valor do PHP em JSON. Não é uma ferramenta de depuração, mas é útil para ver dados como o navegador ou uma API vão recebê-los:</p>
+
+<pre class="file" data-file="json.php">&lt;?php
+$cliente = [
+    "nome" =&gt; "Ana",
+    "idade" =&gt; 29,
+    "ativa" =&gt; true,
+    "compras" =&gt; ["pão", "café"],
+];
+echo json_encode($cliente), "\n";
+echo json_encode($cliente, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php json.php
+{"nome":"Ana","idade":29,"ativa":true,"compras":["pão","café"]}
+{
+    "nome": "Ana",
+    "idade": 29,
+    "ativa": true,
+    "compras": [
+        "pão",
+        "café"
+    ]
+}</pre>
+
+<dl class="anatomy">
+  <dt>json_encode($x)</dt><dd>Tudo numa linha, e os acentos viram códigos (<code>ã</code> é o <code>ã</code>). Continua correto: qualquer programa que lê JSON entende.</dd>
+  <dt>JSON_PRETTY_PRINT</dt><dd>"Impressão bonita": quebra as linhas e recua.</dd>
+  <dt>JSON_UNESCAPED_UNICODE</dt><dd>"Unicode sem escape": mantém <code>ã</code> e <code>é</code> como letras.</dd>
+  <dt>|</dt><dd>Junta as duas opções (detalhes em <a href="json.html">JSON</a>).</dd>
+</dl>
+
+<hr>
+
+<h2>5. Lado a lado</h2>
+<p>O mesmo valor, nas quatro lupas. Todas as saídas abaixo são reais:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th><code>var_dump</code></th><th><code>print_r</code></th><th><code>var_export</code></th><th><code>json_encode</code></th></tr>
+<tr><td><code>"Ana"</code></td><td><code>string(3) "Ana"</code></td><td><code>Ana</code></td><td><code>'Ana'</code></td><td><code>"Ana"</code></td></tr>
+<tr><td><code>29</code></td><td><code>int(29)</code></td><td><code>29</code></td><td><code>29</code></td><td><code>29</code></td></tr>
+<tr><td><code>1.65</code></td><td><code>float(1.65)</code></td><td><code>1.65</code></td><td><code>1.65</code></td><td><code>1.65</code></td></tr>
+<tr><td><code>0.1 + 0.2</code></td><td><code>float(0.30000000000000004)</code></td><td><code>0.3</code></td><td><code>0.30000000000000004</code></td><td><code>0.30000000000000004</code></td></tr>
+<tr><td><code>true</code></td><td><code>bool(true)</code></td><td><code>1</code></td><td><code>true</code></td><td><code>true</code></td></tr>
+<tr><td><code>false</code></td><td><code>bool(false)</code></td><td>(nada)</td><td><code>false</code></td><td><code>false</code></td></tr>
+<tr><td><code>null</code></td><td><code>NULL</code></td><td>(nada)</td><td><code>NULL</code></td><td><code>null</code></td></tr>
+<tr><td>array</td><td>tipos e tamanhos</td><td><code>Array ( [0] =&gt; … )</code></td><td><code>array ( 0 =&gt; … )</code></td><td><code>["…"]</code> ou <code>{"…":…}</code></td></tr>
+<tr><td>objeto</td><td><code>object(stdClass)#1 (2) {…}</code></td><td><code>stdClass Object ( … )</code></td><td><code>(object) array( … )</code></td><td><code>{"nome":"Ana",…}</code></td></tr>
+<tr><td>Devolve texto?</td><td>Não</td><td>Com <code>true</code></td><td>Com <code>true</code></td><td>Sempre</td></tr>
+</table>
+</div>
+
+<p>Repare na linha do <code>0.1 + 0.2</code>: o <code>print_r</code> arredonda como o <code>echo</code> e esconde a imprecisão do float (aula <a href="numeros.html">int e float</a>). Mais um motivo para investigar com <code>var_dump</code>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e compare as quatro saídas. Depois troque <code>"ativa" =&gt; false</code> e acrescente <code>"telefone" =&gt; null</code>: em qual das lupas eles "somem"?</p>
+<pre class="script">&lt;?php
+$produto = ["nome" =&gt; "caderno", "preco" =&gt; 12.9, "ativa" =&gt; true];
+var_dump($produto);
+print_r($produto);
+var_export($produto);
+echo "\n", json_encode($produto), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>6. No navegador: use <code>&lt;pre&gt;</code></h2>
+<p>Quando o PHP gera uma página web, a saída do <code>var_dump</code> vai para o meio do HTML. O navegador junta espaços e quebras de linha, e tudo aparece numa linha só, difícil de ler. A tag HTML <code>&lt;pre&gt;</code> ("pré-formatado") manda o navegador respeitar os espaços:</p>
+
+<pre class="file" data-file="web.php">&lt;?php
+$compras = ["pão", "café"];
+var_dump($compras);
+echo "&lt;pre&gt;";
+var_dump($compras);
+echo "&lt;/pre&gt;";
+</pre>
+
+<p>O código-fonte gerado é o mesmo texto nos dois casos, mas o navegador só respeita as quebras de linha do segundo (o que está dentro do <code>&lt;pre&gt;</code>). Rode no editor abaixo e compare a aba <strong>Resultado</strong> com a aba <strong>Código-fonte HTML</strong>:</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> o primeiro <code>var_dump</code> sai embolado numa linha; o segundo, dentro de <code>&lt;pre&gt;</code>, fica organizado. Troque por <code>print_r</code> e veja a diferença.</p>
+<pre class="script">&lt;?php
+$compras = ["pão", "café", "maçã"];
+echo "&lt;h3&gt;Sem pre&lt;/h3&gt;";
+var_dump($compras);
+echo "&lt;h3&gt;Com pre&lt;/h3&gt;&lt;pre&gt;";
+var_dump($compras);
+echo "&lt;/pre&gt;";
+</pre>
+</div>
+
+<div class="warning">
+<strong>Não deixe <code>var_dump</code> no site publicado</strong>
+<p>Essas lupas são para você, durante o desenvolvimento. Num site no ar, elas podem mostrar dados internos (senhas, caminhos de arquivos) para qualquer visitante. Remova antes de publicar, ou use <code>error_log(print_r($x, true))</code>, que grava no registro do servidor.</p>
+</div>
+
+<hr>
+
+<h2>7. E o <code>echo</code> de um array?</h2>
+<p>O <code>echo</code> só sabe mostrar textos e números. Com um array, ele desiste, avisa e mostra a palavra <code>Array</code>:</p>
+
+<pre class="file" data-file="echo-array.php">&lt;?php
+$compras = ["pão", "café"];
+echo $compras;
+echo "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php echo-array.php
+
+Warning: Array to string conversion in /home/ana/site/echo-array.php on line 3
+Array</pre>
+
+<p><em>Array to string conversion</em> = "conversão de array para string". Para mostrar um array, use uma das lupas, ou junte os itens num texto com <code>implode(", ", $compras)</code> (aula <a href="funcoes-array.html">Funções de Array</a>).</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th></tr>
+<tr><td>Descobrir o que há numa variável, com certeza do tipo</td><td><code>var_dump</code></td></tr>
+<tr><td>Olhar a estrutura de um array grande</td><td><code>print_r</code></td></tr>
+<tr><td>O conteúdo num texto (para log, e-mail, juntar com outra string)</td><td><code>print_r($x, true)</code> ou <code>var_export($x, true)</code></td></tr>
+<tr><td>Ver booleanos e null sem ambiguidade, num formato curto</td><td><code>var_export</code></td></tr>
+<tr><td>Copiar o valor para dentro de um programa PHP</td><td><code>var_export</code></td></tr>
+<tr><td>Ver como os dados vão para o JavaScript ou uma API</td><td><code>json_encode</code></td></tr>
+<tr><td>Mostrar algo para o visitante</td><td><code>echo</code> com <code>htmlspecialchars</code> (nenhuma das lupas!)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Array to string conversion</code></strong>
+<p><strong>O que significa:</strong> você usou um array onde o PHP esperava texto: num <code>echo</code>, dentro de <code>"…"</code> ou com o ponto (<code>.</code>).</p>
+<p><strong>Como consertar:</strong> para investigar, troque por <code>print_r</code> ou <code>var_dump</code>; para mostrar ao usuário, percorra o array com <a href="foreach.html">foreach</a> ou use <code>implode</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Sobrou um <code>1</code> no fim do texto</strong>
+<p><strong>O que significa:</strong> você juntou <code>print_r($x)</code> (sem <code>true</code>) com uma string. O <code>print_r</code> escreveu o array na hora e devolveu <code>true</code>, que o ponto transformou em <code>"1"</code>.</p>
+<p><strong>Como consertar:</strong> <code>print_r($x, true)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>No navegador, tudo saiu numa linha só</strong>
+<p><strong>O que significa:</strong> o HTML ignora quebras de linha e espaços repetidos.</p>
+<p><strong>Como consertar:</strong> coloque <code>echo "&lt;pre&gt;";</code> antes e <code>echo "&lt;/pre&gt;";</code> depois.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>print_r</code> não mostrou um valor</strong>
+<p><strong>O que significa:</strong> o valor é <code>false</code>, <code>null</code> ou <code>""</code>; o <code>print_r</code> mostra os três como nada.</p>
+<p><strong>Como consertar:</strong> use <code>var_dump</code> ou <code>var_export</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Mostra</th><th>Devolve</th></tr>
+<tr><td><code>var_dump($a, $b, …)</code></td><td>Tipo, tamanho e valor de cada um</td><td>nada (<code>null</code>)</td></tr>
+<tr><td><code>print_r($x)</code></td><td>Valor legível</td><td><code>true</code></td></tr>
+<tr><td><code>print_r($x, true)</code></td><td>Nada</td><td>O texto</td></tr>
+<tr><td><code>var_export($x)</code></td><td>Valor como código PHP</td><td><code>null</code></td></tr>
+<tr><td><code>var_export($x, true)</code></td><td>Nada</td><td>O texto</td></tr>
+<tr><td><code>json_encode($x, opções)</code></td><td>Nada</td><td>O texto em JSON</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A lupa completa</h3>
+<p>Complete para ver o tipo e o valor de <code>$preco</code>:</p>
+<div class="ex-code"><input data-answer="var_dump" aria-label="função">($preco);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Texto numa variável</h3>
+<p>Complete para guardar o conteúdo de <code>$lista</code> como texto:</p>
+<div class="ex-code">$texto = print_r($lista, <input data-answer="true" aria-label="argumento">);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que <code>print_r(false);</code> mostra?</p>
+<label><input type="radio" name="q3"> <code>false</code></label>
+<label><input type="radio" name="q3"> Nada</label>
+<label><input type="radio" name="q3"> <code>bool(false)</code></label>
+<label><input type="radio" name="q3"> <code>0</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destas saídas veio do <code>var_export</code>?</p>
+<label><input type="radio" name="q4"> <code>string(3) "Ana"</code></label>
+<label><input type="radio" name="q4"> <code>Ana</code></label>
+<label><input type="radio" name="q4"> <code>"Ana"</code></label>
+<label><input type="radio" name="q4"> <code>'Ana'</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Por que <code>var_dump</code> é melhor que <code>print_r</code> para investigar <code>$idade</code>?</p>
+<label><input type="radio" name="q5"> Porque mostra se é <code>int(29)</code> ou <code>string(2) "29"</code></label>
+<label><input type="radio" name="q5"> Porque é mais rápido</label>
+<label><input type="radio" name="q5"> Porque o <code>print_r</code> não funciona com números</label>
+<label><input type="radio" name="q5"> Porque devolve o texto</label>
+</div>
+
+<h3>Missão final: JSON com acentos</h3>
+
+<div class="tryphp" data-goal="out:[&quot;pão&quot;\,&quot;café&quot;\,&quot;maçã&quot;],semerro,src:json_encode">
+<p class="try-task"><strong>Missão:</strong> o programa mostra a lista de compras em JSON, mas os acentos viram códigos como <code>ã</code>. Acrescente a opção certa no <code>json_encode</code> para a saída ser exatamente <code>["pão","café","maçã"]</code> (numa linha só).</p>
+<pre class="script">&lt;?php
+$compras = ["pão", "café", "maçã"];
+echo json_encode($compras), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$compras = ["pão", "café", "maçã"];
+echo json_encode($compras, JSON_UNESCAPED_UNICODE), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>var_dump</code>: tipo, tamanho e valor. A lupa para investigar. Não devolve nada.</li>
+  <li><code>print_r</code>: legível, mas esconde tipos e mostra <code>true</code> como <code>1</code> e <code>false</code>/<code>null</code> como nada. Com <code>true</code>, devolve o texto.</li>
+  <li><code>var_export</code>: o valor como código PHP; ótimo para booleanos e null.</li>
+  <li><code>json_encode</code>: o valor em JSON; <code>JSON_PRETTY_PRINT</code> e <code>JSON_UNESCAPED_UNICODE</code> deixam legível.</li>
+  <li>No navegador, envolva com <code>&lt;pre&gt;</code>. Não deixe lupas no site publicado.</li>
+  <li><code>echo</code> de um array dá <code>Warning: Array to string conversion</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
