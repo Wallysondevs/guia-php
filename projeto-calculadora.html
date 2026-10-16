@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projeto Calculadora — calculadora web com formulário, match e validação | Guia PHP</title>
+<meta name="description" content="Projeto passo a passo: uma calculadora web em PHP com formulário POST, match para as operações, validação com is_numeric, divisão por zero tratada, resultado formatado com number_format e campos que guardam o que foi digitado. Saídas reais do php -S e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP Projeto <span class="hl">Calculadora Web</span></h1>
+
+<p class="intro">O primeiro projeto é uma calculadora que funciona no navegador: dois campos para os números, uma lista com as quatro operações e um botão <strong>Calcular</strong>. É pequeno, mas tem tudo o que um sistema web de verdade tem: um formulário, o PHP lendo o que chegou, a decisão sobre o que fazer, a checagem do que o usuário digitou e uma resposta bem apresentada.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Montar uma página que mostra um formulário e também processa o envio dele (o mesmo arquivo faz as duas coisas).</li>
+  <li>Saber se a página foi aberta normalmente (<code>GET</code>) ou enviada pelo botão (<code>POST</code>).</li>
+  <li>Escolher a conta com <code>match</code> e entender o erro <code>UnhandledMatchError</code>.</li>
+  <li>Validar números com <code>is_numeric</code>, aceitar vírgula e impedir a divisão por zero.</li>
+  <li>Mostrar o resultado no jeito brasileiro (<code>1.234,50</code>) com <code>number_format</code>.</li>
+  <li>Manter o que o usuário digitou nos campos depois de enviar, sem abrir brecha de segurança.</li>
+</ul>
+</div>
+
+<h2>Antes de começar</h2>
+<p>Este projeto junta aulas dos níveis 1 e 2. Se algum termo parecer novo, a aula do assunto está ao lado:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que usamos</th><th>Para quê</th><th>Aula</th></tr>
+<tr><td><code>&lt;form method="post"&gt;</code></td><td>O formulário com os campos</td><td><a href="formularios.html">Formulários HTML</a></td></tr>
+<tr><td><code>$_POST</code>, <code>$_SERVER['REQUEST_METHOD']</code></td><td>Ler o que foi enviado</td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>??</code></td><td>Valor padrão quando o campo não veio</td><td><a href="null-coalescing.html">?? e ?-&gt;</a></td></tr>
+<tr><td><code>match</code></td><td>Escolher a conta pela operação</td><td><a href="match.html">match</a></td></tr>
+<tr><td><code>is_numeric</code>, <code>trim</code></td><td>Validar o que foi digitado</td><td><a href="validacao.html">Validar Dados</a></td></tr>
+<tr><td><code>htmlspecialchars</code></td><td>Mostrar texto do usuário com segurança</td><td><a href="escapar-saida.html">Escapar a Saída (XSS)</a></td></tr>
+<tr><td><code>number_format</code></td><td>Formatar <code>2469</code> como <code>2.469,00</code></td><td><a href="number-format.html">Formatar Números</a></td></tr>
+<tr><td><code>&lt;?= ?&gt;</code>, <code>if: … endif;</code></td><td>Misturar PHP e HTML</td><td><a href="php-e-html.html">PHP Dentro do HTML</a></td></tr>
+</table>
+</div>
+
+<p>O projeto inteiro é <strong>um arquivo só</strong>, o <code>index.php</code>. Em cada etapa ele cresce um pouco. Você pode seguir de dois jeitos:</p>
+<ul>
+  <li><strong>No editor do guia:</strong> cada etapa tem uma caixa "Experimente" com o <code>index.php</code> daquela etapa, no modo web: a aba <strong>Resultado</strong> mostra a página como no navegador, e o formulário funciona de verdade.</li>
+  <li><strong>No seu computador:</strong> crie a pasta, salve o arquivo e suba o servidor embutido do PHP (veja <a href="servidor-embutido.html">O Servidor Embutido</a>):</li>
+</ul>
+
+<pre class="term">$ mkdir calculadora
+$ cd calculadora
+$ nano index.php                       « cole o código da etapa e salve
+$ php -S localhost:8000
+[Fri Oct 16 20:44:15 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>Deixe esse terminal aberto (ele é o servidor) e abra <code>http://localhost:8000</code> no navegador. Para parar o servidor, volte a ele e aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>. Neste guia, as saídas foram conferidas com o <code>curl</code> num <strong>segundo</strong> terminal: <code>curl -s localhost:8000/</code> busca a página como o navegador faria, e <code>curl -s -d 'a=10&amp;b=4&amp;op=dividir' localhost:8000/</code> simula um clique em <strong>Calcular</strong> com esses valores (o <code>-d</code> faz um POST).</p>
+
+<hr>
+
+<h2>As etapas</h2>
+
+<ol class="passo">
+
+<li>
+<h3>Etapa 1 · O formulário</h3>
+<p>Primeiro, a "cara" da calculadora. Por enquanto é quase só HTML: o PHP aparece em um lugar, para provar que o arquivo está passando pelo PHP.</p>
+
+<pre class="file" data-file="index.php">&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Hoje é &lt;?= date('d/m/Y') ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>&lt;form method="post"&gt;</code></td><td>Quando o botão for clicado, o navegador envia os campos com o método <strong>POST</strong> (eles vão "dentro" da requisição, não na barra de endereço). Sem <code>action</code>, o formulário é enviado para a <strong>mesma página</strong>: o próprio <code>index.php</code> vai receber os dados.</td></tr>
+<tr><td><code>name="a"</code>, <code>name="b"</code></td><td>O <code>name</code> é o nome com que o campo chega ao PHP. Sem <code>name</code>, o campo nem é enviado.</td></tr>
+<tr><td><code>&lt;select name="op"&gt;</code></td><td>A lista de operações. O que chega ao PHP é o <code>value</code> da opção escolhida (<code>somar</code>, <code>dividir</code>…), não o símbolo que aparece na tela.</td></tr>
+<tr><td><code>&lt;button&gt;Calcular&lt;/button&gt;</code></td><td>Um botão dentro de um formulário envia o formulário.</td></tr>
+<tr><td><code>&lt;?= date('d/m/Y') ?&gt;</code></td><td>O único PHP da etapa: escreve a data de hoje. Se você vir <code>16/10/2026</code> (ou a sua data), o PHP está funcionando; se vir o código <code>&lt;?=</code> na página, você abriu o arquivo direto, sem servidor.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Por que <code>value="dividir"</code> e não <code>value="/"</code>?</strong>
+<p>Símbolos como <code>+</code> e <code>/</code> têm significado especial em endereços e formulários (o <code>+</code>, por exemplo, vira espaço). Palavras simples chegam sempre iguais. O símbolo bonito fica só no texto da opção.</p>
+</div>
+
+<p>Com o servidor rodando, o <code>curl</code> mostra o final da página que o navegador recebe:</p>
+<pre class="term">$ curl -s localhost:8000/ | tail -5
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Hoje é 16/10/2026.&lt;/p&gt;          « o PHP trocou o date('d/m/Y') pela data
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>Clicar em <strong>Calcular</strong> agora não faz nada visível: o formulário é enviado, mas o PHP ainda não lê os campos. A página volta igual (e vazia, porque o navegador não "lembra" o que estava nos campos). Isso muda nas próximas etapas.</p>
+
+<div class="tryphp" data-modo="web" data-goal="out:value=&quot;potencia&quot;">
+<p class="try-task"><strong>Missão:</strong> acrescente uma quinta opção na lista, com o valor <code>potencia</code> e o texto <code>^</code>, logo depois da divisão. Rode e abra a lista na aba Resultado.</p>
+<pre class="script">&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Hoje é &lt;?= date('d/m/Y') ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+    &lt;option value="potencia"&gt;^&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Hoje é &lt;?= date('d/m/Y') ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 2 · Ler o que foi enviado</h3>
+<p>Agora o PHP vai pegar os três campos. A parte nova fica no <strong>topo</strong> do arquivo, antes de qualquer HTML: primeiro o PHP prepara os dados, depois o HTML mostra. Essa ordem vai acompanhar você em todos os projetos.</p>
+
+<p>O começo do arquivo (novo):</p>
+<pre class="file" data-file="index.php">&lt;?php
+$a  = $_POST['a']  ?? '';
+$b  = $_POST['b']  ?? '';
+$op = $_POST['op'] ?? 'somar';
+?&gt;
+&lt;!DOCTYPE html&gt;
+...</pre>
+<p>E, logo depois do <code>&lt;/form&gt;</code> (novo):</p>
+<pre class="file" data-file="index.php">&lt;?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?&gt;
+  &lt;p&gt;Recebi: a = "&lt;?= htmlspecialchars($a) ?&gt;", b = "&lt;?= htmlspecialchars($b) ?&gt;", operação = "&lt;?= htmlspecialchars($op) ?&gt;"&lt;/p&gt;
+&lt;?php endif; ?&gt;</pre>
+<p>O arquivo inteiro desta etapa está na caixa "Experimente" logo abaixo.</p>
+
+<dl class="anatomy">
+  <dt>$a</dt><dd>A variável que vai guardar o primeiro número.</dd>
+  <dt>=</dt><dd>Recebe o valor da direita.</dd>
+  <dt>$_POST['a']</dt><dd>O campo <code>name="a"</code> enviado por POST. <code>$_POST</code> é um array associativo que o PHP enche sozinho a cada envio.</dd>
+  <dt>??</dt><dd>"Se não existir, use…". Quando a página é aberta pela primeira vez, ninguém enviou nada e <code>$_POST['a']</code> não existe.</dd>
+  <dt>''</dt><dd>O valor padrão: texto vazio. Para a operação, o padrão é <code>'somar'</code>.</dd>
+</dl>
+
+<p>No fim da página, um <code>if</code> no estilo "dois-pontos" (<code>if (…): … endif;</code>, mais fácil de ler no meio do HTML) só mostra a linha "Recebi" quando a página chegou por POST, isto é, quando o botão foi clicado. <code>$_SERVER['REQUEST_METHOD']</code> diz qual foi o método: <code>GET</code> quando você digita o endereço ou segue um link, <code>POST</code> quando um formulário <code>method="post"</code> é enviado.</p>
+
+<div class="warning">
+<strong>Sempre <code>htmlspecialchars</code> ao mostrar o que o usuário digitou</strong>
+<p>Os valores vêm de fora: qualquer pessoa pode digitar <code>&lt;script&gt;</code> no campo. O <code>htmlspecialchars</code> troca <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code> e as aspas pelas versões "inofensivas" (<code>&amp;lt;</code>…), e o navegador mostra o texto em vez de executá-lo. A aula <a href="escapar-saida.html">Escapar a Saída (XSS)</a> mostra o ataque que isso evita.</p>
+</div>
+
+<pre class="term">$ curl -s -d 'a=10&amp;b=4&amp;op=dividir' localhost:8000/ | tail -3
+  &lt;p&gt;Recebi: a = "10", b = "4", operação = "dividir"&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+$ curl -s -d 'a=abc&amp;b=2&amp;op=somar' localhost:8000/ | tail -3
+  &lt;p&gt;Recebi: a = "abc", b = "2", operação = "somar"&lt;/p&gt;      « o PHP aceita qualquer texto
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>Repare: tudo chega como <strong>texto</strong> (string), até o <code>10</code>. Um formulário não tem "campo de número" para o PHP; quem decide se aquilo é um número é você, e é isso que a etapa 4 faz.</p>
+
+<div class="tryphp" data-modo="web" data-post="a=10&amp;b=4&amp;op=dividir" data-goal="html:Método: POST">
+<p class="try-task"><strong>Missão:</strong> a caixa já começa com um envio (10, 4, dividir). Acrescente, logo abaixo da linha "Recebi", um parágrafo que mostre <code>Método: </code> seguido de <code>$_SERVER['REQUEST_METHOD']</code>. Depois preencha o formulário na aba Resultado e envie de novo.</p>
+<pre class="script">&lt;?php
+$a  = $_POST['a']  ?? '';
+$b  = $_POST['b']  ?? '';
+$op = $_POST['op'] ?? 'somar';
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?&gt;
+  &lt;p&gt;Recebi: a = "&lt;?= htmlspecialchars($a) ?&gt;", b = "&lt;?= htmlspecialchars($b) ?&gt;", operação = "&lt;?= htmlspecialchars($op) ?&gt;"&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$a  = $_POST['a']  ?? '';
+$b  = $_POST['b']  ?? '';
+$op = $_POST['op'] ?? 'somar';
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?&gt;
+  &lt;p&gt;Recebi: a = "&lt;?= htmlspecialchars($a) ?&gt;", b = "&lt;?= htmlspecialchars($b) ?&gt;", operação = "&lt;?= htmlspecialchars($op) ?&gt;"&lt;/p&gt;
+  &lt;p&gt;Método: &lt;?= $_SERVER['REQUEST_METHOD'] ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 3 · Fazer a conta com <code>match</code></h3>
+<p>Hora de calcular. Os textos viram números com <code>(float)</code> e o <code>match</code> escolhe a conta pela operação:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+$a  = $_POST['a']  ?? '';
+$b  = $_POST['b']  ?? '';
+$op = $_POST['op'] ?? 'somar';
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $x = (float) $a;
+    $y = (float) $b;
+    $resultado = match ($op) {
+        'somar'       =&gt; $x + $y,
+        'subtrair'    =&gt; $x - $y,
+        'multiplicar' =&gt; $x * $y,
+        'dividir'     =&gt; $x / $y,
+    };
+}
+?&gt;
+...
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;Resultado: &lt;?= $resultado ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;</pre>
+<p>A linha "Recebi" da etapa 2 saiu: no lugar dela, o resultado. Ele só aparece quando existe (<code>!== null</code>).</p>
+
+<dl class="anatomy">
+  <dt>$resultado =</dt><dd>O valor que o <code>match</code> devolver vai para <code>$resultado</code>. Antes do envio, ele fica <code>null</code> ("ainda não calculei").</dd>
+  <dt>match ($op)</dt><dd>Compara <code>$op</code> com cada "braço", usando <code>===</code> (valor e tipo iguais).</dd>
+  <dt>'somar' =&gt; $x + $y,</dt><dd>Um braço: se <code>$op</code> for <code>'somar'</code>, o resultado é <code>$x + $y</code>.</dd>
+  <dt>};</dt><dd>O <code>match</code> é uma <strong>expressão</strong>: devolve um valor, por isso termina com <code>;</code> depois da chave.</dd>
+</dl>
+
+<p>Por que <code>match</code> e não <code>switch</code>? Porque aqui queremos <strong>um valor</strong> para cada operação, sem precisar de <code>break</code> e sem o risco de "cair" no caso de baixo. A comparação entre os dois está na aula <a href="match.html">match</a>.</p>
+
+<pre class="term">$ curl -s -d 'a=10&amp;b=4&amp;op=dividir' localhost:8000/ | tail -3
+  &lt;p class="resultado"&gt;Resultado: 2.5&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>Funciona! Mas esta versão é <strong>ingênua</strong>: ela confia no usuário. Veja o que acontece com três envios "maldosos":</p>
+
+<pre class="term">$ curl -s -d 'a=abc&amp;b=2&amp;op=somar' localhost:8000/ | grep resultado
+  &lt;p class="resultado"&gt;Resultado: 2&lt;/p&gt;                « "abc" virou 0 em silêncio!
+$ curl -s -d 'a=7&amp;b=0&amp;op=dividir' localhost:8000/ | tail -6
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught DivisionByZeroError: Division by zero in /home/ana/calculadora/index.php:14
+Stack trace:
+#0 {main}
+  thrown in &lt;b&gt;/home/ana/calculadora/index.php&lt;/b&gt; on line &lt;b&gt;14&lt;/b&gt;&lt;br /&gt;
+$ curl -s -d 'a=7&amp;b=2&amp;op=resto' localhost:8000/ | tail -5
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught UnhandledMatchError: Unhandled match case 'resto' in /home/ana/calculadora/index.php:10
+Stack trace:
+#0 {main}
+  thrown in &lt;b&gt;/home/ana/calculadora/index.php&lt;/b&gt; on line &lt;b&gt;10&lt;/b&gt;&lt;br /&gt;
+</pre>
+
+<ul>
+  <li><strong><code>(float) 'abc'</code> é <code>0</code>:</strong> a conversão forçada não reclama, só devolve zero. A calculadora deu uma resposta errada sem avisar ninguém. Esse é o pior tipo de erro.</li>
+  <li><strong><code>DivisionByZeroError: Division by zero</code></strong> (erro de divisão por zero): desde o PHP 8, dividir por zero com <code>/</code> para o programa. A página morre no meio, e o usuário vê uma mensagem técnica.</li>
+  <li><strong><code>UnhandledMatchError: Unhandled match case 'resto'</code></strong> (caso não tratado no match): o <code>match</code> não tinha braço para <code>'resto'</code>. "Mas a lista só tem quatro opções!" Na tela, sim; mas qualquer pessoa pode enviar o que quiser, como fizemos com o <code>curl</code>. <strong>Nunca confie que o valor veio da sua lista.</strong></li>
+</ul>
+<p>No navegador, a mensagem aparece com <code>&lt;b&gt;</code> porque o servidor embutido mostra os erros em HTML; no terminal (<code>php index.php</code>) ela sai em texto puro. As mensagens completas estão em <a href="erros.html">Lendo Erros do PHP</a>.</p>
+
+<div class="tryphp" data-modo="web" data-post="a=2&amp;b=10&amp;op=potencia" data-goal="html:Resultado: 1024">
+<p class="try-task"><strong>Missão:</strong> a caixa começa enviando <code>op=potencia</code>, que ainda não existe: rode e veja o <code>UnhandledMatchError</code>. Depois acrescente o braço <code>'potencia' =&gt; $x ** $y,</code> no <code>match</code> (e a opção <code>potencia</code> na lista). Rodando de novo, 2 elevado a 10 deve dar 1024.</p>
+<pre class="script">&lt;?php
+$a  = $_POST['a']  ?? '';
+$b  = $_POST['b']  ?? '';
+$op = $_POST['op'] ?? 'somar';
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $x = (float) $a;
+    $y = (float) $b;
+    $resultado = match ($op) {
+        'somar'       =&gt; $x + $y,
+        'subtrair'    =&gt; $x - $y,
+        'multiplicar' =&gt; $x * $y,
+        'dividir'     =&gt; $x / $y,
+    };
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;Resultado: &lt;?= $resultado ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$a  = $_POST['a']  ?? '';
+$b  = $_POST['b']  ?? '';
+$op = $_POST['op'] ?? 'somar';
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $x = (float) $a;
+    $y = (float) $b;
+    $resultado = match ($op) {
+        'somar'       =&gt; $x + $y,
+        'subtrair'    =&gt; $x - $y,
+        'multiplicar' =&gt; $x * $y,
+        'dividir'     =&gt; $x / $y,
+        'potencia'    =&gt; $x ** $y,
+    };
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+    &lt;option value="potencia"&gt;^&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;Resultado: &lt;?= $resultado ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 4 · Validar antes de calcular</h3>
+<p>A regra de ouro de todo formulário: <strong>primeiro confira, depois use</strong>. Vamos guardar os problemas encontrados numa lista <code>$erros</code> e só calcular se ela terminar vazia.</p>
+
+<p>O bloco do topo fica assim:</p>
+<pre class="file" data-file="index.php">&lt;?php
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // aceita vírgula como separador decimal: "2,5" vira "2.5"
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!in_array($op, ['somar', 'subtrair', 'multiplicar', 'dividir'], true)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        // ... o mesmo match da etapa 3 ...
+    }
+}
+?&gt;</pre>
+<p>E, antes do resultado, as mensagens de erro:</p>
+<pre class="file" data-file="index.php">&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>trim($_POST['a'] ?? '')</code></td><td>Tira espaços das pontas: <code>" 10 "</code> vira <code>"10"</code>. Quem cola um número de outro lugar costuma trazer espaços junto.</td></tr>
+<tr><td><code>$erros = [];</code></td><td>Começa a lista de problemas vazia.</td></tr>
+<tr><td><code>str_replace(',', '.', $a)</code></td><td>No Brasil, escrevemos <code>2,5</code>; o PHP só entende <code>2.5</code>. Trocamos a vírgula pelo ponto antes de validar.</td></tr>
+<tr><td><code>!is_numeric($a)</code></td><td><code>is_numeric</code> ("é numérico?") responde <code>true</code> para textos como <code>"10"</code>, <code>"2.5"</code>, <code>"-8"</code> e <code>"1e3"</code>, e <code>false</code> para <code>"abc"</code>, <code>""</code> e <code>"2,5"</code>. O <code>!</code> inverte: "se <strong>não</strong> for número…".</td></tr>
+<tr><td><code>$erros[] = '…';</code></td><td>Acrescenta uma mensagem no fim da lista.</td></tr>
+<tr><td><code>in_array($op, [...], true)</code></td><td>A operação está na lista das permitidas? O <code>true</code> faz a comparação estrita (tipo e valor).</td></tr>
+<tr><td><code>!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0</code></td><td>Só se os números já estiverem bons: dividir por zero vira uma mensagem amigável, não um <code>Fatal error</code>. Uma lista vazia vale <code>false</code>, então <code>!$erros</code> quer dizer "nenhum erro até agora".</td></tr>
+<tr><td><code>foreach ($erros as $erro)</code></td><td>Mostra cada mensagem num parágrafo (com <code>htmlspecialchars</code>, por hábito: amanhã a mensagem pode incluir algo que o usuário digitou).</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl -s -d 'a=abc&amp;b=2&amp;op=somar' localhost:8000/ | tail -4
+&lt;/form&gt;
+  &lt;p class="erro"&gt;O primeiro número não é válido.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+$ curl -s -d 'a=7&amp;b=0&amp;op=dividir' localhost:8000/ | grep -E 'resultado|erro'
+  &lt;p class="erro"&gt;Não dá para dividir por zero.&lt;/p&gt;
+$ curl -s -d 'a=7&amp;b=2&amp;op=resto' localhost:8000/ | grep -E 'resultado|erro'
+  &lt;p class="erro"&gt;Operação desconhecida.&lt;/p&gt;
+$ curl -s -d 'a=&amp;b=&amp;op=somar' localhost:8000/ | grep -E 'resultado|erro'
+  &lt;p class="erro"&gt;O primeiro número não é válido.&lt;/p&gt;
+  &lt;p class="erro"&gt;O segundo número não é válido.&lt;/p&gt;      « os dois problemas de uma vez
+$ curl -s -d 'a=10&amp;b=4&amp;op=dividir' localhost:8000/ | tail -3
+  &lt;p class="resultado"&gt;Resultado: 2.5&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>Os três envios que derrubavam ou enganavam a calculadora agora recebem uma resposta clara. Juntar <strong>todos</strong> os erros numa lista, em vez de parar no primeiro, é mais gentil com o usuário: ele corrige tudo de uma vez. Mais formas de validar estão em <a href="validacao.html">Validar Dados</a>.</p>
+
+<div class="tryphp" data-modo="web" data-post="a=&amp;b=5&amp;op=somar" data-goal="html:Preencha o primeiro número.">
+<p class="try-task"><strong>Missão:</strong> "não é válido" é uma mensagem estranha para um campo que ficou <strong>vazio</strong>. Mude a validação: se <code>$a === ''</code>, a mensagem deve ser <code>Preencha o primeiro número.</code>; senão, se não for numérico, continua "não é válido" (use <code>if</code> … <code>elseif</code>). Faça o mesmo para o <code>$b</code>.</p>
+<pre class="script">&lt;?php
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // aceita vírgula como separador decimal: "2,5" vira "2.5"
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!in_array($op, ['somar', 'subtrair', 'multiplicar', 'dividir'], true)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        };
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;Resultado: &lt;?= $resultado ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // aceita vírgula como separador decimal: "2,5" vira "2.5"
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if ($a === '') {
+        $erros[] = 'Preencha o primeiro número.';
+    } elseif (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if ($b === '') {
+        $erros[] = 'Preencha o segundo número.';
+    } elseif (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!in_array($op, ['somar', 'subtrair', 'multiplicar', 'dividir'], true)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        };
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar"&gt;×&lt;/option&gt;
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;input name="b" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;Resultado: &lt;?= $resultado ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 5 · Resultado formatado e campos que lembram</h3>
+<p>Dois acabamentos que fazem diferença para quem usa: o resultado no formato brasileiro, e os campos que <strong>continuam preenchidos</strong> depois do envio (ninguém gosta de redigitar tudo para trocar só a operação).</p>
+
+<p>No topo, a lista de operações vira um array e aparece uma função de formatação:</p>
+<pre class="file" data-file="index.php">&lt;?php
+// Calculadora da Ana — versão final
+$operacoes = [
+    'somar'       =&gt; '+',
+    'subtrair'    =&gt; '−',
+    'multiplicar' =&gt; '×',
+    'dividir'     =&gt; '÷',
+];
+// ... leitura, validação e match como na etapa 4, mas a operação
+//     agora é validada com: !array_key_exists($op, $operacoes)
+
+function br(float $n): string
+{
+    return number_format($n, 2, ',', '.');
+}
+?&gt;</pre>
+<p>No HTML, os campos ganham <code>value</code>, as opções são geradas pelo array e o resultado mostra a conta inteira:</p>
+<pre class="file" data-file="index.php">&lt;form method="post"&gt;
+  &lt;input name="a" value="&lt;?= htmlspecialchars($a) ?&gt;" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+&lt;?php foreach ($operacoes as $valor =&gt; $simbolo): ?&gt;
+    &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $op ? ' selected' : '' ?&gt;&gt;&lt;?= $simbolo ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/select&gt;
+  &lt;input name="b" value="&lt;?= htmlspecialchars($b) ?&gt;" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+...
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;&lt;?= br((float) $a) ?&gt; &lt;?= $operacoes[$op] ?&gt; &lt;?= br((float) $b) ?&gt; = &lt;strong&gt;&lt;?= br($resultado) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Novidade</th><th>O que faz</th></tr>
+<tr><td><code>$operacoes = ['somar' =&gt; '+', …]</code></td><td>Um array associativo com as operações: a chave é o valor enviado, o valor é o símbolo. Ele serve para três coisas: montar a lista do formulário, validar (<code>array_key_exists</code>) e mostrar o símbolo no resultado. Uma operação nova entra num lugar só (mais o braço do <code>match</code>).</td></tr>
+<tr><td><code>function br(float $n): string</code></td><td>Uma função pequena para não repetir <code>number_format($n, 2, ',', '.')</code> três vezes: 2 casas decimais, vírgula nos decimais, ponto nos milhares (veja <a href="funcoes.html">Funções</a> e <a href="number-format.html">Formatar Números</a>).</td></tr>
+<tr><td><code>value="&lt;?= htmlspecialchars($a) ?&gt;"</code></td><td>Põe de volta no campo o que foi digitado. Aqui o <code>htmlspecialchars</code> é <strong>obrigatório</strong>: uma aspa <code>"</code> no texto fecharia o atributo <code>value</code> e deixaria o usuário escrever HTML na sua página.</td></tr>
+<tr><td><code>foreach ($operacoes as $valor =&gt; $simbolo)</code></td><td>Gera as quatro <code>&lt;option&gt;</code> a partir do array.</td></tr>
+<tr><td><code>$valor === $op ? ' selected' : ''</code></td><td>Marca como <code>selected</code> (selecionada) a opção que foi enviada. O operador ternário está em <a href="ternario.html">Operador Ternário</a>.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl -s -d 'a=10&amp;b=3&amp;op=dividir' localhost:8000/ | grep -E 'resultado|erro'
+  &lt;p class="resultado"&gt;10,00 ÷ 3,00 = &lt;strong&gt;3,33&lt;/strong&gt;&lt;/p&gt;
+$ curl -s -d 'a=1000000&amp;b=3&amp;op=multiplicar' localhost:8000/ | grep -E 'resultado|erro'
+  &lt;p class="resultado"&gt;1.000.000,00 × 3,00 = &lt;strong&gt;3.000.000,00&lt;/strong&gt;&lt;/p&gt;
+$ curl -s -d 'a=2,5&amp;b=3&amp;op=multiplicar' localhost:8000/ | grep -E 'resultado|erro|value'
+  &lt;input name="a" value="2.5" placeholder="Primeiro número"&gt;      « o campo voltou preenchido
+    &lt;option value="somar"&gt;+&lt;/option&gt;
+    &lt;option value="subtrair"&gt;−&lt;/option&gt;
+    &lt;option value="multiplicar" selected&gt;×&lt;/option&gt;                « a operação também
+    &lt;option value="dividir"&gt;÷&lt;/option&gt;
+  &lt;input name="b" value="3" placeholder="Segundo número"&gt;
+  &lt;p class="resultado"&gt;2,50 × 3,00 = &lt;strong&gt;7,50&lt;/strong&gt;&lt;/p&gt;</pre>
+
+<p>Repare que o campo voltou com <code>2.5</code> (com ponto), porque a variável <code>$a</code> já tinha passado pelo <code>str_replace</code>. Um dos desafios do fim pede para devolver o texto exatamente como foi digitado.</p>
+
+<p>E a prova de que o <code>htmlspecialchars</code> no <code>value</code> funciona: um envio com aspas e tags aparece "desarmado":</p>
+<pre class="term">$ curl -s -d 'a="&gt;&lt;b&gt;oi&lt;/b&gt;&amp;b=2&amp;op=somar' localhost:8000/ | grep 'name="a"'
+  &lt;input name="a" value="&amp;quot;&amp;gt;&amp;lt;b&amp;gt;oi&amp;lt;/b&amp;gt;" placeholder="Primeiro número"&gt;</pre>
+<p>Sem ele, o <code>"&gt;</code> fecharia o campo e o <code>&lt;b&gt;oi&lt;/b&gt;</code> viraria HTML de verdade na sua página. Com ele, o navegador mostra no campo exatamente o que foi digitado.</p>
+
+<div class="tryphp" data-modo="web" data-post="a=1234.5&amp;b=2&amp;op=multiplicar" data-goal="html:(arredondado: 2.469)">
+<p class="try-task"><strong>Missão:</strong> abaixo do resultado, mostre também o valor arredondado para inteiro, no formato <code>(arredondado: 2.469)</code>. Dica: <code>number_format($resultado, 0, ',', '.')</code>, com zero casas decimais.</p>
+<pre class="script">&lt;?php
+// Calculadora da Ana — versão final
+$operacoes = [
+    'somar'       =&gt; '+',
+    'subtrair'    =&gt; '−',
+    'multiplicar' =&gt; '×',
+    'dividir'     =&gt; '÷',
+];
+
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!array_key_exists($op, $operacoes)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        };
+    }
+}
+
+function br(float $n): string
+{
+    return number_format($n, 2, ',', '.');
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" value="&lt;?= htmlspecialchars($a) ?&gt;" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+&lt;?php foreach ($operacoes as $valor =&gt; $simbolo): ?&gt;
+    &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $op ? ' selected' : '' ?&gt;&gt;&lt;?= $simbolo ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/select&gt;
+  &lt;input name="b" value="&lt;?= htmlspecialchars($b) ?&gt;" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;&lt;?= br((float) $a) ?&gt; &lt;?= $operacoes[$op] ?&gt; &lt;?= br((float) $b) ?&gt; = &lt;strong&gt;&lt;?= br($resultado) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+// Calculadora da Ana — versão final
+$operacoes = [
+    'somar'       =&gt; '+',
+    'subtrair'    =&gt; '−',
+    'multiplicar' =&gt; '×',
+    'dividir'     =&gt; '÷',
+];
+
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!array_key_exists($op, $operacoes)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        };
+    }
+}
+
+function br(float $n): string
+{
+    return number_format($n, 2, ',', '.');
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" value="&lt;?= htmlspecialchars($a) ?&gt;" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+&lt;?php foreach ($operacoes as $valor =&gt; $simbolo): ?&gt;
+    &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $op ? ' selected' : '' ?&gt;&gt;&lt;?= $simbolo ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/select&gt;
+  &lt;input name="b" value="&lt;?= htmlspecialchars($b) ?&gt;" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;&lt;?= br((float) $a) ?&gt; &lt;?= $operacoes[$op] ?&gt; &lt;?= br((float) $b) ?&gt; = &lt;strong&gt;&lt;?= br($resultado) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+  &lt;p&gt;(arredondado: &lt;?= number_format($resultado, 0, ',', '.') ?&gt;)&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+</ol>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Warning: Undefined array key "a"</strong>
+<p>Você escreveu <code>$a = $_POST['a'];</code> sem o <code>??</code> e abriu a página pela primeira vez (um GET, sem formulário enviado):</p>
+<pre class="term">$ curl -s localhost:8000/
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "a" in &lt;b&gt;/home/ana/calculadora/index.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "b" in &lt;b&gt;/home/ana/calculadora/index.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+Recebi  e </pre>
+<p><strong>O que significa:</strong> "chave de array indefinida": não existe <code>'a'</code> dentro de <code>$_POST</code>, porque nada foi enviado. <strong>Como consertar:</strong> <code>$_POST['a'] ?? ''</code>, que dá um valor padrão quando a chave não existe.</p>
+</div>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught DivisionByZeroError: Division by zero</strong>
+<p>Apareceu ao dividir por zero (etapa 3). <strong>Como consertar:</strong> confira o divisor <strong>antes</strong> da conta e transforme o caso numa mensagem para o usuário, como na etapa 4. O resto da divisão com <code>%</code> tem o seu próprio erro: <code>DivisionByZeroError: Modulo by zero</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught UnhandledMatchError: Unhandled match case 'resto'</strong>
+<p>O <code>match</code> recebeu um valor que não tem braço. <strong>Como consertar:</strong> valide a operação antes (lista de permitidas) ou acrescente um braço <code>default =&gt; …</code>. Na calculadora preferimos validar, porque assim o usuário recebe "Operação desconhecida." em vez de um resultado inventado.</p>
+</div>
+
+<div class="cenario">
+<strong>O resultado sai errado, sem erro nenhum</strong>
+<p>Por exemplo, <code>abc + 2</code> dá <code>2</code>. É o <code>(float)</code> transformando texto inválido em <code>0</code>. <strong>Como consertar:</strong> <code>is_numeric</code> antes de converter. E se em vez de <code>(float)</code> você fizer a conta direto com os textos, o PHP 8.5 reclama de verdade: <code>"abc" + 1</code> dá <code>Fatal error: Uncaught TypeError: Unsupported operand types: string + int</code>, e <code>"5 maçãs" + 1</code> dá <code>Warning: A non-numeric value encountered</code> e o resultado <code>6</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>A página aparece com o código <code>&lt;?php</code> à mostra</strong>
+<p>Você abriu o <code>index.php</code> com dois cliques (endereço <code>file:///…</code>). O navegador não sabe rodar PHP. <strong>Como consertar:</strong> suba o <code>php -S localhost:8000</code> na pasta e abra <code>http://localhost:8000</code>.</p>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>A versão final, com tudo das cinco etapas. São cerca de 70 linhas.</p>
+<pre class="file" data-file="index.php">&lt;?php
+// Calculadora da Ana — versão final
+$operacoes = [
+    'somar'       =&gt; '+',
+    'subtrair'    =&gt; '−',
+    'multiplicar' =&gt; '×',
+    'dividir'     =&gt; '÷',
+];
+
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!array_key_exists($op, $operacoes)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        };
+    }
+}
+
+function br(float $n): string
+{
+    return number_format($n, 2, ',', '.');
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" value="&lt;?= htmlspecialchars($a) ?&gt;" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+&lt;?php foreach ($operacoes as $valor =&gt; $simbolo): ?&gt;
+    &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $op ? ' selected' : '' ?&gt;&gt;&lt;?= $simbolo ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/select&gt;
+  &lt;input name="b" value="&lt;?= htmlspecialchars($b) ?&gt;" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;&lt;?= br((float) $a) ?&gt; &lt;?= $operacoes[$op] ?&gt; &lt;?= br((float) $b) ?&gt; = &lt;strong&gt;&lt;?= br($resultado) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<h2>Desafios extras</h2>
+<p>Sem resposta pronta; use a caixa livre abaixo ou o seu computador.</p>
+<ol>
+  <li><strong>Devolver o que foi digitado:</strong> guarde o texto original em <code>$aTexto</code> antes do <code>str_replace</code> e use-o no <code>value</code>, para o campo voltar com <code>2,5</code> e não <code>2.5</code>.</li>
+  <li><strong>Mais operações:</strong> potência (<code>**</code>) e resto (<code>fmod($x, $y)</code>, que funciona com decimais). Não esqueça de proteger o resto contra zero também.</li>
+  <li><strong>Casas decimais à escolha:</strong> um terceiro campo (um <code>&lt;select name="casas"&gt;</code> com 0, 2 e 4) que decide quantas casas o <code>br()</code> usa. Valide com <code>in_array</code>.</li>
+  <li><strong>Números que aparecem como digitados:</strong> mostre <code>10 ÷ 4 = 2,50</code> (sem <code>,00</code> nos números inteiros). Dica: <code>$n == (int) $n</code>.</li>
+  <li><strong>Histórico:</strong> guarde as últimas cinco contas numa sessão e mostre-as abaixo do formulário (veja <a href="sessoes.html">Sessões</a>; o <a href="projeto-login.html">projeto de login</a> usa sessão do começo ao fim).</li>
+</ol>
+
+<div class="tryphp" data-modo="web" data-post="a=15&amp;b=200&amp;op=porcentagem" data-goal="html:15\,00 % de 200\,00 = 30\,00">
+<p class="try-task"><strong>Missão final:</strong> acrescente a operação <strong>porcentagem</strong>: "a % de b". A chave é <code>porcentagem</code>, o símbolo é <code>% de</code> e a conta é <code>$x * $y / 100</code>. A caixa já envia "15 % de 200"; a resposta deve ser <code>15,00 % de 200,00 = 30,00</code>. Repare em quantos lugares você precisou mexer (spoiler: dois).</p>
+<pre class="script">&lt;?php
+// Calculadora da Ana — versão final
+$operacoes = [
+    'somar'       =&gt; '+',
+    'subtrair'    =&gt; '−',
+    'multiplicar' =&gt; '×',
+    'dividir'     =&gt; '÷',
+];
+
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!array_key_exists($op, $operacoes)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        };
+    }
+}
+
+function br(float $n): string
+{
+    return number_format($n, 2, ',', '.');
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" value="&lt;?= htmlspecialchars($a) ?&gt;" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+&lt;?php foreach ($operacoes as $valor =&gt; $simbolo): ?&gt;
+    &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $op ? ' selected' : '' ?&gt;&gt;&lt;?= $simbolo ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/select&gt;
+  &lt;input name="b" value="&lt;?= htmlspecialchars($b) ?&gt;" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;&lt;?= br((float) $a) ?&gt; &lt;?= $operacoes[$op] ?&gt; &lt;?= br((float) $b) ?&gt; = &lt;strong&gt;&lt;?= br($resultado) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+// Calculadora da Ana — versão final
+$operacoes = [
+    'somar'       =&gt; '+',
+    'subtrair'    =&gt; '−',
+    'multiplicar' =&gt; '×',
+    'dividir'     =&gt; '÷',
+    'porcentagem' =&gt; '% de',
+];
+
+$a  = trim($_POST['a'] ?? '');
+$b  = trim($_POST['b'] ?? '');
+$op = $_POST['op'] ?? 'somar';
+$erros = [];
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $a = str_replace(',', '.', $a);
+    $b = str_replace(',', '.', $b);
+
+    if (!is_numeric($a)) {
+        $erros[] = 'O primeiro número não é válido.';
+    }
+    if (!is_numeric($b)) {
+        $erros[] = 'O segundo número não é válido.';
+    }
+    if (!array_key_exists($op, $operacoes)) {
+        $erros[] = 'Operação desconhecida.';
+    }
+    if (!$erros &amp;&amp; $op === 'dividir' &amp;&amp; (float) $b == 0) {
+        $erros[] = 'Não dá para dividir por zero.';
+    }
+
+    if (!$erros) {
+        $x = (float) $a;
+        $y = (float) $b;
+        $resultado = match ($op) {
+            'somar'       =&gt; $x + $y,
+            'subtrair'    =&gt; $x - $y,
+            'multiplicar' =&gt; $x * $y,
+            'dividir'     =&gt; $x / $y,
+        'porcentagem' =&gt; $x * $y / 100,
+        };
+    }
+}
+
+function br(float $n): string
+{
+    return number_format($n, 2, ',', '.');
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Calculadora&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Calculadora da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="a" value="&lt;?= htmlspecialchars($a) ?&gt;" placeholder="Primeiro número"&gt;
+  &lt;select name="op"&gt;
+&lt;?php foreach ($operacoes as $valor =&gt; $simbolo): ?&gt;
+    &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $op ? ' selected' : '' ?&gt;&gt;&lt;?= $simbolo ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+  &lt;/select&gt;
+  &lt;input name="b" value="&lt;?= htmlspecialchars($b) ?&gt;" placeholder="Segundo número"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= htmlspecialchars($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php if ($resultado !== null): ?&gt;
+  &lt;p class="resultado"&gt;&lt;?= br((float) $a) ?&gt; &lt;?= $operacoes[$op] ?&gt; &lt;?= br((float) $b) ?&gt; = &lt;strong&gt;&lt;?= br($resultado) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<p>Complete para ler o campo <code>op</code> com o valor padrão <code>'somar'</code> quando ele não vier:</p>
+<div class="ex-code">$op = $_POST['op'] <input data-answer="??"> 'somar';</div>
+</div>
+
+<div class="exercise">
+<p>Complete para formatar <code>2469</code> como <code>2.469,00</code>:</p>
+<div class="ex-code">number_format(2469, <input data-answer="2">, <input data-answer="','|&quot;,&quot;">, <input data-answer="'.'|&quot;.&quot;">)</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">Um usuário envia <code>op=resto</code> para a versão da etapa 3 (sem validação). O que acontece?</p>
+<label><input type="radio" name="q1"> O resultado sai 0</label>
+<label><input type="radio" name="q1"> O PHP escolhe a primeira operação (somar)</label>
+<label><input type="radio" name="q1"> Fatal error: Uncaught UnhandledMatchError</label>
+<label><input type="radio" name="q1"> Nada: a lista só tem quatro opções</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">Por que o <code>value="&lt;?= htmlspecialchars($a) ?&gt;"</code> precisa do <code>htmlspecialchars</code>?</p>
+<label><input type="radio" name="q2"> Para converter o texto em número</label>
+<label><input type="radio" name="q2"> Para que aspas e tags digitadas não "quebrem" o HTML e virem código na página</label>
+<label><input type="radio" name="q2"> Para tirar os espaços das pontas</label>
+<label><input type="radio" name="q2"> Não precisa: o navegador já protege o atributo</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">Quanto vale <code>is_numeric("2,5")</code>?</p>
+<label><input type="radio" name="q3"> <code>false</code>: o PHP só entende o ponto como separador decimal</label>
+<label><input type="radio" name="q3"> <code>true</code></label>
+<label><input type="radio" name="q3"> <code>2.5</code></label>
+<label><input type="radio" name="q3"> Dá erro</label>
+</div>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um só <code>index.php</code> mostra o formulário (GET) e processa o envio (POST); <code>$_SERVER['REQUEST_METHOD']</code> diz qual dos dois aconteceu.</li>
+  <li>Todo campo chega como texto e pode não chegar: <code>$_POST['x'] ?? ''</code> e <code>trim</code>.</li>
+  <li>Valide <strong>antes</strong> de usar: <code>is_numeric</code>, lista de operações permitidas, divisor diferente de zero. Junte os erros numa lista.</li>
+  <li><code>match</code> escolhe o valor; sem braço para o valor, <code>UnhandledMatchError</code>.</li>
+  <li><code>number_format($n, 2, ',', '.')</code> deixa o número no formato brasileiro.</li>
+  <li>Tudo que veio do usuário e volta para a página passa por <code>htmlspecialchars</code>, inclusive dentro de <code>value="…"</code>.</li>
+</ul>
+<p>Próximo projeto: o <a href="projeto-contato.html">Formulário de Contato</a>, que guarda as mensagens num arquivo e usa o padrão Post/Redirect/Get.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,1450 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projeto Contato — formulário com validação, CSV/JSON e Post/Redirect/Get | Guia PHP</title>
+<meta name="description" content="Projeto passo a passo: o formulário de contato da lojinha da Ana em PHP. Validação campo a campo com filter_var e mb_strlen, mensagens de erro ao lado de cada campo, valores mantidos, saída escapada, mensagens salvas em CSV (fputcsv) ou JSON e o padrão Post/Redirect/Get contra envios duplicados. Saídas reais do php -S e curl.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP Projeto <span class="hl">Formulário de Contato</span></h1>
+
+<p class="intro">A lojinha da Ana vende cestas de café da manhã e quer receber mensagens dos clientes pelo site. Neste projeto você constrói o formulário de contato completo: ele confere cada campo, mostra o erro ao lado do campo certo, não apaga o que a pessoa digitou, guarda as mensagens num arquivo e não grava a mesma mensagem duas vezes quando alguém aperta <kbd>F5</kbd>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Guardar os campos num array <code>$dados</code> e os erros num array <code>$erros</code> com o nome do campo como chave.</li>
+  <li>Validar nome, e-mail (<code>filter_var</code>), assunto e mensagem (<code>mb_strlen</code>), e mostrar cada erro no lugar certo.</li>
+  <li>Devolver os valores para <code>input</code>, <code>select</code> e <code>textarea</code> com segurança.</li>
+  <li>Salvar cada mensagem como uma linha de CSV com <code>fputcsv</code> (e a versão em JSON).</li>
+  <li>O padrão <strong>Post/Redirect/Get</strong>: por que o <kbd>F5</kbd> duplica envios e como o <code>header('Location: …')</code> resolve.</li>
+  <li>Listar as mensagens recebidas numa tabela, sem deixar uma mensagem maliciosa estragar a página.</li>
+</ul>
+</div>
+
+<h2>Antes de começar</h2>
+<p>Faça antes o <a href="projeto-calculadora.html">projeto da calculadora</a>: ele mostra, com calma, o "esqueleto" que vamos repetir aqui (o PHP no topo prepara os dados, o HTML embaixo mostra). As aulas que este projeto usa:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que usamos</th><th>Aula</th></tr>
+<tr><td><code>$_POST</code>, <code>$_GET</code>, <code>??</code></td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>filter_var</code>, <code>mb_strlen</code>, mensagens de erro</td><td><a href="validacao.html">Validar Dados</a>, <a href="mbstring.html">Acentos e mbstring</a></td></tr>
+<tr><td><code>htmlspecialchars</code></td><td><a href="escapar-saida.html">Escapar a Saída (XSS)</a></td></tr>
+<tr><td><code>fopen</code>, <code>fputcsv</code>, <code>fgetcsv</code></td><td><a href="arquivos.html">Ler e Escrever Arquivos</a>, <a href="csv.html">CSV</a></td></tr>
+<tr><td><code>json_encode</code>, <code>json_decode</code></td><td><a href="json.html">JSON</a></td></tr>
+<tr><td><code>header('Location: …')</code>, <code>exit</code></td><td><a href="redirecionar.html">header e Redirecionamento</a></td></tr>
+<tr><td><code>date</code>, fuso horário</td><td><a href="datas.html">Datas e Horas</a></td></tr>
+</table>
+</div>
+
+<p>Crie a pasta e suba o servidor (veja <a href="servidor-embutido.html">O Servidor Embutido</a>); deixe o terminal aberto e use outro para o <code>curl</code>:</p>
+<pre class="term">$ mkdir contato
+$ cd contato
+$ php -S localhost:8000
+[Fri Oct 16 20:50:12 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>Cada etapa tem uma caixa "Experimente" no modo web com o arquivo completo daquela etapa: a aba <strong>Resultado</strong> é a página, e o formulário funciona nela. Os blocos de código das etapas mostram só o que é <strong>novo</strong>.</p>
+
+<hr>
+
+<h2>As etapas</h2>
+
+<ol class="passo">
+
+<li>
+<h3>Etapa 1 · O formulário que não esquece</h3>
+<p>Quatro campos: nome, e-mail, assunto (uma lista) e a mensagem (um <code>textarea</code>, a caixa de texto de várias linhas). Em vez de quatro variáveis soltas, os valores ficam juntos no array <code>$dados</code>, e cada campo já volta preenchido depois do envio.</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$assuntos = ['duvida' =&gt; 'Dúvida', …]</code></td><td>As opções da lista: a chave (sem acento nem espaço) é o que viaja no formulário; o valor é o texto que a pessoa vê.</td></tr>
+<tr><td><code>$dados = ['nome' =&gt; trim($_POST['nome'] ?? ''), …]</code></td><td>Lê os quatro campos de uma vez. Na primeira visita (GET), nada foi enviado e tudo vale <code>''</code> (o assunto começa em <code>'duvida'</code>).</td></tr>
+<tr><td><code>function e(string $texto): string</code></td><td>Um "apelido" curto para <code>htmlspecialchars</code>. Como ele vai aparecer muitas vezes, o nome curto deixa o HTML legível. É um costume comum em projetos PHP.</td></tr>
+<tr><td><code>value="&lt;?= e($dados['nome']) ?&gt;"</code></td><td>Devolve o que foi digitado para o campo, escapado.</td></tr>
+<tr><td><code>&lt;textarea&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;</code></td><td>O <code>textarea</code> não tem <code>value</code>: o conteúdo fica <strong>entre</strong> as tags. Sem espaços nem quebras de linha extras, senão eles entram no texto.</td></tr>
+<tr><td><code>$valor === $dados['assunto'] ? ' selected' : ''</code></td><td>Marca a opção que foi enviada.</td></tr>
+</table>
+</div>
+
+<p>A primeira visita mostra tudo vazio; um envio volta com os campos preenchidos:</p>
+<pre class="term">$ curl -s localhost:8000/ | grep -E 'input|option|textarea'
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value=""&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value=""&gt;&lt;/label&gt;&lt;/p&gt;
+      &lt;option value="duvida" selected&gt;Dúvida&lt;/option&gt;
+      &lt;option value="pedido"&gt;Pedido&lt;/option&gt;
+      &lt;option value="elogio"&gt;Elogio&lt;/option&gt;
+      &lt;option value="reclamacao"&gt;Reclamação&lt;/option&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+$ curl -s -d 'nome=Beto&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Entregam no sábado?' localhost:8000/ | grep -E 'input|selected|textarea'
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="Beto"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="beto@exemplo.com"&gt;&lt;/label&gt;&lt;/p&gt;
+      &lt;option value="pedido" selected&gt;Pedido&lt;/option&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;Entregam no sábado?&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;</pre>
+
+<p>E se alguém tentar "furar" o formulário? O <code>"&gt;</code> tentaria fechar o <code>value</code>, e o <code>&lt;/textarea&gt;</code> tentaria fechar a caixa de texto antes da hora. Com o <code>e()</code>, tudo vira texto inofensivo:</p>
+<pre class="term">$ curl -s -d 'nome="&gt;&lt;script&gt;alert(1)&lt;/script&gt;&amp;mensagem=&lt;/textarea&gt;&lt;b&gt;oi&lt;/b&gt;' localhost:8000/ | grep -E 'input|textarea'
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&amp;quot;&amp;gt;&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value=""&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&amp;lt;/textarea&amp;gt;&amp;lt;b&amp;gt;oi&amp;lt;/b&amp;gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;</pre>
+
+<div class="tryphp" data-modo="web" data-post="nome=Ana&amp;telefone=11 99999-0000" data-goal="out:value=&quot;11 99999-0000&quot;">
+<p class="try-task"><strong>Missão:</strong> acrescente um campo opcional <strong>Telefone</strong> (<code>name="telefone"</code>), logo depois do e-mail, que também volte preenchido. Você vai precisar de uma linha nova em <code>$dados</code> e de um parágrafo novo no formulário. A caixa já envia um telefone para você conferir.</p>
+<pre class="script">&lt;?php
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'telefone' =&gt; trim($_POST['telefone'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Telefone&lt;br&gt;&lt;input name="telefone" value="&lt;?= e($dados['telefone']) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 2 · Validar cada campo</h3>
+<p>Agora as regras. Cada erro entra em <code>$erros</code> com o <strong>nome do campo como chave</strong>: <code>$erros['email'] = '…'</code>. Assim, na hora de mostrar, sabemos exatamente ao lado de qual campo cada mensagem vai.</p>
+
+<pre class="file" data-file="index.php">$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Por quê</th></tr>
+<tr><td><code>mb_strlen($dados['nome']) &lt; 2</code></td><td>Conta as <strong>letras</strong> do nome. O <code>strlen</code> comum conta bytes, e cada letra acentuada vale 2 bytes em UTF-8: <code>strlen('Zé')</code> é 3. Para texto em português, use as funções <code>mb_</code> (veja <a href="mbstring.html">Acentos e mbstring</a>).</td></tr>
+<tr><td><code>filter_var($email, FILTER_VALIDATE_EMAIL)</code></td><td>"Filtrar a variável como e-mail": devolve o próprio e-mail se ele tiver um formato válido, ou <code>false</code>. No laboratório, <code>ana@exemplo.com</code> passou; <code>ana@exemplo</code>, <code>ana.exemplo.com</code> e <code>ana@localhost</code> deram <code>false</code>. Formato válido não quer dizer que o e-mail existe; só que <strong>parece</strong> um e-mail.</td></tr>
+<tr><td><code>=== false</code></td><td>Compara com <code>false</code> de forma estrita, porque o retorno bom é um texto.</td></tr>
+<tr><td><code>array_key_exists($dados['assunto'], $assuntos)</code></td><td>O assunto tem que ser uma das chaves da lista. Qualquer pessoa pode enviar <code>assunto=spam</code> pelo <code>curl</code>.</td></tr>
+<tr><td><code>"… (tem $tamanho)."</code></td><td>Aspas duplas trocam <code>$tamanho</code> pelo valor (veja <a href="interpolacao.html">Interpolação</a>). Dizer quanto falta ajuda a pessoa a corrigir.</td></tr>
+</table>
+</div>
+
+<p>Ao lado de cada campo, o erro aparece só se existir. O mesmo padrão se repete para os quatro campos:</p>
+<pre class="file" data-file="index.php">&lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;</pre>
+<p>E, antes do formulário, uma confirmação quando não houve erro nenhum (provisória: na etapa 3 ela muda):</p>
+<pre class="file" data-file="index.php">&lt;?php if ($_SERVER['REQUEST_METHOD'] === 'POST' &amp;&amp; !$erros): ?&gt;
+  &lt;p class="sucesso"&gt;Tudo certo, &lt;?= e($dados['nome']) ?&gt;! (ainda não salvamos nada)&lt;/p&gt;
+&lt;?php endif; ?&gt;</pre>
+
+<pre class="term">$ curl -s -d 'nome=A&amp;email=ana@exemplo&amp;assunto=spam&amp;mensagem=Oi' localhost:8000/ | grep erro
+    &lt;br&gt;&lt;span class="erro"&gt;Escreva o seu nome.&lt;/span&gt;  &lt;/p&gt;
+    &lt;br&gt;&lt;span class="erro"&gt;Esse e-mail não parece válido.&lt;/span&gt;  &lt;/p&gt;
+    &lt;br&gt;&lt;span class="erro"&gt;Escolha um assunto da lista.&lt;/span&gt;  &lt;/p&gt;
+    &lt;br&gt;&lt;span class="erro"&gt;A mensagem precisa ter entre 10 e 1000 caracteres (tem 2).&lt;/span&gt;  &lt;/p&gt;
+$ curl -s -d 'nome=Beto&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Entregam no sábado?' localhost:8000/ | grep -E 'erro|sucesso'
+  &lt;p class="sucesso"&gt;Tudo certo, Beto! (ainda não salvamos nada)&lt;/p&gt;</pre>
+
+<div class="tip">
+<strong>E o <code>required</code> do HTML?</strong>
+<p>Você pode (e deve) pôr <code>required</code> e <code>type="email"</code> nos campos: o navegador avisa antes de enviar, o que é mais rápido para a pessoa. Mas isso é só conforto: o <code>curl</code> acima ignorou tudo isso. A validação que <strong>protege</strong> é a do PHP.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="nome=Beto&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Veja http://promo.exemplo" data-goal="html:Links não são permitidos na mensagem.">
+<p class="try-task"><strong>Missão:</strong> a Ana anda recebendo propaganda. Acrescente uma regra: se a mensagem contiver <code>http</code>, o erro do campo mensagem é <code>Links não são permitidos na mensagem.</code> Use <code>str_contains($dados['mensagem'], 'http')</code>.</p>
+<pre class="script">&lt;?php
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if ($_SERVER['REQUEST_METHOD'] === 'POST' &amp;&amp; !$erros): ?&gt;
+  &lt;p class="sucesso"&gt;Tudo certo, &lt;?= e($dados['nome']) ?&gt;! (ainda não salvamos nada)&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+    if (str_contains($dados['mensagem'], 'http')) {
+        $erros['mensagem'] = 'Links não são permitidos na mensagem.';
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if ($_SERVER['REQUEST_METHOD'] === 'POST' &amp;&amp; !$erros): ?&gt;
+  &lt;p class="sucesso"&gt;Tudo certo, &lt;?= e($dados['nome']) ?&gt;! (ainda não salvamos nada)&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 3 · Salvar a mensagem num arquivo CSV</h3>
+<p>Quando não há erros, a mensagem vai para o fim do arquivo <code>mensagens.csv</code>, uma linha por mensagem. CSV ("valores separados por vírgula") é o formato de planilha mais simples que existe: abre no LibreOffice Calc e no Excel.</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+...
+$erros = [];
+$enviado = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // ... as quatro validações da etapa 2 ...
+
+    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+        $enviado = true;
+    }
+}</pre>
+
+<dl class="anatomy">
+  <dt>date_default_timezone_set(…)</dt><dd>Diz ao PHP o fuso horário. Sem isso (e sem configurar o <code>php.ini</code>), o PHP usa <strong>UTC</strong>: no laboratório, <code>date_default_timezone_get()</code> respondeu <code>UTC</code>, e as mensagens sairiam com 3 horas a mais.</dd>
+  <dt>fopen(…, 'a')</dt><dd>Abre o arquivo no modo <code>'a'</code> (<em>append</em>, "acrescentar"): escreve no fim, sem apagar o que já existe, e cria o arquivo se ele não existir.</dd>
+  <dt>__DIR__ . '/mensagens.csv'</dt><dd><code>__DIR__</code> é a pasta do próprio <code>index.php</code>. Usar o caminho completo evita surpresas quando o PHP roda a partir de outra pasta.</dd>
+  <dt>fputcsv($arquivo, $linha, ',', '"', '')</dt><dd>Escreve o array como uma linha CSV, cuidando sozinho das vírgulas e aspas dentro do texto. Os três últimos argumentos são o separador, a aspa e o caractere de escape; o escape vazio <code>''</code> é o recomendado e, no PHP 8.4+, <strong>precisa</strong> ser informado (veja "Quando dá errado").</dd>
+  <dt>fclose($arquivo)</dt><dd>Fecha o arquivo e garante que tudo foi gravado.</dd>
+</dl>
+
+<pre class="term">$ curl -s -d 'nome=Beto Souza&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Vocês entregam no sábado? Queria duas cestas.' localhost:8000/ | grep sucesso
+  &lt;p class="sucesso"&gt;Obrigada, Beto Souza! Sua mensagem foi registrada.&lt;/p&gt;
+$ cat mensagens.csv
+"2026-10-16 20:50:07","Beto Souza",beto@exemplo.com,pedido,"Vocês entregam no sábado? Queria duas cestas."</pre>
+
+<p>Repare que o <code>fputcsv</code> pôs aspas só onde precisava (textos com espaço). E a vírgula e as aspas dentro da mensagem da Carla não quebram a linha: o texto ganha aspas em volta e as aspas internas viram duas (<code>""</code>), a regra do CSV:</p>
+
+<pre class="term">$ curl -s -d 'nome=Carla&amp;email=carla@exemplo.com&amp;assunto=elogio&amp;mensagem=Adorei a cesta "grande", obrigada!' localhost:8000/ | grep sucesso
+  &lt;p class="sucesso"&gt;Obrigada, Carla! Sua mensagem foi registrada.&lt;/p&gt;
+$ curl -s -d 'nome=Carla&amp;email=carla@exemplo.com&amp;assunto=elogio&amp;mensagem=Adorei a cesta "grande", obrigada!' localhost:8000/ | grep sucesso
+  &lt;p class="sucesso"&gt;Obrigada, Carla! Sua mensagem foi registrada.&lt;/p&gt;      « o mesmo envio de novo: é o que o F5 faz
+$ cat mensagens.csv
+"2026-10-16 20:50:07","Beto Souza",beto@exemplo.com,pedido,"Vocês entregam no sábado? Queria duas cestas."
+"2026-10-16 20:50:07",Carla,carla@exemplo.com,elogio,"Adorei a cesta ""grande"", obrigada!"
+"2026-10-16 20:50:07",Carla,carla@exemplo.com,elogio,"Adorei a cesta ""grande"", obrigada!"      « duplicada!</pre>
+
+<p>Achou o problema? A página de "Obrigada" é a resposta de um <strong>POST</strong>. Se a Carla apertar <kbd>F5</kbd> nela, o navegador pergunta "Reenviar os dados do formulário?" e, se ela confirmar, o mesmo POST vai de novo: mensagem duplicada. A próxima etapa resolve.</p>
+
+<div class="tryphp" data-modo="web" data-post="nome=Beto&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Entregam no sábado?" data-goal="html:Esta é a mensagem número">
+<p class="try-task"><strong>Missão:</strong> depois de salvar, conte quantas mensagens o arquivo já tem e mostre <code>Esta é a mensagem número N.</code> abaixo do agradecimento. Dica: <code>file(…)</code> devolve um array com as linhas do arquivo, e <code>count</code> conta. Envie o formulário mais vezes na aba Resultado e veja o número subir.</p>
+<pre class="script">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+$enviado = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+
+    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+        $enviado = true;
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if ($enviado): ?&gt;
+  &lt;p class="sucesso"&gt;Obrigada, &lt;?= e($dados['nome']) ?&gt;! Sua mensagem foi registrada.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+$enviado = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+
+    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+        $enviado = true;
+        $total = count(file(__DIR__ . '/mensagens.csv'));
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if ($enviado): ?&gt;
+  &lt;p class="sucesso"&gt;Obrigada, &lt;?= e($dados['nome']) ?&gt;! Sua mensagem foi registrada.&lt;/p&gt;
+  &lt;p&gt;Esta é a mensagem número &lt;?= $total ?&gt;.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 4 · Post/Redirect/Get: acabar com o envio duplicado</h3>
+<p>O nome descreve a receita: o navegador faz o <strong>POST</strong>; o PHP salva e, em vez de mostrar a página, responde "vá para outro endereço" (<strong>Redirect</strong>); o navegador obedece e faz um <strong>GET</strong> nesse endereço. A página que a pessoa vê no fim é a resposta de um GET, e o <kbd>F5</kbd> repete só o GET, que não grava nada.</p>
+
+<pre class="file" data-file="index.php">    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+
+        header('Location: index.php?enviado=1', true, 303);
+        exit;
+    }</pre>
+<p>E a confirmação agora olha o endereço, não uma variável:</p>
+<pre class="file" data-file="index.php">&lt;?php if (isset($_GET['enviado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Obrigada! Sua mensagem foi registrada. Responderemos em breve.&lt;/p&gt;
+&lt;?php endif; ?&gt;</pre>
+
+<dl class="anatomy">
+  <dt>header(</dt><dd>Envia um <strong>cabeçalho</strong> HTTP: uma instrução para o navegador que vai antes do conteúdo da página.</dd>
+  <dt>'Location: index.php?enviado=1'</dt><dd>"O que você procura está neste endereço." O <code>?enviado=1</code> é só um aviso para a próxima página saber que deu certo.</dd>
+  <dt>true, 303</dt><dd>Substitui um <code>Location</code> anterior e usa o código <strong>303 See Other</strong> ("veja outro"), que manda o navegador buscar o novo endereço com <strong>GET</strong>. Sem o 303, o PHP usa 302, que os navegadores também tratam como GET; o 303 deixa a intenção explícita.</dd>
+  <dt>exit;</dt><dd>Para o script aqui. Sem ele, o PHP continuaria e geraria a página inteira à toa (o navegador nem a mostraria).</dd>
+</dl>
+
+<p>O <code>curl -i</code> mostra os cabeçalhos da resposta. Repare: nada de HTML, só a ordem de ir para outro lugar:</p>
+<pre class="term">$ curl -si -d 'nome=Carla&amp;email=carla@exemplo.com&amp;assunto=elogio&amp;mensagem=Adorei a cesta "grande", obrigada!' localhost:8000/
+HTTP/1.1 303 See Other
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:50:13 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Location: index.php?enviado=1
+Content-type: text/html; charset=UTF-8
+</pre>
+
+<p>Com <code>-L</code>, o <code>curl</code> segue o redirecionamento, como o navegador. A página final tem o agradecimento e o formulário <strong>limpo</strong>, pronto para outra mensagem:</p>
+<pre class="term">$ curl -sL -d 'nome=Davi&amp;email=davi@exemplo.com&amp;assunto=duvida&amp;mensagem=Qual o horário de vocês?' localhost:8000/ | grep -E 'sucesso|value='
+  &lt;p class="sucesso"&gt;Obrigada! Sua mensagem foi registrada. Responderemos em breve.&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value=""&gt;&lt;/label&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value=""&gt;&lt;/label&gt;
+      &lt;option value="duvida" selected&gt;Dúvida&lt;/option&gt;
+      &lt;option value="pedido"&gt;Pedido&lt;/option&gt;
+      &lt;option value="elogio"&gt;Elogio&lt;/option&gt;
+      &lt;option value="reclamacao"&gt;Reclamação&lt;/option&gt;
+$ cat mensagens.csv
+"2026-10-16 20:50:13",Carla,carla@exemplo.com,elogio,"Adorei a cesta ""grande"", obrigada!"
+"2026-10-16 20:50:13",Davi,davi@exemplo.com,duvida,"Qual o horário de vocês?"</pre>
+
+<p>O terminal do servidor conta a história inteira: o POST recebeu <code>303</code>, e logo depois veio o GET para <code>/index.php?enviado=1</code>:</p>
+<pre class="term">[Fri Oct 16 20:50:13 2026] 127.0.0.1:57254 [303]: POST /
+[Fri Oct 16 20:50:13 2026] 127.0.0.1:57264 [200]: GET /index.php?enviado=1</pre>
+
+<div class="note">
+<strong>E quando há erros?</strong>
+<p>Aí <strong>não</strong> redirecionamos: a resposta do próprio POST mostra o formulário com os erros e os valores digitados. Redirecionar faria a pessoa perder tudo. O PRG é só para o caminho de sucesso.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="nome=Beto&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Entregam no sábado?" data-goal="html:Obrigada\, Beto!">
+<p class="try-task"><strong>Missão:</strong> agradeça pelo nome. Leve o nome no endereço do redirecionamento (<code>'Location: index.php?enviado=' . urlencode($dados['nome'])</code>) e, na página, mostre <code>Obrigada, &lt;?= e($_GET['enviado']) ?&gt;!</code>. O <code>urlencode</code> protege espaços e acentos no endereço; o <code>e()</code> protege a página, porque qualquer um pode digitar <code>?enviado=&lt;script&gt;</code> na barra de endereço.</p>
+<pre class="script">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+
+    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+
+        header('Location: index.php?enviado=1', true, 303);
+        exit;
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if (isset($_GET['enviado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Obrigada! Sua mensagem foi registrada. Responderemos em breve.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+
+    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+
+        header('Location: index.php?enviado=' . urlencode($dados['nome']), true, 303);
+        exit;
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if (isset($_GET['enviado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Obrigada, &lt;?= e($_GET['enviado']) ?&gt;! Sua mensagem foi registrada. Responderemos em breve.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 5 · Ler as mensagens recebidas</h3>
+<p>A Ana precisa ler o que chegou. Um segundo arquivo, <code>mensagens.php</code>, lê o CSV e monta uma tabela. É aqui que o <code>htmlspecialchars</code> faz a maior diferença: o texto das mensagens foi escrito por <strong>qualquer pessoa da internet</strong>.</p>
+
+<pre class="file" data-file="mensagens.php">&lt;?php
+$mensagens = [];
+$caminho = __DIR__ . '/mensagens.csv';
+
+if (file_exists($caminho)) {
+    $arquivo = fopen($caminho, 'r');
+    while (($linha = fgetcsv($arquivo, null, ',', '"', '')) !== false) {
+        $mensagens[] = $linha;
+    }
+    fclose($arquivo);
+}
+
+$mensagens = array_reverse($mensagens); // as mais novas primeiro
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Mensagens recebidas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Mensagens recebidas (&lt;?= count($mensagens) ?&gt;)&lt;/h1&gt;
+&lt;?php if (!$mensagens): ?&gt;
+  &lt;p&gt;Nenhuma mensagem ainda.&lt;/p&gt;
+&lt;?php else: ?&gt;
+&lt;table border="1" cellpadding="4"&gt;
+  &lt;tr&gt;&lt;th&gt;Quando&lt;/th&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;E-mail&lt;/th&gt;&lt;th&gt;Assunto&lt;/th&gt;&lt;th&gt;Mensagem&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($mensagens as [$quando, $nome, $email, $assunto, $texto]): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($quando) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($nome) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($email) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($assunto) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= nl2br(htmlspecialchars($texto)) ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>file_exists($caminho)</code></td><td>Antes da primeira mensagem, o arquivo não existe; sem essa checagem, o <code>fopen</code> daria um <code>Warning</code>.</td></tr>
+<tr><td><code>while (($linha = fgetcsv(…)) !== false)</code></td><td>Lê uma linha por vez, já separada num array, até o fim do arquivo (quando <code>fgetcsv</code> devolve <code>false</code>).</td></tr>
+<tr><td><code>array_reverse($mensagens)</code></td><td>O arquivo tem as mais antigas primeiro; invertemos para ver as novas no topo.</td></tr>
+<tr><td><code>foreach ($mensagens as [$quando, $nome, …])</code></td><td>Desestruturação: cada posição da linha vai direto para uma variável com nome (veja <a href="desestruturacao.html">Desestruturação</a>).</td></tr>
+<tr><td><code>nl2br(htmlspecialchars($texto))</code></td><td>Primeiro escapa; depois troca as quebras de linha por <code>&lt;br /&gt;</code>, para a mensagem manter os parágrafos. A ordem importa: ao contrário, o <code>&lt;br /&gt;</code> seria escapado e apareceria escrito na tela.</td></tr>
+</table>
+</div>
+
+<p>Com um CSV que tem uma mensagem "maldosa" (a segunda linha), a página continua inteira:</p>
+<pre class="file" data-file="mensagens.csv">"2026-10-16 20:50:12","Beto Souza",beto@exemplo.com,pedido,"Vocês entregam no sábado? Queria duas cestas."
+"2026-10-16 20:52:40","Carla &lt;script&gt;",carla@exemplo.com,duvida,"Testando: &lt;b&gt;negrito&lt;/b&gt; e ""aspas"""
+</pre>
+<pre class="term">$ curl -s localhost:8000/mensagens.php | sed -n '/&lt;h1&gt;/,/&lt;\/table&gt;/p'
+&lt;h1&gt;Mensagens recebidas (2)&lt;/h1&gt;
+&lt;table border="1" cellpadding="4"&gt;
+  &lt;tr&gt;&lt;th&gt;Quando&lt;/th&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;E-mail&lt;/th&gt;&lt;th&gt;Assunto&lt;/th&gt;&lt;th&gt;Mensagem&lt;/th&gt;&lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;2026-10-16 20:52:40&lt;/td&gt;
+    &lt;td&gt;Carla &amp;lt;script&amp;gt;&lt;/td&gt;
+    &lt;td&gt;carla@exemplo.com&lt;/td&gt;
+    &lt;td&gt;duvida&lt;/td&gt;
+    &lt;td&gt;Testando: &amp;lt;b&amp;gt;negrito&amp;lt;/b&amp;gt; e &amp;quot;aspas&amp;quot;&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;2026-10-16 20:50:12&lt;/td&gt;
+    &lt;td&gt;Beto Souza&lt;/td&gt;
+    &lt;td&gt;beto@exemplo.com&lt;/td&gt;
+    &lt;td&gt;pedido&lt;/td&gt;
+    &lt;td&gt;Vocês entregam no sábado? Queria duas cestas.&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</pre>
+
+<div class="warning">
+<strong>Esta página não tem senha</strong>
+<p>Do jeito que está, qualquer um que souber o endereço <code>/mensagens.php</code> lê as mensagens. Num site de verdade, ela ficaria atrás de um login: é exatamente o que o <a href="projeto-login.html">projeto Login com Sessão</a> ensina. E o arquivo <code>mensagens.csv</code> deveria ficar <strong>fora</strong> da pasta pública do site, para não ser baixado direto pelo navegador.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/mensagens.php?assunto=duvida" data-goal="html:Mensagens recebidas (1)">
+<p class="try-task"><strong>Missão:</strong> esta caixa tem duas abas, <code>mensagens.php</code> e o <code>mensagens.csv</code> de exemplo. Faça a página aceitar um filtro no endereço: com <code>?assunto=duvida</code>, só aparecem as dúvidas. Antes do <code>array_reverse</code>, use <code>array_filter($mensagens, fn($m) =&gt; $m[3] === $_GET['assunto'])</code> quando <code>isset($_GET['assunto'])</code>.</p>
+<pre class="script" data-file="mensagens.php">&lt;?php
+$mensagens = [];
+$caminho = __DIR__ . '/mensagens.csv';
+
+if (file_exists($caminho)) {
+    $arquivo = fopen($caminho, 'r');
+    while (($linha = fgetcsv($arquivo, null, ',', '"', '')) !== false) {
+        $mensagens[] = $linha;
+    }
+    fclose($arquivo);
+}
+
+$mensagens = array_reverse($mensagens); // as mais novas primeiro
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Mensagens recebidas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Mensagens recebidas (&lt;?= count($mensagens) ?&gt;)&lt;/h1&gt;
+&lt;?php if (!$mensagens): ?&gt;
+  &lt;p&gt;Nenhuma mensagem ainda.&lt;/p&gt;
+&lt;?php else: ?&gt;
+&lt;table border="1" cellpadding="4"&gt;
+  &lt;tr&gt;&lt;th&gt;Quando&lt;/th&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;E-mail&lt;/th&gt;&lt;th&gt;Assunto&lt;/th&gt;&lt;th&gt;Mensagem&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($mensagens as [$quando, $nome, $email, $assunto, $texto]): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($quando) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($nome) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($email) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($assunto) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= nl2br(htmlspecialchars($texto)) ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="mensagens.csv">"2026-10-16 20:50:12","Beto Souza",beto@exemplo.com,pedido,"Vocês entregam no sábado? Queria duas cestas."
+"2026-10-16 20:52:40","Carla &lt;script&gt;",carla@exemplo.com,duvida,"Testando: &lt;b&gt;negrito&lt;/b&gt; e ""aspas"""
+</pre>
+<pre class="solucao" data-file="mensagens.php">&lt;?php
+$mensagens = [];
+$caminho = __DIR__ . '/mensagens.csv';
+
+if (file_exists($caminho)) {
+    $arquivo = fopen($caminho, 'r');
+    while (($linha = fgetcsv($arquivo, null, ',', '"', '')) !== false) {
+        $mensagens[] = $linha;
+    }
+    fclose($arquivo);
+}
+
+if (isset($_GET['assunto'])) {
+    $mensagens = array_filter($mensagens, fn($m) =&gt; $m[3] === $_GET['assunto']);
+}
+
+$mensagens = array_reverse($mensagens); // as mais novas primeiro
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Mensagens recebidas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Mensagens recebidas (&lt;?= count($mensagens) ?&gt;)&lt;/h1&gt;
+&lt;?php if (!$mensagens): ?&gt;
+  &lt;p&gt;Nenhuma mensagem ainda.&lt;/p&gt;
+&lt;?php else: ?&gt;
+&lt;table border="1" cellpadding="4"&gt;
+  &lt;tr&gt;&lt;th&gt;Quando&lt;/th&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;E-mail&lt;/th&gt;&lt;th&gt;Assunto&lt;/th&gt;&lt;th&gt;Mensagem&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($mensagens as [$quando, $nome, $email, $assunto, $texto]): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($quando) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($nome) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($email) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($assunto) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= nl2br(htmlspecialchars($texto)) ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 6 (alternativa) · Salvar em JSON em vez de CSV</h3>
+<p>CSV é ótimo para abrir numa planilha. Se as mensagens forem lidas por outro programa (uma API, um painel em JavaScript), JSON costuma ser mais prático: cada mensagem guarda os nomes dos campos. A troca fica toda numa função:</p>
+
+<pre class="file" data-file="index.php">function salvarMensagem(array $mensagem): void
+{
+    $caminho = __DIR__ . '/mensagens.json';
+
+    $lista = [];
+    if (file_exists($caminho)) {
+        $lista = json_decode(file_get_contents($caminho), true) ?? [];
+    }
+
+    $lista[] = $mensagem;
+
+    file_put_contents(
+        $caminho,
+        json_encode($lista, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+        LOCK_EX
+    );
+}</pre>
+<p>E, no lugar das quatro linhas do CSV, uma só:</p>
+<pre class="file" data-file="index.php">        salvarMensagem(['quando' =&gt; date('Y-m-d H:i:s')] + $dados);</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>json_decode(…, true)</code></td><td>Lê o JSON como array associativo (o <code>true</code>). Se o arquivo estiver vazio ou estragado, devolve <code>null</code>, e o <code>?? []</code> recomeça com uma lista vazia.</td></tr>
+<tr><td><code>$lista[] = $mensagem</code></td><td>Acrescenta a nova mensagem no fim da lista.</td></tr>
+<tr><td><code>JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE</code></td><td>Arquivo bonito, com recuo, e acentos escritos como acentos (sem a opção, <code>sábado</code> viraria <code>sábado</code>).</td></tr>
+<tr><td><code>LOCK_EX</code></td><td>Trava o arquivo enquanto escreve, para dois envios ao mesmo tempo não se atropelarem na escrita.</td></tr>
+<tr><td><code>['quando' =&gt; …] + $dados</code></td><td>O <code>+</code> junta dois arrays associativos: a data primeiro, depois os quatro campos.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -d 'nome=Beto Souza&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Vocês entregam no sábado?' localhost:8000/
+303 http://localhost:8000/index.php?enviado=1
+$ curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -d 'nome=Carla&amp;email=carla@exemplo.com&amp;assunto=elogio&amp;mensagem=Adorei a cesta "grande"!' localhost:8000/
+303 http://localhost:8000/index.php?enviado=1
+$ cat mensagens.json
+[
+    {
+        "quando": "2026-10-16 20:51:52",
+        "nome": "Beto Souza",
+        "email": "beto@exemplo.com",
+        "assunto": "pedido",
+        "mensagem": "Vocês entregam no sábado?"
+    },
+    {
+        "quando": "2026-10-16 20:51:52",
+        "nome": "Carla",
+        "email": "carla@exemplo.com",
+        "assunto": "elogio",
+        "mensagem": "Adorei a cesta \"grande\"!"
+    }
+]</pre>
+<p>(O <code>-o /dev/null -w '…'</code> faz o <code>curl</code> mostrar só o código da resposta e o endereço do redirecionamento.)</p>
+
+<p><strong>Qual usar?</strong> Para uma lojinha, os dois servem. O CSV só <strong>acrescenta</strong> uma linha (rápido, mesmo com milhares de mensagens); o JSON lê e regrava o arquivo inteiro a cada envio, o que fica lento com muitos dados. Quando o volume crescer, o lugar certo é um banco de dados, como no <a href="projeto-tarefas.html">projeto Tarefas com SQLite</a>.</p>
+</li>
+
+</ol>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Warning: Cannot modify header information - headers already sent</strong>
+<p>Um arquivo com uma <strong>linha em branco antes do <code>&lt;?php</code></strong> e um <code>header('Location: …')</code> logo depois:</p>
+<pre class="term">$ curl -si localhost:8000/teste.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:51:44 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/contato/teste.php:1) in &lt;b&gt;/home/ana/contato/teste.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que significa:</strong> "não posso mudar os cabeçalhos: eles já foram enviados (a saída começou em <code>teste.php:1</code>)". Os cabeçalhos vão <strong>antes</strong> do conteúdo; a linha em branco já era conteúdo, então o PHP já tinha mandado os cabeçalhos (com <code>200 OK</code>), e o redirecionamento não aconteceu. <strong>Como consertar:</strong> o <code>&lt;?php</code> tem que ser a primeiríssima coisa do arquivo, e nenhum <code>echo</code> ou HTML pode vir antes do <code>header()</code>. A mensagem diz exatamente o arquivo e a linha culpados. (Algumas instalações têm <code>output_buffering</code> ligado no <code>php.ini</code> e escondem esse erro; não conte com isso.)</p>
+</div>
+
+<div class="cenario">
+<strong>Deprecated: fputcsv(): the $escape parameter must be provided as its default value will change</strong>
+<p>Aparece no PHP 8.4+ quando você chama <code>fputcsv($arquivo, $linha)</code> só com dois argumentos (o mesmo vale para <code>fgetcsv</code>). <strong>O que significa:</strong> "informe o parâmetro <code>$escape</code>, porque o valor padrão dele vai mudar". <strong>Como consertar:</strong> passe os três: <code>fputcsv($arquivo, $linha, ',', '"', '')</code>. O escape vazio segue o padrão CSV de verdade (aspas dobradas).</p>
+</div>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught TypeError: trim(): Argument #1 ($string) must be of type string, array given</strong>
+<p>Alguém enviou <code>nome[]=Ana</code> (com colchetes), e o PHP transformou o campo num array:</p>
+<pre class="term">$ curl -s -d 'nome[]=Ana' localhost:8000/index.php | head -8
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: trim(): Argument #1 ($string) must be of type string, array given in /home/ana/contato/index.php:12
+Stack trace:
+#0 /home/ana/contato/index.php(12): trim(Array)
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/contato/index.php&lt;/b&gt; on line &lt;b&gt;12&lt;/b&gt;&lt;br /&gt;</pre>
+<p>Não é um furo de segurança (a página só parou), mas é feio. <strong>Como consertar:</strong> leia o campo só se for texto: <code>is_string($_POST['nome'] ?? null) ? trim($_POST['nome']) : ''</code>. É um dos desafios do fim.</p>
+</div>
+
+<div class="cenario">
+<strong>Warning: fopen(…/mensagens.csv): Failed to open stream: Permission denied</strong>
+<p>No laboratório, tiramos a permissão de escrita de uma pasta (<code>chmod a-w trancada</code>) e enviamos uma mensagem válida para o <code>index.php</code> dela:</p>
+<pre class="term">$ curl -s -d 'nome=Beto&amp;email=beto@exemplo.com&amp;assunto=pedido&amp;mensagem=Entregam no sábado?' localhost:8000/trancada/index.php | head -12
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  fopen(/home/ana/contato/trancada/mensagens.csv): Failed to open stream: Permission denied in &lt;b&gt;/home/ana/contato/trancada/index.php&lt;/b&gt; on line &lt;b&gt;37&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: fputcsv(): Argument #1 ($stream) must be of type resource, false given in /home/ana/contato/trancada/index.php:38
+Stack trace:
+#0 /home/ana/contato/trancada/index.php(38): fputcsv(false, Array, ',', '&amp;quot;', '')
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/contato/trancada/index.php&lt;/b&gt; on line &lt;b&gt;38&lt;/b&gt;&lt;br /&gt;</pre>
+<p>Dois erros em cadeia: o <code>fopen</code> não conseguiu abrir ("permissão negada") e devolveu <code>false</code>; o <code>fputcsv</code> recebeu esse <code>false</code> no lugar do arquivo e parou tudo. Num servidor de verdade isso acontece porque o PHP roda como outro usuário (por exemplo <code>www-data</code>), que não pode escrever na pasta do site. <strong>Como consertar:</strong> dê permissão de escrita só na pasta dos dados para esse usuário, de preferência uma pasta fora da pública. Com o <code>php -S</code> isso não acontece, porque ele roda como você.</p>
+</div>
+
+<div class="cenario">
+<strong>As datas saem 3 horas adiantadas</strong>
+<p>Faltou o fuso horário: sem <code>date_default_timezone_set</code> nem <code>date.timezone</code> no <code>php.ini</code>, o PHP usa UTC. Veja <a href="datas.html">Datas e Horas</a>.</p>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>O <code>index.php</code> final (versão CSV, com Post/Redirect/Get):</p>
+<pre class="file" data-file="index.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+
+$assuntos = [
+    'duvida'     =&gt; 'Dúvida',
+    'pedido'     =&gt; 'Pedido',
+    'elogio'     =&gt; 'Elogio',
+    'reclamacao' =&gt; 'Reclamação',
+];
+
+$dados = [
+    'nome'     =&gt; trim($_POST['nome'] ?? ''),
+    'email'    =&gt; trim($_POST['email'] ?? ''),
+    'assunto'  =&gt; $_POST['assunto'] ?? 'duvida',
+    'mensagem' =&gt; trim($_POST['mensagem'] ?? ''),
+];
+
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($dados['nome']) &lt; 2) {
+        $erros['nome'] = 'Escreva o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Esse e-mail não parece válido.';
+    }
+    if (!array_key_exists($dados['assunto'], $assuntos)) {
+        $erros['assunto'] = 'Escolha um assunto da lista.';
+    }
+    $tamanho = mb_strlen($dados['mensagem']);
+    if ($tamanho &lt; 10 || $tamanho &gt; 1000) {
+        $erros['mensagem'] = "A mensagem precisa ter entre 10 e 1000 caracteres (tem $tamanho).";
+    }
+
+    if (!$erros) {
+        $linha = [date('Y-m-d H:i:s'), $dados['nome'], $dados['email'], $dados['assunto'], $dados['mensagem']];
+        $arquivo = fopen(__DIR__ . '/mensagens.csv', 'a');
+        fputcsv($arquivo, $linha, ',', '"', '');
+        fclose($arquivo);
+
+        header('Location: index.php?enviado=1', true, 303);
+        exit;
+    }
+}
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Fale com a Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Fale com a lojinha da Ana&lt;/h1&gt;
+&lt;?php if (isset($_GET['enviado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Obrigada! Sua mensagem foi registrada. Responderemos em breve.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['nome']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['email']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Assunto&lt;br&gt;
+    &lt;select name="assunto"&gt;
+&lt;?php foreach ($assuntos as $valor =&gt; $texto): ?&gt;
+      &lt;option value="&lt;?= $valor ?&gt;"&lt;?= $valor === $dados['assunto'] ? ' selected' : '' ?&gt;&gt;&lt;?= $texto ?&gt;&lt;/option&gt;
+&lt;?php endforeach; ?&gt;
+    &lt;/select&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['assunto'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['assunto']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Mensagem&lt;br&gt;&lt;textarea name="mensagem" rows="5" cols="40"&gt;&lt;?= e($dados['mensagem']) ?&gt;&lt;/textarea&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['mensagem'])): ?&gt;&lt;br&gt;&lt;span class="erro"&gt;&lt;?= e($erros['mensagem']) ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;
+  &lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Enviar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<p>E o <code>mensagens.php</code> é o da etapa 5, sem mudanças.</p>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Campos à prova de array:</strong> uma função <code>campo(string $nome): string</code> que devolve <code>trim</code> do campo se ele for texto e <code>''</code> em qualquer outro caso. Use-a para montar <code>$dados</code>.</li>
+  <li><strong>Pote de mel (<em>honeypot</em>) contra robôs:</strong> um campo escondido com CSS, <code>&lt;input name="site"&gt;</code>. Pessoas não o veem; robôs preenchem tudo. Se <code>site</code> vier preenchido, redirecione como se tivesse dado certo, mas não salve.</li>
+  <li><strong>Limite de envios:</strong> no máximo uma mensagem por minuto por pessoa, usando uma sessão (veja <a href="sessoes.html">Sessões</a>).</li>
+  <li><strong>Contador no topo:</strong> no <code>mensagens.php</code>, mostre quantas mensagens há de cada assunto (dica: <code>array_count_values(array_column($mensagens, 3))</code>).</li>
+  <li><strong>Mover os dados:</strong> guarde o CSV numa pasta <code>dados/</code> fora da pasta pública e ajuste o caminho com <code>__DIR__ . '/../dados/mensagens.csv'</code>.</li>
+</ol>
+
+<div class="tryphp" data-modo="web" data-url="/mensagens.php" data-goal="html:Mensagens recebidas (2),html:Adorei a cesta">
+<p class="try-task"><strong>Missão final:</strong> as mensagens agora estão em <code>mensagens.json</code> (aba ao lado, gerado pela etapa 6). Mude o <code>mensagens.php</code> para ler o JSON: troque o bloco do <code>fopen</code>/<code>fgetcsv</code> por <code>json_decode(file_get_contents($caminho), true) ?? []</code>, e o <code>foreach</code> para desestruturar pelas chaves: <code>foreach ($mensagens as ['quando' =&gt; $quando, 'nome' =&gt; $nome, …])</code>.</p>
+<pre class="script" data-file="mensagens.php">&lt;?php
+$mensagens = [];
+$caminho = __DIR__ . '/mensagens.csv';
+
+if (file_exists($caminho)) {
+    $arquivo = fopen($caminho, 'r');
+    while (($linha = fgetcsv($arquivo, null, ',', '"', '')) !== false) {
+        $mensagens[] = $linha;
+    }
+    fclose($arquivo);
+}
+
+$mensagens = array_reverse($mensagens); // as mais novas primeiro
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Mensagens recebidas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Mensagens recebidas (&lt;?= count($mensagens) ?&gt;)&lt;/h1&gt;
+&lt;?php if (!$mensagens): ?&gt;
+  &lt;p&gt;Nenhuma mensagem ainda.&lt;/p&gt;
+&lt;?php else: ?&gt;
+&lt;table border="1" cellpadding="4"&gt;
+  &lt;tr&gt;&lt;th&gt;Quando&lt;/th&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;E-mail&lt;/th&gt;&lt;th&gt;Assunto&lt;/th&gt;&lt;th&gt;Mensagem&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($mensagens as [$quando, $nome, $email, $assunto, $texto]): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($quando) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($nome) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($email) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($assunto) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= nl2br(htmlspecialchars($texto)) ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="mensagens.json">[
+    {
+        "quando": "2026-10-16 20:51:52",
+        "nome": "Beto Souza",
+        "email": "beto@exemplo.com",
+        "assunto": "pedido",
+        "mensagem": "Vocês entregam no sábado?"
+    },
+    {
+        "quando": "2026-10-16 20:51:52",
+        "nome": "Carla",
+        "email": "carla@exemplo.com",
+        "assunto": "elogio",
+        "mensagem": "Adorei a cesta \"grande\"!"
+    }
+]
+</pre>
+<pre class="solucao" data-file="mensagens.php">&lt;?php
+$mensagens = [];
+$caminho = __DIR__ . '/mensagens.json';
+
+if (file_exists($caminho)) {
+    $mensagens = json_decode(file_get_contents($caminho), true) ?? [];
+}
+
+$mensagens = array_reverse($mensagens); // as mais novas primeiro
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Mensagens recebidas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Mensagens recebidas (&lt;?= count($mensagens) ?&gt;)&lt;/h1&gt;
+&lt;?php if (!$mensagens): ?&gt;
+  &lt;p&gt;Nenhuma mensagem ainda.&lt;/p&gt;
+&lt;?php else: ?&gt;
+&lt;table border="1" cellpadding="4"&gt;
+  &lt;tr&gt;&lt;th&gt;Quando&lt;/th&gt;&lt;th&gt;Nome&lt;/th&gt;&lt;th&gt;E-mail&lt;/th&gt;&lt;th&gt;Assunto&lt;/th&gt;&lt;th&gt;Mensagem&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($mensagens as ['quando' =&gt; $quando, 'nome' =&gt; $nome, 'email' =&gt; $email, 'assunto' =&gt; $assunto, 'mensagem' =&gt; $texto]): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($quando) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($nome) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($email) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= htmlspecialchars($assunto) ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= nl2br(htmlspecialchars($texto)) ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<p>Complete o redirecionamento do Post/Redirect/Get e a linha que impede o resto do script de rodar:</p>
+<div class="ex-code"><input data-answer="header">('Location: index.php?enviado=1', true, <input data-answer="303">);<br><input data-answer="exit;|exit();|die;|die();"></div>
+</div>
+
+<div class="exercise">
+<p>Complete o modo do <code>fopen</code> que escreve no fim do arquivo sem apagar o que já existe:</p>
+<div class="ex-code">$arquivo = fopen(__DIR__ . '/mensagens.csv', '<input data-answer="a">');</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">Por que validamos o e-mail com <code>filter_var</code> no PHP, se o campo pode ter <code>type="email"</code> no HTML?</p>
+<label><input type="radio" name="q1"> Porque o <code>type="email"</code> não existe</label>
+<label><input type="radio" name="q1"> Porque a checagem do navegador pode ser pulada (pelo <code>curl</code>, por exemplo); só a do servidor protege</label>
+<label><input type="radio" name="q1"> Porque o <code>filter_var</code> confere se o e-mail existe de verdade</label>
+<label><input type="radio" name="q1"> Não precisa validar nos dois lugares</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">Depois de enviar o formulário (sem PRG), a pessoa aperta F5 na página de "Obrigada". O que acontece?</p>
+<label><input type="radio" name="q2"> A página só é recarregada, nada é salvo</label>
+<label><input type="radio" name="q2"> O PHP detecta a repetição e ignora</label>
+<label><input type="radio" name="q2"> O navegador reenvia o mesmo POST e a mensagem é salva de novo</label>
+<label><input type="radio" name="q2"> Aparece um Fatal error</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">Qual a ordem certa para mostrar uma mensagem com quebras de linha?</p>
+<label><input type="radio" name="q3"> <code>nl2br(htmlspecialchars($texto))</code></label>
+<label><input type="radio" name="q3"> <code>htmlspecialchars(nl2br($texto))</code></label>
+<label><input type="radio" name="q3"> Tanto faz</label>
+<label><input type="radio" name="q3"> Só <code>nl2br($texto)</code>, sem escapar</label>
+</div>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>$dados</code> guarda os campos (com <code>trim</code> e <code>??</code>); <code>$erros</code> guarda as mensagens com o nome do campo como chave.</li>
+  <li>Valide no servidor: <code>mb_strlen</code> para tamanhos, <code>filter_var(…, FILTER_VALIDATE_EMAIL)</code> para e-mail, lista de valores permitidos para o <code>select</code>.</li>
+  <li>Todo valor devolvido para a página passa por <code>htmlspecialchars</code> (aqui, a função <code>e()</code>): em <code>value</code>, dentro do <code>textarea</code> e na listagem.</li>
+  <li><code>fputcsv($f, $linha, ',', '"', '')</code> escreve CSV corretamente; JSON com <code>json_encode(…, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)</code> e <code>LOCK_EX</code>.</li>
+  <li>Post/Redirect/Get: depois de salvar, <code>header('Location: …', true, 303); exit;</code>. Nada pode ser impresso antes do <code>header()</code>.</li>
+</ul>
+<p>Próximo projeto: <a href="projeto-login.html">Login com Sessão</a>, para proteger páginas como o <code>mensagens.php</code>.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
