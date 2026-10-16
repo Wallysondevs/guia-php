@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP printf e sprintf — formatar textos e números com %s, %d, %.2f | Guia PHP</title>
+<meta name="description" content="printf e sprintf no PHP: o modelo com %s, %d, %f, %.2f, largura (%5d, %-10s), zeros à esquerda (%05d), %x, %b, %e, %%, argumentos numerados (%1$s), o %f que não usa vírgula e uma tabela alinhada com as notas dos alunos da Ana. Saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">printf e sprintf</span></h1>
+
+<p class="intro">Mostrar <code>8.5</code> como <code>8.50</code>, o número <code>7</code> como <code>007</code>, ou alinhar uma tabela de notas em colunas: com interpolação e concatenação isso dá trabalho. As funções <code>printf</code> e <code>sprintf</code> recebem um <strong>modelo</strong> com "lacunas formatadas" e preenchem cada lacuna do jeito que você pediu.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <code>printf</code> (mostra) e <code>sprintf</code> (devolve o texto).</li>
+  <li>Os marcadores: <code>%s</code>, <code>%d</code>, <code>%f</code>, <code>%.2f</code>, <code>%x</code>, <code>%b</code>, <code>%e</code>, <code>%%</code>.</li>
+  <li>Largura e alinhamento: <code>%5d</code>, <code>%-10s</code>, <code>%05d</code>.</li>
+  <li>Argumentos numerados: <code>%1$s</code>, <code>%2$s</code>.</li>
+  <li>Por que o <code>%f</code> sai com ponto, e não com vírgula.</li>
+  <li>Como montar uma tabela alinhada com as notas dos alunos.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: um carimbo com espaços para preencher</h2>
+<p>Imagine um carimbo de recibo: "Recebi de <u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u> a quantia de R$ <u>&nbsp;&nbsp;&nbsp;&nbsp;</u>". Cada espaço tem um formato: um é para nome, outro é para valor com centavos. O <code>printf</code> funciona assim: você escreve o modelo uma vez, com marcadores <code>%</code> no lugar das lacunas, e passa os valores na ordem.</p>
+
+<p>O nome vem da linguagem C: <em>print formatted</em>, "imprimir formatado". O <code>s</code> de <code>sprintf</code> é de <em>string</em>: "formatar e devolver como texto".</p>
+
+<hr>
+
+<h2><code>printf</code> e <code>sprintf</code></h2>
+
+<pre class="file" data-file="primeiro.php">&lt;?php
+$nome = "Ana";
+$idade = 29;
+printf("%s tem %d anos.\n", $nome, $idade);
+$frase = sprintf("%s tem %d anos.", $nome, $idade);
+echo $frase, "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>printf(…)</dt><dd>Monta o texto e <strong>mostra na tela</strong>, como um <code>echo</code>.</dd>
+  <dt>"%s tem %d anos.\n"</dt><dd>O <strong>modelo</strong> (em inglês, <em>format string</em>). Cada <code>%</code> seguido de uma letra é uma lacuna.</dd>
+  <dt>%s</dt><dd>Lacuna para um texto (<em>string</em>). Recebe o 1º valor, <code>$nome</code>.</dd>
+  <dt>%d</dt><dd>Lacuna para um número inteiro (<em>decimal</em>, "na base 10"). Recebe o 2º valor, <code>$idade</code>.</dd>
+  <dt>$nome, $idade</dt><dd>Os valores, <strong>na ordem</strong> das lacunas.</dd>
+  <dt>sprintf(…)</dt><dd>Faz o mesmo, mas <strong>não mostra</strong>: devolve o texto pronto, para você guardar numa variável, juntar com outro texto ou passar para outra função.</dd>
+</dl>
+
+<pre class="term">$ php primeiro.php
+Ana tem 29 anos.
+Ana tem 29 anos.</pre>
+
+<p>Na prática, <code>sprintf</code> é o mais útil dos dois: você formata o valor e depois o usa onde quiser (num <a href="heredoc.html">heredoc</a>, num HTML, num arquivo). <code>printf</code> é um atalho para <code>echo sprintf(…)</code>.</p>
+
+<hr>
+
+<h2>Os marcadores principais</h2>
+
+<h3><code>%s</code>, <code>%d</code> e <code>%f</code></h3>
+<pre class="file" data-file="marcadores.php">&lt;?php
+printf("[%s]\n", 3.14159);
+printf("[%d]\n", 3.99);
+printf("[%d]\n", "42 laranjas");
+printf("[%f]\n", 3.14159);
+printf("[%.2f]\n", 3.14159);
+printf("[%.1f]\n", 8.75);
+</pre>
+
+<pre class="term">$ php marcadores.php
+[3.14159]        « %s: o valor como texto, do jeito que está
+[3]              « %d: só a parte inteira (corta, não arredonda!)
+[42]             « %d: pegou o número do começo do texto
+[3.141590]       « %f: sempre 6 casas decimais
+[3.14]           « %.2f: 2 casas decimais, arredondando
+[8.8]            « %.1f: 1 casa</pre>
+
+<p>Os colchetes <code>[ ]</code> estão no modelo só para você ver onde o valor começa e termina. O mais usado de todos é o <strong><code>%.2f</code></strong>: "número com 2 casas decimais", perfeito para dinheiro e notas.</p>
+
+<dl class="anatomy">
+  <dt>%</dt><dd>Começa uma lacuna.</dd>
+  <dt>.2</dt><dd>A <strong>precisão</strong>: quantas casas depois do ponto.</dd>
+  <dt>f</dt><dd>O tipo: número com casas decimais (<em>float</em>).</dd>
+</dl>
+
+<div class="warning">
+<strong><code>%d</code> corta, não arredonda</strong>
+<p><code>printf("%d", 3.99)</code> mostra <code>3</code>. Se você quer arredondar para inteiro, use <code>%.0f</code> ou a função <code>round</code> (veja <a href="number-format.html">Formatar Números</a>).</p>
+</div>
+
+<h3 id="ponto">O <code>%f</code> não usa vírgula</h3>
+<p>O laboratório da Ana está em português do Brasil (<code>LANG=pt_BR.UTF-8</code>), e mesmo assim:</p>
+<pre class="term">$ echo $LANG
+pt_BR.UTF-8
+$ php -r 'printf("%.2f\n", 1234.5);'
+1234.50</pre>
+<p>Ponto decimal e nenhum separador de milhar. O PHP <strong>não</strong> usa o idioma do sistema para formatar números: o <code>printf</code> sempre sai no formato americano. (Quem vem do Java estranha: lá o <code>printf</code> em pt_BR dá <code>1234,50</code>.)</p>
+<p>Para o formato brasileiro <code>1.234,50</code>, a ferramenta certa é o <code>number_format</code>, assunto da <a href="number-format.html">próxima aula</a>. Existe uma função <code>setlocale</code> que, em algumas instalações, faz o <code>%f</code> minúsculo usar vírgula; mas ela depende de o idioma estar instalado no servidor (no laboratório da Ana, não fez diferença) e muda o comportamento do programa inteiro. Se quiser garantir o ponto em qualquer situação (num arquivo CSV ou JSON, por exemplo), use <code>%F</code> maiúsculo, que nunca olha o idioma.</p>
+
+<div class="tryphp" data-goal="out:Total: R$ 13.50,src:printf|sprintf">
+<p class="try-task"><strong>Missão:</strong> a Ana vendeu 3 kg de maçã a R$ 4,50 o quilo. Mostre <code>Total: R$ 13.50</code> (com duas casas) usando <code>printf</code> e o marcador <code>%.2f</code>.</p>
+<pre class="script">&lt;?php
+$preco = 4.5;
+$quilos = 3;
+$total = $preco * $quilos;
+echo "Total: R$ $total";
+</pre>
+<pre class="solucao">&lt;?php
+$preco = 4.5;
+$quilos = 3;
+$total = $preco * $quilos;
+printf("Total: R$ %.2f", $total);
+</pre>
+</div>
+
+<hr>
+
+<h2>Largura, alinhamento e zeros</h2>
+<p>Entre o <code>%</code> e a letra, você pode dizer a <strong>largura mínima</strong> do campo. O valor é completado com espaços até essa largura: à esquerda (alinhado à direita) por padrão, ou à direita com um <code>-</code> (alinhado à esquerda).</p>
+
+<pre class="file" data-file="largura.php">&lt;?php
+printf("[%5d]\n", 42);
+printf("[%-5d]\n", 42);
+printf("[%05d]\n", 42);
+printf("[%10s]\n", "Ana");
+printf("[%-10s]\n", "Ana");
+printf("[%'.10s]\n", "Ana");
+printf("[%8.2f]\n", 3.14159);
+printf("[%08.2f]\n", 3.14159);
+printf("[%+d] [%+d]\n", 5, -5);
+printf("[%.3s]\n", "Conceição");
+</pre>
+
+<pre class="term">$ php largura.php
+[   42]          « largura 5, alinhado à direita
+[42   ]          « o - alinha à esquerda
+[00042]          « o 0 completa com zeros
+[       Ana]
+[Ana       ]
+[.......Ana]     « '. (aspa simples + caractere) escolhe o caractere de preenchimento
+[    3.14]       « largura 8 no total (contando o ponto), 2 casas
+[00003.14]
+[+5] [-5]        « o + mostra o sinal sempre
+[Con]            « em %s, o .3 corta o texto em 3 caracteres</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Marcador</th><th>Partes</th><th>Resultado com 42 / "Ana"</th></tr>
+<tr><td><code>%5d</code></td><td>largura 5</td><td><code>&nbsp;&nbsp;&nbsp;42</code></td></tr>
+<tr><td><code>%-5d</code></td><td><code>-</code> (à esquerda) + largura 5</td><td><code>42&nbsp;&nbsp;&nbsp;</code></td></tr>
+<tr><td><code>%05d</code></td><td><code>0</code> (zeros) + largura 5</td><td><code>00042</code></td></tr>
+<tr><td><code>%-10s</code></td><td><code>-</code> + largura 10, texto</td><td><code>Ana&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td></tr>
+<tr><td><code>%8.2f</code></td><td>largura 8 + precisão 2</td><td><code>&nbsp;&nbsp;&nbsp;42.00</code></td></tr>
+</table>
+</div>
+
+<p>A ordem das partes é sempre: <code>%</code> → opções (<code>-</code>, <code>0</code>, <code>+</code>, <code>'x</code>) → largura → <code>.precisão</code> → tipo. Se o valor for maior que a largura, nada é cortado: a largura é só um mínimo.</p>
+
+<hr>
+
+<h2>A tabela de notas da Ana</h2>
+<p>Juntando largura e precisão, a Ana monta o boletim da turma com as colunas alinhadas:</p>
+
+<pre class="file" data-file="boletim.php">&lt;?php
+printf("%-10s %6s\n", "Aluno", "Nota");
+printf("%-10s %6.2f\n", "Bruno", 8.5);
+printf("%-10s %6.2f\n", "Carla", 10);
+printf("%-10s %6.2f\n", "Davi", 6.75);
+printf("%-10s %6.2f\n", "Eduarda", 9.333);
+</pre>
+
+<dl class="anatomy">
+  <dt>%-10s</dt><dd>O nome, alinhado à esquerda, ocupando 10 posições.</dd>
+  <dt>(espaço)</dt><dd>Um espaço fixo entre as colunas.</dd>
+  <dt>%6.2f</dt><dd>A nota, alinhada à direita em 6 posições, com 2 casas. Assim os pontos decimais ficam um embaixo do outro.</dd>
+  <dt>%6s</dt><dd>No cabeçalho, o título "Nota" também ocupa 6 posições, alinhado à direita, para ficar em cima dos números.</dd>
+</dl>
+
+<pre class="term">$ php boletim.php
+Aluno        Nota
+Bruno        8.50
+Carla       10.00
+Davi         6.75
+Eduarda      9.33</pre>
+
+<p>Quando você aprender o <a href="foreach.html">foreach</a>, vai fazer o mesmo com uma lista de alunos de qualquer tamanho, escrevendo o <code>printf</code> uma vez só.</p>
+
+<div class="warning">
+<strong>Acentos desalinham a tabela</strong>
+<pre class="term">$ php -r 'printf("%-10s %6.2f\n", "Conceição", 7);'
+Conceição   7.00</pre>
+<p>A largura do <code>printf</code> conta <strong>bytes</strong>, como o <code>strlen</code>. "Conceição" tem 9 letras, mas 11 bytes, e passou da largura 10: nenhum espaço de preenchimento foi colocado e a nota ficou fora da coluna. Para nomes com acento, prepare a coluna com <code>mb_str_pad</code> e use <code>%s</code>: <code>printf("%s %6.2f\n", mb_str_pad($nome, 10), $nota)</code>. Veja <a href="mbstring.html">Acentos e mbstring</a>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Maçã        4.50,out:Uva         7.90,out:Banana      3.25,semerro">
+<p class="try-task"><strong>Experimente:</strong> a tabela de preços da lojinha está desalinhada. Use <code>%-10s</code> para o nome e <code>%5.2f</code> para o preço em cada linha. Repare que "Maçã" tem acento: veja o que acontece e corrija a primeira linha com <code>mb_str_pad</code>.</p>
+<pre class="script">&lt;?php
+printf("%s %s\n", "Maçã", 4.5);
+printf("%s %s\n", "Uva", 7.9);
+printf("%s %s\n", "Banana", 3.25);
+</pre>
+<pre class="solucao">&lt;?php
+printf("%s %5.2f\n", mb_str_pad("Maçã", 10), 4.5);
+printf("%-10s %5.2f\n", "Uva", 7.9);
+printf("%-10s %5.2f\n", "Banana", 3.25);
+</pre>
+</div>
+
+<hr>
+
+<h2>Outros marcadores: <code>%x</code>, <code>%b</code>, <code>%e</code>, <code>%%</code></h2>
+
+<pre class="file" data-file="outros.php">&lt;?php
+printf("[%x] [%X] [%o] [%b]\n", 255, 255, 8, 5);
+printf("[%08b]\n", 5);
+printf("[%e]\n", 1234.5678);
+printf("[%.2e]\n", 0.000123);
+printf("[%c]\n", 65);
+printf("Aprovação: %d%%\n", 87);
+</pre>
+
+<pre class="term">$ php outros.php
+[ff] [FF] [10] [101]   « hexadecimal, hexadecimal maiúsculo, octal, binário
+[00000101]             « binário com 8 dígitos
+[1.234568e+3]          « notação científica: 1,234568 × 10³
+[1.23e-4]              « 1,23 × 10⁻⁴
+[A]                    « o caractere de código 65
+Aprovação: 87%         « %% = um sinal de porcentagem</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Marcador</th><th>Mostra</th><th>Quando aparece</th></tr>
+<tr><td><code>%x</code> / <code>%X</code></td><td>Hexadecimal (base 16)</td><td>Cores do CSS (<code>#ff8800</code>), códigos</td></tr>
+<tr><td><code>%o</code></td><td>Octal (base 8)</td><td>Permissões de arquivo (<code>755</code>)</td></tr>
+<tr><td><code>%b</code></td><td>Binário (base 2)</td><td>Estudar bits</td></tr>
+<tr><td><code>%e</code></td><td>Notação científica</td><td>Números muito grandes ou muito pequenos</td></tr>
+<tr><td><code>%c</code></td><td>O caractere com aquele código</td><td>Raro</td></tr>
+<tr><td><code>%%</code></td><td>Um <code>%</code> literal</td><td>Porcentagens</td></tr>
+</table>
+</div>
+
+<p>O <code>%%</code> é importante: como o <code>%</code> começa uma lacuna, para escrever o símbolo você precisa de dois. Um exemplo com cor: <code>sprintf("#%02x%02x%02x", 255, 136, 0)</code> dá <code>#ff8800</code>.</p>
+
+<hr>
+
+<h2>Argumentos numerados: <code>%1$s</code></h2>
+<p>Normalmente, as lacunas pegam os valores na ordem. Com <code>%N$</code>, você escolhe <strong>qual</strong> valor vai em cada lacuna: <code>%1$s</code> é "o 1º valor, como texto", <code>%2$s</code> é "o 2º". Assim dá para trocar a ordem ou repetir um valor.</p>
+
+<pre class="file" data-file="numerados.php">&lt;?php
+printf('%2$s, %1$s' . "\n", "Ana", "Souza");
+printf('%1$s! %1$s! %1$s!' . "\n", "Bis");
+printf('%2$s tirou %1$.1f' . "\n", 9.5, "Ana");
+</pre>
+
+<pre class="term">$ php numerados.php
+Souza, Ana             « o 2º antes do 1º
+Bis! Bis! Bis!         « o mesmo valor três vezes
+Ana tirou 9.5          « %1$.1f: o 1º valor, com 1 casa</pre>
+
+<div class="warning">
+<strong>Aspas simples no modelo com <code>$</code></strong>
+<p>O <code>$</code> do <code>%1$s</code> dentro de aspas duplas seria lido como o começo de uma variável (veja <a href="interpolacao.html">Interpolação</a>). Por isso o modelo está entre aspas <strong>simples</strong>, e o <code>"\n"</code> foi concatenado à parte. Com aspas duplas, escreva <code>"%1\$s"</code>.</p>
+</div>
+
+<p>Esse recurso é muito usado em sites traduzidos: em português é "Souza, Ana", em outro idioma pode ser "Ana Souza", e só o modelo muda.</p>
+
+<hr>
+
+<h2>Formas diferentes e qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Quando usar</th></tr>
+<tr><td><code>printf($modelo, …)</code></td><td>Formata e mostra</td><td>Programas de terminal, relatórios</td></tr>
+<tr><td><code>sprintf($modelo, …)</code></td><td>Formata e devolve o texto</td><td>Quase sempre: guardar, montar HTML, juntar</td></tr>
+<tr><td><code>vsprintf($modelo, $lista)</code></td><td>Igual ao <code>sprintf</code>, mas os valores vêm num array</td><td>Quando os valores já estão numa lista</td></tr>
+<tr><td><code>fprintf($arquivo, $modelo, …)</code></td><td>Formata e grava num arquivo</td><td>Relatórios em arquivo (veja <a href="arquivos.html">Arquivos</a>)</td></tr>
+<tr><td><code>number_format($n, 2, ",", ".")</code></td><td>Formata um número no padrão brasileiro</td><td>Valores para o usuário ver: <code>1.234,50</code> (veja <a href="number-format.html">Formatar Números</a>)</td></tr>
+<tr><td>Interpolação <code>"…$var…"</code></td><td>Coloca o valor como está</td><td>Quando não precisa de formatação</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>ArgumentCountError: 3 arguments are required, 2 given</strong>
+<pre class="file" data-file="faltou.php">&lt;?php
+printf("%s tem %d anos\n", "Ana");
+</pre>
+<pre class="term">$ php faltou.php
+
+Fatal error: Uncaught ArgumentCountError: 3 arguments are required, 2 given in /home/ana/php/faltou.php:2
+Stack trace:
+#0 /home/ana/php/faltou.php(2): printf('%s tem %d anos\n', 'Ana')
+#1 {main}
+  thrown in /home/ana/php/faltou.php on line 2</pre>
+<p><strong>O que significa:</strong> "são necessários 3 argumentos, 2 foram dados". O modelo tem duas lacunas, então o <code>printf</code> precisa de 3 argumentos (o modelo + 2 valores), mas só recebeu o modelo e <code>"Ana"</code>. Erro fatal: o programa para.</p>
+<p><strong>Como consertar:</strong> conte os <code>%</code> do modelo (sem contar os <code>%%</code>) e passe um valor para cada. Com argumentos numerados, o maior número manda: <code>'%2$s'</code> exige pelo menos 2 valores.</p>
+</div>
+
+<div class="cenario">
+<strong>Um <code>%</code> sozinho no texto</strong>
+<pre class="file" data-file="porcento.php">&lt;?php
+printf("Desconto de 10% para Ana\n");
+</pre>
+<pre class="term">$ php porcento.php
+
+Fatal error: Uncaught ArgumentCountError: 2 arguments are required, 1 given in /home/ana/php/porcento.php:2
+Stack trace:
+#0 /home/ana/php/porcento.php(2): printf('Desconto de 10%...')
+#1 {main}
+  thrown in /home/ana/php/porcento.php on line 2</pre>
+<p><strong>O que significa:</strong> a Ana queria escrever "10%", mas para o <code>printf</code> todo <code>%</code> começa uma lacuna. Ele leu <code>% p</code> como uma lacuna (o espaço é uma opção de preenchimento) e foi buscar um valor que não existe. Por isso o erro fala de argumentos, e não do sinal.</p>
+<p><strong>Como consertar:</strong> escreva <code>10%%</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>ValueError: Unknown format specifier</strong>
+<pre class="file" data-file="tipo.php">&lt;?php
+printf("Idade: %i anos\n", 29);
+</pre>
+<pre class="term">$ php tipo.php
+
+Fatal error: Uncaught ValueError: Unknown format specifier "i" in /home/ana/php/tipo.php:2
+Stack trace:
+#0 /home/ana/php/tipo.php(2): printf('Idade: %i anos\n', 29)
+#1 {main}
+  thrown in /home/ana/php/tipo.php on line 2</pre>
+<p><strong>O que significa:</strong> "marcador de formato desconhecido: i". Em outras linguagens (C, Java) <code>%i</code> é inteiro; no PHP, não existe.</p>
+<p><strong>Como consertar:</strong> use um dos marcadores da <a href="#referencia">referência</a>: para inteiro, <code>%d</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A nota "8,5" virou 8.00 (sem nenhum aviso)</strong>
+<pre class="file" data-file="virgula.php">&lt;?php
+$nota = "8,5";
+printf("Nota: %.2f\n", $nota);
+</pre>
+<pre class="term">$ php virgula.php
+Nota: 8.00</pre>
+<p><strong>O que significa:</strong> para o PHP, números usam <strong>ponto</strong>. O texto <code>"8,5"</code> foi lido até onde parecia número (<code>8</code>) e o resto foi ignorado, sem aviso. Isso acontece muito com valores digitados por brasileiros num formulário.</p>
+<p><strong>Como consertar:</strong> troque a vírgula antes: <code>$nota = (float) str_replace(",", ".", $nota);</code>. Validar o que o usuário digita é o assunto de <a href="validacao.html">Validar Dados</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceu <code>Array</code> no lugar do valor</strong>
+<pre class="file" data-file="lista.php">&lt;?php
+$notas = [8.5, 9];
+printf("Notas: %s\n", $notas);
+</pre>
+<pre class="term">$ php lista.php
+
+Warning: Array to string conversion in /home/ana/php/lista.php on line 3
+Notas: Array</pre>
+<p><strong>Como consertar:</strong> passe um item (<code>$notas[0]</code>) ou junte a lista antes com <code>implode(", ", $notas)</code>. Se os valores já estão numa lista, na ordem certa, use <code>vsprintf</code>.</p>
+</div>
+
+<hr>
+
+<h2 id="referencia">Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Marcador</th><th>Tipo</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>%s</code></td><td>Texto</td><td><code>sprintf("%s", "Ana")</code> → <code>Ana</code></td></tr>
+<tr><td><code>%d</code></td><td>Inteiro (corta as casas)</td><td><code>sprintf("%d", 3.99)</code> → <code>3</code></td></tr>
+<tr><td><code>%f</code></td><td>Decimal, 6 casas</td><td><code>sprintf("%f", 1.5)</code> → <code>1.500000</code></td></tr>
+<tr><td><code>%.2f</code></td><td>Decimal, 2 casas</td><td><code>sprintf("%.2f", 1.5)</code> → <code>1.50</code></td></tr>
+<tr><td><code>%F</code></td><td>Decimal, nunca usa o idioma</td><td><code>sprintf("%.1F", 1.5)</code> → <code>1.5</code></td></tr>
+<tr><td><code>%5d</code> / <code>%-5d</code></td><td>Largura 5, à direita / à esquerda</td><td><code>[&nbsp;&nbsp;&nbsp;42]</code> / <code>[42&nbsp;&nbsp;&nbsp;]</code></td></tr>
+<tr><td><code>%05d</code></td><td>Zeros à esquerda</td><td><code>sprintf("%05d", 42)</code> → <code>00042</code></td></tr>
+<tr><td><code>%'*8s</code></td><td>Preenche com <code>*</code></td><td><code>sprintf("%'*8s", "Ana")</code> → <code>*****Ana</code></td></tr>
+<tr><td><code>%+d</code></td><td>Sempre com sinal</td><td><code>sprintf("%+d", 5)</code> → <code>+5</code></td></tr>
+<tr><td><code>%.3s</code></td><td>Corta o texto (em bytes)</td><td><code>sprintf("%.3s", "Ana Souza")</code> → <code>Ana</code></td></tr>
+<tr><td><code>%x</code> / <code>%X</code> / <code>%o</code> / <code>%b</code></td><td>Hexa / HEXA / octal / binário</td><td><code>sprintf("%b", 5)</code> → <code>101</code></td></tr>
+<tr><td><code>%e</code></td><td>Notação científica</td><td><code>sprintf("%.2e", 0.000123)</code> → <code>1.23e-4</code></td></tr>
+<tr><td><code>%c</code></td><td>Caractere pelo código</td><td><code>sprintf("%c", 65)</code> → <code>A</code></td></tr>
+<tr><td><code>%%</code></td><td>O símbolo <code>%</code></td><td><code>sprintf("%d%%", 87)</code> → <code>87%</code></td></tr>
+<tr><td><code>%1$s</code>, <code>%2$.2f</code></td><td>Argumento numerado</td><td><code>sprintf('%2$s %1$s', "a", "b")</code> → <code>b a</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Duas casas</h3>
+<p>Complete para mostrar <code>9.50</code>:</p>
+<div class="ex-code">printf("<input data-answer="%.2f" aria-label="marcador">", 9.5);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Matrícula com zeros</h3>
+<p>Complete para o número <code>42</code> virar <code>000042</code>:</p>
+<div class="ex-code">echo sprintf("<input data-answer="%06d" aria-label="marcador">", 42);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Porcentagem</h3>
+<p>Complete para mostrar <code>Desconto: 15%</code>:</p>
+<div class="ex-code">printf("Desconto: <input data-answer="%d%%|%s%%" aria-label="marcadores">", 15);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual a diferença entre <code>printf</code> e <code>sprintf</code>?</p>
+<label><input type="radio" name="q4"> <code>sprintf</code> aceita mais marcadores.</label>
+<label><input type="radio" name="q4"> <code>printf</code> mostra o texto; <code>sprintf</code> devolve o texto sem mostrar.</label>
+<label><input type="radio" name="q4"> <code>sprintf</code> usa vírgula decimal.</label>
+<label><input type="radio" name="q4"> Nenhuma, são a mesma função.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que mostra <code>printf("%d", 7.9)</code>?</p>
+<label><input type="radio" name="q5"> <code>8</code></label>
+<label><input type="radio" name="q5"> <code>7.9</code></label>
+<label><input type="radio" name="q5"> <code>7,9</code></label>
+<label><input type="radio" name="q5"> <code>7</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O laboratório está em pt_BR. O que mostra <code>printf("%.2f", 2.5)</code>?</p>
+<label><input type="radio" name="q6"> <code>2.50</code></label>
+<label><input type="radio" name="q6"> <code>2,50</code></label>
+<label><input type="radio" name="q6"> <code>2.5</code></label>
+<label><input type="radio" name="q6"> <code>3</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Carla       10.00,out:Davi         6.75,src:%-10s">
+<p class="try-task"><strong>Missão final:</strong> complete o boletim para as notas ficarem alinhadas embaixo de "Nota", como na tabela da aula: nome com <code>%-10s</code> e nota com <code>%6.2f</code>. A saída deve ficar igual à do boletim da aula.</p>
+<pre class="script">&lt;?php
+printf("%-10s %6s\n", "Aluno", "Nota");
+printf("%s %s\n", "Carla", 10);
+printf("%s %s\n", "Davi", 6.75);
+</pre>
+<pre class="solucao">&lt;?php
+printf("%-10s %6s\n", "Aluno", "Nota");
+printf("%-10s %6.2f\n", "Carla", 10);
+printf("%-10s %6.2f\n", "Davi", 6.75);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>printf</code> mostra; <code>sprintf</code> devolve o texto. Os dois recebem um modelo com lacunas <code>%</code> e os valores na ordem.</li>
+  <li><code>%s</code> texto, <code>%d</code> inteiro (corta), <code>%f</code> decimal, <code>%.2f</code> duas casas (arredonda), <code>%%</code> o símbolo de porcentagem.</li>
+  <li>Largura: <code>%5d</code> (à direita), <code>%-10s</code> (à esquerda), <code>%05d</code> (zeros). A largura conta bytes: acentos desalinham.</li>
+  <li><code>%1$s</code> escolhe qual argumento usar; escreva o modelo com aspas simples.</li>
+  <li>O <code>%f</code> sai com ponto, mesmo com o sistema em português. Para <code>1.234,50</code>, use <code>number_format</code>.</li>
+  <li>Faltou valor para uma lacuna? <code>ArgumentCountError</code>. Um <code>%</code> solto? <code>Unknown format specifier</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
