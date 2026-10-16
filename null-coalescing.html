@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP ?? e ?-&gt; — valor padrão quando algo é null | Guia PHP</title>
+<meta name="description" content="Os operadores ?? (coalescência nula), ??= e ?-&gt; (nullsafe, PHP 8.0) explicados do zero: valor padrão para variáveis e chaves que não existem, sem Warning, a diferença para isset, para o ternário e para ?:, e o uso com $_GET. Saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">?? e ?-&gt;</span></h1>
+
+<p class="intro">Muitas vezes um valor pode estar <strong>faltando</strong>: o cliente não informou o telefone, o endereço não tem complemento, a página foi aberta sem o nome na URL. O operador <code>??</code> resolve isso numa linha: "use este valor; se ele não existir ou for <code>null</code>, use aquele outro". Nesta aula você vai conhecer o <code>??</code>, o seu irmão <code>??=</code> e o <code>?-&gt;</code>, que evita um erro fatal quando o objeto é <code>null</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>??</code> faz e por que ele não mostra <code>Warning</code> quando a variável não existe.</li>
+  <li>A diferença entre <code>??</code>, <code>isset</code>, o ternário e o <code>?:</code> (com <code>0</code> e <code>""</code> isso importa muito).</li>
+  <li>Como encadear vários <code>??</code> e como usar o <code>??=</code> para preencher só o que está faltando.</li>
+  <li>O operador nullsafe <code>?-&gt;</code> <span class="versao">PHP 8.0+</span> e o erro <code>Call to a member function … on null</code>.</li>
+  <li>A ideia do <code>$_GET["nome"] ?? "visitante"</code>, que você vai usar em todo formulário.</li>
+</ul>
+</div>
+
+<p>Antes, é bom ter visto <a href="null.html">null</a> (o valor "nada") e <a href="booleanos.html">Booleanos</a>. Alguns exemplos usam um array com nomes nas posições, como <code>$aluna["nome"]</code>; basta saber que é uma "ficha" com campos, e a aula <a href="arrays-associativos.html">Arrays Associativos</a> explica tudo.</p>
+
+<hr>
+
+<h2>A ideia: o plano B</h2>
+<p>Pense numa ficha de cadastro em papel. Quando a Ana vai ler o campo "Apelido" e ele está em branco, ela usa o nome. Quando o campo "Telefone" está em branco, ela escreve "não informado". Ninguém para o trabalho por causa de um campo vazio: existe um <strong>plano B</strong>.</p>
+
+<p>O <code>??</code> é exatamente isso. Ele olha o valor da esquerda:</p>
+<ul>
+  <li>se ele <strong>existe</strong> e <strong>não é <code>null</code></strong>, usa ele;</li>
+  <li>senão, usa o valor da direita (o plano B, ou "valor padrão").</li>
+</ul>
+
+<p>O nome oficial é <em>null coalescing operator</em>, "operador de coalescência nula". <em>Coalescer</em> quer dizer "juntar": ele junta vários candidatos e fica com o primeiro que não é <code>null</code>.</p>
+
+<hr>
+
+<h2>O problema: o que não existe gera um aviso</h2>
+<p>Primeiro, veja o que acontece <strong>sem</strong> o <code>??</code> quando a variável não existe:</p>
+
+<pre class="file" data-file="sem.php">&lt;?php
+echo $sobrenome, "\n";
+echo "fim\n";
+</pre>
+
+<pre class="term">$ php sem.php
+
+Warning: Undefined variable $sobrenome in /home/ana/site/sem.php on line 2
+
+fim</pre>
+
+<p>O PHP avisa "variável indefinida: <code>$sobrenome</code>" (veja <a href="erros.html">Lendo Erros do PHP</a>), trata o valor como <code>null</code> e continua. Com uma chave de array que não existe, acontece o mesmo:</p>
+
+<pre class="file" data-file="aluno.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "nota" =&gt; 8];
+
+echo $aluna["nome"], "\n";
+echo $aluna["email"], "\n";
+echo $aluna["email"] ?? "sem e-mail", "\n";
+</pre>
+
+<pre class="term">$ php aluno.php
+Ana
+
+Warning: Undefined array key "email" in /home/ana/site/aluno.php on line 5
+
+sem e-mail</pre>
+
+<p>A linha 5 deu o aviso <code>Undefined array key "email"</code> ("chave de array indefinida") e mostrou uma linha vazia. A linha 6 é a mesma coisa com o <code>??</code>: nada de aviso, e o plano B apareceu.</p>
+
+<hr>
+
+<h2>O operador <code>??</code></h2>
+
+<pre class="file" data-file="coalescencia.php">&lt;?php
+$apelido = null;
+$nome = "Ana";
+
+echo $apelido ?? "sem apelido", "\n";
+echo $nome ?? "sem nome", "\n";
+echo $sobrenome ?? "sem sobrenome", "\n";
+</pre>
+
+<pre class="term">$ php coalescencia.php
+sem apelido
+Ana
+sem sobrenome</pre>
+
+<dl class="anatomy">
+  <dt>$apelido</dt><dd>O valor que você <strong>quer</strong> usar (o plano A).</dd>
+  <dt>??</dt><dd>"Se o da esquerda não existir ou for <code>null</code>…"</dd>
+  <dt>"sem apelido"</dt><dd>"…use este" (o plano B). Pode ser um texto, um número, outra variável, o resultado de uma conta.</dd>
+</dl>
+
+<p>Linha por linha:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Expressão</th><th>O valor da esquerda</th><th>Resultado</th></tr>
+<tr><td><code>$apelido ?? "sem apelido"</code></td><td>existe, mas é <code>null</code></td><td><code>"sem apelido"</code></td></tr>
+<tr><td><code>$nome ?? "sem nome"</code></td><td>existe e vale <code>"Ana"</code></td><td><code>"Ana"</code></td></tr>
+<tr><td><code>$sobrenome ?? "sem sobrenome"</code></td><td>não existe</td><td><code>"sem sobrenome"</code>, <strong>sem Warning</strong></td></tr>
+</table>
+</div>
+
+<p>Esse "sem Warning" é o grande trunfo do <code>??</code>. Ele verifica se a variável existe <strong>antes</strong> de ler o valor. Funciona até com várias chaves seguidas: se o pedido não tiver cliente, <code>$pedido["cliente"]["email"] ?? "sem e-mail"</code> dá <code>"sem e-mail"</code>, sem nenhum aviso.</p>
+
+<div class="tryphp" data-goal="out:Telefone: não informado,semerro,src:\?\?">
+<p class="try-task"><strong>Missão:</strong> rode e veja o <code>Warning</code> da última linha. Depois use o <code>??</code> para mostrar <code>Telefone: não informado</code>, sem aviso nenhum. Copie o jeito da linha do e-mail (os parênteses são necessários; a próxima seção explica).</p>
+<pre class="script">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "email" =&gt; "ana@exemplo.com"];
+
+echo "Nome: " . $aluna["nome"] . "\n";
+echo "E-mail: " . ($aluna["email"] ?? "não informado") . "\n";
+echo "Telefone: " . $aluna["telefone"] . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "email" =&gt; "ana@exemplo.com"];
+
+echo "Nome: " . $aluna["nome"] . "\n";
+echo "E-mail: " . ($aluna["email"] ?? "não informado") . "\n";
+echo "Telefone: " . ($aluna["telefone"] ?? "não informado") . "\n";
+</pre>
+</div>
+
+<h3>Por que os parênteses com o <code>.</code>?</h3>
+<p>O <code>??</code> tem prioridade <strong>menor</strong> que o ponto que junta textos. Sem parênteses, <code>"Telefone: " . $aluna["telefone"] ?? "não informado"</code> é lido como <code>("Telefone: " . $aluna["telefone"]) ?? "não informado"</code>: o PHP junta os textos primeiro (com o <code>Warning</code>) e o resultado, um texto, nunca é <code>null</code>. Então, sempre que o <code>??</code> estiver no meio de outros operadores, coloque-o entre parênteses. A aula <a href="precedencia.html">Precedência</a> mostra esse caso com a saída real.</p>
+
+<hr>
+
+<h2>Encadeando: plano B, plano C…</h2>
+<p>Dá para colocar vários <code>??</code> seguidos. O PHP fica com o <strong>primeiro</strong> valor que existe e não é <code>null</code>:</p>
+
+<pre class="file" data-file="cadeia.php">&lt;?php
+$apelido = null;
+$nome = null;
+echo $apelido ?? $nome ?? "visitante", "\n";
+$nome = "Ana";
+echo $apelido ?? $nome ?? "visitante", "\n";
+</pre>
+
+<pre class="term">$ php cadeia.php
+visitante
+Ana</pre>
+
+<p>Na primeira vez, o apelido e o nome são <code>null</code>, então sobra <code>"visitante"</code>. Na segunda, o apelido continua <code>null</code>, mas o nome vale <code>"Ana"</code>, e o PHP para ali.</p>
+
+<hr>
+
+<h2><code>??</code>, <code>isset</code> e o ternário</h2>
+<p>Antes do PHP 7.0 não existia <code>??</code>. O jeito de escrever "valor ou plano B" era com a função <code>isset</code> ("está definido?") e o <a href="ternario.html">operador ternário</a> (<code>condição ? se sim : se não</code>, que tem aula própria):</p>
+
+<pre class="file" data-file="isset.php">&lt;?php
+$apelido = null;
+echo isset($apelido) ? $apelido : "sem apelido", "\n";
+echo $apelido ?? "sem apelido", "\n";
+var_dump(isset($apelido));
+var_dump(isset($nome));
+$nome = "Ana";
+var_dump(isset($nome));
+</pre>
+
+<pre class="term">$ php isset.php
+sem apelido
+sem apelido
+bool(false)
+bool(false)
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>isset($apelido)</dt><dd>Responde <code>true</code> se a variável existe <strong>e</strong> não é <code>null</code>. Aqui, <code>false</code>: ela existe, mas vale <code>null</code>.</dd>
+  <dt>? $apelido : "sem apelido"</dt><dd>O ternário: se o <code>isset</code> deu <code>true</code>, usa <code>$apelido</code>; senão, <code>"sem apelido"</code>.</dd>
+  <dt>$apelido ?? "sem apelido"</dt><dd>Faz <strong>exatamente</strong> a mesma coisa, e você escreve o nome da variável uma vez só.</dd>
+</dl>
+
+<p>Em outras palavras: <code>$a ?? $b</code> é um atalho para <code>isset($a) ? $a : $b</code>. Você ainda vai encontrar a forma longa em código antigo. Em código novo, prefira o <code>??</code>. Use o <code>isset</code> sozinho quando a pergunta for só "existe?", sem plano B (por exemplo, numa decisão com <a href="if-else.html">if</a>).</p>
+
+<h3>Cuidado: <code>??</code> só se importa com <code>null</code></h3>
+<p>O <code>??</code> não troca <code>0</code>, <code>""</code> (texto vazio) nem <code>false</code>. Esses valores existem e não são <code>null</code>, então o <code>??</code> os mantém. Existe outro atalho, o <code>?:</code> (apelidado de "operador Elvis", porque <code>?:</code> lembra o topete do cantor), que troca qualquer valor que <a href="booleanos.html">vale <code>false</code></a>. Compare:</p>
+
+<pre class="file" data-file="zero.php">&lt;?php
+$quantidade = 0;
+$cupom = "";
+
+var_dump($quantidade ?? 1);
+var_dump($quantidade ?: 1);
+var_dump($cupom ?? "nenhum");
+var_dump($cupom ?: "nenhum");
+</pre>
+
+<pre class="term">$ php zero.php
+int(0)
+int(1)
+string(0) ""
+string(6) "nenhum"</pre>
+
+<p>Se a Ana tem <strong>zero</strong> itens no carrinho, o <code>?:</code> "corrigiu" para 1, o que é um erro. O <code>??</code> respeitou o zero. E tem mais uma diferença: o <code>?:</code> <strong>mostra o Warning</strong> quando a variável não existe:</p>
+
+<pre class="file" data-file="elvis.php">&lt;?php
+echo $sobrenome ?: "sem sobrenome", "\n";
+</pre>
+
+<pre class="term">$ php elvis.php
+
+Warning: Undefined variable $sobrenome in /home/ana/site/elvis.php on line 2
+sem sobrenome</pre>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Um valor padrão quando a variável ou a chave <strong>não existe</strong> ou é <code>null</code></td><td><code>??</code></td><td><code>$aluna["email"] ?? "não informado"</code></td></tr>
+<tr><td>Um valor padrão também para <code>""</code>, <code>0</code> e <code>false</code> (a variável com certeza existe)</td><td><code>?:</code></td><td><code>$titulo ?: "Sem título"</code></td></tr>
+<tr><td>Só saber <strong>se existe</strong> (<code>true</code>/<code>false</code>)</td><td><code>isset()</code></td><td><code>isset($aluna["email"])</code></td></tr>
+<tr><td>A mesma coisa que o <code>??</code>, mas em código antigo (PHP 5)</td><td><code>isset() ? : </code></td><td><code>isset($a) ? $a : "x"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2><code>??=</code>: preencher só o que está faltando <span class="versao">PHP 7.4+</span></h2>
+<p>Às vezes você não quer só <strong>mostrar</strong> um valor padrão, e sim <strong>guardá-lo</strong> na variável, mas apenas se ela ainda estiver vazia (<code>null</code> ou inexistente). É o <code>??=</code>, uma <a href="operadores-atribuicao.html">atribuição combinada</a>, como <code>+=</code>:</p>
+
+<pre class="file" data-file="atrib.php">&lt;?php
+$tema = null;
+$tema ??= "claro";
+echo $tema, "\n";
+
+$tema ??= "escuro";
+echo $tema, "\n";
+
+$config = ["idioma" =&gt; "pt-BR"];
+$config["idioma"] ??= "en";
+$config["moeda"] ??= "BRL";
+print_r($config);
+</pre>
+
+<pre class="term">$ php atrib.php
+claro
+claro
+Array
+(
+    [idioma] =&gt; pt-BR
+    [moeda] =&gt; BRL
+)</pre>
+
+<dl class="anatomy">
+  <dt>$tema ??= "claro";</dt><dd>Atalho de <code>$tema = $tema ?? "claro";</code>. Como <code>$tema</code> era <code>null</code>, passou a valer <code>"claro"</code>.</dd>
+  <dt>$tema ??= "escuro";</dt><dd><code>$tema</code> já tem valor, então <strong>nada muda</strong>: continua <code>"claro"</code>.</dd>
+  <dt>$config["idioma"] ??= "en";</dt><dd>O idioma já existia (<code>pt-BR</code>), ficou como estava.</dd>
+  <dt>$config["moeda"] ??= "BRL";</dt><dd>A chave <code>moeda</code> não existia: foi criada com <code>BRL</code>, sem Warning. O <code>print_r</code> mostra o array por dentro (veja <a href="var-dump.html">var_dump e print_r</a>).</dd>
+</dl>
+
+<p>É o jeito ideal de preencher configurações com valores padrão: o que a pessoa escolheu fica; o que ela não escolheu ganha o padrão.</p>
+
+<hr>
+
+<h2>O operador nullsafe <code>?-&gt;</code> <span class="versao">PHP 8.0+</span></h2>
+<p>Este operador funciona com <strong>objetos</strong>, que você vai estudar a fundo no Nível 3 (<a href="classes-objetos.html">Classes e Objetos</a>). Por enquanto, basta saber: um objeto é um valor que tem <strong>funções próprias</strong>, chamadas de métodos, e você chama um método com a seta <code>-&gt;</code>. O PHP já vem com vários objetos prontos; um deles é a data, <code>DateTime</code>, que tem o método <code>format</code> para escrever a data do jeito que você quiser.</p>
+
+<p>A lojinha da Ana guarda a data de entrega de cada pedido. Quando a entrega ainda não foi marcada, a variável vale <code>null</code>. Veja o que acontece:</p>
+
+<pre class="file" data-file="entrega.php">&lt;?php
+$entrega = new DateTime("2026-10-20");
+echo $entrega-&gt;format("d/m/Y"), "\n";
+
+$entrega = null;
+echo $entrega-&gt;format("d/m/Y"), "\n";
+echo "fim\n";
+</pre>
+
+<pre class="term">$ php entrega.php
+20/10/2026
+
+Fatal error: Uncaught Error: Call to a member function format() on null in /home/ana/site/entrega.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/entrega.php on line 6</pre>
+
+<p>Agora não é um simples aviso: é um <strong>erro fatal</strong>, e o programa <strong>parou</strong> (o "fim" nunca apareceu). A mensagem diz "chamada a um método <code>format()</code> em null": você pediu para o "nada" se formatar.</p>
+
+<p>O <code>?-&gt;</code> (seta com interrogação) resolve: se o valor da esquerda for <code>null</code>, ele <strong>não chama</strong> o método e devolve <code>null</code>. Junto com o <code>??</code>, vira um plano B completo:</p>
+
+<pre class="file" data-file="entrega2.php">&lt;?php
+$entrega = new DateTime("2026-10-20");
+var_dump($entrega?-&gt;format("d/m/Y"));
+
+$entrega = null;
+var_dump($entrega?-&gt;format("d/m/Y"));
+
+echo "Entrega: " . ($entrega?-&gt;format("d/m/Y") ?? "a combinar"), "\n";
+</pre>
+
+<pre class="term">$ php entrega2.php
+string(10) "20/10/2026"
+NULL
+Entrega: a combinar</pre>
+
+<dl class="anatomy">
+  <dt>$entrega</dt><dd>Pode ser um objeto de data ou <code>null</code>.</dd>
+  <dt>?-&gt;</dt><dd>"Se não for <code>null</code>, chame o método; se for, pare aqui e devolva <code>null</code>."</dd>
+  <dt>format("d/m/Y")</dt><dd>O método chamado quando há data: escreve dia/mês/ano.</dd>
+  <dt>?? "a combinar"</dt><dd>Se o resultado foi <code>null</code>, usa o plano B.</dd>
+</dl>
+
+<div class="note">
+<strong>Antes do PHP 8.0</strong>
+<p>Sem o <code>?-&gt;</code>, era preciso perguntar antes: <code>$entrega !== null ? $entrega-&gt;format("d/m/Y") : null</code>. Em cadeias longas (objeto dentro de objeto), isso virava vários <code>if</code>. Com o nullsafe, <code>$pedido?-&gt;cliente?-&gt;endereco?-&gt;cidade</code> para no primeiro <code>null</code> que encontrar.</p>
+</div>
+
+<hr>
+
+<h2>Na web: <code>$_GET["nome"] ?? "visitante"</code></h2>
+<p>Este é o uso mais comum do <code>??</code> na vida real. Quando alguém abre <code>ola.php?nome=Ana</code>, o PHP coloca o <code>nome</code> num array especial chamado <code>$_GET</code>. Mas a pessoa pode abrir só <code>ola.php</code>, sem nada, e aí a chave <code>"nome"</code> não existe. A aula <a href="get-post.html">$_GET e $_POST</a> explica tudo em detalhes; aqui fica só a ideia.</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+echo "&lt;p&gt;Olá, " . htmlspecialchars($nome) . "!&lt;/p&gt;\n";
+</pre>
+
+<p>Testando com o <a href="servidor-embutido.html">servidor embutido</a> e o <code>curl</code> (que abre a página pelo terminal), com e sem o nome na URL:</p>
+
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=Ana"
+&lt;p&gt;Olá, Ana!&lt;/p&gt;
+$ curl -s localhost:8000/ola.php
+&lt;p&gt;Olá, visitante!&lt;/p&gt;</pre>
+
+<p>Sem o <code>??</code> (com <code>$nome = $_GET["nome"];</code>), a página aberta sem o nome mostra os avisos para o visitante, em HTML:</p>
+
+<pre class="term">$ curl -s localhost:8000/ola-sem.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "nome" in &lt;b&gt;/home/ana/site/ola-sem.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Deprecated&lt;/b&gt;:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in &lt;b&gt;/home/ana/site/ola-sem.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+&lt;p&gt;Olá, !&lt;/p&gt;</pre>
+
+<p>O <code>htmlspecialchars</code> está ali por segurança: ele impede que alguém coloque HTML (ou JavaScript) na URL e o seu site o mostre. Veja <a href="escapar-saida.html">Escapar a Saída</a>. Experimente: a caixa abaixo funciona como uma página de verdade, aberta no endereço <code>index.php?nome=Ana</code>.</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=Ana">
+<p class="try-task">Rode e veja o nome que veio da URL. Depois troque <code>$_GET["nome"]</code> por <code>$_GET["apelido"]</code> (uma chave que <strong>não</strong> está no endereço) e rode de novo: aparece o plano B, sem Warning. Por fim, tire o <code>?? "visitante"</code> e veja o aviso que o visitante receberia.</p>
+<pre class="script">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+echo "&lt;p&gt;Olá, " . htmlspecialchars($nome) . "!&lt;/p&gt;\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught Error: Call to a member function format() on null</strong>
+<pre class="term">$ php entrega.php
+20/10/2026
+
+Fatal error: Uncaught Error: Call to a member function format() on null in /home/ana/site/entrega.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/entrega.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> a variável antes da seta <code>-&gt;</code> vale <code>null</code>, e <code>null</code> não tem métodos. O programa parou na linha 6.</p>
+<p><strong>Como resolver:</strong> se o <code>null</code> é esperado (a entrega pode não estar marcada), use <code>?-&gt;</code> e um <code>??</code> para o plano B. Se não deveria ser <code>null</code>, descubra de onde veio o <code>null</code> (veja <a href="depuracao.html">Depurar</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O plano B não apareceu: o valor era <code>0</code> ou <code>""</code></strong>
+<pre class="term">$ php zero.php
+int(0)
+int(1)
+string(0) ""
+string(6) "nenhum"</pre>
+<p><strong>O que aconteceu:</strong> o <code>??</code> só troca <code>null</code> e o que não existe. Zero, texto vazio e <code>false</code> são valores de verdade para ele.</p>
+<p><strong>Como resolver:</strong> se você quer trocar também o vazio, use <code>?:</code> (e garanta que a variável existe). Se o zero é um valor válido, como uma quantidade, o <code>??</code> está certo.</p>
+</div>
+
+<div class="cenario">
+<strong>Warning: Undefined array key, mesmo com <code>??</code> na linha</strong>
+<pre class="term">$ php telefone.php
+Nome: Ana
+E-mail: ana@exemplo.com
+
+Warning: Undefined array key "telefone" in /home/ana/site/telefone.php on line 6
+Telefone: </pre>
+<p><strong>O que aconteceu:</strong> o <code>??</code> não está "encostado" na variável. Ou ele foi esquecido, ou está fora de parênteses depois de um <code>.</code>, e aí o PHP leu a variável antes de chegar no <code>??</code>.</p>
+<p><strong>Como resolver:</strong> <code>"Telefone: " . ($aluna["telefone"] ?? "não informado")</code>. O mesmo acontece se a variável estiver dentro de uma função: <code>strtoupper($apelido) ?? "X"</code> avisa, porque a função lê o valor primeiro. Escreva <code>strtoupper($apelido ?? "x")</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Deprecated: Passing null to parameter #1 ($string) of type string is deprecated</strong>
+<pre class="term">$ php funcao.php
+
+Warning: Undefined variable $apelido in /home/ana/site/funcao.php on line 2
+
+Deprecated: strtoupper(): Passing null to parameter #1 ($string) of type string is deprecated in /home/ana/site/funcao.php on line 2
+</pre>
+<p><strong>O que aconteceu:</strong> a linha era <code>echo strtoupper($apelido) ?? "SEM APELIDO", "\n";</code>. O valor <code>null</code> foi entregue a uma função que espera texto. <em>Deprecated</em> quer dizer "obsoleto": hoje é só um aviso, mas numa versão futura do PHP vai virar erro. E o plano B nem foi usado, porque <code>strtoupper</code> devolveu um texto vazio, não <code>null</code>.</p>
+<p><strong>Como resolver:</strong> dê o plano B <strong>antes</strong> de entregar à função: <code>strtoupper($apelido ?? "sem apelido")</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Nome</th><th>O que faz</th><th>Desde</th></tr>
+<tr><td><code>$a ?? $b</code></td><td>Coalescência nula</td><td><code>$a</code> se existir e não for <code>null</code>; senão <code>$b</code>. Sem Warning.</td><td>PHP 7.0</td></tr>
+<tr><td><code>$a ?? $b ?? $c</code></td><td>Em cadeia</td><td>O primeiro que existir e não for <code>null</code>.</td><td>PHP 7.0</td></tr>
+<tr><td><code>$a ??= $b</code></td><td>Atribuição de coalescência nula</td><td>Guarda <code>$b</code> em <code>$a</code> só se <code>$a</code> não existir ou for <code>null</code>.</td><td>PHP 7.4</td></tr>
+<tr><td><code>$obj?-&gt;metodo()</code></td><td>Nullsafe</td><td>Chama o método se <code>$obj</code> não for <code>null</code>; senão devolve <code>null</code>.</td><td>PHP 8.0</td></tr>
+<tr><td><code>$a ?: $b</code></td><td>"Elvis" (ternário curto)</td><td><code>$a</code> se ele valer <code>true</code>; senão <code>$b</code>. Avisa se <code>$a</code> não existir.</td><td>PHP 5.3</td></tr>
+<tr><td><code>isset($a)</code></td><td>"Está definido?"</td><td><code>true</code> se <code>$a</code> existe e não é <code>null</code>.</td><td>sempre</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Plano B</h3>
+<p>Complete para mostrar a cidade, ou <code>não informada</code> se ela não existir:</p>
+<div class="ex-code">echo $cliente["cidade"] <input data-answer="??" aria-label="operador"> "não informada";</div>
+</div>
+
+<div class="exercise">
+<h3>2. Preencher o que falta</h3>
+<p>Complete para o tema virar <code>"claro"</code> só se ainda não tiver valor:</p>
+<div class="ex-code">$tema <input data-answer="??=" aria-label="operador"> "claro";</div>
+</div>
+
+<div class="exercise">
+<h3>3. Objeto que pode ser null</h3>
+<p>Complete para não dar erro fatal quando <code>$entrega</code> for <code>null</code>:</p>
+<div class="ex-code">echo $entrega<input data-answer="?-&gt;" aria-label="operador">format("d/m/Y") ?? "a combinar";</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. <code>$quantidade = 0;</code> O que <code>var_dump($quantidade ?? 1);</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>int(1)</code></label>
+<label><input type="radio" name="q4"> <code>int(0)</code></label>
+<label><input type="radio" name="q4"> <code>NULL</code></label>
+<label><input type="radio" name="q4"> Um <code>Warning</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. A variável <code>$x</code> nunca foi criada. Qual linha mostra <code>padrão</code> <strong>sem</strong> nenhum Warning?</p>
+<label><input type="radio" name="q5"> <code>echo $x ?: "padrão";</code></label>
+<label><input type="radio" name="q5"> <code>echo $x;</code></label>
+<label><input type="radio" name="q5"> <code>echo $x ?? "padrão";</code></label>
+<label><input type="radio" name="q5"> <code>echo strtoupper($x) ?? "padrão";</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. <code>$a ?? $b</code> é um atalho para qual forma longa?</p>
+<label><input type="radio" name="q6"> <code>isset($a) ? $a : $b</code></label>
+<label><input type="radio" name="q6"> <code>$a ? $a : $b</code></label>
+<label><input type="radio" name="q6"> <code>$a == null ? $a : $b</code></label>
+<label><input type="radio" name="q6"> <code>empty($a) ? $b : $a</code></label>
+</div>
+
+<h3>Missão final: a ficha do cliente</h3>
+<div class="tryphp" data-goal="out:Cliente: Ana,out:Cidade: não informada,out:País: Brasil,semerro,src:\?\?=">
+<p class="try-task"><strong>Missão:</strong> siga os três comentários. (1) Mostre o apelido ou, se ele for <code>null</code>, o nome do cliente. (2) Mostre <code>não informada</code> se a cidade for <code>null</code>. (3) Use <code>??=</code> para guardar <code>"Brasil"</code> no país, que ainda não existe. No fim, nenhum <code>Warning</code>.</p>
+<pre class="script">&lt;?php
+$cliente = ["nome" =&gt; "Ana", "cidade" =&gt; null];
+$apelido = null;
+
+// 1. Use o apelido; se ele for null, use o nome do cliente
+echo "Cliente: " . $apelido . "\n";
+
+// 2. Se a cidade for null ou não existir, mostre "não informada"
+echo "Cidade: " . $cliente["cidade"] . "\n";
+
+// 3. Se o cliente não tiver país, guarde "Brasil" nele (use ??=)
+
+echo "País: " . $cliente["pais"] . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$cliente = ["nome" =&gt; "Ana", "cidade" =&gt; null];
+$apelido = null;
+
+// 1. Use o apelido; se ele for null, use o nome do cliente
+echo "Cliente: " . ($apelido ?? $cliente["nome"]) . "\n";
+
+// 2. Se a cidade for null ou não existir, mostre "não informada"
+echo "Cidade: " . ($cliente["cidade"] ?? "não informada") . "\n";
+
+// 3. Se o cliente não tiver país, guarde "Brasil" nele (use ??=)
+$cliente["pais"] ??= "Brasil";
+echo "País: " . $cliente["pais"] . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>$a ?? $b</code>: usa <code>$a</code> se ele existir e não for <code>null</code>; senão, <code>$b</code>. Não mostra Warning para variável ou chave inexistente.</li>
+  <li>É o atalho de <code>isset($a) ? $a : $b</code>. Pode ser encadeado: <code>$a ?? $b ?? "padrão"</code>.</li>
+  <li>O <code>??</code> mantém <code>0</code>, <code>""</code> e <code>false</code>. Para trocá-los também, existe o <code>?:</code>, que avisa se a variável não existe.</li>
+  <li><code>$a ??= $b</code> guarda o padrão só no que está faltando.</li>
+  <li><code>$obj?-&gt;metodo()</code> <span class="versao">PHP 8.0+</span> devolve <code>null</code> em vez de dar <code>Call to a member function … on null</code>.</li>
+  <li>No meio de um texto com <code>.</code>, coloque o <code>??</code> entre parênteses.</li>
+  <li>Na web: <code>$_GET["nome"] ?? "visitante"</code>, sempre com <code>htmlspecialchars</code> na saída.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
