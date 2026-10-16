@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Operadores Lógicos — &amp;&amp;, ||, !, and, or e xor | Guia PHP</title>
+<meta name="description" content="Os operadores lógicos do PHP explicados do zero: &amp;&amp; (e), || (ou), ! (não), xor, as palavras and e or e a armadilha da precedência com =, o curto-circuito que evita divisão por zero e Warning. Tabelas-verdade e saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Operadores Lógicos</span></h1>
+
+<p class="intro">Uma comparação responde uma pergunta só: "a idade é maior que 18?". Na vida real, as perguntas são compostas: "é maior de idade <strong>e</strong> tem ingresso?", "pagou com Pix <strong>ou</strong> com cartão?", "<strong>não</strong> está logado?". Os <strong>operadores lógicos</strong> juntam várias respostas <code>true</code>/<code>false</code> numa só. Eles são a base de toda decisão que você vai escrever com <a href="if-else.html">if</a>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os três operadores principais: <code>&amp;&amp;</code> (e), <code>||</code> (ou) e <code>!</code> (não), com as tabelas-verdade.</li>
+  <li>O <code>xor</code> (ou exclusivo): "um ou outro, mas não os dois".</li>
+  <li>As palavras <code>and</code> e <code>or</code>, e a armadilha delas com o <code>=</code> (com a demonstração real).</li>
+  <li>O <strong>curto-circuito</strong>: por que a ordem das perguntas evita um erro fatal.</li>
+  <li>O que acontece quando os valores não são booleanos (no PHP, o resultado é sempre <code>true</code> ou <code>false</code>).</li>
+</ul>
+</div>
+
+<p>Antes, é bom ter visto <a href="booleanos.html">Booleanos</a> (o que vale <code>true</code> e <code>false</code>) e <a href="operadores-comparacao.html">Comparação</a> (de onde vêm os <code>true</code>/<code>false</code>). Os resultados aparecem com o <a href="var-dump.html"><code>var_dump</code></a>, que mostra <code>bool(true)</code> ou <code>bool(false)</code>.</p>
+
+<hr>
+
+<h2>A ideia: as regras da portaria</h2>
+<p>A Ana trabalha na portaria de um show. Ela recebeu três regras:</p>
+<ul>
+  <li>"Entra quem tem 18 anos <strong>e</strong> tem ingresso." As duas coisas precisam ser verdade.</li>
+  <li>"Ganha meia-entrada quem é estudante <strong>ou</strong> tem 60 anos ou mais." Basta uma.</li>
+  <li>"Quem <strong>não</strong> tem pulseira vai para a fila." Inverte a resposta.</li>
+</ul>
+<p>Esses três "conectivos", <strong>e</strong>, <strong>ou</strong> e <strong>não</strong>, são os operadores lógicos. No PHP, eles se escrevem <code>&amp;&amp;</code>, <code>||</code> e <code>!</code>. O resultado de cada um é sempre <code>true</code> (verdadeiro) ou <code>false</code> (falso).</p>
+
+<hr>
+
+<h2><code>&amp;&amp;</code>: "e" (as duas precisam ser verdade)</h2>
+
+<pre class="file" data-file="e.php">&lt;?php
+$idade = 20;
+$temIngresso = true;
+
+var_dump($idade &gt;= 18 &amp;&amp; $temIngresso);
+var_dump($idade &gt;= 18 &amp;&amp; false);
+var_dump(true &amp;&amp; true);
+var_dump(true &amp;&amp; false);
+var_dump(false &amp;&amp; true);
+var_dump(false &amp;&amp; false);
+</pre>
+
+<pre class="term">$ php e.php
+bool(true)
+bool(false)
+bool(true)
+bool(false)
+bool(false)
+bool(false)</pre>
+
+<dl class="anatomy">
+  <dt>$idade &gt;= 18</dt><dd>A primeira pergunta: "a idade é maior ou igual a 18?". Aqui, <code>true</code>.</dd>
+  <dt>&amp;&amp;</dt><dd>"E": o resultado só é <code>true</code> se os dois lados forem <code>true</code>. Lê-se "e comercial e comercial", ou só "e".</dd>
+  <dt>$temIngresso</dt><dd>A segunda pergunta. Uma variável booleana já é uma resposta pronta; não precisa escrever <code>$temIngresso == true</code>.</dd>
+</dl>
+
+<p>As quatro últimas linhas formam a <strong>tabela-verdade</strong> do <code>&amp;&amp;</code>: todas as combinações possíveis. Só uma dá <code>true</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A</th><th>B</th><th>A &amp;&amp; B</th></tr>
+<tr><td><code>true</code></td><td><code>true</code></td><td><strong><code>true</code></strong></td></tr>
+<tr><td><code>true</code></td><td><code>false</code></td><td><code>false</code></td></tr>
+<tr><td><code>false</code></td><td><code>true</code></td><td><code>false</code></td></tr>
+<tr><td><code>false</code></td><td><code>false</code></td><td><code>false</code></td></tr>
+</table>
+</div>
+
+<p>Um uso muito comum é perguntar se um valor está <strong>dentro de uma faixa</strong>: <code>$idade &gt;= 18 &amp;&amp; $idade &lt;= 60</code>. O PHP não aceita <code>18 &lt;= $idade &lt;= 60</code>, como a matemática escreve; a aula <a href="precedencia.html">Precedência</a> mostra o erro.</p>
+
+<hr>
+
+<h2><code>||</code>: "ou" (basta uma ser verdade)</h2>
+
+<pre class="file" data-file="ou.php">&lt;?php
+$pagouPix = false;
+$pagouCartao = true;
+var_dump($pagouPix || $pagouCartao);
+var_dump(false || false);
+</pre>
+
+<pre class="term">$ php ou.php
+bool(true)
+bool(false)</pre>
+
+<p>O <code>||</code> (duas barras verticais; no teclado brasileiro, a barra <kbd>|</kbd> fica na tecla ao lado do <kbd>Z</kbd>, com <kbd>Shift</kbd>) dá <code>true</code> se <strong>pelo menos um</strong> lado for <code>true</code>. Só dá <code>false</code> quando os dois são <code>false</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A</th><th>B</th><th>A || B</th></tr>
+<tr><td><code>true</code></td><td><code>true</code></td><td><code>true</code></td></tr>
+<tr><td><code>true</code></td><td><code>false</code></td><td><code>true</code></td></tr>
+<tr><td><code>false</code></td><td><code>true</code></td><td><code>true</code></td></tr>
+<tr><td><code>false</code></td><td><code>false</code></td><td><strong><code>false</code></strong></td></tr>
+</table>
+</div>
+
+<p>Repare: o "ou" do PHP <strong>inclui</strong> o caso dos dois. Se a pessoa pagou com Pix e com cartão, <code>$pagouPix || $pagouCartao</code> é <code>true</code>. Para "um ou outro, mas não os dois", existe o <a href="#xor"><code>xor</code></a>.</p>
+
+<div class="tryphp" data-goal="out:bool(true),src:\|\|,src:\$estudante,src:\$idade">
+<p class="try-task"><strong>Missão:</strong> a meia-entrada vale para quem é estudante <strong>ou</strong> tem 60 anos ou mais. Complete a linha do <code>$temDesconto</code> usando <code>$estudante</code>, <code>$idade</code> e o <code>||</code>. Com os valores do exemplo, o resultado deve ser <code>bool(true)</code>. Depois mude a idade para 30 e veja virar <code>false</code>.</p>
+<pre class="script">&lt;?php
+$estudante = false;
+$idade = 65;
+
+$temDesconto = false; // troque false pela regra
+var_dump($temDesconto);
+</pre>
+<pre class="solucao">&lt;?php
+$estudante = false;
+$idade = 65;
+
+$temDesconto = $estudante || $idade &gt;= 60;
+var_dump($temDesconto);
+</pre>
+</div>
+
+<hr>
+
+<h2><code>!</code>: "não" (inverte)</h2>
+<p>O <code>!</code> (ponto de exclamação) vem <strong>antes</strong> de um valor e o inverte: <code>true</code> vira <code>false</code> e vice-versa.</p>
+
+<pre class="file" data-file="nao.php">&lt;?php
+$logado = false;
+var_dump(!$logado);
+var_dump(!true);
+var_dump(!0);
+var_dump(!"Ana");
+var_dump(!!"Ana");
+</pre>
+
+<pre class="term">$ php nao.php
+bool(true)
+bool(false)
+bool(true)
+bool(false)
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>!$logado</dt><dd>"Não está logado?" Como <code>$logado</code> é <code>false</code>, a resposta é <code>true</code>.</dd>
+  <dt>!0</dt><dd>O <code>!</code> funciona com qualquer valor. O PHP primeiro converte o valor para booleano (<code>0</code> vale <code>false</code>, veja <a href="booleanos.html">Booleanos</a>) e depois inverte.</dd>
+  <dt>!"Ana"</dt><dd>Um texto não vazio vale <code>true</code>; invertido, <code>false</code>.</dd>
+  <dt>!!"Ana"</dt><dd>Duas negações se anulam. O efeito é converter para booleano: <code>!!"Ana"</code> é o mesmo que <code>(bool) "Ana"</code>.</dd>
+</dl>
+
+<div class="warning">
+<strong>O <code>!</code> gruda só no vizinho</strong>
+<p><code>!$nome == "Bia"</code> <strong>não</strong> é "o nome não é Bia". O PHP entende <code>(!$nome) == "Bia"</code>. Para negar uma comparação, use <code>$nome !== "Bia"</code> ou <code>!($nome == "Bia")</code>. A aula <a href="precedencia.html">Precedência</a> mostra a saída real.</p>
+</div>
+
+<hr>
+
+<h2>Misturando <code>&amp;&amp;</code> e <code>||</code></h2>
+<p>Quando os dois aparecem na mesma linha, o <code>&amp;&amp;</code> é feito <strong>primeiro</strong> (como a multiplicação antes da soma). A regra da portaria mudou: "convidado VIP entra; os outros precisam ter 18 anos e ingresso". Veja a diferença que os parênteses fazem para um VIP de 16 anos sem ingresso:</p>
+
+<pre class="file" data-file="vip.php">&lt;?php
+$convidadoVip = true;
+$idade = 16;
+$temIngresso = false;
+
+var_dump($convidadoVip || $idade &gt;= 18 &amp;&amp; $temIngresso);
+var_dump(($convidadoVip || $idade &gt;= 18) &amp;&amp; $temIngresso);
+</pre>
+
+<pre class="term">$ php vip.php
+bool(true)
+bool(false)</pre>
+
+<dl class="anatomy">
+  <dt>$convidadoVip || $idade &gt;= 18 &amp;&amp; $temIngresso</dt><dd>O PHP lê <code>$convidadoVip || ($idade &gt;= 18 &amp;&amp; $temIngresso)</code>: "é VIP, <strong>ou</strong> é maior e tem ingresso". VIP entra: <code>true</code>.</dd>
+  <dt>($convidadoVip || $idade &gt;= 18) &amp;&amp; $temIngresso</dt><dd>Outra regra: "(é VIP ou maior) <strong>e</strong> tem ingresso". Sem ingresso, ninguém entra: <code>false</code>.</dd>
+</dl>
+
+<p>As duas regras fazem sentido; só você sabe qual é a certa. Por isso, <strong>sempre que misturar <code>&amp;&amp;</code> e <code>||</code>, escreva os parênteses</strong>, mesmo quando a ordem natural já é a que você quer: <code>$convidadoVip || ($idade &gt;= 18 &amp;&amp; $temIngresso)</code>.</p>
+
+<hr>
+
+<h2 id="xor"><code>xor</code>: "ou exclusivo" (um ou outro, não os dois)</h2>
+<p><code>xor</code> vem do inglês <em>exclusive or</em>, "ou exclusivo". Ele dá <code>true</code> quando <strong>exatamente um</strong> dos lados é <code>true</code>. Se os dois forem iguais (ambos <code>true</code> ou ambos <code>false</code>), dá <code>false</code>.</p>
+
+<pre class="file" data-file="xor.php">&lt;?php
+var_dump(true xor false);
+var_dump(false xor true);
+var_dump(true xor true);
+var_dump(false xor false);
+$pix = true;
+$cartao = true;
+var_dump($pix xor $cartao);
+$ok = $pix xor $cartao;
+var_dump($ok);
+$ok = ($pix xor $cartao);
+var_dump($ok);
+var_dump($pix != $cartao);
+</pre>
+
+<pre class="term">$ php xor.php
+bool(true)
+bool(true)
+bool(false)
+bool(false)
+bool(false)
+bool(true)
+bool(false)
+bool(false)</pre>
+
+<p>Exemplo prático: a lojinha da Ana aceita <strong>uma</strong> forma de pagamento por pedido. <code>$pix xor $cartao</code> é <code>true</code> se a pessoa escolheu exatamente uma; <code>false</code> se escolheu as duas ou nenhuma.</p>
+
+<p>Mas repare na 6ª linha da saída: <code>$ok = $pix xor $cartao;</code> guardou <code>true</code>, embora a resposta certa seja <code>false</code>. O <code>xor</code> só existe em forma de palavra, e as palavras lógicas têm a armadilha da próxima seção. Com parênteses (7ª linha), funciona. Para booleanos, <code>$pix != $cartao</code> dá o mesmo resultado que o <code>xor</code>, sem armadilha.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>A</th><th>B</th><th>A xor B</th></tr>
+<tr><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td></tr>
+<tr><td><code>true</code></td><td><code>false</code></td><td><strong><code>true</code></strong></td></tr>
+<tr><td><code>false</code></td><td><code>true</code></td><td><strong><code>true</code></strong></td></tr>
+<tr><td><code>false</code></td><td><code>false</code></td><td><code>false</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2><code>and</code> e <code>or</code>: as palavras e a armadilha do <code>=</code></h2>
+<p>O PHP também aceita as palavras <code>and</code> ("e") e <code>or</code> ("ou"), em letras minúsculas ou maiúsculas (<code>AND</code>, <code>Or</code>…). A conta é a mesma do <code>&amp;&amp;</code> e do <code>||</code>. A diferença está na <strong>prioridade</strong>: as palavras ficam no fim da <a href="precedencia.html">tabela de precedência</a>, <strong>abaixo do <code>=</code></strong>. Veja o que isso causa:</p>
+
+<pre class="file" data-file="and.php">&lt;?php
+$temIngresso = true;
+$maiorDeIdade = false;
+
+$podeEntrar = $temIngresso and $maiorDeIdade;
+var_dump($podeEntrar);
+
+$podeEntrar = $temIngresso &amp;&amp; $maiorDeIdade;
+var_dump($podeEntrar);
+
+$podeEntrar = ($temIngresso and $maiorDeIdade);
+var_dump($podeEntrar);
+</pre>
+
+<pre class="term">$ php and.php
+bool(true)
+bool(false)
+bool(false)</pre>
+
+<p>A pessoa <strong>não</strong> é maior de idade, e mesmo assim a primeira linha deixou entrar! Veja como o PHP leu cada uma:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreveu</th><th>O PHP entendeu</th><th><code>$podeEntrar</code></th></tr>
+<tr><td><code>$podeEntrar = $temIngresso and $maiorDeIdade;</code></td><td><code>($podeEntrar = $temIngresso) and $maiorDeIdade;</code></td><td><code>true</code> (errado)</td></tr>
+<tr><td><code>$podeEntrar = $temIngresso &amp;&amp; $maiorDeIdade;</code></td><td><code>$podeEntrar = ($temIngresso &amp;&amp; $maiorDeIdade);</code></td><td><code>false</code></td></tr>
+<tr><td><code>$podeEntrar = ($temIngresso and $maiorDeIdade);</code></td><td>os parênteses mandam</td><td><code>false</code></td></tr>
+</table>
+</div>
+
+<p>Na primeira linha, o <code>=</code> foi feito antes: <code>$podeEntrar</code> recebeu só <code>$temIngresso</code>. O <code>and</code> foi calculado depois, e o resultado dele foi jogado fora. Com o <code>or</code> acontece o mesmo:</p>
+
+<pre class="file" data-file="or.php">&lt;?php
+$temCupom = false;
+$clienteVip = true;
+$desconto = $temCupom or $clienteVip;
+var_dump($desconto);
+$desconto = $temCupom || $clienteVip;
+var_dump($desconto);
+</pre>
+
+<pre class="term">$ php or.php
+bool(false)
+bool(true)</pre>
+
+<p>O PHP não mostra nenhum erro ou aviso nesses casos: as linhas são válidas. É um erro silencioso.</p>
+
+<h3>Então por que <code>and</code> e <code>or</code> existem?</h3>
+<p>Para um estilo antigo, que você ainda vai ver em tutoriais e código legado: "faça isto <strong>ou</strong> pare o programa".</p>
+
+<pre class="file" data-file="die.php">&lt;?php
+$arquivo = fopen("nao-existe.txt", "r") or die("Não consegui abrir o arquivo.\n");
+echo "Arquivo aberto!\n";
+</pre>
+
+<pre class="term">$ php die.php
+
+Warning: fopen(nao-existe.txt): Failed to open stream: No such file or directory in /home/ana/site/die.php on line 2
+Não consegui abrir o arquivo.</pre>
+
+<p>Aqui a prioridade baixa do <code>or</code> é proposital: primeiro <code>$arquivo = fopen(…)</code> (abrir o arquivo, veja <a href="arquivos.html">Ler e Escrever Arquivos</a>); se o resultado for <code>false</code>, o <code>or</code> roda o <code>die</code>, que mostra a mensagem e encerra o programa. Hoje, o jeito recomendado de tratar falhas é com <a href="if-else.html">if</a> ou <a href="excecoes.html">exceções</a>.</p>
+
+<div class="tip">
+<strong>Regra prática</strong>
+<p>Use <strong>sempre</strong> <code>&amp;&amp;</code>, <code>||</code> e <code>!</code>. Deixe <code>and</code> e <code>or</code> para ler código antigo. Para <code>xor</code>, que só existe como palavra, use parênteses: <code>$ok = ($a xor $b);</code>.</p>
+</div>
+
+<hr>
+
+<h2>Curto-circuito: o PHP para assim que sabe a resposta</h2>
+<p>Pense no <code>&amp;&amp;</code>: se o lado esquerdo já é <code>false</code>, o resultado vai ser <code>false</code>, não importa o lado direito. Então o PHP <strong>nem olha</strong> o lado direito. Com o <code>||</code>, se o lado esquerdo já é <code>true</code>, o resultado é <code>true</code>, e o lado direito é pulado. Isso se chama <strong>curto-circuito</strong> (ou avaliação preguiçosa).</p>
+
+<p>Dá para ver o curto-circuito com o <code>print</code>, que mostra um texto (veja <a href="echo-print.html">echo e print</a>) e pode ser usado no meio de uma expressão:</p>
+
+<pre class="file" data-file="curto.php">&lt;?php
+var_dump(false &amp;&amp; print("lado direito do &amp;&amp;\n"));
+var_dump(true &amp;&amp; print("lado direito do &amp;&amp;\n"));
+var_dump(true || print("lado direito do ||\n"));
+var_dump(false || print("lado direito do ||\n"));
+</pre>
+
+<pre class="term">$ php curto.php
+bool(false)
+lado direito do &amp;&amp;
+bool(true)
+bool(true)
+lado direito do ||
+bool(true)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O lado direito rodou?</th><th>Por quê</th></tr>
+<tr><td><code>false &amp;&amp; print(…)</code></td><td>Não</td><td>Com <code>false</code> à esquerda, o "e" já é <code>false</code>.</td></tr>
+<tr><td><code>true &amp;&amp; print(…)</code></td><td>Sim</td><td>O PHP precisa do lado direito para decidir.</td></tr>
+<tr><td><code>true || print(…)</code></td><td>Não</td><td>Com <code>true</code> à esquerda, o "ou" já é <code>true</code>.</td></tr>
+<tr><td><code>false || print(…)</code></td><td>Sim</td><td>O PHP precisa do lado direito para decidir.</td></tr>
+</table>
+</div>
+
+<h3>Para que serve: perguntar primeiro se é seguro</h3>
+<p>O curto-circuito permite colocar uma <strong>pergunta de proteção</strong> antes de uma conta perigosa. A Ana quer saber se o pedido é "grande" (mais de R$ 10 por item, em média), mas o carrinho pode estar vazio, e dividir por zero é um erro fatal:</p>
+
+<pre class="file" data-file="divisao.php">&lt;?php
+$itens = 0;
+$total = 50;
+
+var_dump($itens &gt; 0 &amp;&amp; $total / $itens &gt; 10);
+var_dump($total / $itens &gt; 10 &amp;&amp; $itens &gt; 0);
+</pre>
+
+<pre class="term">$ php divisao.php
+bool(false)
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/site/divisao.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/divisao.php on line 6</pre>
+
+<dl class="anatomy">
+  <dt>$itens &gt; 0 &amp;&amp; $total / $itens &gt; 10</dt><dd>A proteção vem primeiro. <code>$itens &gt; 0</code> é <code>false</code>, então a divisão <strong>nunca acontece</strong>. Resultado: <code>false</code>, sem erro.</dd>
+  <dt>$total / $itens &gt; 10 &amp;&amp; $itens &gt; 0</dt><dd>As mesmas perguntas, na ordem errada. A divisão por zero acontece antes da proteção, e o programa para com <code>DivisionByZeroError</code> ("erro de divisão por zero").</dd>
+</dl>
+
+<p>O mesmo truque evita avisos com chaves que podem não existir num <a href="arrays-associativos.html">array</a>:</p>
+
+<pre class="file" data-file="chave.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana"];
+
+var_dump(isset($aluna["idade"]) &amp;&amp; $aluna["idade"] &gt;= 18);
+var_dump($aluna["idade"] &gt;= 18 &amp;&amp; isset($aluna["idade"]));
+</pre>
+
+<pre class="term">$ php chave.php
+bool(false)
+
+Warning: Undefined array key "idade" in /home/ana/site/chave.php on line 5
+bool(false)</pre>
+
+<p>Com o <code>isset</code> ("está definido?") primeiro, a chave só é lida se existir. Na ordem inversa, o PHP lê a chave antes e avisa. (Para dar um valor padrão a uma chave que pode faltar, existe também o <a href="null-coalescing.html"><code>??</code></a>.)</p>
+
+<div class="tip">
+<strong>Ordem das perguntas</strong>
+<p>Num <code>&amp;&amp;</code>, coloque à esquerda a pergunta que <strong>protege</strong> (existe? é maior que zero? não é <code>null</code>?) e à direita a que <strong>usa</strong> o valor. Bônus: se a pergunta da esquerda for mais rápida, o programa também fica mais rápido.</p>
+</div>
+
+<hr>
+
+<h2>Com valores que não são booleanos</h2>
+<p>Os operadores lógicos aceitam qualquer valor: o PHP converte cada lado para booleano (as regras estão em <a href="booleanos.html">Booleanos</a>: <code>0</code>, <code>""</code>, <code>"0"</code>, <code>null</code> e <code>[]</code> valem <code>false</code>; o resto, <code>true</code>). E o resultado é <strong>sempre</strong> <code>true</code> ou <code>false</code>:</p>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+var_dump("Ana" &amp;&amp; 0);
+var_dump("Ana" || 0);
+$nome = "";
+var_dump($nome || "visitante");
+var_dump($nome ?: "visitante");
+</pre>
+
+<pre class="term">$ php tipos.php
+bool(false)
+bool(true)
+bool(true)
+string(9) "visitante"</pre>
+
+<div class="note">
+<strong>Para quem vem do JavaScript</strong>
+<p>No JavaScript, <code>nome || "visitante"</code> devolve <code>"visitante"</code>. No PHP, o <code>||</code> devolve <code>bool(true)</code>, nunca o valor. Para "este valor ou um padrão", o PHP tem o <code>?:</code> (quando o valor é vazio) e o <a href="null-coalescing.html"><code>??</code></a> (quando é <code>null</code> ou não existe).</p>
+</div>
+
+<div class="tryphp">
+<p class="try-task"><strong>Laboratório livre:</strong> mude os valores das variáveis e preveja cada resultado antes de rodar. Experimente trocar <code>&amp;&amp;</code> por <code>and</code> na linha do <code>$podeEntrar</code>.</p>
+<pre class="script">&lt;?php
+$idade = 17;
+$temIngresso = true;
+$convidadoVip = false;
+
+$podeEntrar = $convidadoVip || ($idade &gt;= 18 &amp;&amp; $temIngresso);
+var_dump($podeEntrar);
+
+var_dump(!$temIngresso);
+var_dump($idade &gt;= 12 &amp;&amp; $idade &lt;= 17);
+var_dump(($convidadoVip xor $temIngresso));
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A variável recebeu <code>true</code>, mas a conta dava <code>false</code></strong>
+<pre class="term">$ php and.php
+bool(true)
+bool(false)
+bool(false)</pre>
+<p><strong>O que aconteceu:</strong> a linha usa <code>and</code>, <code>or</code> ou <code>xor</code> junto com <code>=</code>. Como o <code>=</code> é feito antes, a variável guardou só o primeiro valor.</p>
+<p><strong>Como resolver:</strong> troque por <code>&amp;&amp;</code>/<code>||</code>, ou coloque parênteses em volta da conta lógica.</p>
+</div>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught DivisionByZeroError: Division by zero</strong>
+<pre class="term">$ php divisao.php
+bool(false)
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/site/divisao.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/divisao.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> a divisão veio antes da pergunta que a protegia. O curto-circuito só ajuda se a proteção estiver <strong>à esquerda</strong>.</p>
+<p><strong>Como resolver:</strong> inverta a ordem: <code>$itens &gt; 0 &amp;&amp; $total / $itens &gt; 10</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Saiu <code>int(0)</code> ou <code>int(1)</code> em vez de <code>bool</code></strong>
+<pre class="term">$ php maiusc.php
+bool(false)
+bool(true)
+int(0)
+int(1)</pre>
+<p><strong>O que aconteceu:</strong> as duas últimas linhas eram <code>var_dump(true &amp; false);</code> e <code>var_dump(true | false);</code>, com <strong>um</strong> <code>&amp;</code> e <strong>uma</strong> <code>|</code>. Esses são operadores de <strong>bits</strong>, outra coisa: devolvem números e não fazem curto-circuito. (As duas primeiras linhas mostram que <code>AND</code> e <code>Or</code> em maiúsculas funcionam como <code>and</code> e <code>or</code>.)</p>
+<p><strong>Como resolver:</strong> para lógica, sempre dois: <code>&amp;&amp;</code> e <code>||</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Warning: Undefined array key, mesmo com <code>isset</code> na linha</strong>
+<pre class="term">$ php chave.php
+bool(false)
+
+Warning: Undefined array key "idade" in /home/ana/site/chave.php on line 5
+bool(false)</pre>
+<p><strong>O que aconteceu:</strong> o <code>isset</code> estava à <strong>direita</strong> do <code>&amp;&amp;</code>. A chave foi lida antes de ser verificada.</p>
+<p><strong>Como resolver:</strong> <code>isset($aluna["idade"]) &amp;&amp; $aluna["idade"] &gt;= 18</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Nome</th><th>Dá <code>true</code> quando…</th><th>Curto-circuito</th></tr>
+<tr><td><code>$a &amp;&amp; $b</code></td><td>E</td><td>os dois são <code>true</code></td><td>pula <code>$b</code> se <code>$a</code> for <code>false</code></td></tr>
+<tr><td><code>$a || $b</code></td><td>Ou</td><td>pelo menos um é <code>true</code></td><td>pula <code>$b</code> se <code>$a</code> for <code>true</code></td></tr>
+<tr><td><code>!$a</code></td><td>Não</td><td><code>$a</code> é <code>false</code></td><td>—</td></tr>
+<tr><td><code>$a xor $b</code></td><td>Ou exclusivo</td><td>exatamente um é <code>true</code></td><td>não (precisa dos dois)</td></tr>
+<tr><td><code>$a and $b</code></td><td>E (palavra)</td><td>igual ao <code>&amp;&amp;</code>, com prioridade abaixo do <code>=</code></td><td>sim</td></tr>
+<tr><td><code>$a or $b</code></td><td>Ou (palavra)</td><td>igual ao <code>||</code>, com prioridade abaixo do <code>=</code></td><td>sim</td></tr>
+</table>
+</div>
+
+<p>Prioridade, do mais forte para o mais fraco: <code>!</code> → comparações → <code>&amp;&amp;</code> → <code>||</code> → <code>??</code> → <code>=</code> → <code>and</code> → <code>xor</code> → <code>or</code>. A tabela completa está em <a href="precedencia.html">Precedência</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. As duas condições</h3>
+<p>Complete para dar <code>true</code> só se a pessoa tiver 18 anos ou mais <strong>e</strong> tiver ingresso:</p>
+<div class="ex-code">$podeEntrar = $idade &gt;= 18 <input data-answer="&amp;&amp;" aria-label="operador"> $temIngresso;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Inverter</h3>
+<p>Complete para <code>$visitante</code> ser o contrário de <code>$logado</code>:</p>
+<div class="ex-code">$visitante = <input data-answer="!$logado|! $logado|!($logado)" aria-label="expressão">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Proteger a divisão</h3>
+<p>Complete a proteção, à esquerda, para a divisão só acontecer quando <code>$itens</code> for maior que zero:</p>
+<div class="ex-code">$grande = <input data-answer="$itens &gt; 0|$itens != 0|$itens !== 0" aria-label="proteção"> &amp;&amp; $total / $itens &gt; 10;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Depois de <code>$ok = true and false;</code>, o que <code>var_dump($ok)</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>bool(false)</code></label>
+<label><input type="radio" name="q4"> <code>bool(true)</code></label>
+<label><input type="radio" name="q4"> <code>NULL</code></label>
+<label><input type="radio" name="q4"> <code>Parse error</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Quanto vale <code>true xor true</code>?</p>
+<label><input type="radio" name="q5"> <code>true</code>, porque os dois são verdadeiros</label>
+<label><input type="radio" name="q5"> <code>int(0)</code></label>
+<label><input type="radio" name="q5"> <code>false</code>, porque o xor exige exatamente um verdadeiro</label>
+<label><input type="radio" name="q5"> Dá erro</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Em <code>false &amp;&amp; print("oi")</code>, o que acontece?</p>
+<label><input type="radio" name="q6"> O <code>print</code> não roda: o resultado já é <code>false</code>.</label>
+<label><input type="radio" name="q6"> Mostra <code>oi</code> e o resultado é <code>false</code>.</label>
+<label><input type="radio" name="q6"> Mostra <code>oi</code> e o resultado é <code>true</code>.</label>
+<label><input type="radio" name="q6"> Dá erro, porque <code>print</code> não pode ficar ali.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. <code>$nome = "";</code> O que <code>var_dump($nome || "visitante");</code> mostra no PHP?</p>
+<label><input type="radio" name="q7"> <code>string(9) "visitante"</code></label>
+<label><input type="radio" name="q7"> <code>string(0) ""</code></label>
+<label><input type="radio" name="q7"> <code>bool(false)</code></label>
+<label><input type="radio" name="q7"> <code>bool(true)</code></label>
+</div>
+
+<h3>Missão final: o pedido pode sair?</h3>
+<div class="tryphp" data-goal="outre:bool\(false\)\s+bool\(false\),semerro,src:\$itens\s*(&gt;|!=|!==)\s*0\s*(&amp;&amp;|and)">
+<p class="try-task"><strong>Missão:</strong> o programa tem dois problemas. (1) O pedido está pago mas <strong>sem estoque</strong>, então <code>$podeEnviar</code> deve ser <code>bool(false)</code>; hoje sai <code>true</code>. (2) O carrinho está vazio e a divisão dá erro fatal: proteja-a com uma pergunta à esquerda do <code>&amp;&amp;</code>. No fim, o programa deve mostrar <code>bool(false)</code> duas vezes, sem erros.</p>
+<pre class="script">&lt;?php
+$pago = true;
+$temEstoque = false;
+$itens = 0;
+$total = 0;
+
+// 1. Só pode enviar se estiver pago E tiver estoque
+$podeEnviar = $pago and $temEstoque;
+var_dump($podeEnviar);
+
+// 2. Pedido grande = mais de R$ 10 por item, em média.
+//    Proteja a divisão: só divida se $itens for maior que 0.
+$pedidoGrande = $total / $itens &gt; 10;
+var_dump($pedidoGrande);
+</pre>
+<pre class="solucao">&lt;?php
+$pago = true;
+$temEstoque = false;
+$itens = 0;
+$total = 0;
+
+// 1. Só pode enviar se estiver pago E tiver estoque
+$podeEnviar = $pago &amp;&amp; $temEstoque;
+var_dump($podeEnviar);
+
+// 2. Pedido grande = mais de R$ 10 por item, em média.
+//    Proteja a divisão: só divida se $itens for maior que 0.
+$pedidoGrande = $itens &gt; 0 &amp;&amp; $total / $itens &gt; 10;
+var_dump($pedidoGrande);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>&amp;&amp;</code> (e): <code>true</code> só se os dois forem <code>true</code>. <code>||</code> (ou): <code>true</code> se pelo menos um for. <code>!</code> (não): inverte.</li>
+  <li><code>xor</code>: <code>true</code> se exatamente um for <code>true</code>. Use com parênteses.</li>
+  <li>O <code>&amp;&amp;</code> vem antes do <code>||</code>. Ao misturar os dois, escreva os parênteses.</li>
+  <li><code>and</code>/<code>or</code> fazem a mesma conta, mas ficam abaixo do <code>=</code>: <code>$x = true and false</code> guarda <code>true</code>. Prefira <code>&amp;&amp;</code>/<code>||</code>.</li>
+  <li>Curto-circuito: o PHP para assim que sabe a resposta. Coloque a pergunta de proteção à esquerda.</li>
+  <li>O resultado é sempre <code>bool</code>, mesmo com textos e números. Um <code>&amp;</code> ou <code>|</code> sozinho é outra coisa (bits).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
