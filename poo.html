@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP O que é POO — classes, objetos e os quatro pilares | Guia PHP</title>
+<meta name="description" content="Orientação a Objetos em PHP para quem já sabe funções e arrays: o molde (classe) e o objeto, a lojinha da Ana com arrays e com objetos, por que usar POO, o vocabulário e a ideia dos quatro pilares, com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">O que é POO</span></h1>
+
+<p class="intro">Até aqui, você guardou dados em <strong>variáveis e arrays</strong> e escreveu o comportamento em <strong>funções</strong> separadas. A <strong>Programação Orientada a Objetos</strong> (POO) junta as duas coisas: os dados de um "produto" e o que um produto sabe fazer passam a morar no mesmo lugar, chamado <strong>objeto</strong>. Esta aula é a porta de entrada do Nível 3: ela mostra a ideia, o vocabulário e por que vale a pena. Os detalhes de cada parte ganham uma aula própria nas próximas páginas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <strong>classe</strong> (o molde) e <strong>objeto</strong> (a coisa feita com o molde).</li>
+  <li>Como a lojinha da Ana fica escrita com arrays e funções, e como fica com uma classe.</li>
+  <li>Os problemas que a POO resolve (e quando ela não é necessária).</li>
+  <li>O vocabulário: classe, objeto, instância, propriedade, método, <code>$this</code>.</li>
+  <li>A ideia dos quatro pilares: encapsulamento, herança, polimorfismo e abstração.</li>
+</ul>
+</div>
+
+<p>Pré-requisitos: <a href="funcoes.html">funções</a>, <a href="tipos-retorno.html">tipos e retorno</a> e <a href="arrays-associativos.html">arrays associativos</a>. Todos os exemplos rodam na máquina fictícia da Ana (usuária <strong>ana</strong>, computador <strong>notebook</strong>), na pasta <code>~/loja</code>, com o PHP 8.5.</p>
+
+<hr>
+
+<h2>A ideia antes do código: o molde e o bolo</h2>
+<p>Pense numa <strong>forma de bolo</strong>. A forma não é um bolo: ninguém come a forma. Ela é o <strong>molde</strong> que diz que todo bolo feito com ela vai ter aquele formato. Com uma forma só, a Ana faz quantos bolos quiser, e cada bolo é independente: um pode ser de chocolate, o outro de cenoura; comer um pedaço de um não diminui o outro.</p>
+
+<p>Na POO é igual:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na cozinha</th><th>Na POO</th><th>Na lojinha da Ana</th></tr>
+<tr><td>A forma de bolo</td><td><strong>Classe</strong>: o molde, a descrição</td><td><code>Produto</code>: "todo produto tem nome, preço e estoque, e pode ser vendido"</td></tr>
+<tr><td>Cada bolo assado</td><td><strong>Objeto</strong> (ou <strong>instância</strong>): uma coisa concreta feita com o molde</td><td>A caneca, a camiseta, o adesivo</td></tr>
+<tr><td>O sabor, o tamanho de cada bolo</td><td><strong>Propriedades</strong>: os dados de cada objeto</td><td>A caneca custa 25,90; a camiseta custa 49,90</td></tr>
+<tr><td>O que se faz com um bolo (cortar, servir)</td><td><strong>Métodos</strong>: as ações que o objeto sabe fazer</td><td>Vender 3 canecas; mostrar a descrição</td></tr>
+</table>
+</div>
+
+<p>Outra comparação que ajuda: a <strong>ficha de cadastro</strong> em branco (com os campos Nome, Preço, Estoque) é a classe. Cada ficha <strong>preenchida</strong> é um objeto. A ficha em branco existe uma vez; fichas preenchidas, quantas você quiser.</p>
+
+<hr>
+
+<h2>A lojinha da Ana com arrays e funções</h2>
+<p>A Ana vende canecas e camisetas pela internet. Com o que você já sabe, cada produto é um <a href="arrays-associativos.html">array associativo</a> e o "vender" é uma <a href="funcoes.html">função</a>:</p>
+
+<pre class="file" data-file="arrays.php">&lt;?php
+$caneca = ["nome" =&gt; "Caneca", "preco" =&gt; 25.90, "estoque" =&gt; 10];
+$camiseta = ["nome" =&gt; "Camiseta", "preco" =&gt; 49.90, "estoque" =&gt; 4];
+
+function vender(array $produto, int $quantidade): array
+{
+    $produto["estoque"] -= $quantidade;
+    return $produto;
+}
+
+$caneca = vender($caneca, 3);
+echo $caneca["nome"] . ": " . $caneca["estoque"] . " em estoque\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php arrays.php
+Caneca: 7 em estoque</pre>
+
+<p>Funciona, e para um programa pequeno está ótimo. Mas repare em três coisas que começam a incomodar quando a loja cresce:</p>
+<ol>
+  <li><strong>Nada garante o formato.</strong> O array <code>$caneca</code> é só um "saco de chaves". Ninguém impede que alguém crie um produto sem <code>"preco"</code>, ou com <code>"preço"</code> (com cedilha), ou com o preço <code>"barato"</code>.</li>
+  <li><strong>Os dados e as ações moram longe.</strong> A função <code>vender</code> está solta no arquivo. Quem lê <code>$caneca</code> não sabe quais funções servem para ela; quem lê <code>vender</code> não sabe que formato de array ela espera.</li>
+  <li><strong>Um erro de digitação passa quase despercebido.</strong> Olhe o que acontece:</li>
+</ol>
+
+<pre class="file" data-file="erro-array.php">&lt;?php
+$caneca = ["nome" =&gt; "Caneca", "preco" =&gt; 25.90, "estoque" =&gt; 10];
+$caneca["preço"] = 19.90;
+echo "Preço: " . $caneca["preco"] . "\n";
+echo "Desconto: " . $caneca["desconto"] . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php erro-array.php
+Preço: 25.9                    « a promoção não pegou: ela foi para outra chave
+                               « linha em branco que o PHP põe antes do aviso
+Warning: Undefined array key "desconto" in /home/ana/loja/erro-array.php on line 5
+Desconto: </pre>
+
+<p>A linha 3 queria baixar o preço para 19,90, mas escreveu <code>"preço"</code> com cedilha. O PHP não reclamou: simplesmente criou <strong>uma chave nova</strong> no array. A promoção "sumiu" em silêncio. Só a chave que não existe (<code>"desconto"</code>) gerou um aviso (<code>Warning</code> = "aviso"; o programa continuou).</p>
+
+<hr>
+
+<h2>A mesma lojinha com uma classe</h2>
+<p>Agora o mesmo programa em POO. Primeiro a Ana escreve o <strong>molde</strong> (a classe <code>Produto</code>), dizendo quais dados todo produto tem e o que todo produto sabe fazer. Depois ela cria os produtos de verdade com <code>new</code>.</p>
+
+<pre class="file" data-file="produto.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function vender(int $quantidade): void
+    {
+        $this-&gt;estoque -= $quantidade;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome}: {$this-&gt;estoque} em estoque";
+    }
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+$caneca-&gt;estoque = 10;
+
+$camiseta = new Produto();
+$camiseta-&gt;nome = "Camiseta";
+$camiseta-&gt;preco = 49.90;
+$camiseta-&gt;estoque = 4;
+
+$caneca-&gt;vender(3);
+
+echo $caneca-&gt;descricao() . "\n";
+echo $camiseta-&gt;descricao() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php produto.php
+Caneca: 7 em estoque
+Camiseta: 4 em estoque     « vender canecas não mexeu na camiseta</pre>
+
+<p>Não se preocupe em entender cada detalhe agora: cada peça tem a sua aula. Por enquanto, leia o programa assim:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th><th>Aula</th></tr>
+<tr><td><code>class Produto { … }</code></td><td>Cria o molde chamado <code>Produto</code>. Sozinho, não cria produto nenhum.</td><td><a href="classes-objetos.html">Classes e Objetos</a></td></tr>
+<tr><td><code>public string $nome;</code></td><td>Uma <strong>propriedade</strong>: todo produto tem um nome, que é texto (<code>string</code>).</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>public function vender(…)</code></td><td>Um <strong>método</strong>: uma função que mora dentro da classe e age sobre um produto.</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>$this-&gt;estoque</code></td><td>"O estoque <strong>deste</strong> produto": o objeto que chamou o método.</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>new Produto()</code></td><td>Usa o molde para criar um objeto novo (um "bolo").</td><td><a href="classes-objetos.html">Classes e Objetos</a></td></tr>
+<tr><td><code>$caneca-&gt;vender(3)</code></td><td>A seta <code>-&gt;</code> acessa algo <strong>dentro</strong> do objeto: "caneca, venda 3".</td><td><a href="classes-objetos.html">Classes e Objetos</a></td></tr>
+</table>
+</div>
+
+<p>Compare com a versão de arrays: em vez de <code>vender($caneca, 3)</code> (uma função solta que recebe o produto), agora é <code>$caneca-&gt;vender(3)</code>: <strong>o próprio produto sabe se vender</strong>. Os dados e as ações andam juntos.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode o programa. Depois venda 2 camisetas (<code>$camiseta-&gt;vender(2);</code>) antes dos <code>echo</code> e rode de novo. Repare que cada objeto guarda o seu próprio estoque.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function vender(int $quantidade): void
+    {
+        $this-&gt;estoque -= $quantidade;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome}: {$this-&gt;estoque} em estoque";
+    }
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+$caneca-&gt;estoque = 10;
+
+$camiseta = new Produto();
+$camiseta-&gt;nome = "Camiseta";
+$camiseta-&gt;preco = 49.90;
+$camiseta-&gt;estoque = 4;
+
+$caneca-&gt;vender(3);
+
+echo $caneca-&gt;descricao() . "\n";
+echo $camiseta-&gt;descricao() . "\n";
+</pre>
+</div>
+
+<h3>A classe protege os dados</h3>
+<p>Lembra do preço <code>"barato"</code>? Como a propriedade foi declarada como <code>float</code> (número com casas decimais), o PHP <strong>recusa</strong> um texto ali:</p>
+
+<pre class="file" data-file="tipo.php">&lt;?php
+class Produto
+{
+    public float $preco = 25.90;
+}
+$caneca = new Produto();
+$caneca-&gt;preco = "barato";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tipo.php
+
+Fatal error: Uncaught TypeError: Cannot assign string to property Produto::$preco of type float in /home/ana/loja/tipo.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/tipo.php on line 7</pre>
+
+<p>Traduzindo: "não é possível atribuir uma <code>string</code> à propriedade <code>Produto::$preco</code>, que é do tipo <code>float</code>". O erro aparece <strong>na hora</strong>, na linha certa, em vez de virar um bug escondido. E o erro de digitação (<code>preço</code> com cedilha)? Num objeto, o PHP 8.2 em diante avisa (<code>Deprecated: Creation of dynamic property Produto::$preço is deprecated</code>), e você vai ver como transformar isso num erro de verdade em <a href="propriedades-metodos.html">Propriedades e Métodos</a> e <a href="visibilidade.html">Visibilidade</a>.</p>
+
+<hr>
+
+<h2>Por que usar POO</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Vantagem</th><th>O que significa na prática</th></tr>
+<tr><td><strong>Organização</strong></td><td>Tudo o que é de "produto" está na classe <code>Produto</code>. Para mudar como um produto é vendido, você sabe onde procurar.</td></tr>
+<tr><td><strong>Formato garantido</strong></td><td>Todo objeto <code>Produto</code> tem as mesmas propriedades, com os tipos certos. Nada de "saco de chaves".</td></tr>
+<tr><td><strong>Proteção</strong></td><td>Você pode proibir que o estoque seja mexido de fora da classe, a não ser pelo método <code>vender</code> (que confere se há estoque).</td></tr>
+<tr><td><strong>Reaproveitamento</strong></td><td>Um <code>ProdutoDigital</code> pode "herdar" tudo de <code>Produto</code> e mudar só o que é diferente.</td></tr>
+<tr><td><strong>É assim que o PHP moderno é escrito</strong></td><td>Frameworks (Laravel, Symfony), bibliotecas do <a href="composer.html">Composer</a>, o próprio PHP (<code>PDO</code>, <code>DateTime</code>, exceções): tudo é objeto. Você já usou objetos em <a href="pdo.html">PDO</a> e <a href="excecoes.html">exceções</a>, talvez sem perceber.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>POO não é obrigatória</strong>
+<p>Um script de 20 linhas que lê um CSV e mostra um total não precisa de classes. O PHP deixa você misturar: funções soltas onde elas bastam, classes onde o programa tem "coisas" com dados e comportamento (produtos, pedidos, clientes, contas). Use POO quando o programa começar a ter vários arrays com o mesmo formato e várias funções que só servem para eles.</p>
+</div>
+
+<hr>
+
+<h2>O vocabulário da POO</h2>
+<p>Estes nomes vão aparecer em todas as aulas do Nível 3 e em qualquer documentação de PHP. Muitos têm sinônimos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Sinônimos</th><th>O que é</th><th>Exemplo</th></tr>
+<tr><td><strong>Classe</strong></td><td>tipo, molde</td><td>A descrição de um tipo de coisa</td><td><code>class Produto</code></td></tr>
+<tr><td><strong>Objeto</strong></td><td>instância</td><td>Uma coisa concreta criada a partir da classe</td><td><code>new Produto()</code></td></tr>
+<tr><td><strong>Instanciar</strong></td><td>criar um objeto</td><td>Usar o <code>new</code></td><td><code>$caneca = new Produto();</code></td></tr>
+<tr><td><strong>Propriedade</strong></td><td>atributo, campo</td><td>Uma variável que pertence ao objeto</td><td><code>$caneca-&gt;preco</code></td></tr>
+<tr><td><strong>Método</strong></td><td>função da classe</td><td>Uma função que pertence à classe e age sobre o objeto</td><td><code>$caneca-&gt;vender(3)</code></td></tr>
+<tr><td><strong><code>$this</code></strong></td><td>"este", "eu mesmo"</td><td>Dentro de um método, o objeto que foi chamado</td><td><code>$this-&gt;estoque</code></td></tr>
+<tr><td><strong>Membros</strong></td><td>-</td><td>Propriedades e métodos, juntos</td><td>-</td></tr>
+</table>
+</div>
+
+<p>Na documentação oficial, você também vai ver a notação <code>Produto::$preco</code> (a propriedade <code>$preco</code> da classe <code>Produto</code>) e <code>Produto::vender()</code> (o método <code>vender</code> da classe <code>Produto</code>). É só uma forma de escrever "o que pertence a quem", como nas mensagens de erro que você já viu.</p>
+
+<hr>
+
+<h2>Os quatro pilares (só a ideia)</h2>
+<p>Livros e entrevistas de emprego falam nos "quatro pilares da orientação a objetos". São quatro ideias que você vai praticar, uma de cada vez, nas próximas aulas. Por enquanto, basta a ideia:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pilar</th><th>A ideia em uma frase</th><th>No dia a dia</th><th>Aula</th></tr>
+<tr><td><strong>Encapsulamento</strong></td><td>Esconder os detalhes internos e só deixar mexer pelos métodos certos.</td><td>No caixa eletrônico você não mexe no cofre: usa os botões "sacar" e "depositar", que conferem o saldo.</td><td><a href="visibilidade.html">Visibilidade</a></td></tr>
+<tr><td><strong>Herança</strong></td><td>Uma classe nova aproveita tudo de outra e muda ou acrescenta só o que é diferente.</td><td>Um <code>ProdutoDigital</code> é um <code>Produto</code>, mas não tem frete.</td><td><a href="heranca.html">Herança</a></td></tr>
+<tr><td><strong>Polimorfismo</strong></td><td>Objetos diferentes respondem à mesma "ordem", cada um do seu jeito.</td><td>"Pague" funciona com Pix, boleto ou cartão; cada um paga de um jeito.</td><td><a href="interfaces.html">Interfaces</a></td></tr>
+<tr><td><strong>Abstração</strong></td><td>Mostrar só o que importa e esconder a complexidade; descrever "o que" sem dizer "como".</td><td>Você dirige sem saber como o motor funciona: volante, pedais e câmbio bastam.</td><td><a href="abstratas.html">Classes Abstratas</a></td></tr>
+</table>
+</div>
+
+<p>Além dos pilares, o PHP tem ferramentas próprias para organizar classes: <a href="static.html">membros <code>static</code></a>, <a href="traits.html">traits</a>, <a href="enums.html">enums</a>, <a href="readonly-hooks.html">readonly e property hooks</a> e <a href="metodos-magicos.html">métodos mágicos</a>. Todas estão neste mesmo grupo do menu.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Um nome de propriedade digitado errado</strong>
+<pre class="file" data-file="erro-obj.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+    public float $preco = 25.90;
+}
+
+$caneca = new Produto();
+$caneca-&gt;preço = 19.90;
+echo $caneca-&gt;preco . "\n";
+echo $caneca-&gt;desconto . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php erro-obj.php
+
+Deprecated: Creation of dynamic property Produto::$preço is deprecated in /home/ana/loja/erro-obj.php on line 9
+25.9
+
+Warning: Undefined property: Produto::$desconto in /home/ana/loja/erro-obj.php on line 11
+</pre>
+<p><strong>O que significa:</strong> na linha 9, a Ana escreveu <code>preço</code> (com cedilha), que não existe na classe. O PHP criou a propriedade na hora (uma "propriedade dinâmica") e avisou: <code>Deprecated</code> quer dizer "isso ainda funciona, mas está condenado e vai deixar de funcionar". Na linha 11, ler uma propriedade que não existe dá <code>Warning: Undefined property</code> ("propriedade indefinida").</p>
+<p><strong>Como consertar:</strong> use o nome exato declarado na classe (<code>preco</code>). Diferente do array, o objeto <strong>avisa</strong> o erro de digitação na escrita. Leve esses avisos a sério: eles apontam a linha exata do problema.</p>
+</div>
+
+<div class="cenario">
+<strong>Usar a classe como se fosse o objeto</strong>
+<pre class="file" data-file="sem-new.php">&lt;?php
+class Produto { public string $nome; }
+Produto-&gt;nome = "Caneca";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-new.php
+
+Fatal error: Cannot use temporary expression in write context in /home/ana/loja/sem-new.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> a Ana esqueceu o <code>new</code> e tentou usar o molde direto. Sem o <code>$</code>, o PHP não enxerga ali uma variável onde guardar o nome, e recusa o programa inteiro antes de rodar ("não dá para usar uma expressão temporária num lugar de escrita"). A mensagem é estranha, mas a linha indicada aponta o problema.</p>
+<p><strong>Como consertar:</strong> a classe é só a forma. Para ter um produto, crie um objeto e guarde numa variável: <code>$caneca = new Produto();</code> e depois <code>$caneca-&gt;nome = "Caneca";</code>. Veja os detalhes em <a href="classes-objetos.html">Classes e Objetos</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>class Nome { … }</code></td><td>Declara uma classe (o molde)</td></tr>
+<tr><td><code>public tipo $prop;</code></td><td>Declara uma propriedade</td></tr>
+<tr><td><code>public function nome(): tipo { … }</code></td><td>Declara um método</td></tr>
+<tr><td><code>$obj = new Nome();</code></td><td>Cria um objeto (instancia a classe)</td></tr>
+<tr><td><code>$obj-&gt;prop</code></td><td>Lê ou altera uma propriedade do objeto</td></tr>
+<tr><td><code>$obj-&gt;metodo()</code></td><td>Chama um método do objeto</td></tr>
+<tr><td><code>$this</code></td><td>Dentro de um método: o objeto atual</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão</h2>
+<div class="tryphp" data-goal="out:Adesivo: 45 em estoque,out:Caneca: 7 em estoque,src:new Produto">
+<p class="try-task"><strong>Missão:</strong> a Ana começou a vender adesivos. Crie um terceiro objeto <code>$adesivo</code> com <code>new Produto()</code>, nome <code>Adesivo</code>, preço <code>3.50</code> e estoque <code>50</code>. Venda 5 adesivos e mostre a descrição dele. A saída deve ter <code>Adesivo: 45 em estoque</code>.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function vender(int $quantidade): void
+    {
+        $this-&gt;estoque -= $quantidade;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome}: {$this-&gt;estoque} em estoque";
+    }
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+$caneca-&gt;estoque = 10;
+$caneca-&gt;vender(3);
+echo $caneca-&gt;descricao() . "\n";
+
+// crie o $adesivo aqui
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function vender(int $quantidade): void
+    {
+        $this-&gt;estoque -= $quantidade;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome}: {$this-&gt;estoque} em estoque";
+    }
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+$caneca-&gt;estoque = 10;
+$caneca-&gt;vender(3);
+echo $caneca-&gt;descricao() . "\n";
+
+$adesivo = new Produto();
+$adesivo-&gt;nome = "Adesivo";
+$adesivo-&gt;preco = 3.50;
+$adesivo-&gt;estoque = 50;
+$adesivo-&gt;vender(5);
+echo $adesivo-&gt;descricao() . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A palavra do molde</h3>
+<p>Complete com a palavra que declara o molde <code>Cliente</code>:</p>
+<div class="ex-code"><input data-answer="class" aria-label="palavra-chave"> Cliente { }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Criar o objeto</h3>
+<p>Complete para criar um objeto da classe <code>Cliente</code>:</p>
+<div class="ex-code">$ana = <input data-answer="new Cliente()|new Cliente" aria-label="criação do objeto">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. A seta</h3>
+<p>Complete para chamar o método <code>vender</code> do objeto <code>$caneca</code> com a quantidade 2:</p>
+<div class="ex-code">$caneca<input data-answer="-&gt;vender(2)" aria-label="chamada do método">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Na comparação da cozinha, o que é a <strong>classe</strong>?</p>
+<label><input type="radio" name="q4"> Um bolo de chocolate</label>
+<label><input type="radio" name="q4"> A forma de bolo</label>
+<label><input type="radio" name="q4"> O sabor do bolo</label>
+<label><input type="radio" name="q4"> O ato de cortar o bolo</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Dentro do método <code>vender</code>, o que <code>$this</code> representa?</p>
+<label><input type="radio" name="q5"> A classe <code>Produto</code> inteira</label>
+<label><input type="radio" name="q5"> Todos os produtos criados até agora</label>
+<label><input type="radio" name="q5"> O objeto que chamou o método (por exemplo, <code>$caneca</code>)</label>
+<label><input type="radio" name="q5"> O valor que o método retorna</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual pilar descreve "um <code>ProdutoDigital</code> aproveita tudo de <code>Produto</code> e muda só o frete"?</p>
+<label><input type="radio" name="q6"> Herança</label>
+<label><input type="radio" name="q6"> Encapsulamento</label>
+<label><input type="radio" name="q6"> Abstração</label>
+<label><input type="radio" name="q6"> Polimorfismo</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. A Ana criou <code>$caneca</code> e <code>$camiseta</code> com <code>new Produto()</code> e chamou <code>$caneca-&gt;vender(3)</code>. O que acontece com o estoque da camiseta?</p>
+<label><input type="radio" name="q7"> Diminui 3, porque as duas vêm da mesma classe</label>
+<label><input type="radio" name="q7"> Vira zero</label>
+<label><input type="radio" name="q7"> Dá erro</label>
+<label><input type="radio" name="q7"> Nada: cada objeto tem as suas próprias propriedades</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>A <strong>classe</strong> é o molde (a forma de bolo); o <strong>objeto</strong> é a coisa feita com ele (o bolo). Um molde, muitos objetos, cada um independente.</li>
+  <li><strong>Propriedades</strong> são os dados do objeto; <strong>métodos</strong> são as ações. Os dois moram juntos na classe.</li>
+  <li><code>new Produto()</code> cria um objeto; <code>-&gt;</code> acessa o que está dentro dele; <code>$this</code> é "este objeto" dentro de um método.</li>
+  <li>Comparada a arrays soltos, a classe garante o formato e os tipos, e avisa erros de digitação.</li>
+  <li>Os quatro pilares: <strong>encapsulamento</strong>, <strong>herança</strong>, <strong>polimorfismo</strong> e <strong>abstração</strong>. Cada um tem a sua aula.</li>
+  <li>POO não é obrigatória: use quando o programa tem "coisas" com dados e comportamento.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
