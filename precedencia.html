@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Precedência — quem o PHP calcula primeiro | Guia PHP</title>
+<meta name="description" content="Precedência e associatividade dos operadores no PHP 8.5: por que 2 + 3 * 4 dá 14, 1 + 2 . &quot;3&quot; dá &quot;33&quot;, !$a == $b engana e $x = true and false guarda true. Tabela completa, erros reais e a regra de ouro: use parênteses.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Precedência</span></h1>
+
+<p class="intro">Quando uma linha tem vários operadores, como <code>2 + 3 * 4</code>, o PHP precisa decidir <strong>qual conta fazer primeiro</strong>. Essa ordem se chama <strong>precedência</strong> (do latim "ir na frente"). Na maior parte das vezes ela é igual à da matemática da escola, mas o PHP tem operadores que a escola não tem, como o ponto <code>.</code>, o <code>!</code> e o <code>and</code>, e alguns deles têm surpresas. Esta aula mostra as surpresas reais e a regra que evita todas elas: <strong>use parênteses</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é precedência e como o PHP coloca "parênteses invisíveis" nas suas contas.</li>
+  <li>O que é associatividade: quem vai primeiro quando os operadores são do mesmo nível.</li>
+  <li>Por que <code>1 + 2 . "3"</code> dá <code>"33"</code> e <code>"Média: " . 7 + 9 / 2</code> não dá a média.</li>
+  <li>As armadilhas do <code>!</code>, do <code>and</code>/<code>or</code> e do <code>??</code>.</li>
+  <li>Os erros que o PHP mostra quando a ordem fica ambígua (comparações em cadeia e ternário sem parênteses).</li>
+  <li>A tabela completa de precedência, para consultar.</li>
+</ul>
+</div>
+
+<p>Esta aula fecha o grupo "Operadores". Ela usa operadores das aulas anteriores: <a href="operadores-aritmeticos.html">aritméticos</a>, <a href="operadores-atribuicao.html">de atribuição</a>, <a href="operadores-comparacao.html">de comparação</a>, <a href="operadores-logicos.html">lógicos</a>, <a href="operadores-string.html">de string</a> e o <a href="null-coalescing.html"><code>??</code></a>. Para ver os resultados com o tipo, usamos o <a href="var-dump.html"><code>var_dump</code></a>.</p>
+
+<hr>
+
+<h2>A ideia: parênteses invisíveis</h2>
+<p>Pense na calculadora do celular. Se você digitar <code>2 + 3 × 4</code>, algumas calculadoras simples mostram <code>20</code> (fazem a conta na ordem em que você digitou: 2 + 3 = 5, vezes 4 = 20). A calculadora científica mostra <code>14</code>, porque segue a regra da escola: <strong>multiplicação antes de soma</strong>.</p>
+
+<p>O PHP é como a calculadora científica. Antes de calcular, ele lê a linha inteira e coloca <strong>parênteses invisíveis</strong> em volta das partes que vêm primeiro. Você escreve <code>2 + 3 * 4</code>; o PHP entende <code>2 + (3 * 4)</code>.</p>
+
+<p>Cada operador tem um "nível de prioridade". Quem tem prioridade mais alta "gruda" mais forte nos valores ao lado e é calculado antes. A lista desses níveis é a <strong>tabela de precedência</strong>, que está completa <a href="#tabela">mais abaixo</a>.</p>
+
+<hr>
+
+<h2>Contas: igual à escola</h2>
+<p>Com os <a href="operadores-aritmeticos.html">operadores aritméticos</a>, não há surpresa: <code>*</code>, <code>/</code> e <code>%</code> vêm antes de <code>+</code> e <code>-</code>. Os parênteses que você escreve vêm antes de tudo.</p>
+
+<pre class="file" data-file="precedencia.php">&lt;?php
+var_dump(2 + 3 * 4);
+var_dump((2 + 3) * 4);
+var_dump(10 - 4 / 2);
+var_dump(10 % 3 * 2);
+</pre>
+
+<pre class="term">$ php precedencia.php
+int(14)
+int(20)
+int(8)
+int(2)</pre>
+
+<p>Veja como o PHP leu cada linha:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreveu</th><th>O PHP entendeu</th><th>Resultado</th><th>Por quê</th></tr>
+<tr><td><code>2 + 3 * 4</code></td><td><code>2 + (3 * 4)</code></td><td><code>14</code></td><td><code>*</code> vem antes de <code>+</code></td></tr>
+<tr><td><code>(2 + 3) * 4</code></td><td><code>(2 + 3) * 4</code></td><td><code>20</code></td><td>os seus parênteses mandam</td></tr>
+<tr><td><code>10 - 4 / 2</code></td><td><code>10 - (4 / 2)</code></td><td><code>8</code></td><td><code>/</code> vem antes de <code>-</code></td></tr>
+<tr><td><code>10 % 3 * 2</code></td><td><code>(10 % 3) * 2</code></td><td><code>2</code></td><td><code>%</code> e <code>*</code> têm o mesmo nível: da esquerda para a direita (próxima seção)</td></tr>
+</table>
+</div>
+
+<h3>O erro mais comum: a média</h3>
+<p>A Ana quer a média de duas notas, 7 e 9. A resposta certa é 8. Ela escreveu assim:</p>
+
+<pre class="file" data-file="media.php">&lt;?php
+$nota1 = 7;
+$nota2 = 9;
+$media = $nota1 + $nota2 / 2;
+var_dump($media);
+</pre>
+
+<pre class="term">$ php media.php
+float(11.5)</pre>
+
+<p>O PHP não mostrou nenhum erro: ele fez exatamente o que está escrito. A divisão vem antes da soma, então ele calculou <code>$nota1 + ($nota2 / 2)</code>, isto é, <code>7 + 4.5</code> = <code>11.5</code>. Para somar primeiro, a soma precisa estar entre parênteses.</p>
+
+<div class="tryphp" data-goal="out:int(8),src:\(\s*\$nota1\s*\+\s*\$nota2\s*\)">
+<p class="try-task"><strong>Missão:</strong> conserte a conta para o programa mostrar <code>int(8)</code>, a média certa. Não troque a conta pelo número 8: use parênteses em volta de <code>$nota1 + $nota2</code>.</p>
+<pre class="script">&lt;?php
+$nota1 = 7;
+$nota2 = 9;
+$media = $nota1 + $nota2 / 2;
+var_dump($media);
+</pre>
+<pre class="solucao">&lt;?php
+$nota1 = 7;
+$nota2 = 9;
+$media = ($nota1 + $nota2) / 2;
+var_dump($media);
+</pre>
+</div>
+
+<p>Repare no tipo: <code>16 / 2</code> é uma divisão exata, então o resultado é o inteiro <code>int(8)</code>. Na versão errada, <code>9 / 2</code> não é exata e o resultado virou <code>float</code> (veja <a href="numeros.html">int e float</a>).</p>
+
+<hr>
+
+<h2>Associatividade: empate no mesmo nível</h2>
+<p>E quando os operadores têm <strong>o mesmo nível</strong>, como <code>10 - 5 - 2</code>? Aí entra a <strong>associatividade</strong>: a regra que diz de que lado o PHP começa.</p>
+
+<ul>
+  <li><strong>Da esquerda para a direita</strong> (quase todos): <code>10 - 5 - 2</code> é <code>(10 - 5) - 2</code>.</li>
+  <li><strong>Da direita para a esquerda</strong> (a potência <code>**</code>, as atribuições <code>=</code>, <code>+=</code>… e o <code>??</code>): <code>2 ** 3 ** 2</code> é <code>2 ** (3 ** 2)</code>.</li>
+</ul>
+
+<pre class="file" data-file="associatividade.php">&lt;?php
+var_dump(10 - 5 - 2);
+var_dump(100 / 10 / 5);
+var_dump(2 ** 3 ** 2);
+var_dump(-3 ** 2);
+var_dump((-3) ** 2);
+</pre>
+
+<pre class="term">$ php associatividade.php
+int(3)
+int(2)
+int(512)
+int(-9)
+int(9)</pre>
+
+<dl class="anatomy">
+  <dt>10 - 5 - 2 → 3</dt><dd>Da esquerda: <code>(10 - 5) - 2</code> = <code>5 - 2</code> = <code>3</code>. Se fosse da direita, daria <code>10 - 3</code> = <code>7</code>.</dd>
+  <dt>100 / 10 / 5 → 2</dt><dd>Da esquerda: <code>(100 / 10) / 5</code> = <code>10 / 5</code> = <code>2</code>.</dd>
+  <dt>2 ** 3 ** 2 → 512</dt><dd>A potência vai da <strong>direita</strong>, como na matemática: <code>2 ** (3 ** 2)</code> = <code>2 ** 9</code> = <code>512</code>. Da esquerda daria <code>8 ** 2</code> = <code>64</code>.</dd>
+  <dt>-3 ** 2 → -9</dt><dd>A potência é mais forte que o sinal de menos. O PHP entende <code>-(3 ** 2)</code> = <code>-9</code>. Também é assim na matemática: −3² = −9.</dd>
+  <dt>(-3) ** 2 → 9</dt><dd>Para elevar o número negativo, coloque-o entre parênteses.</dd>
+</dl>
+
+<p>As atribuições irem da direita para a esquerda é o que faz <code>$a = $b = 0;</code> funcionar: o PHP entende <code>$a = ($b = 0)</code>, guarda <code>0</code> em <code>$b</code> e depois o mesmo valor em <code>$a</code> (veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>).</p>
+
+<hr>
+
+<h2>Surpresa 1: o ponto <code>.</code> e as contas <span class="versao">PHP 8.0+</span></h2>
+<p>O ponto <code>.</code> junta textos (veja <a href="operadores-string.html">Operadores de String</a>). Desde o PHP 8.0, ele tem prioridade <strong>menor</strong> que <code>+</code> e <code>-</code>. Ou seja: o PHP faz as contas primeiro e só depois junta os textos.</p>
+
+<pre class="file" data-file="concatenar.php">&lt;?php
+$nota1 = 7;
+$nota2 = 9;
+echo "Soma: " . $nota1 + $nota2 . "\n";
+echo "Média: " . $nota1 + $nota2 / 2 . "\n";
+echo "Média: " . ($nota1 + $nota2) / 2 . "\n";
+var_dump(1 + 2 . "3");
+</pre>
+
+<pre class="term">$ php concatenar.php
+Soma: 16
+Média: 11.5
+Média: 8
+string(2) "33"</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreveu</th><th>O PHP entendeu</th><th>Resultado</th></tr>
+<tr><td><code>"Soma: " . $nota1 + $nota2 . "\n"</code></td><td><code>"Soma: " . ($nota1 + $nota2) . "\n"</code></td><td><code>Soma: 16</code> (certo)</td></tr>
+<tr><td><code>"Média: " . $nota1 + $nota2 / 2 . "\n"</code></td><td><code>"Média: " . ($nota1 + ($nota2 / 2)) . "\n"</code></td><td><code>Média: 11.5</code> (errado: é o problema da média de novo)</td></tr>
+<tr><td><code>"Média: " . ($nota1 + $nota2) / 2 . "\n"</code></td><td><code>"Média: " . (($nota1 + $nota2) / 2) . "\n"</code></td><td><code>Média: 8</code> (certo)</td></tr>
+<tr><td><code>1 + 2 . "3"</code></td><td><code>(1 + 2) . "3"</code></td><td><code>"33"</code>: o 3 da soma colado no texto "3"</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Antes do PHP 8.0 era diferente</strong>
+<p>Até o PHP 7, o <code>.</code>, o <code>+</code> e o <code>-</code> tinham o <strong>mesmo</strong> nível e eram feitos da esquerda para a direita. Por isso <code>"Soma: " . 7 + 9</code> virava <code>("Soma: " . 7) + 9</code>, uma soma com um texto, e dava resultado errado. Se você encontrar código antigo cheio de parênteses em volta das contas, é por isso. No PHP 8.5, que este guia ensina, as contas vão primeiro. Mesmo assim, os parênteses deixam a intenção clara para qualquer pessoa (e qualquer versão).</p>
+</div>
+
+<hr>
+
+<h2>Surpresa 2: o <code>!</code> é mais forte que a comparação</h2>
+<p>O <code>!</code> ("não", da aula <a href="operadores-logicos.html">Operadores Lógicos</a>) tem prioridade <strong>maior</strong> que <code>==</code>. Ele "gruda" só no valor logo à direita, não na comparação inteira. A Ana quer saber se o nome <strong>não</strong> é "Bia":</p>
+
+<pre class="file" data-file="nao.php">&lt;?php
+$nome = "Ana";
+var_dump(!$nome == "Bia");
+var_dump(!($nome == "Bia"));
+var_dump($nome !== "Bia");
+</pre>
+
+<pre class="term">$ php nao.php
+bool(false)
+bool(true)
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>!$nome == "Bia"</dt><dd>O PHP entende <code>(!$nome) == "Bia"</code>. <code>!"Ana"</code> é <code>false</code> (um texto não vazio vale <code>true</code>; o "não" dele é <code>false</code>). Depois compara <code>false == "Bia"</code>, que é <code>false</code>. A pergunta que o PHP respondeu não foi a que a Ana fez.</dd>
+  <dt>!($nome == "Bia")</dt><dd>Com parênteses: primeiro <code>"Ana" == "Bia"</code> (<code>false</code>), depois o "não": <code>true</code>. Certo.</dd>
+  <dt>$nome !== "Bia"</dt><dd>A forma mais clara: use o operador "não é idêntico" (veja <a href="operadores-comparacao.html">Comparação</a>). Nada de <code>!</code> solto.</dd>
+</dl>
+
+<hr>
+
+<h2>Surpresa 3: <code>and</code> e <code>or</code> perdem para o <code>=</code></h2>
+<p>O PHP tem duas formas de escrever "e" e "ou": <code>&amp;&amp;</code>/<code>||</code> e as palavras <code>and</code>/<code>or</code>. Elas fazem a mesma conta, mas <strong>não têm a mesma prioridade</strong>. As palavras <code>and</code> e <code>or</code> estão no <strong>fim</strong> da tabela, abaixo até da atribuição <code>=</code>. O resultado é uma armadilha clássica:</p>
+
+<pre class="file" data-file="ingresso.php">&lt;?php
+$temIngresso = true;
+$maiorDeIdade = false;
+
+$podeEntrar = $temIngresso and $maiorDeIdade;
+var_dump($podeEntrar);
+
+$podeEntrar = $temIngresso &amp;&amp; $maiorDeIdade;
+var_dump($podeEntrar);
+</pre>
+
+<pre class="term">$ php ingresso.php
+bool(true)
+bool(false)</pre>
+
+<p>A Ana não é maior de idade, e mesmo assim a primeira linha guardou <code>true</code>! Veja os parênteses invisíveis:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreveu</th><th>O PHP entendeu</th><th>Valor guardado</th></tr>
+<tr><td><code>$podeEntrar = $temIngresso and $maiorDeIdade;</code></td><td><code>($podeEntrar = $temIngresso) and $maiorDeIdade;</code></td><td><code>true</code>: o <code>=</code> foi feito primeiro, e o <code>and</code> ficou "sobrando", sem guardar nada</td></tr>
+<tr><td><code>$podeEntrar = $temIngresso &amp;&amp; $maiorDeIdade;</code></td><td><code>$podeEntrar = ($temIngresso &amp;&amp; $maiorDeIdade);</code></td><td><code>false</code>: certo</td></tr>
+</table>
+</div>
+
+<p>O PHP não mostra erro nem aviso: as duas linhas são válidas. Por isso esse problema é tão traiçoeiro. A regra prática: <strong>use sempre <code>&amp;&amp;</code> e <code>||</code></strong>. A aula <a href="operadores-logicos.html">Operadores Lógicos</a> mostra mais detalhes.</p>
+
+<p>Entre os dois lógicos "de símbolo", <code>&amp;&amp;</code> vem antes de <code>||</code> (como a multiplicação antes da soma). Então <code>true || false &amp;&amp; false</code> é <code>true || (false &amp;&amp; false)</code>, que dá <code>true</code>. Se a sua ideia era <code>(true || false) &amp;&amp; false</code>, escreva os parênteses.</p>
+
+<hr>
+
+<h2>Surpresa 4: o <code>??</code> está abaixo do ponto</h2>
+<p>O <code>??</code> (da aula <a href="null-coalescing.html">?? e ?-&gt;</a>) quer dizer "use o valor da esquerda; se ele for <code>null</code>, use o da direita". Ele tem prioridade <strong>menor</strong> que o <code>.</code>. Veja o que acontece quando a Ana quer cumprimentar um visitante sem nome:</p>
+
+<pre class="file" data-file="visitante.php">&lt;?php
+$nome = null;
+echo "Olá, " . $nome ?? "visitante";
+echo "\n";
+echo "Olá, " . ($nome ?? "visitante");
+echo "\n";
+</pre>
+
+<pre class="term">$ php visitante.php
+Olá,
+Olá, visitante</pre>
+
+<p>Na primeira linha, o PHP entendeu <code>("Olá, " . $nome) ?? "visitante"</code>. Juntar <code>"Olá, "</code> com <code>null</code> dá o texto <code>"Olá, "</code>, que <strong>não</strong> é <code>null</code>; então o <code>??</code> nunca usa o "visitante". Com parênteses em volta do <code>??</code>, funciona.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Laboratório livre:</strong> rode, depois tire e coloque parênteses e veja os resultados mudarem. Tente prever cada resultado <strong>antes</strong> de clicar em Rodar.</p>
+<pre class="script">&lt;?php
+var_dump(2 + 3 * 4);
+var_dump(2 ** 3 ** 2);
+var_dump(-2 ** 2);
+var_dump(1 + 2 . "3");
+var_dump(true || false &amp;&amp; false);
+
+$x = true and false;
+var_dump($x);
+
+$nome = null;
+var_dump("Olá, " . ($nome ?? "visitante"));
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando a ordem é ambígua, o PHP recusa</h2>
+<p>Em alguns casos, o PHP não escolhe uma ordem: ele para com um erro e pede que você decida. Isso é bom, porque o erro aparece na hora, em vez de uma conta errada silenciosa.</p>
+
+<h3>Comparações em cadeia</h3>
+<p>Na matemática se escreve 18 ≤ idade ≤ 60. No PHP, não dá:</p>
+
+<pre class="file" data-file="idade.php">&lt;?php
+$idade = 20;
+var_dump(18 &lt;= $idade &lt;= 60);
+</pre>
+
+<pre class="term">$ php idade.php
+
+Parse error: syntax error, unexpected token "&lt;=" in /home/ana/site/idade.php on line 3</pre>
+
+<p>Os operadores de comparação são <strong>não associativos</strong>: o PHP não aceita dois deles lado a lado sem parênteses. É um <em>Parse error</em> ("erro de leitura"): o PHP nem começa a rodar o programa. Para perguntar "está entre 18 e 60?", junte duas comparações com <code>&amp;&amp;</code>:</p>
+
+<pre class="file" data-file="idade2.php">&lt;?php
+$idade = 20;
+var_dump(18 &lt;= $idade &amp;&amp; $idade &lt;= 60);
+</pre>
+
+<pre class="term">$ php idade2.php
+bool(true)</pre>
+
+<p>Aqui não precisa de parênteses: <code>&lt;=</code> tem prioridade maior que <code>&amp;&amp;</code>, então o PHP faz as duas comparações e depois o "e".</p>
+
+<h3>Ternário dentro de ternário</h3>
+<p>O ternário <code>condição ? valor1 : valor2</code> é ensinado na aula <a href="ternario.html">Operador Ternário</a>. Colocar um dentro do outro <strong>sem parênteses</strong> é proibido desde o PHP 8.0:</p>
+
+<pre class="file" data-file="nota.php">&lt;?php
+$nota = 7;
+echo $nota &gt;= 7 ? "aprovada" : $nota &gt;= 5 ? "recuperação" : "reprovada";
+</pre>
+
+<pre class="term">$ php nota.php
+
+Fatal error: Unparenthesized `a ? b : c ? d : e` is not supported. Use either `(a ? b : c) ? d : e` or `a ? b : (c ? d : e)` in /home/ana/site/nota.php on line 3
+Stack trace:
+#0 {main}</pre>
+
+<p>A mensagem já diz como consertar: escolha onde vão os parênteses. Aqui, a intenção é "se não for aprovada, veja se é recuperação", então os parênteses ficam em volta do segundo ternário:</p>
+
+<pre class="file" data-file="nota2.php">&lt;?php
+$nota = 7;
+echo $nota &gt;= 7 ? "aprovada" : ($nota &gt;= 5 ? "recuperação" : "reprovada");
+echo "\n";
+</pre>
+
+<pre class="term">$ php nota2.php
+aprovada</pre>
+
+<hr>
+
+<h2 id="tabela">A tabela de precedência</h2>
+<p>Do <strong>mais forte</strong> (feito primeiro) para o <strong>mais fraco</strong> (feito por último). Operadores na mesma linha têm o mesmo nível; a coluna "Empate" diz a associatividade. Você não precisa decorar: consulte quando estiver em dúvida, e na dúvida, use parênteses.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nível</th><th>Operadores</th><th>O que são</th><th>Empate</th></tr>
+<tr><td>1</td><td><code>clone</code> <code>new</code></td><td>Objetos (Nível 3)</td><td>—</td></tr>
+<tr><td>2</td><td><code>**</code></td><td>Potência</td><td>direita</td></tr>
+<tr><td>3</td><td><code>++</code> <code>--</code> <code>-</code> (sinal) <code>+</code> (sinal) <code>~</code> <code>(int)</code> <code>(float)</code> <code>(string)</code> <code>(bool)</code> <code>(array)</code> <code>@</code></td><td>Incremento, sinal, conversão de tipo, silenciar erro</td><td>—</td></tr>
+<tr><td>4</td><td><code>instanceof</code></td><td>"É um objeto desta classe?" (Nível 3)</td><td>esquerda</td></tr>
+<tr><td>5</td><td><code>!</code></td><td>Não lógico</td><td>—</td></tr>
+<tr><td>6</td><td><code>*</code> <code>/</code> <code>%</code></td><td>Multiplicação, divisão, resto</td><td>esquerda</td></tr>
+<tr><td>7</td><td><code>+</code> <code>-</code></td><td>Soma e subtração</td><td>esquerda</td></tr>
+<tr><td>8</td><td><code>&lt;&lt;</code> <code>&gt;&gt;</code></td><td>Deslocamento de bits (raro)</td><td>esquerda</td></tr>
+<tr><td>9</td><td><code>.</code></td><td>Concatenação (desde o PHP 8.0)</td><td>esquerda</td></tr>
+<tr><td>10</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>Maior e menor</td><td>não aceita empate</td></tr>
+<tr><td>11</td><td><code>==</code> <code>!=</code> <code>===</code> <code>!==</code> <code>&lt;&gt;</code> <code>&lt;=&gt;</code></td><td>Igualdade e nave espacial</td><td>não aceita empate</td></tr>
+<tr><td>12</td><td><code>&amp;</code></td><td>"E" de bits (raro)</td><td>esquerda</td></tr>
+<tr><td>13</td><td><code>^</code></td><td>"Ou exclusivo" de bits (raro)</td><td>esquerda</td></tr>
+<tr><td>14</td><td><code>|</code></td><td>"Ou" de bits (raro)</td><td>esquerda</td></tr>
+<tr><td>15</td><td><code>&amp;&amp;</code></td><td>E lógico</td><td>esquerda</td></tr>
+<tr><td>16</td><td><code>||</code></td><td>Ou lógico</td><td>esquerda</td></tr>
+<tr><td>17</td><td><code>??</code></td><td>Coalescência nula</td><td>direita</td></tr>
+<tr><td>18</td><td><code>? :</code></td><td>Ternário</td><td>não aceita empate</td></tr>
+<tr><td>19</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>.=</code> <code>??=</code> …</td><td>Atribuição</td><td>direita</td></tr>
+<tr><td>20</td><td><code>yield</code> <code>print</code></td><td>Geradores e <code>print</code></td><td>—</td></tr>
+<tr><td>21</td><td><code>and</code></td><td>E lógico (palavra)</td><td>esquerda</td></tr>
+<tr><td>22</td><td><code>xor</code></td><td>Ou exclusivo lógico</td><td>esquerda</td></tr>
+<tr><td>23</td><td><code>or</code></td><td>Ou lógico (palavra)</td><td>esquerda</td></tr>
+</table>
+</div>
+
+<p>Três "atalhos" para lembrar o que importa no dia a dia:</p>
+<ol>
+  <li><strong>Contas, depois texto, depois comparações, depois lógica, depois atribuição.</strong> É por isso que <code>$ok = $preco * 2 &gt; 10 &amp;&amp; $nome != "";</code> funciona sem parênteses.</li>
+  <li><strong><code>!</code> gruda só no vizinho.</strong> Para negar uma comparação, use <code>!=</code>/<code>!==</code> ou parênteses.</li>
+  <li><strong><code>and</code>, <code>or</code> e <code>xor</code> ficam abaixo do <code>=</code>.</strong> Prefira <code>&amp;&amp;</code> e <code>||</code>.</li>
+</ol>
+
+<hr>
+
+<h2>A regra de ouro: use parênteses</h2>
+<p>Programadores experientes também não decoram a tabela inteira. Eles colocam parênteses sempre que a ordem não é óbvia. Os parênteses:</p>
+<ul>
+  <li>não deixam o programa mais lento;</li>
+  <li>mostram a sua intenção para quem lê (inclusive você, daqui a um mês);</li>
+  <li>funcionam igual em qualquer versão do PHP;</li>
+  <li>evitam as surpresas desta aula.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Em vez de</th><th>Escreva</th></tr>
+<tr><td>Média, porcentagem, conta com soma e divisão</td><td><code>$a + $b / 2</code></td><td><code>($a + $b) / 2</code></td></tr>
+<tr><td>Conta no meio de um texto</td><td><code>"Total: " . $preco * $qtd</code></td><td><code>"Total: " . ($preco * $qtd)</code></td></tr>
+<tr><td>Negar uma comparação</td><td><code>!$nome == "Bia"</code></td><td><code>$nome !== "Bia"</code></td></tr>
+<tr><td>Guardar o resultado de um "e"/"ou"</td><td><code>$ok = $a and $b;</code></td><td><code>$ok = $a &amp;&amp; $b;</code></td></tr>
+<tr><td><code>??</code> junto com outros operadores</td><td><code>"Olá, " . $nome ?? "visitante"</code></td><td><code>"Olá, " . ($nome ?? "visitante")</code></td></tr>
+<tr><td>Potência de número negativo</td><td><code>-3 ** 2</code></td><td><code>(-3) ** 2</code></td></tr>
+<tr><td>Misturar <code>&amp;&amp;</code> e <code>||</code></td><td><code>$a || $b &amp;&amp; $c</code></td><td><code>$a || ($b &amp;&amp; $c)</code></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Parênteses demais também atrapalham</strong>
+<p><code>((($a) + ($b)))</code> não ajuda ninguém. Use parênteses onde a ordem <strong>muda o resultado</strong> ou onde um leitor poderia ficar em dúvida. <code>$total = $preco * $qtd;</code> não precisa de nenhum.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A conta dá um número estranho, sem nenhum erro</strong>
+<pre class="term">$ php media.php
+float(11.5)</pre>
+<p><strong>O que aconteceu:</strong> o PHP fez as contas na ordem da tabela, não na ordem que você imaginou. <code>$nota1 + $nota2 / 2</code> divide primeiro.</p>
+<p><strong>Como resolver:</strong> escreva os parênteses que estavam "na sua cabeça": <code>($nota1 + $nota2) / 2</code>. Para descobrir onde está o problema, mostre cada pedaço com <code>var_dump</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A variável ficou <code>true</code> quando deveria ser <code>false</code></strong>
+<pre class="term">$ php ingresso.php
+bool(true)
+bool(false)</pre>
+<p><strong>O que aconteceu:</strong> a linha usa <code>and</code> ou <code>or</code> junto com <code>=</code>. Como o <code>=</code> é mais forte, a variável recebeu só o primeiro valor.</p>
+<p><strong>Como resolver:</strong> troque <code>and</code> por <code>&amp;&amp;</code> e <code>or</code> por <code>||</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Parse error: syntax error, unexpected token "&lt;="</strong>
+<pre class="term">$ php idade.php
+
+Parse error: syntax error, unexpected token "&lt;=" in /home/ana/site/idade.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> você encadeou duas comparações, como <code>18 &lt;= $idade &lt;= 60</code>. O PHP não aceita. O mesmo vale para <code>==</code>: <code>$a == $b == $c</code> dá <code>unexpected token "=="</code>.</p>
+<p><strong>Como resolver:</strong> separe em duas comparações ligadas por <code>&amp;&amp;</code>: <code>18 &lt;= $idade &amp;&amp; $idade &lt;= 60</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Fatal error: Unparenthesized `a ? b : c ? d : e` is not supported</strong>
+<pre class="term">$ php nota.php
+
+Fatal error: Unparenthesized `a ? b : c ? d : e` is not supported. Use either `(a ? b : c) ? d : e` or `a ? b : (c ? d : e)` in /home/ana/site/nota.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que aconteceu:</strong> há um ternário dentro de outro, sem parênteses. Antes do PHP 8.0 isso era aceito e quase sempre fazia o contrário do esperado; hoje é proibido.</p>
+<p><strong>Como resolver:</strong> coloque parênteses em volta do ternário de dentro, como a própria mensagem sugere. Se ficar complicado, troque por <a href="if-else.html">if/elseif</a> ou <a href="match.html">match</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>??</code> nunca usa o valor padrão</strong>
+<pre class="term">$ php visitante.php
+Olá,
+Olá, visitante</pre>
+<p><strong>O que aconteceu:</strong> o <code>.</code> foi feito antes do <code>??</code>. O texto juntado nunca é <code>null</code>.</p>
+<p><strong>Como resolver:</strong> parênteses em volta do <code>??</code>: <code>"Olá, " . ($nome ?? "visitante")</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Expressão</th><th>O PHP lê como</th><th>Resultado</th></tr>
+<tr><td><code>2 + 3 * 4</code></td><td><code>2 + (3 * 4)</code></td><td><code>14</code></td></tr>
+<tr><td><code>10 - 5 - 2</code></td><td><code>(10 - 5) - 2</code></td><td><code>3</code></td></tr>
+<tr><td><code>2 ** 3 ** 2</code></td><td><code>2 ** (3 ** 2)</code></td><td><code>512</code></td></tr>
+<tr><td><code>-3 ** 2</code></td><td><code>-(3 ** 2)</code></td><td><code>-9</code></td></tr>
+<tr><td><code>1 + 2 . "3"</code></td><td><code>(1 + 2) . "3"</code></td><td><code>"33"</code></td></tr>
+<tr><td><code>!$a == $b</code></td><td><code>(!$a) == $b</code></td><td>quase nunca o que você quer</td></tr>
+<tr><td><code>$a || $b &amp;&amp; $c</code></td><td><code>$a || ($b &amp;&amp; $c)</code></td><td>—</td></tr>
+<tr><td><code>$x = true and false</code></td><td><code>($x = true) and false</code></td><td><code>$x</code> vale <code>true</code></td></tr>
+<tr><td><code>"a" . $n ?? "b"</code></td><td><code>("a" . $n) ?? "b"</code></td><td>nunca usa <code>"b"</code></td></tr>
+<tr><td><code>$a = $b = 0</code></td><td><code>$a = ($b = 0)</code></td><td>as duas valem <code>0</code></td></tr>
+<tr><td><code>1 &lt; $x &lt; 5</code></td><td>—</td><td><code>Parse error</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Mudar a ordem</h3>
+<p>Complete com parênteses para o resultado ser <code>int(20)</code>, e não <code>int(14)</code>:</p>
+<div class="ex-code">var_dump(<input data-answer="(2 + 3)|(2+3)" aria-label="primeira parte"> * 4);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Porcentagem</h3>
+<p>A Ana quer 10% de desconto sobre <code>$preco + $frete</code>. Complete a conta:</p>
+<div class="ex-code">$total = <input data-answer="($preco + $frete)|($preco+$frete)" aria-label="soma entre parênteses"> * 0.9;</div>
+</div>
+
+<div class="exercise">
+<h3>3. O "e" certo</h3>
+<p>Complete com o operador que faz <code>$ok</code> receber o resultado da conta inteira:</p>
+<div class="ex-code">$ok = $pago <input data-answer="&amp;&amp;" aria-label="operador"> $enderecoOk;</div>
+</div>
+
+<div class="exercise">
+<h3>4. Negar a comparação</h3>
+<p>Complete com um operador de comparação (sem usar <code>!</code> sozinho) para perguntar "o nome não é idêntico a Bia?":</p>
+<div class="ex-code">var_dump($nome <input data-answer="!==" aria-label="operador"> "Bia");</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que <code>var_dump(1 + 2 . "3");</code> mostra no PHP 8.5?</p>
+<label><input type="radio" name="q5"> <code>int(6)</code></label>
+<label><input type="radio" name="q5"> <code>string(3) "123"</code></label>
+<label><input type="radio" name="q5"> <code>string(2) "33"</code></label>
+<label><input type="radio" name="q5"> <code>int(24)</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Depois de <code>$x = true and false;</code>, quanto vale <code>$x</code>?</p>
+<label><input type="radio" name="q6"> <code>false</code>, porque <code>true and false</code> é <code>false</code></label>
+<label><input type="radio" name="q6"> <code>true</code>, porque o <code>=</code> é feito antes do <code>and</code></label>
+<label><input type="radio" name="q6"> <code>null</code></label>
+<label><input type="radio" name="q6"> Dá <code>Parse error</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Quanto é <code>-2 ** 2</code> no PHP?</p>
+<label><input type="radio" name="q7"> <code>-4</code></label>
+<label><input type="radio" name="q7"> <code>4</code></label>
+<label><input type="radio" name="q7"> <code>-2</code></label>
+<label><input type="radio" name="q7"> Dá erro</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">8. O que acontece com <code>var_dump(0 &lt; $x &lt; 10);</code>?</p>
+<label><input type="radio" name="q8"> Mostra <code>bool(true)</code> se <code>$x</code> estiver entre 0 e 10.</label>
+<label><input type="radio" name="q8"> Compara da esquerda para a direita.</label>
+<label><input type="radio" name="q8"> Mostra um <code>Warning</code> e continua.</label>
+<label><input type="radio" name="q8"> <code>Parse error</code>: comparações não podem ser encadeadas.</label>
+</div>
+
+<h3>Missão final: o pedido da lojinha</h3>
+<div class="tryphp" data-goal="out:Total: R$ 63,out:bool(false),semerro">
+<p class="try-task"><strong>Missão:</strong> o programa da lojinha da Ana tem dois erros de precedência. (1) O desconto de 10% deve valer sobre <strong>tudo</strong> (produtos + frete): o total certo é <code>R$ 63</code>. (2) O pedido só pode ser enviado se estiver pago <strong>e</strong> com o endereço certo; como o endereço está errado, <code>$podeEnviar</code> deve ser <code>bool(false)</code>. Conserte os dois.</p>
+<pre class="script">&lt;?php
+$preco = 20;
+$quantidade = 3;
+$frete = 10;
+$pago = true;
+$enderecoOk = false;
+
+// 10% de desconto em tudo (produtos + frete)
+$total = $preco * $quantidade + $frete * 0.9;
+echo "Total: R$ " . $total . "\n";
+
+$podeEnviar = $pago and $enderecoOk;
+var_dump($podeEnviar);
+</pre>
+<pre class="solucao">&lt;?php
+$preco = 20;
+$quantidade = 3;
+$frete = 10;
+$pago = true;
+$enderecoOk = false;
+
+// 10% de desconto em tudo (produtos + frete)
+$total = ($preco * $quantidade + $frete) * 0.9;
+echo "Total: R$ " . $total . "\n";
+
+$podeEnviar = $pago &amp;&amp; $enderecoOk;
+var_dump($podeEnviar);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Precedência</strong> é a ordem em que o PHP calcula os operadores: ele coloca "parênteses invisíveis" antes de calcular.</li>
+  <li>Contas seguem a escola: <code>**</code>, depois <code>* / %</code>, depois <code>+ -</code>.</li>
+  <li><strong>Associatividade</strong> decide os empates: quase tudo vai da esquerda; <code>**</code>, <code>=</code> e <code>??</code> vão da direita.</li>
+  <li>Desde o PHP 8.0, o <code>.</code> fica abaixo de <code>+</code> e <code>-</code>: as contas são feitas antes de juntar o texto.</li>
+  <li><code>!</code> gruda só no vizinho: <code>!$a == $b</code> é <code>(!$a) == $b</code>. Use <code>!==</code>.</li>
+  <li><code>and</code>/<code>or</code> ficam abaixo do <code>=</code>: <code>$x = true and false</code> guarda <code>true</code>. Use <code>&amp;&amp;</code>/<code>||</code>.</li>
+  <li>Comparações em cadeia dão <code>Parse error</code>; ternário dentro de ternário sem parênteses dá <code>Fatal error</code>.</li>
+  <li>A regra de ouro: na dúvida, <strong>parênteses</strong>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
