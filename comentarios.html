@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Comentários — //, #, /* */ e PHPDoc | Guia PHP</title>
+<meta name="description" content="Aprenda os comentários do PHP: // e # para uma linha, /* */ para várias, /** */ (PHPDoc) para documentar, por que #[…] não é comentário no PHP 8, a armadilha do ?&gt; e como usar comentários para desligar código, com saídas reais e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Comentários</span></h1>
+
+<p class="intro">Um comentário é um texto dentro do código que o PHP <strong>ignora</strong> completamente. Ele não muda o que o programa faz: serve para as pessoas. Para você mesmo, daqui a três meses, lembrar por que fez daquele jeito; para quem trabalha com você entender o código; e para "desligar" uma linha sem apagá-la. Nesta aula você vai conhecer as quatro formas de comentar no PHP e uma armadilha nova do PHP 8.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Comentários de uma linha: <code>//</code> e <code>#</code>.</li>
+  <li>Comentários de várias linhas: <code>/* … */</code>.</li>
+  <li>Comentários de documentação (PHPDoc): <code>/** … */</code>.</li>
+  <li>Por que <code>#[…]</code> <strong>não</strong> é comentário no PHP 8.</li>
+  <li>Como "desligar" uma linha de código e as armadilhas do <code>?&gt;</code> e dos comentários dentro de comentários.</li>
+  <li>O que escrever num bom comentário.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o lápis na margem do livro</h2>
+<p>Pense numa receita de bolo da sua avó, com anotações a lápis na margem: <em>"usar a forma grande"</em>, <em>"no forno da tia, 10 minutos a menos"</em>. Quem faz o bolo lê as anotações; o bolo não "lê" nada. As anotações não mudam a receita, mas ajudam muito quem vai segui-la.</p>
+<p>Os comentários são essas anotações. O PHP pula tudo o que está marcado como comentário, como se não existisse. Quem lê é gente.</p>
+
+<hr>
+
+<h2>Comentários de uma linha: <code>//</code> e <code>#</code></h2>
+<p>Duas barras <code>//</code> dizem ao PHP: "daqui até o fim da linha, ignore". O <code>#</code> (cerquilha, "jogo da velha") faz exatamente a mesma coisa:</p>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+// Programa da lista de compras da Ana
+echo "Lista de compras\n"; // título
+
+# Este também é um comentário de uma linha
+echo "- pão\n";
+</pre>
+
+<pre class="term">$ php tipos.php
+Lista de compras
+- pão</pre>
+
+<dl class="anatomy">
+  <dt>// Programa da lista…</dt><dd>Um comentário ocupando a linha inteira. O PHP pula.</dd>
+  <dt>echo "Lista de compras\n"; // título</dt><dd>Código <strong>e depois</strong> um comentário, na mesma linha. O PHP executa o <code>echo</code> e ignora o que vem a partir do <code>//</code>.</dd>
+  <dt># Este também…</dt><dd>Mesmo efeito, com <code>#</code>.</dd>
+</dl>
+
+<p>Repare na saída: nenhum comentário apareceu. Eles existem só no arquivo.</p>
+
+<div class="tip">
+<strong><code>//</code> ou <code>#</code>?</strong>
+<p>Para o PHP, tanto faz. Mas quase todo código PHP moderno usa <code>//</code>, e os guias de estilo da comunidade (veja <a href="psr.html">Padrões PSR</a>) também. Use <code>//</code>. O <code>#</code> aparece em códigos antigos e no <a href="linha-comando.html">shebang</a> (<code>#!/usr/bin/env php</code>), que é outra coisa: é uma instrução para o Linux, na primeira linha, e o PHP a pula.</p>
+</div>
+
+<h3>Dentro de um texto, não é comentário</h3>
+<p>As marcas de comentário só valem no <strong>código</strong>. Dentro de aspas, <code>//</code> e <code>#</code> são caracteres comuns. Ainda bem: senão, nenhum endereço <code>https://</code> funcionaria.</p>
+
+<pre class="file" data-file="string.php">&lt;?php
+echo "Site: https://www.php.net // não é comentário\n";
+echo "# também não\n";
+</pre>
+
+<pre class="term">$ php string.php
+Site: https://www.php.net // não é comentário
+# também não</pre>
+
+<hr>
+
+<h2>Comentários de várias linhas: <code>/* … */</code></h2>
+<p>Para um texto mais longo, abra com <code>/*</code> e feche com <code>*/</code>. Tudo o que estiver entre as duas marcas é ignorado, quantas linhas forem:</p>
+
+<pre class="file" data-file="bloco.php">&lt;?php
+/*
+   Comentário de várias linhas:
+   o leite acabou, mas o café ainda tem.
+*/
+echo "- leite\n";
+
+$total = 10 /* preço */ * 2;
+echo "Total: $total\n";
+</pre>
+
+<pre class="term">$ php bloco.php
+- leite
+Total: 20</pre>
+
+<dl class="anatomy">
+  <dt>/*</dt><dd>Abre o comentário. Pode estar sozinho na linha ou junto do texto.</dd>
+  <dt>*/</dt><dd>Fecha. Tudo entre <code>/*</code> e <code>*/</code> some para o PHP.</dd>
+  <dt>10 /* preço */ * 2</dt><dd>Como o bloco tem começo e fim marcados, ele pode ficar até <strong>no meio</strong> de uma linha de código. O PHP lê <code>10 * 2</code>. Funciona, mas atrapalha a leitura: use com moderação.</dd>
+</dl>
+
+<p>É comum ver blocos com um <code>*</code> no começo de cada linha, só por estética:</p>
+<pre class="file" data-file="estetica.php">&lt;?php
+/*
+ * Lojinha da Ana
+ * Versão 1, outubro de 2026
+ */
+</pre>
+<p>Os <code>*</code> do meio não têm função nenhuma: são parte do texto do comentário. Só o <code>/*</code> do começo e o <code>*/</code> do fim importam.</p>
+
+<hr>
+
+<h2>Comentários de documentação: <code>/** … */</code> (PHPDoc)</h2>
+<p>Um bloco que começa com <strong>dois</strong> asteriscos, <code>/**</code>, é um <strong>comentário de documentação</strong>, no formato chamado <strong>PHPDoc</strong>. Para o PHP, ele continua sendo um comentário: não muda nada na execução. A diferença é que os editores de código e outras ferramentas sabem ler esse formato.</p>
+
+<p>Ele é usado logo <strong>acima</strong> de algo que se quer documentar, como uma <a href="funcoes.html">função</a> (você vai aprender a criar funções no Nível 2; aqui basta saber que <code>total</code> calcula preço vezes quantidade):</p>
+
+<pre class="file" data-file="doc.php">&lt;?php
+/**
+ * Calcula o total de uma compra.
+ *
+ * @param float $preco Preço de uma unidade.
+ * @param int   $qtd   Quantidade comprada.
+ * @return float O preço vezes a quantidade.
+ */
+function total(float $preco, int $qtd): float
+{
+    return $preco * $qtd;
+}
+
+echo total(12.5, 3), "\n";
+</pre>
+
+<pre class="term">$ php doc.php
+37.5</pre>
+
+<dl class="anatomy">
+  <dt>/**</dt><dd>Abre um comentário de documentação (dois asteriscos).</dd>
+  <dt>Calcula o total de uma compra.</dt><dd>A primeira frase: um resumo do que vem abaixo.</dd>
+  <dt>@param float $preco …</dt><dd>Uma <strong>etiqueta</strong> (<em>tag</em>): começa com <code>@</code>. <code>@param</code> descreve um parâmetro, a informação que a função recebe: o tipo, o nome e o que ele significa.</dd>
+  <dt>@return float …</dt><dd>Descreve o que a função devolve.</dd>
+  <dt>*/</dt><dd>Fecha, como num bloco comum.</dd>
+</dl>
+
+<p>Para que serve, se o PHP ignora? Quando você passa o mouse sobre <code>total(</code> em outra parte do código, editores como o VS Code e o PhpStorm mostram esse texto numa caixinha, com a descrição de cada parâmetro (veja <a href="editores.html">Editores e IDEs</a>). Ferramentas como o phpDocumentor transformam esses comentários num site de documentação. As etiquetas mais vistas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Etiqueta</th><th>Descreve</th></tr>
+<tr><td><code>@param tipo $nome descrição</code></td><td>Um parâmetro da função</td></tr>
+<tr><td><code>@return tipo descrição</code></td><td>O que a função devolve</td></tr>
+<tr><td><code>@throws ClasseDoErro</code></td><td>Um erro que a função pode lançar (veja <a href="excecoes.html">Exceções</a>)</td></tr>
+<tr><td><code>@var tipo</code></td><td>O tipo de uma variável ou propriedade</td></tr>
+<tr><td><code>@deprecated</code></td><td>"Não use mais; vai sair"</td></tr>
+<tr><td><code>@see</code>, <code>@link</code></td><td>"Veja também" outra função ou um endereço</td></tr>
+</table>
+</div>
+
+<p>No PHP moderno, os tipos podem ficar no próprio código (o <code>float $preco</code> e o <code>: float</code> do exemplo; veja <a href="tipos-retorno.html">Tipos e Retorno</a>), e o PHPDoc fica para as <strong>explicações</strong>. Enquanto você aprende, não precisa documentar tudo; basta reconhecer o formato quando encontrá-lo.</p>
+
+<div class="tryphp" data-goal="outre:^Total: 37\.5\n?$,src:(//|#|/\*)\s*echo">
+<p class="try-task"><strong>Missão:</strong> a Ana deixou uma linha de "depuração" que mostra o preço, e agora só quer ver o total. <strong>Não apague</strong> a linha: transforme-a em comentário, para poder ligá-la de novo depois. A saída deve ser só <code>Total: 37.5</code>.</p>
+<pre class="script">&lt;?php
+$preco = 12.5;
+$qtd = 3;
+echo "Depuração: preço = $preco\n";
+echo "Total: ", $preco * $qtd, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$preco = 12.5;
+$qtd = 3;
+// echo "Depuração: preço = $preco\n";
+echo "Total: ", $preco * $qtd, "\n";
+</pre>
+</div>
+
+<p>"Comentar" uma linha para desligá-la é um truque que você vai usar o tempo todo para encontrar defeitos (veja <a href="depuracao.html">Depurar</a>). Nos editores de código, o atalho <kbd>Ctrl</kbd>+<kbd>/</kbd> coloca ou tira o <code>//</code> da linha onde está o cursor, ou de todas as linhas selecionadas.</p>
+
+<hr>
+
+<h2>Cuidado: <code>#[…]</code> não é comentário <span class="versao">PHP 8.0+</span></h2>
+<p>Até o PHP 7, qualquer coisa começando com <code>#</code> era comentário. No PHP 8 surgiram os <strong>atributos</strong>, um recurso que "etiqueta" funções e classes, e eles são escritos justamente com <code>#[</code> … <code>]</code>. Resultado: uma "anotação" que começa com <code>#[</code> deixou de ser comentário e virou código:</p>
+
+<pre class="file" data-file="attr.php">&lt;?php
+#[TODO] colocar o preço
+echo "Olá!\n";
+</pre>
+
+<pre class="term">$ php attr.php
+
+Parse error: syntax error, unexpected identifier "colocar" in /home/ana/coment/attr.php on line 2</pre>
+
+<p>O PHP leu <code>#[TODO]</code> como um atributo chamado <code>TODO</code> e depois achou a palavra solta <code>colocar</code>, que não faz sentido ali. Com um espaço entre o <code>#</code> e o <code>[</code>, volta a ser comentário:</p>
+
+<pre class="file" data-file="attr2.php">&lt;?php
+# [TODO] colocar o preço
+echo "Olá!\n";
+</pre>
+
+<pre class="term">$ php attr2.php
+Olá!</pre>
+
+<p>E o pior caso é quando <strong>não dá erro</strong>. Se o <code>#[…]</code> estiver logo acima de uma função, ele é um atributo válido, e o PHP aceita calado:</p>
+
+<pre class="file" data-file="attr4.php">&lt;?php
+#[TODO]
+function saudar() {
+    echo "Olá!\n";
+}
+saudar();
+</pre>
+
+<pre class="term">$ php attr4.php
+Olá!</pre>
+
+<p>Aqui nada quebrou, mas o <code>#[TODO]</code> não é uma anotação para você: é código, que o PHP guardou como um atributo da função. Os atributos de verdade têm usos importantes, como o <code>#[\Override]</code> e o <code>#[\Deprecated]</code>, e são assunto de <a href="atributos.html">Atributos</a>.</p>
+
+<div class="warning">
+<strong>A regra</strong>
+<p>Para comentar, use <code>//</code>. Se usar <code>#</code>, nunca o grude num <code>[</code>. E se você pegar um código antigo, do PHP 7, cheio de <code>#[</code> usados como comentário, troque-os por <code>//</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Preço: R$ 12.5,semerro,src:TODO">
+<p class="try-task"><strong>Missão:</strong> o programa abaixo não roda por causa da anotação da linha 2. Conserte <strong>sem apagar</strong> a anotação (o texto <code>TODO</code> deve continuar no código, como comentário).</p>
+<pre class="script">&lt;?php
+#[TODO] mostrar o preço com vírgula
+echo "Preço: R$ 12.5\n";
+</pre>
+<pre class="solucao">&lt;?php
+// TODO: mostrar o preço com vírgula
+echo "Preço: R$ 12.5\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Mais duas armadilhas</h2>
+
+<h3>O <code>?&gt;</code> fecha o PHP, mesmo dentro de <code>//</code></h3>
+<p>A marca <code>?&gt;</code> encerra o trecho de PHP e volta ao "modo HTML" (veja <a href="php-e-html.html">PHP Dentro do HTML</a>). Ela é tão forte que <strong>termina um comentário de uma linha</strong>:</p>
+
+<pre class="file" data-file="fecha.php">&lt;?php
+echo "Antes\n";
+// o PHP termina com ?&gt; e volta ao HTML
+echo "Depois\n";
+</pre>
+
+<pre class="term">$ php fecha.php
+Antes
+ e volta ao HTML
+echo "Depois\n";</pre>
+
+<p>O comentário acabou no <code>?&gt;</code>. Dali em diante, o PHP estava fora do modo PHP: o resto da linha e o <code>echo</code> de baixo saíram como <strong>texto comum</strong>, e o "Depois" nunca foi executado. Num comentário de várias linhas (<code>/* … */</code>), o <code>?&gt;</code> não tem esse efeito. Se precisar escrever <code>?&gt;</code> num comentário, use um bloco <code>/* */</code>.</p>
+
+<h3>Um <code>/* */</code> não cabe dentro de outro</h3>
+<p>O comentário de bloco termina no <strong>primeiro</strong> <code>*/</code> que aparecer. Por isso não dá para "aninhar" (colocar um dentro do outro). Isso pega quem tenta desligar um trecho que já tinha um comentário de bloco:</p>
+
+<pre class="file" data-file="aninhado.php">&lt;?php
+/*
+echo "pão\n";
+/* echo "leite\n"; */
+echo "café\n";
+*/
+echo "fim\n";
+</pre>
+
+<pre class="term">$ php aninhado.php
+
+Parse error: syntax error, unexpected token "*", expecting end of file in /home/ana/coment/aninhado.php on line 6</pre>
+
+<p>O primeiro <code>*/</code> (linha 4) fechou o comentário. A linha 5 virou código de novo, e o <code>*/</code> da linha 6 sobrou, sem par. Para desligar trechos grandes, prefira <code>//</code> em cada linha (o <kbd>Ctrl</kbd>+<kbd>/</kbd> faz isso por você).</p>
+
+<hr>
+
+<h2>Comentários no PHP × comentários no HTML</h2>
+<p>Numa página web você pode usar dois tipos de comentário, e eles têm destinos diferentes:</p>
+
+<pre class="file" data-file="index.php">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;body&gt;
+&lt;!-- Comentário HTML: o visitante vê no código-fonte --&gt;
+&lt;?php
+// Comentário PHP: o visitante nunca vê
+$nome = "Ana";
+/* Este também não sai do servidor */
+echo "&lt;p&gt;Olá, $nome!&lt;/p&gt;\n";
+?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>O que chega ao navegador (pelo <a href="servidor-embutido.html">servidor embutido</a>):</p>
+
+<pre class="term">$ curl -s localhost:8000/index.php
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;body&gt;
+&lt;!-- Comentário HTML: o visitante vê no código-fonte --&gt;
+&lt;p&gt;Olá, Ana!&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>O comentário HTML <code>&lt;!-- … --&gt;</code> está fora do PHP, então é texto comum e vai para o navegador. Ele não aparece na página, mas qualquer pessoa vê com "Exibir código-fonte". Os comentários PHP ficam no servidor. Por isso, <strong>nunca escreva senhas, nomes de servidores ou detalhes internos em comentários HTML</strong>.</p>
+
+<hr>
+
+<h2>O que escrever num comentário</h2>
+<p>Comentário bom explica o <strong>porquê</strong>; o <strong>quê</strong>, o próprio código já diz. Compare:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comentário</th><th>Avaliação</th></tr>
+<tr><td><code>$total = $preco * $qtd; // multiplica preço por quantidade</code></td><td>Inútil: repete o código.</td></tr>
+<tr><td><code>$frete = 0; // frete grátis: promoção de outubro, combinada com a transportadora</code></td><td>Bom: explica uma decisão que o código não mostra.</td></tr>
+<tr><td><code>// TODO: aceitar preço com vírgula ("12,50")</code></td><td>Bom: marca algo pendente. <code>TODO</code> ("a fazer") e <code>FIXME</code> ("conserte-me") são marcas que os editores destacam e listam.</td></tr>
+<tr><td><code>// $desconto = 10;</code> (esquecido há meses)</td><td>Ruim: código comentado que ninguém sabe se ainda serve. Se não serve, apague; o histórico do Git guarda.</td></tr>
+</table>
+</div>
+
+<p>Enquanto você aprende, porém, vale o contrário: comente à vontade, até o óbvio. Escrever em português o que cada linha faz é um ótimo jeito de estudar. Só não estranhe quando, em projetos profissionais, os comentários forem poucos e bem escolhidos.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>#[</code> usado como comentário</strong>
+<pre class="term">$ php attr.php
+
+Parse error: syntax error, unexpected identifier "colocar" in /home/ana/coment/attr.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> no PHP 8, <code>#[</code> começa um atributo, não um comentário.</p>
+<p><strong>Como consertar:</strong> troque por <code>//</code> (ou ponha um espaço: <code># [TODO]</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Comentário de bloco que não fecha</strong>
+<pre class="file" data-file="naofechou.php">&lt;?php
+echo "Olá\n";
+/* comentário que nunca fecha
+echo "Tchau\n";
+</pre>
+<pre class="term">$ php naofechou.php
+
+Parse error: Unterminated comment starting line 3 in /home/ana/coment/naofechou.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> "comentário não terminado, começando na linha 3". Faltou o <code>*/</code>. Como é um <code>Parse error</code>, nem o <code>Olá</code> da linha 2 aparece (veja <a href="erros.html">Lendo Erros</a>).</p>
+<p><strong>Como consertar:</strong> feche o bloco com <code>*/</code> onde o comentário termina.</p>
+</div>
+
+<div class="cenario">
+<strong>Comentário dentro de comentário</strong>
+<pre class="term">$ php aninhado.php
+
+Parse error: syntax error, unexpected token "*", expecting end of file in /home/ana/coment/aninhado.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> o primeiro <code>*/</code> fechou o bloco; o segundo sobrou.</p>
+<p><strong>Como consertar:</strong> use <code>//</code> em cada linha para desligar trechos que já têm comentários.</p>
+</div>
+
+<div class="cenario">
+<strong>Código apareceu na tela depois de um comentário</strong>
+<pre class="term">$ php fecha.php
+Antes
+ e volta ao HTML
+echo "Depois\n";</pre>
+<p><strong>O que aconteceu:</strong> o comentário <code>//</code> tinha um <code>?&gt;</code>, que encerrou o modo PHP.</p>
+<p><strong>Como consertar:</strong> tire o <code>?&gt;</code> do comentário ou use <code>/* … */</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:37.5,src:/\*\*,src:@param,src:@return,semerro">
+<p class="try-task"><strong>Missão final:</strong> documente a função <code>total</code> com um comentário PHPDoc logo acima dela: uma frase dizendo o que ela faz, um <code>@param</code> para cada parâmetro (<code>$preco</code> e <code>$qtd</code>) e um <code>@return</code>. O resultado do programa não deve mudar.</p>
+<pre class="script">&lt;?php
+function total(float $preco, int $qtd): float
+{
+    return $preco * $qtd;
+}
+
+echo total(12.5, 3), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+/**
+ * Calcula o total de uma compra.
+ *
+ * @param float $preco Preço de uma unidade.
+ * @param int   $qtd   Quantidade comprada.
+ * @return float O preço vezes a quantidade.
+ */
+function total(float $preco, int $qtd): float
+{
+    return $preco * $qtd;
+}
+
+echo total(12.5, 3), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Nome</th><th>Alcance</th><th>Uso</th></tr>
+<tr><td><code>// texto</code></td><td>Comentário de linha</td><td>Até o fim da linha (ou até um <code>?&gt;</code>)</td><td>O mais comum</td></tr>
+<tr><td><code># texto</code></td><td>Comentário de linha (estilo shell)</td><td>Igual ao <code>//</code></td><td>Raro hoje; nunca grudado em <code>[</code></td></tr>
+<tr><td><code>/* texto */</code></td><td>Comentário de bloco</td><td>Do <code>/*</code> ao primeiro <code>*/</code></td><td>Textos longos; não aninha</td></tr>
+<tr><td><code>/** texto */</code></td><td>PHPDoc (documentação)</td><td>Igual ao bloco</td><td>Acima de funções, classes, propriedades</td></tr>
+<tr><td><code>#[Nome]</code></td><td>Atributo (<strong>não</strong> é comentário) <span class="versao">PHP 8.0+</span></td><td>—</td><td>Veja <a href="atributos.html">Atributos</a></td></tr>
+<tr><td><code>&lt;!-- texto --&gt;</code></td><td>Comentário HTML</td><td>Fora do PHP; vai para o navegador</td><td>Nunca com informações internas</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Comentário de uma linha</h3>
+<p>Complete com a marca de comentário mais usada no PHP moderno:</p>
+<div class="ex-code"><input data-answer="//" aria-label="marca de comentário"> calcula o frete</div>
+</div>
+
+<div class="exercise">
+<h3>2. Fechar o bloco</h3>
+<p>Complete para fechar o comentário de bloco:</p>
+<div class="ex-code">/* lista de compras da Ana <input data-answer="*/" aria-label="fechamento"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Documentação</h3>
+<p>Com que três caracteres começa um comentário PHPDoc?</p>
+<div class="ex-code"><input data-answer="/**" aria-label="abertura do PHPDoc"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destas linhas dá erro no PHP 8?</p>
+<label><input type="radio" name="q4"> <code>// [TODO] revisar</code></label>
+<label><input type="radio" name="q4"> <code># [TODO] revisar</code></label>
+<label><input type="radio" name="q4"> <code>#[TODO] revisar</code></label>
+<label><input type="radio" name="q4"> <code>/* [TODO] revisar */</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que <code>echo "a"; // echo "b";</code> mostra?</p>
+<label><input type="radio" name="q5"> <code>ab</code></label>
+<label><input type="radio" name="q5"> <code>a</code></label>
+<label><input type="radio" name="q5"> <code>b</code></label>
+<label><input type="radio" name="q5"> Um erro</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Numa página PHP, qual comentário um visitante consegue ler com "Exibir código-fonte"?</p>
+<label><input type="radio" name="q6"> <code>// comentário</code></label>
+<label><input type="radio" name="q6"> <code>/* comentário */</code></label>
+<label><input type="radio" name="q6"> <code>/** comentário */</code></label>
+<label><input type="radio" name="q6"> <code>&lt;!-- comentário --&gt;</code>, escrito fora do <code>&lt;?php</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Para que serve um comentário PHPDoc (<code>/** */</code>) com <code>@param</code> e <code>@return</code>?</p>
+<label><input type="radio" name="q7"> Documentar a função para pessoas, editores e ferramentas; o PHP o ignora ao rodar.</label>
+<label><input type="radio" name="q7"> Fazer o PHP conferir os tipos dos parâmetros.</label>
+<label><input type="radio" name="q7"> Deixar a função mais rápida.</label>
+<label><input type="radio" name="q7"> Esconder a função de outros arquivos.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Comentários são ignorados pelo PHP; servem para pessoas.</li>
+  <li><code>//</code> e <code>#</code>: até o fim da linha. Prefira <code>//</code>.</li>
+  <li><code>/* … */</code>: várias linhas, até o primeiro <code>*/</code>; não dá para colocar um dentro do outro.</li>
+  <li><code>/** … */</code> (PHPDoc): documentação com etiquetas como <code>@param</code> e <code>@return</code>, lida por editores e ferramentas.</li>
+  <li>No PHP 8, <code>#[…]</code> é um <strong>atributo</strong>, não comentário.</li>
+  <li>Um <code>?&gt;</code> dentro de <code>//</code> encerra o PHP. Dentro de aspas, <code>//</code> e <code>#</code> são texto comum.</li>
+  <li>Comentar uma linha (<kbd>Ctrl</kbd>+<kbd>/</kbd>) é o jeito de desligá-la sem apagar.</li>
+  <li>Comentários HTML vão para o navegador; comentários PHP ficam no servidor.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
