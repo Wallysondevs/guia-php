@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Booleanos — true, false e o que conta como falso | Guia PHP</title>
+<meta name="description" content="Booleanos em PHP para quem nunca programou: true e false, de onde eles vêm, o que o PHP considera falso (0, &quot;0&quot;, &quot;&quot;, [], null…) com var_dump real de cada valor, a armadilha da string &quot;0&quot; e como o echo mostra um booleano.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Booleanos</span></h1>
+
+<p class="intro">"O cliente está logado?" "Tem o produto no estoque?" "A senha está certa?" Perguntas assim só têm duas respostas: <strong>sim</strong> ou <strong>não</strong>. Em programação, a resposta sim/não é um valor do tipo <strong>booleano</strong> (<code>bool</code>), que só pode ser <code>true</code> (verdadeiro) ou <code>false</code> (falso). Nesta aula você aprende de onde vêm esses valores e uma regra do PHP que pega muita gente: na hora de decidir, <strong>quase qualquer valor</strong> pode ser tratado como verdadeiro ou falso, inclusive o texto <code>"0"</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são <code>true</code> e <code>false</code> e onde eles aparecem.</li>
+  <li>Por que <code>echo true</code> mostra <code>1</code> e <code>echo false</code> não mostra nada.</li>
+  <li>A lista completa do que o PHP considera <strong>falso</strong> (com o resultado real de cada um).</li>
+  <li>A armadilha da string <code>"0"</code>, e como fugir dela.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. Os booleanos são o "combustível" das decisões (<a href="if-else.html">if, elseif, else</a>) e das repetições (<a href="while.html">while</a>); aqui você entende o valor em si.</p>
+
+<hr>
+
+<h2>A ideia: um interruptor</h2>
+<p>Um interruptor de luz tem duas posições: <strong>ligado</strong> ou <strong>desligado</strong>. Não existe "meio ligado". Um booleano é isso: um valor com só duas posições. O nome vem do matemático inglês George Boole, que criou, no século XIX, a "álgebra" do verdadeiro e falso que todo computador usa.</p>
+
+<pre class="file" data-file="interruptor.php">&lt;?php
+$logado = true;
+$temEstoque = false;
+var_dump($logado, $temEstoque);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php interruptor.php
+bool(true)
+bool(false)</pre>
+
+<dl class="anatomy">
+  <dt>true</dt><dd>"Verdadeiro". Escrito <strong>sem aspas</strong>: <code>"true"</code> com aspas é uma string de 4 letras.</dd>
+  <dt>false</dt><dd>"Falso". Também sem aspas.</dd>
+  <dt>bool(true)</dt><dd>O <code>var_dump</code> mostra o tipo <code>bool</code> e o valor.</dd>
+</dl>
+
+<p>O PHP aceita <code>true</code>, <code>TRUE</code> e <code>True</code> (as palavras da linguagem não diferenciam maiúsculas), mas o costume moderno é sempre em minúsculas. Bons nomes para variáveis booleanas parecem perguntas de sim/não: <code>$logado</code>, <code>$temEstoque</code>, <code>$ehAdmin</code>, <code>$podeComprar</code>.</p>
+
+<hr>
+
+<h2>1. De onde vêm os booleanos</h2>
+<p>Você raramente escreve <code>true</code> ou <code>false</code> à mão. Na maior parte do tempo, eles são a <strong>resposta</strong> de uma pergunta que o programa faz:</p>
+
+<pre class="file" data-file="perguntas.php">&lt;?php
+var_dump(5 &gt; 3);
+var_dump(5 &lt; 3);
+var_dump("Ana" === "Ana");
+var_dump(isset($cupom));
+var_dump(is_int(29));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php perguntas.php
+bool(true)               « 5 é maior que 3?
+bool(false)              « 5 é menor que 3?
+bool(true)               « "Ana" é idêntico a "Ana"?
+bool(false)              « $cupom existe?
+bool(true)               « 29 é um int?</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>De onde vem</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td>Comparações</td><td><code>$idade &gt;= 18</code>, <code>$senha === "abc"</code></td><td><a href="operadores-comparacao.html">Comparação</a></td></tr>
+<tr><td>Combinações de perguntas</td><td><code>$logado &amp;&amp; $temEstoque</code></td><td><a href="operadores-logicos.html">Operadores Lógicos</a></td></tr>
+<tr><td>Funções que respondem sim/não</td><td><code>isset</code>, <code>is_int</code>, <code>in_array</code>, <code>file_exists</code></td><td>várias</td></tr>
+<tr><td>Escritos à mão</td><td><code>$modoTeste = true;</code></td><td>esta</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Mostrar um booleano: o <code>echo</code> engana</h2>
+<p>Experimente mostrar um booleano com <code>echo</code>:</p>
+
+<pre class="file" data-file="echo-bool.php">&lt;?php
+echo "echo true: [", true, "]\n";
+echo "echo false: [", false, "]\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php echo-bool.php
+echo true: [1]           « true vira o texto "1"
+echo false: []           « false vira o texto vazio: não aparece nada!</pre>
+
+<p>O <code>echo</code> só sabe mostrar texto, então converte o booleano: <code>true</code> vira <code>"1"</code> e <code>false</code> vira <code>""</code> (string vazia). Os colchetes no exemplo estão lá só para você ver que não saiu nada no lugar do <code>false</code>. Por isso, para <strong>investigar</strong> um booleano, use sempre o <code>var_dump</code>. Se precisar escrever a palavra, use <code>var_export($x, true)</code> ou <code>json_encode($x)</code>, que devolvem <code>"true"</code> / <code>"false"</code> (veja <a href="var-dump.html">var_dump e print_r</a>).</p>
+
+<hr>
+
+<h2>3. O que conta como falso</h2>
+<p>Quando o PHP precisa de um booleano e recebe outro tipo (no <code>if</code>, no <code>while</code>, no <code>!</code>, no <code>&amp;&amp;</code>), ele <strong>converte</strong> o valor. A regra é curta: <strong>existe uma lista pequena de valores que viram <code>false</code>; todo o resto vira <code>true</code></strong>.</p>
+
+<p>Para ver a conversão, use <code>(bool)</code> na frente do valor: é o <em>cast</em>, a conversão explícita (aula <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+
+<pre class="file" data-file="falsos.php">&lt;?php
+var_dump((bool) false);
+var_dump((bool) 0);
+var_dump((bool) 0.0);
+var_dump((bool) -0.0);
+var_dump((bool) "");
+var_dump((bool) "0");
+var_dump((bool) []);
+var_dump((bool) null);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php falsos.php
+bool(false)
+bool(false)
+bool(false)
+bool(false)
+bool(false)
+bool(false)
+bool(false)
+bool(false)</pre>
+
+<p>Esses são <strong>todos</strong> os valores falsos do PHP. Decore esta tabela: ela vale para a linguagem inteira.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th>Tipo</th><th>(bool)</th><th>Comentário</th></tr>
+<tr><td><code>false</code></td><td>bool</td><td><code>false</code></td><td>o próprio</td></tr>
+<tr><td><code>0</code></td><td>int</td><td><code>false</code></td><td>o inteiro zero</td></tr>
+<tr><td><code>0.0</code>, <code>-0.0</code></td><td>float</td><td><code>false</code></td><td>o float zero</td></tr>
+<tr><td><code>""</code></td><td>string</td><td><code>false</code></td><td>a string vazia</td></tr>
+<tr><td><code>"0"</code></td><td>string</td><td><code>false</code></td><td><strong>a armadilha</strong>: o texto com um zero</td></tr>
+<tr><td><code>[]</code></td><td>array</td><td><code>false</code></td><td>o array vazio</td></tr>
+<tr><td><code>null</code></td><td>null</td><td><code>false</code></td><td>"nenhum valor" (e variáveis inexistentes)</td></tr>
+</table>
+</div>
+
+<h3>E o que é verdadeiro: todo o resto</h3>
+<p>Qualquer valor fora da lista vira <code>true</code>, inclusive alguns que "parecem" falsos:</p>
+
+<pre class="file" data-file="verdadeiros.php">&lt;?php
+var_dump((bool) 1);
+var_dump((bool) -1);
+var_dump((bool) 0.1);
+var_dump((bool) "a");
+var_dump((bool) " ");
+var_dump((bool) "0.0");
+var_dump((bool) "00");
+var_dump((bool) "false");
+var_dump((bool) [0]);
+var_dump((bool) new stdClass());
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php verdadeiros.php
+bool(true)               « 1
+bool(true)               « -1: negativo não é zero
+bool(true)               « 0.1
+bool(true)               « "a"
+bool(true)               « " ": um espaço já não é string vazia
+bool(true)               « "0.0": só o texto "0" exato é falso
+bool(true)               « "00"
+bool(true)               « "false": é uma string de 5 letras!
+bool(true)               « [0]: array com um item (mesmo que o item seja 0)
+bool(true)               « qualquer objeto</pre>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque o valor de <code>$valor</code> e tente adivinhar o resultado antes de rodar. Teste <code>"0"</code>, <code>"0.0"</code>, <code>" "</code>, <code>[]</code>, <code>[[]]</code>, <code>-5</code>, <code>"no"</code>, <code>null</code>.</p>
+<pre class="script">&lt;?php
+$valor = "0";
+var_dump((bool) $valor);
+</pre>
+</div>
+
+<div class="note">
+<strong>Novidade do PHP 8.5: NAN</strong>
+<p>O valor especial <code>NAN</code> ("não é um número", visto em <a href="numeros.html">int e float</a>) vira <code>true</code>, mas o PHP 8.5 passou a avisar, porque isso quase sempre indica um erro de conta:</p>
+<pre class="term" data-cwd="~/site">$ php nan.php                « var_dump((bool) NAN);
+
+Warning: unexpected NAN value was coerced to bool in /home/ana/site/nan.php on line 2
+bool(true)</pre>
+<p><em>Coerced to bool</em> = "forçado a virar bool".</p>
+</div>
+
+<hr>
+
+<h2>4. A armadilha da string <code>"0"</code></h2>
+<p>Por que o PHP trata <code>"0"</code> como falso? Porque, na web, <strong>tudo chega como texto</strong>. Se um formulário pergunta "quantos itens?" e o visitante digita 0, o PHP recebe a string <code>"0"</code>. Tratar <code>"0"</code> como o número zero (falso) foi pensado para ajudar. Só que, às vezes, <code>"0"</code> é um texto legítimo:</p>
+
+<pre class="file" data-file="armadilha.php">&lt;?php
+$apelido = "0";
+if ($apelido) {
+    echo "Olá, $apelido\n";
+} else {
+    echo "Apelido vazio!\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php armadilha.php
+Apelido vazio!           « a cliente digitou "0" e o programa achou que estava vazio</pre>
+
+<p>(O <code>if</code> executa o primeiro bloco quando a condição é verdadeira e o bloco do <code>else</code> quando é falsa; os detalhes estão em <a href="if-else.html">if, elseif, else</a>.)</p>
+
+<p>O <code>if ($apelido)</code> pergunta "o apelido, convertido para bool, é verdadeiro?". E <code>"0"</code> vira <code>false</code>. O conserto é perguntar <strong>exatamente</strong> o que você quer saber: "o apelido é diferente da string vazia?":</p>
+
+<pre class="file" data-file="trecho">if ($apelido !== "") {      // "é diferente de vazio?"  →  "0" passa</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer saber…</th><th>Pergunte assim</th><th>Com <code>"0"</code> dá</th></tr>
+<tr><td>A string tem algum caractere?</td><td><code>$s !== ""</code> ou <code>strlen($s) &gt; 0</code></td><td><code>true</code> ✔</td></tr>
+<tr><td>A variável existe e não é null?</td><td><code>isset($s)</code></td><td><code>true</code> ✔</td></tr>
+<tr><td>O valor é "verdadeiro" pela regra do PHP?</td><td><code>if ($s)</code></td><td><code>false</code> ✘</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>O <code>empty</code> cai na mesma armadilha</strong>
+<p>A função <code>empty($x)</code> ("está vazio?") é o contrário da conversão para bool, e ainda não reclama de variável inexistente. Ela devolve <code>true</code> para todos os valores falsos da tabela, <strong>inclusive <code>"0"</code></strong>:</p>
+<pre class="term" data-cwd="~/site">$ php empty.php             « var_dump(empty("0"), empty(""), empty("a"), empty($naoExiste));
+bool(true)                  « "0" é considerado vazio!
+bool(true)
+bool(false)
+bool(true)                  « variável inexistente: vazio, sem Warning</pre>
+<p>Use <code>empty</code> com cuidado em campos de texto que podem receber "0" (apelido, número da casa, nota de prova).</p>
+</div>
+
+<div class="tip">
+<strong>E o texto "false", "sim", "não"?</strong>
+<p>Um formulário ou arquivo de configuração pode mandar <code>"false"</code> como texto. Como você viu, <code>(bool) "false"</code> é <code>true</code>. Para interpretar palavras, use <code>filter_var($x, FILTER_VALIDATE_BOOLEAN)</code>, que entende <code>"true"</code>, <code>"false"</code>, <code>"yes"</code>, <code>"no"</code>, <code>"on"</code>, <code>"off"</code>, <code>"1"</code> e <code>"0"</code>, em inglês (<code>"sim"</code> dá <code>false</code>). Detalhes em <a href="validacao.html">Validar Dados</a>.</p>
+</div>
+
+<hr>
+
+<h2>5. Booleanos em contas</h2>
+<p>Se você usar um booleano numa conta, ele vira número: <code>true</code> é <code>1</code> e <code>false</code> é <code>0</code>. <code>true + true</code> dá <code>int(2)</code>. Funciona, mas evite: quem lê o código não espera contas com verdadeiro e falso.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O <code>echo</code> de uma variável não mostra nada</strong>
+<p><strong>O que significa:</strong> a variável provavelmente vale <code>false</code> (ou <code>null</code>, ou <code>""</code>), e o <code>echo</code> mostra todos eles como "nada".</p>
+<p><strong>Como consertar:</strong> troque o <code>echo</code> por <code>var_dump</code> para ver o tipo e o valor real.</p>
+</div>
+
+<div class="cenario">
+<strong>Um valor "0" foi tratado como vazio</strong>
+<p><strong>O que significa:</strong> o código usa <code>if ($x)</code>, <code>if (!$x)</code> ou <code>empty($x)</code>, e <code>"0"</code> é falso no PHP.</p>
+<p><strong>Como consertar:</strong> pergunte exatamente o que quer: <code>$x !== ""</code>, <code>$x !== null</code>, <code>isset($x)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>"false"</code> foi tratado como verdadeiro</strong>
+<p><strong>O que significa:</strong> o valor é a <strong>string</strong> <code>"false"</code>, que não está na lista dos falsos.</p>
+<p><strong>Como consertar:</strong> escreva <code>false</code> sem aspas, ou converta o texto com <code>filter_var($x, FILTER_VALIDATE_BOOLEAN)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>true</code>, <code>false</code></td><td>Os dois valores booleanos</td><td><code>bool(true)</code></td></tr>
+<tr><td><code>(bool) $x</code>, <code>boolval($x)</code></td><td>Converte para bool</td><td><code>(bool) "0"</code> → <code>false</code></td></tr>
+<tr><td><code>is_bool($x)</code></td><td>É do tipo bool?</td><td><code>is_bool(0)</code> → <code>false</code></td></tr>
+<tr><td><code>empty($x)</code></td><td>Não existe ou é falso?</td><td><code>empty("0")</code> → <code>true</code></td></tr>
+<tr><td><code>echo true</code> / <code>echo false</code></td><td>Mostra <code>1</code> / nada</td><td></td></tr>
+<tr><td><code>var_export($x, true)</code></td><td>A palavra <code>true</code>/<code>false</code></td><td><code>"false"</code></td></tr>
+<tr><td>Falsos</td><td colspan="2"><code>false</code>, <code>0</code>, <code>0.0</code>, <code>-0.0</code>, <code>""</code>, <code>"0"</code>, <code>[]</code>, <code>null</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Converter</h3>
+<p>Complete para converter <code>$x</code> em booleano:</p>
+<div class="ex-code">var_dump((<input data-answer="bool|boolean" aria-label="tipo">) $x);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O texto do verdadeiro</h3>
+<p>Complete com o que aparece na tela quando o PHP roda <code>echo true;</code>:</p>
+<div class="ex-code">echo true; &nbsp;→&nbsp; <input data-answer="1" aria-label="saída"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Qual destes valores é <strong>verdadeiro</strong> para o PHP?</p>
+<label><input type="radio" name="q3"> <code>"0"</code></label>
+<label><input type="radio" name="q3"> <code>"0.0"</code></label>
+<label><input type="radio" name="q3"> <code>[]</code></label>
+<label><input type="radio" name="q3"> <code>null</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>var_dump((bool) "false");</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>bool(false)</code></label>
+<label><input type="radio" name="q4"> Um Warning</label>
+<label><input type="radio" name="q4"> <code>bool(true)</code></label>
+<label><input type="radio" name="q4"> <code>string(5) "false"</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A variável <code>$numeroCasa</code> veio de um formulário com o texto <code>"0"</code>. Qual teste responde "o campo foi preenchido?" corretamente?</p>
+<label><input type="radio" name="q5"> <code>if ($numeroCasa)</code></label>
+<label><input type="radio" name="q5"> <code>if (!empty($numeroCasa))</code></label>
+<label><input type="radio" name="q5"> <code>if ((bool) $numeroCasa)</code></label>
+<label><input type="radio" name="q5"> <code>if ($numeroCasa !== "")</code></label>
+</div>
+
+<h3>Missão final: o apelido "0"</h3>
+
+<div class="tryphp" data-goal="out:Olá\, 0,semerro,src:!==?\s*(&quot;&quot;|'')|strlen">
+<p class="try-task"><strong>Missão:</strong> a cliente escolheu o apelido <code>"0"</code>, mas o programa responde <code>Apelido vazio!</code>. Mude <strong>só a condição do <code>if</code></strong> para que qualquer texto não vazio seja aceito, inclusive <code>"0"</code>. A saída deve ser <code>Olá, 0</code>. Depois teste com <code>$apelido = "";</code>: deve voltar a aparecer <code>Apelido vazio!</code>.</p>
+<pre class="script">&lt;?php
+$apelido = "0";
+if ($apelido) {
+    echo "Olá, $apelido\n";
+} else {
+    echo "Apelido vazio!\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$apelido = "0";
+if ($apelido !== "") {
+    echo "Olá, $apelido\n";
+} else {
+    echo "Apelido vazio!\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Booleano (<code>bool</code>) tem dois valores: <code>true</code> e <code>false</code>, sem aspas.</li>
+  <li>Eles vêm de comparações (<code>5 &gt; 3</code>), de funções (<code>isset</code>, <code>is_int</code>) e das combinações com <code>&amp;&amp;</code>, <code>||</code>, <code>!</code>.</li>
+  <li><code>echo true</code> mostra <code>1</code>; <code>echo false</code> não mostra nada. Investigue com <code>var_dump</code>.</li>
+  <li>São falsos: <code>false</code>, <code>0</code>, <code>0.0</code>, <code>-0.0</code>, <code>""</code>, <code>"0"</code>, <code>[]</code>, <code>null</code>. Todo o resto é verdadeiro (inclusive <code>" "</code>, <code>"0.0"</code> e <code>"false"</code>).</li>
+  <li>Cuidado com <code>"0"</code>: em <code>if ($x)</code> e <code>empty($x)</code> ele conta como vazio. Pergunte exatamente o que quer (<code>$x !== ""</code>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
