@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP MySQL e MariaDB — instalar, criar banco e conectar com PDO | Guia PHP</title>
+<meta name="description" content="MySQL e MariaDB para quem já usou SQLite: o que é um servidor de banco, como instalar em cada sistema, criar banco e usuário, o DSN mysql:host=…;dbname=…;charset=utf8mb4, as diferenças em relação ao SQLite, mysqli × PDO e as mensagens reais de erro de conexão (SQLSTATE[HY000] [2002]).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">MySQL e MariaDB</span></h1>
+
+<p class="intro">Até aqui, a lojinha da Ana guardou tudo num <strong>SQLite</strong>: um arquivo <code>loja.db</code> ao lado dos programas. Para um site pequeno, isso basta. Mas a maioria das hospedagens e dos sistemas PHP do mundo (WordPress, Moodle, lojas virtuais) usa um <strong>servidor de banco de dados</strong>, quase sempre o <strong>MySQL</strong> ou o seu "irmão" <strong>MariaDB</strong>. A boa notícia: com o PDO, o seu código PHP quase não muda. Muda a <strong>linha da conexão</strong> e alguns detalhes do SQL. Esta aula mostra exatamente quais.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre um banco "arquivo" (SQLite) e um banco "servidor" (MySQL, MariaDB).</li>
+  <li>O que é o MariaDB e por que ele aparece no lugar do MySQL em muitos Linux.</li>
+  <li>Como instalar o servidor em cada sistema e criar um <strong>banco</strong> e um <strong>usuário</strong> para a loja.</li>
+  <li>Como montar o <strong>DSN</strong> <code>mysql:host=…;dbname=…;charset=utf8mb4</code> e conectar com o PDO.</li>
+  <li>As diferenças de SQL entre SQLite e MySQL que mais dão problema (como o <code>AUTO_INCREMENT</code>).</li>
+  <li>O que é o <code>mysqli</code> e por que este guia usa o PDO.</li>
+  <li>O que significam as mensagens <code>SQLSTATE[HY000] [2002] …</code> e <code>could not find driver</code>.</li>
+</ul>
+</div>
+
+<div class="warning">
+<strong>Esta aula é para ler (e praticar a parte que roda no navegador)</strong>
+<p>O editor do guia roda o PHP de verdade, mas <strong>dentro do seu navegador</strong>: ele não consegue falar com um servidor MySQL. Por isso, as conexões com MySQL desta página aparecem em sessões de terminal da máquina da Ana (com saídas reais), e as missões treinam o que roda em qualquer lugar: montar o DSN e adaptar SQL do MySQL para o SQLite. A máquina da Ana <strong>não tem</strong> um servidor MySQL instalado; foi de propósito, para você ver as mensagens de erro reais de "servidor não encontrado", que são as que todo mundo encontra no primeiro dia.</p>
+</div>
+
+<p>Antes desta aula, você precisa conhecer o <a href="pdo.html">PDO</a>, o <a href="crud.html">CRUD</a> e os <a href="prepared-statements.html">prepared statements</a>. Os programas foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/loja</code>.</p>
+
+<hr>
+
+<h2>A ideia: o caderno e a secretaria</h2>
+<p>Pense em duas formas de guardar as fichas dos alunos de uma escola:</p>
+<ul>
+  <li><strong>Um caderno na mesa da professora</strong> (o SQLite). Quem quer uma ficha abre o caderno. É simples, não precisa de ninguém para cuidar, mas só uma pessoa escreve de cada vez, e o caderno está naquela mesa.</li>
+  <li><strong>A secretaria da escola</strong> (o MySQL). As fichas ficam num arquivo trancado, e existe um <strong>funcionário</strong> no balcão. Você não mexe nas fichas: vai ao balcão, diz quem é (usuário e senha) e faz o pedido. O funcionário atende muitas pessoas ao mesmo tempo, controla quem pode ver o quê e pode ficar em outro prédio.</li>
+</ul>
+
+<p>Esse "funcionário" é um <strong>programa servidor</strong> que fica rodando o tempo todo (no Linux, o processo se chama <code>mariadbd</code> ou <code>mysqld</code>) e atende pedidos pela rede, normalmente na <strong>porta 3306</strong>. O seu PHP é o <strong>cliente</strong>: ele se conecta, se identifica e envia SQL.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>SQLite</th><th>MySQL / MariaDB</th></tr>
+<tr><td>Onde os dados ficam</td><td>Num arquivo (<code>loja.db</code>)</td><td>Com um programa servidor, que guarda em arquivos próprios</td></tr>
+<tr><td>Precisa instalar e ligar algo?</td><td>Não: vem dentro do PHP (<code>pdo_sqlite</code>)</td><td>Sim: o servidor, e ele precisa estar rodando</td></tr>
+<tr><td>Usuário e senha</td><td>Não tem (vale a permissão do arquivo)</td><td>Tem: cada programa entra com um usuário</td></tr>
+<tr><td>Vários acessos ao mesmo tempo</td><td>Muitos leem; um escreve por vez</td><td>Muitos leem e escrevem ao mesmo tempo</td></tr>
+<tr><td>Pode ficar em outra máquina?</td><td>Não (o arquivo precisa estar acessível)</td><td>Sim, pela rede</td></tr>
+<tr><td>Bom para</td><td>Aprender, testes, sites pequenos, programas locais</td><td>Sites com muitos visitantes, hospedagens, sistemas grandes</td></tr>
+</table>
+</div>
+
+<h3>MySQL ou MariaDB?</h3>
+<p>O <strong>MySQL</strong> nasceu em 1995 e virou o banco mais usado com PHP. Em 2009, quando ele passou a pertencer à Oracle, um dos criadores (Michael "Monty" Widenius) fez uma cópia livre chamada <strong>MariaDB</strong> (MySQL e MariaDB têm os nomes das filhas dele, My e Maria). Hoje:</p>
+<ul>
+  <li>O Debian e várias outras distribuições trazem o <strong>MariaDB</strong> como padrão. O comando <code>mysql</code> continua existindo nelas, apontando para o MariaDB.</li>
+  <li>Para tudo o que este guia ensina (criar tabelas, <code>SELECT</code>, <code>INSERT</code>, conectar pelo PHP), os dois são <strong>iguais</strong>. O PHP usa o mesmo driver para os dois: <code>pdo_mysql</code>, com o prefixo <code>mysql:</code>.</li>
+  <li>As diferenças aparecem em recursos avançados e em versões novas. Se a sua hospedagem diz "MySQL 8" ou "MariaDB 11", o código desta aula funciona nos dois.</li>
+</ul>
+<p>No resto da página, "MySQL" vale para os dois.</p>
+
+<hr>
+
+<h2>1. Instalar o servidor e a extensão do PHP</h2>
+<p>São <strong>duas peças</strong> diferentes, e esquecer uma delas é o erro mais comum:</p>
+<ol>
+  <li><strong>O servidor</strong> (MariaDB ou MySQL): o "funcionário da secretaria".</li>
+  <li><strong>A extensão <code>pdo_mysql</code> do PHP</strong>: o "idioma" que o PHP usa para falar com ele. Sem ela, o PHP nem tenta conectar (você vai ver a mensagem <code>could not find driver</code> mais adiante).</li>
+</ol>
+
+<p>A tabela abaixo mostra os comandos de cada sistema. Ela é <strong>ilustrativa</strong>: os nomes dos pacotes mudam de versão para versão, então confira a documentação do seu sistema. A instalação do PHP em si está em <a href="instalar-linux.html">Instalar no Linux</a> e <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sistema</th><th>Servidor</th><th>Extensão do PHP</th></tr>
+<tr><td>Debian, Ubuntu, Mint</td><td><code>sudo apt install mariadb-server</code></td><td><code>sudo apt install php-mysql</code> (traz <code>pdo_mysql</code> e <code>mysqli</code>)</td></tr>
+<tr><td>Fedora</td><td><code>sudo dnf install mariadb-server</code> e depois <code>sudo systemctl enable --now mariadb</code></td><td><code>sudo dnf install php-mysqlnd</code></td></tr>
+<tr><td>Arch Linux</td><td><code>sudo pacman -S mariadb</code>, depois <code>sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql</code> e <code>sudo systemctl enable --now mariadb</code></td><td>Já vem no PHP; tire o <code>;</code> da linha <code>extension=pdo_mysql</code> no <code>php.ini</code></td></tr>
+<tr><td>Windows</td><td>Pacotes prontos como XAMPP ou Laragon (trazem PHP + MariaDB), ou o instalador oficial do MySQL</td><td>Já vem; tire o <code>;</code> de <code>extension=pdo_mysql</code> no <code>php.ini</code></td></tr>
+<tr><td>macOS (Homebrew)</td><td><code>brew install mariadb</code> (ou <code>mysql</code>) e <code>brew services start mariadb</code></td><td>O PHP do Homebrew já traz <code>pdo_mysql</code></td></tr>
+<tr><td>Qualquer um, com Docker</td><td><code>docker run -d --name banco -e MARIADB_ROOT_PASSWORD=troque -p 3306:3306 mariadb:11</code></td><td>Depende de onde o PHP está instalado</td></tr>
+</table>
+</div>
+
+<p>No Debian e no Ubuntu, o servidor já começa a rodar depois da instalação. Vale ainda rodar <code>sudo mariadb-secure-installation</code>, um assistente que remove usuários de teste e o banco <code>test</code> que vêm de fábrica.</p>
+
+<h3>Conferindo se o PHP tem o driver</h3>
+<p>Antes de qualquer coisa, pergunte ao PHP se a extensão está lá. O <code>php -m</code> lista os <strong>m</strong>ódulos (extensões) e o <code>grep -i mysql</code> filtra só as linhas com "mysql":</p>
+
+<pre class="term" data-cwd="~/loja">$ php -m | grep -i mysql
+mysqlnd                       « a biblioteca que fala o "idioma" do MySQL
+pdo_mysql                     « o driver do PDO: é este que você precisa
+$ php -r 'print_r(PDO::getAvailableDrivers());'
+Array
+(
+    [0] =&gt; mysql
+    [1] =&gt; pgsql
+    [2] =&gt; sqlite
+)</pre>
+
+<p><code>PDO::getAvailableDrivers()</code> devolve a lista de bancos que <strong>este</strong> PHP sabe usar. Na máquina da Ana são três: <code>mysql</code> (MySQL e MariaDB), <code>pgsql</code> (PostgreSQL) e <code>sqlite</code>. Se <code>mysql</code> não aparecer, instale a extensão (tabela acima) antes de continuar.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja quais drivers o PHP <strong>do editor do guia</strong> tem. Compare com a lista da máquina da Ana: é por isso que as missões desta aula usam SQLite.</p>
+<pre class="script">&lt;?php
+print_r(PDO::getAvailableDrivers());
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Criar o banco e o usuário da loja</h2>
+<p>Um servidor MySQL guarda <strong>vários bancos</strong> (um para a loja, outro para o blog…), cada um com suas tabelas. E ele tem <strong>usuários próprios</strong>, que não são os usuários do Linux. A regra de ouro: <strong>cada sistema tem o seu usuário</strong>, com acesso só ao seu banco. Nunca ponha o usuário <code>root</code> do MySQL no código PHP.</p>
+
+<p>Você entra no servidor como administrador com o cliente de linha de comando (no Debian, <code>sudo mariadb</code>; em outros sistemas, <code>mysql -u root -p</code>) e digita:</p>
+
+<pre class="file" data-file="criar-banco.sql">CREATE DATABASE loja CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE USER 'ana'@'localhost' IDENTIFIED BY 'troque-esta-senha';
+
+GRANT ALL PRIVILEGES ON loja.* TO 'ana'@'localhost';
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>CREATE DATABASE loja</code></td><td>Cria um banco vazio chamado <code>loja</code> (no SQLite, isso era criar o arquivo <code>loja.db</code>).</td></tr>
+<tr><td><code>CHARACTER SET utf8mb4</code></td><td>O texto será guardado em UTF-8 completo: acentos, <code>ç</code>, emoji. Veja o aviso logo abaixo.</td></tr>
+<tr><td><code>COLLATE utf8mb4_unicode_ci</code></td><td>A regra de <strong>comparar e ordenar</strong> texto. O <code>ci</code> (<em>case insensitive</em>) faz <code>'ana'</code> e <code>'Ana'</code> serem iguais numa busca.</td></tr>
+<tr><td><code>CREATE USER 'ana'@'localhost'</code></td><td>Cria a usuária <code>ana</code>, que só pode entrar <strong>a partir da própria máquina</strong> (<code>localhost</code>).</td></tr>
+<tr><td><code>IDENTIFIED BY '…'</code></td><td>A senha dela. Use uma senha forte de verdade.</td></tr>
+<tr><td><code>GRANT ALL PRIVILEGES ON loja.*</code></td><td>Dá à <code>ana</code> todos os poderes sobre <strong>todas as tabelas</strong> (<code>.*</code>) do banco <code>loja</code>, e só dele.</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Use <code>utf8mb4</code>, nunca <code>utf8</code></strong>
+<p>No MySQL, o nome <code>utf8</code> é uma armadilha histórica: ele guarda só caracteres de até 3 bytes, então emoji (e alguns ideogramas) não cabem. O UTF-8 completo se chama <code>utf8mb4</code> ("até 4 bytes"). Use <code>utf8mb4</code> no banco, nas tabelas e na conexão do PHP.</p>
+</div>
+
+<h3>A tabela <code>produtos</code>, versão MySQL</h3>
+<p>A mesma tabela que você criou no SQLite em <a href="crud.html">CRUD com PDO</a> fica assim no MySQL:</p>
+
+<pre class="file" data-file="produtos-mysql.sql">CREATE TABLE produtos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    preco DECIMAL(10,2) NOT NULL,
+    estoque INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+</pre>
+
+<dl class="anatomy">
+  <dt>INT AUTO_INCREMENT PRIMARY KEY</dt><dd>Número inteiro que o servidor preenche sozinho (1, 2, 3…). No SQLite, o equivalente é <code>INTEGER PRIMARY KEY</code>.</dd>
+  <dt>VARCHAR(100)</dt><dd>Texto de <strong>até 100 caracteres</strong>. O MySQL quer saber o tamanho máximo; o SQLite usa só <code>TEXT</code>.</dd>
+  <dt>DECIMAL(10,2)</dt><dd>Número <strong>exato</strong> com 10 dígitos, 2 deles depois da vírgula: o tipo certo para dinheiro (nada de <code>0.1 + 0.2</code> dando 0.30000000000000004).</dd>
+  <dt>ENGINE=InnoDB</dt><dd>O "motor" que guarda a tabela. O InnoDB é o padrão e suporta <a href="prepared-statements.html">transações</a>.</dd>
+  <dt>DEFAULT CHARSET=utf8mb4</dt><dd>A tabela guarda texto em UTF-8 completo.</dd>
+</dl>
+
+<hr>
+
+<h2>3. O DSN do MySQL</h2>
+<p>Lembra que o PDO recebe um <strong>DSN</strong> (<em>Data Source Name</em>, "nome da fonte de dados"), um texto que diz qual banco usar e onde ele está? No SQLite, era só <code>sqlite:</code> e o caminho do arquivo. No MySQL, o DSN tem mais peças, separadas por <code>;</code>:</p>
+
+<pre class="file" data-file="dsn">mysql:host=localhost;port=3306;dbname=loja;charset=utf8mb4</pre>
+
+<dl class="anatomy">
+  <dt>mysql:</dt><dd>O driver: "fale com um MySQL (ou MariaDB)". Precisa da extensão <code>pdo_mysql</code>.</dd>
+  <dt>host=localhost</dt><dd>Onde o servidor está. <code>localhost</code> = esta mesma máquina. Pode ser um IP (<code>127.0.0.1</code>) ou um nome (<code>db.minhahospedagem.com.br</code>).</dd>
+  <dt>port=3306</dt><dd>A porta. Opcional: se você não escrever, vale 3306, a padrão.</dd>
+  <dt>dbname=loja</dt><dd>Qual banco, dos vários do servidor.</dd>
+  <dt>charset=utf8mb4</dt><dd>Em que codificação o texto vai e volta. Sem isso, acentos podem virar <code>Ã©</code>.</dd>
+</dl>
+
+<p>Repare no que <strong>não</strong> vai no DSN: o usuário e a senha. Eles são o segundo e o terceiro argumento do <code>new PDO</code>.</p>
+
+<div class="tip">
+<strong>Sem espaços</strong>
+<p>O DSN é lido ao pé da letra. <code>mysql:host=localhost; dbname=loja</code> (com espaço depois do <code>;</code>) ou <code>host = localhost</code> podem fazer o PDO procurar um banco chamado <code>" loja"</code>. Escreva tudo grudado.</p>
+</div>
+
+<div class="tryphp" data-goal="out:mysql:host=localhost;port=3306;dbname=loja;charset=utf8mb4,semerro,src:\$dsn\s*=">
+<p class="try-task"><strong>Missão:</strong> monte o DSN numa variável <code>$dsn</code> usando as variáveis <code>$host</code>, <code>$porta</code> e <code>$banco</code> (sem digitar <code>localhost</code>, <code>3306</code> nem <code>loja</code> de novo) e mostre-o. A saída deve ser exatamente:</p>
+<pre class="out">mysql:host=localhost;port=3306;dbname=loja;charset=utf8mb4</pre>
+<pre class="script">&lt;?php
+$host  = "localhost";
+$porta = 3306;
+$banco = "loja";
+
+// monte o $dsn aqui
+
+echo $dsn, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$host  = "localhost";
+$porta = 3306;
+$banco = "loja";
+
+$dsn = "mysql:host=$host;port=$porta;dbname=$banco;charset=utf8mb4";
+
+echo $dsn, "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Conectar com o PDO</h2>
+<p>Com o servidor rodando, o banco e o usuário criados, a conexão é a mesma de <a href="pdo.html">Conectar com PDO</a>, só que com o DSN novo e com usuário e senha:</p>
+
+<pre class="file" data-file="conexao.php">&lt;?php
+$dsn = "mysql:host=localhost;port=3306;dbname=loja;charset=utf8mb4";
+$usuario = "ana";
+$senha = "troque-esta-senha";
+
+try {
+    $pdo = new PDO($dsn, $usuario, $senha, [
+        PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+    ]);
+    echo "Conectado ao MySQL!\n";
+} catch (PDOException $e) {
+    error_log("Falha no banco: " . $e-&gt;getMessage());
+    echo "Desculpe, a loja está fora do ar. Tente mais tarde.\n";
+    exit(1);
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>new PDO($dsn, $usuario, $senha, [...])</code></td><td>Tenta conectar. Os dois argumentos do meio são o usuário e a senha criados no passo 2; o último é a lista de opções.</td></tr>
+<tr><td><code>PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION</code></td><td>Erros de SQL viram exceções. Já é o padrão desde o PHP 8.0; escrever deixa a intenção clara.</td></tr>
+<tr><td><code>PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC</code></td><td>Cada linha volta como array associativo (<code>$linha["nome"]</code>), sem precisar repetir isso em todo <code>fetch</code>.</td></tr>
+<tr><td><code>catch (PDOException $e)</code></td><td>Se a conexão falhar, o PDO lança uma <code>PDOException</code> (veja <a href="excecoes.html">Exceções</a>).</td></tr>
+<tr><td><code>error_log(...)</code></td><td>Guarda a mensagem técnica no <strong>log</strong> (registro de erros), para você ler depois. No terminal, ela aparece na saída de erros.</td></tr>
+<tr><td><code>echo "Desculpe..."; exit(1);</code></td><td>Mostra ao visitante uma mensagem amigável e encerra com código 1 ("deu errado").</td></tr>
+</table>
+</div>
+
+<p>Na máquina da Ana não há servidor MySQL. Veja o que acontece:</p>
+
+<pre class="term" data-cwd="~/loja">$ php conexao.php
+Falha no banco: SQLSTATE[HY000] [2002] No such file or directory      « veio do error_log
+Desculpe, a loja está fora do ar. Tente mais tarde.
+$ echo $?
+1
+$ php conexao.php 2&gt;/dev/null                                           « escondendo a saída de erros
+Desculpe, a loja está fora do ar. Tente mais tarde.</pre>
+
+<p>Na primeira execução aparecem as duas linhas, porque no terminal a saída de erros (onde o <code>error_log</code> escreve) e a saída normal vão para a mesma tela. Na segunda, o <code>2&gt;/dev/null</code> joga fora a saída de erros, e sobra só o que um <strong>visitante</strong> do site veria: a mensagem amigável. Num site de verdade, o <code>error_log</code> vai para o arquivo de log do servidor web, e o visitante nunca vê detalhes técnicos.</p>
+
+<h3>E se eu não tratar o erro?</h3>
+<p>Sem o <code>try</code>/<code>catch</code>, a exceção não é capturada e o PHP para com um <code>Fatal error</code>:</p>
+
+<pre class="file" data-file="conectar.php">&lt;?php
+$pdo = new PDO("mysql:host=localhost;dbname=loja;charset=utf8mb4", "ana", "segredo");
+echo "Conectou!\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php conectar.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000] [2002] No such file or directory in /home/ana/loja/conectar.php:2
+Stack trace:
+#0 /home/ana/loja/conectar.php(2): PDO-&gt;__construct('mysql:host=loca...', 'ana', Object(SensitiveParameterValue))
+#1 {main}
+  thrown in /home/ana/loja/conectar.php on line 2</pre>
+
+<p>Leia a linha <code>#0</code> do <em>stack trace</em> (o "rastro" das chamadas): o PHP mostra os argumentos do <code>new PDO</code>, mas a senha aparece como <code>Object(SensitiveParameterValue)</code> ("valor sensível"), e não como <code>'segredo'</code>. Desde o <span class="versao">PHP 8.2+</span>, parâmetros marcados como sensíveis são escondidos assim. Mesmo assim, o caminho dos arquivos, o nome do usuário e o começo do DSN aparecem. Por isso: <strong>trate o erro de conexão</strong> e, no servidor de produção, deixe <code>display_errors</code> desligado (veja <a href="tipos-erro.html">Tipos de Erro</a>).</p>
+
+<hr>
+
+<h2>5. As mensagens de erro de conexão</h2>
+<p>A mensagem <code>SQLSTATE[HY000] [2002] …</code> tem três partes:</p>
+<dl class="anatomy">
+  <dt>SQLSTATE[HY000]</dt><dd>Um código padrão de erro de SQL. <code>HY000</code> é o "erro geral": quer dizer só "veja o resto".</dd>
+  <dt>[2002]</dt><dd>O código do próprio MySQL. <code>2002</code> = "não consegui chegar até o servidor".</dd>
+  <dt>No such file or directory</dt><dd>O motivo, explicado pelo sistema.</dd>
+</dl>
+
+<p>O motivo muda conforme o <code>host</code>. Este programa tenta três endereços e mostra a mensagem de cada um:</p>
+
+<pre class="file" data-file="tres-servidores.php">&lt;?php
+$enderecos = [
+    "mysql:host=localhost;dbname=loja;charset=utf8mb4",
+    "mysql:host=127.0.0.1;port=3306;dbname=loja;charset=utf8mb4",
+    "mysql:host=banco.exemplo.invalid;dbname=loja;charset=utf8mb4",
+];
+
+foreach ($enderecos as $dsn) {
+    echo $dsn, "\n";
+    try {
+        new PDO($dsn, "ana", "troque-esta-senha");
+    } catch (PDOException $e) {
+        echo "  → ", $e-&gt;getMessage(), "\n";
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tres-servidores.php
+mysql:host=localhost;dbname=loja;charset=utf8mb4
+  → SQLSTATE[HY000] [2002] No such file or directory
+mysql:host=127.0.0.1;port=3306;dbname=loja;charset=utf8mb4
+  → SQLSTATE[HY000] [2002] Connection refused
+mysql:host=banco.exemplo.invalid;dbname=loja;charset=utf8mb4
+  → SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for banco.exemplo.invalid failed: Name does not resolve</pre>
+
+<p>Três mensagens diferentes para o mesmo problema ("não achei o servidor"). Cada uma aponta uma causa:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>O que aconteceu</th><th>O que conferir</th></tr>
+<tr><td><code>[2002] No such file or directory</code></td><td>Com <code>host=localhost</code>, o PDO não usa a rede: procura um <strong>socket</strong>, um arquivo especial (como <code>/run/mysqld/mysqld.sock</code>) que o servidor cria quando está ligado. O arquivo não existe.</td><td>O servidor está rodando? (<code>systemctl status mariadb</code>). O PHP procura o socket no lugar certo? (opção <code>unix_socket=</code> no DSN)</td></tr>
+<tr><td><code>[2002] Connection refused</code></td><td>Com um IP (<code>127.0.0.1</code>), o PDO usa a rede, chegou à máquina, mas <strong>ninguém atende</strong> na porta 3306.</td><td>O servidor está ligado? Está na porta que você escreveu? Aceita conexões pela rede?</td></tr>
+<tr><td><code>[2002] php_network_getaddresses: getaddrinfo … failed</code></td><td>O <strong>nome</strong> do servidor não foi encontrado (não existe, ou foi digitado errado).</td><td>A grafia do <code>host</code>. O texto depois de <code>failed:</code> vem do sistema e pode variar.</td></tr>
+<tr><td><code>could not find driver</code></td><td>O PHP não tem o driver pedido no DSN.</td><td>A extensão <code>pdo_mysql</code> (veja o <a href="#cenarios">cenário</a> abaixo).</td></tr>
+</table>
+</div>
+
+<p>Quando o servidor <strong>existe</strong> e atende, os erros passam a ser sobre quem você é e o que pediu. Estes não puderam ser reproduzidos na máquina da Ana (ela não tem servidor), mas você vai reconhecê-los pelo código:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Significado</th><th>Causa comum</th></tr>
+<tr><td><code>[1045]</code> Access denied</td><td>Acesso negado</td><td>Usuário ou senha errados, ou o usuário foi criado para outro host (<code>'ana'@'localhost'</code> não entra de outra máquina).</td></tr>
+<tr><td><code>[1049]</code> Unknown database</td><td>Banco desconhecido</td><td>O <code>dbname</code> está errado ou o <code>CREATE DATABASE</code> não foi feito.</td></tr>
+<tr><td><code>[1044]</code> Access denied … to database</td><td>Sem permissão naquele banco</td><td>Faltou o <code>GRANT</code> para o usuário.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong><code>localhost</code> × <code>127.0.0.1</code></strong>
+<p>Para você, os dois são "esta máquina". Para o PDO com MySQL, são caminhos diferentes: <code>localhost</code> usa o <strong>socket</strong> (um arquivo), <code>127.0.0.1</code> usa a <strong>rede</strong> (porta 3306). Se um não funciona, testar o outro ajuda a descobrir o problema. Isso também muda o usuário: para o MySQL, <code>'ana'@'localhost'</code> e <code>'ana'@'127.0.0.1'</code> podem ser contas diferentes.</p>
+</div>
+
+<hr>
+
+<h2>6. SQLite × MySQL: o que muda no SQL</h2>
+<p>Com o PDO, o PHP é o mesmo: <code>prepare</code>, <code>execute</code>, <code>fetch</code>, <code>lastInsertId</code>, <code>rowCount</code>, transações. O que muda é o <strong>SQL</strong> que você escreve, porque cada banco tem o seu "sotaque".</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Assunto</th><th>SQLite</th><th>MySQL / MariaDB</th></tr>
+<tr><td>Conectar</td><td><code>new PDO("sqlite:loja.db")</code></td><td><code>new PDO("mysql:host=…;dbname=…;charset=utf8mb4", $usuario, $senha)</code></td></tr>
+<tr><td>Chave que se numera sozinha</td><td><code>id INTEGER PRIMARY KEY</code> (ou <code>… AUTOINCREMENT</code>)</td><td><code>id INT AUTO_INCREMENT PRIMARY KEY</code></td></tr>
+<tr><td>Texto</td><td><code>TEXT</code></td><td><code>VARCHAR(100)</code> (com tamanho máximo) ou <code>TEXT</code></td></tr>
+<tr><td>Dinheiro</td><td><code>REAL</code> (ou centavos em <code>INTEGER</code>)</td><td><code>DECIMAL(10,2)</code></td></tr>
+<tr><td>Tipos das colunas</td><td><strong>Flexíveis</strong>: aceita texto numa coluna <code>REAL</code> (a não ser em tabelas <code>STRICT</code>)</td><td><strong>Rígidos</strong>: no modo estrito (o padrão), recusa o valor errado</td></tr>
+<tr><td>Data e hora de agora</td><td><code>datetime('now')</code></td><td><code>NOW()</code></td></tr>
+<tr><td>Listar as tabelas</td><td><code>SELECT name FROM sqlite_master WHERE type = 'table'</code></td><td><code>SHOW TABLES</code></td></tr>
+<tr><td>Detalhes da tabela</td><td><code>ENGINE</code> e <code>CHARSET</code> não existem</td><td><code>ENGINE=InnoDB DEFAULT CHARSET=utf8mb4</code></td></tr>
+<tr><td>Igual em ambos</td><td colspan="2"><code>SELECT … FROM … WHERE … ORDER BY … LIMIT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>COUNT</code>, <code>SUM</code>, <code>JOIN</code></td></tr>
+</table>
+</div>
+
+<h3>A armadilha: SQL do MySQL dentro do SQLite</h3>
+<p>Muito tutorial na internet traz o <code>CREATE TABLE</code> do MySQL. O que acontece se você colar isso num SQLite? Com o final <code>ENGINE=InnoDB</code>, o SQLite reclama na hora:</p>
+
+<pre class="file" data-file="engine.php">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php engine.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 near "=": syntax error in /home/ana/loja/engine.php:3
+Stack trace:
+#0 /home/ana/loja/engine.php(3): PDO-&gt;exec('CREATE TABLE pr...')
+#1 {main}
+  thrown in /home/ana/loja/engine.php on line 3</pre>
+
+<p><code>near "=": syntax error</code> = "erro de sintaxe perto do <code>=</code>": o SQLite não conhece <code>ENGINE=…</code>. Até aí, fácil de ver. O perigo é o próximo caso: sem o <code>ENGINE</code>, o SQLite <strong>aceita</strong> o resto sem reclamar…</p>
+
+<pre class="file" data-file="mysql-no-sqlite.php">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    preco DECIMAL(10,2) NOT NULL
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caderno', 15.90)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caneta', 2.50)");
+
+foreach ($pdo-&gt;query("SELECT id, nome FROM produtos") as $linha) {
+    echo "id: ", var_export($linha["id"], true), " | nome: ", $linha["nome"], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php mysql-no-sqlite.php
+id: NULL | nome: Caderno          « o id não foi numerado!
+id: NULL | nome: Caneta</pre>
+
+<p>Nenhum erro, e os produtos ficaram <strong>sem id</strong>. O motivo: o SQLite leu <code>INT AUTO_INCREMENT</code> como um nome de tipo qualquer (ele aceita quase tudo como tipo) e não entendeu <code>AUTO_INCREMENT</code> como "numere sozinho". No SQLite, só a forma exata <code>INTEGER PRIMARY KEY</code> (com <code>INTEGER</code> escrito por extenso) cria a numeração automática. Um <code>INT PRIMARY KEY</code> é só uma coluna comum, que aceita <code>NULL</code>.</p>
+
+<h3>Os tipos flexíveis do SQLite</h3>
+<p>Outra diferença que surpreende quem vem do MySQL:</p>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (nome TEXT, preco REAL)");
+$pdo-&gt;exec("INSERT INTO produtos VALUES ('Caderno', 'quinze reais')");
+
+$linha = $pdo-&gt;query("SELECT preco, typeof(preco) AS tipo FROM produtos")-&gt;fetch(PDO::FETCH_ASSOC);
+print_r($linha);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tipos.php
+Array
+(
+    [preco] =&gt; quinze reais        « texto guardado numa coluna de números
+    [tipo] =&gt; text
+)</pre>
+
+<p>O SQLite guardou o texto <code>quinze reais</code> na coluna <code>preco</code> sem reclamar (a função <code>typeof</code> do SQLite confirma: <code>text</code>). Um MySQL em modo estrito recusaria esse <code>INSERT</code>. Moral: <strong>valide os dados no PHP</strong> antes de gravar (veja <a href="validacao.html">Validar Dados</a>), qualquer que seja o banco. No SQLite, você pode ainda criar a tabela com a palavra <code>STRICT</code> no fim (<code>CREATE TABLE … (…) STRICT</code>), e aí ele passa a recusar, com a mensagem <code>cannot store TEXT value in REAL column produtos.preco</code>.</p>
+
+<hr>
+
+<h2>7. Trocar de banco mudando só a conexão</h2>
+<p>A grande vantagem do PDO: se o SQL da aplicação é o "comum" (o que é igual nos dois), <strong>só a criação do <code>PDO</code> muda</strong>. Um jeito organizado é guardar os dados da conexão num arquivo de configuração e montar o DSN a partir dele:</p>
+
+<pre class="file" data-file="config.php">&lt;?php
+// Em casa: SQLite. Na hospedagem: troque por MySQL.
+return [
+    "driver"  =&gt; "mysql",
+    "host"    =&gt; "localhost",
+    "banco"   =&gt; "loja",
+    "usuario" =&gt; "ana",
+    "senha"   =&gt; "troque-esta-senha",
+];
+</pre>
+
+<p>O resto do sistema faz <code>$config = require "config.php";</code> (veja <a href="include-require.html">include e require</a>) e nunca precisa saber qual banco está do outro lado. Duas regras de segurança para esse arquivo: ele <strong>não vai para o Git</strong> (a senha ficaria pública) e <strong>não fica numa pasta acessível pelo navegador</strong>.</p>
+
+<div class="tryphp" data-goal="out:sqlite:loja.db,out:mysql:host=localhost;dbname=loja;charset=utf8mb4,out:Conectado com o driver sqlite,semerro">
+<p class="try-task"><strong>Missão:</strong> a função <code>montarDsn</code> só sabe montar DSN de MySQL. Faça com que, quando <code>$c["driver"]</code> for <code>"sqlite"</code>, ela devolva <code>"sqlite:"</code> seguido de <code>$c["arquivo"]</code>. A saída deve ser:</p>
+<pre class="out">sqlite:loja.db
+mysql:host=localhost;dbname=loja;charset=utf8mb4
+Conectado com o driver sqlite</pre>
+<pre class="script">&lt;?php
+function montarDsn(array $c): string
+{
+    // se o driver for "sqlite", devolva outro DSN aqui
+
+    return "mysql:host={$c['host']};dbname={$c['banco']};charset=utf8mb4";
+}
+
+echo montarDsn(["driver" =&gt; "sqlite", "arquivo" =&gt; "loja.db"]), "\n";
+echo montarDsn(["driver" =&gt; "mysql", "host" =&gt; "localhost", "banco" =&gt; "loja"]), "\n";
+
+$pdo = new PDO(montarDsn(["driver" =&gt; "sqlite", "arquivo" =&gt; ":memory:"]));
+echo "Conectado com o driver ", $pdo-&gt;getAttribute(PDO::ATTR_DRIVER_NAME), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function montarDsn(array $c): string
+{
+    if ($c["driver"] === "sqlite") {
+        return "sqlite:" . $c["arquivo"];
+    }
+
+    return "mysql:host={$c['host']};dbname={$c['banco']};charset=utf8mb4";
+}
+
+echo montarDsn(["driver" =&gt; "sqlite", "arquivo" =&gt; "loja.db"]), "\n";
+echo montarDsn(["driver" =&gt; "mysql", "host" =&gt; "localhost", "banco" =&gt; "loja"]), "\n";
+
+$pdo = new PDO(montarDsn(["driver" =&gt; "sqlite", "arquivo" =&gt; ":memory:"]));
+echo "Conectado com o driver ", $pdo-&gt;getAttribute(PDO::ATTR_DRIVER_NAME), "\n";
+</pre>
+</div>
+
+<p><code>$pdo-&gt;getAttribute(PDO::ATTR_DRIVER_NAME)</code> pergunta ao objeto PDO com qual driver ele está conectado. Útil quando um trecho de SQL precisa ser diferente para cada banco.</p>
+
+<hr>
+
+<h2>8. <code>mysqli</code> × PDO</h2>
+<p>Você vai encontrar em tutoriais e em sistemas antigos uma segunda forma de falar com MySQL: a extensão <strong><code>mysqli</code></strong> (<em>MySQL improved</em>, "MySQL melhorado"). Ela é boa e segura quando usada com prepared statements, mas só fala com MySQL/MariaDB. Este é o mesmo <code>SELECT</code> nas duas, só para você reconhecer (exemplo para ler):</p>
+
+<pre class="file" data-file="com-mysqli.php">&lt;?php
+$db = new mysqli("localhost", "ana", "troque-esta-senha", "loja");
+$db-&gt;set_charset("utf8mb4");
+
+$stmt = $db-&gt;prepare("SELECT nome, preco FROM produtos WHERE preco &lt; ?");
+$stmt-&gt;bind_param("d", $limite);   // "d" = double (número com casas decimais)
+$limite = 20;
+$stmt-&gt;execute();
+foreach ($stmt-&gt;get_result() as $linha) {
+    echo $linha["nome"], "\n";
+}
+</pre>
+
+<pre class="file" data-file="com-pdo.php">&lt;?php
+$pdo = new PDO("mysql:host=localhost;dbname=loja;charset=utf8mb4", "ana", "troque-esta-senha");
+
+$stmt = $pdo-&gt;prepare("SELECT nome, preco FROM produtos WHERE preco &lt; ?");
+$stmt-&gt;execute([20]);
+foreach ($stmt as $linha) {
+    echo $linha["nome"], "\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>mysqli</code></th><th>PDO</th></tr>
+<tr><td>Bancos</td><td>Só MySQL e MariaDB</td><td>Vários: SQLite, MySQL, PostgreSQL, SQL Server…</td></tr>
+<tr><td>Estilos</td><td>Objetos (<code>new mysqli</code>) e funções (<code>mysqli_connect</code>)</td><td>Só objetos</td></tr>
+<tr><td>Marcadores no SQL</td><td>Só <code>?</code>, com <code>bind_param("sdi", …)</code> (uma letra de tipo por valor)</td><td><code>?</code> e <code>:nome</code>; os valores vão direto no <code>execute([...])</code></td></tr>
+<tr><td>Erros</td><td>Exceções por padrão desde o PHP 8.1</td><td>Exceções por padrão desde o PHP 8.0</td></tr>
+<tr><td>Recursos só do MySQL</td><td>Tem alguns a mais (consultas múltiplas, assíncronas)</td><td>Fica no que é comum a todos</td></tr>
+<tr><td>Neste guia</td><td>Só para reconhecer</td><td><strong>É o que usamos</strong></td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Para aprender e para sistemas novos, <strong>PDO</strong>: uma forma só de trabalhar, para qualquer banco, e você treina tudo com SQLite antes de ter um servidor. Use <code>mysqli</code> se for manter um sistema que já o usa. Se encontrar funções <code>mysql_query</code>, <code>mysql_connect</code> (sem o "i"), é código muito antigo: essa extensão foi <strong>removida no PHP 7.0</strong> e não existe mais.</p>
+
+<hr>
+
+<h2 id="cenarios">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>SQLSTATE[HY000] [2002] No such file or directory</code></strong>
+<pre class="term" data-cwd="~/loja">$ php conexao.php
+Falha no banco: SQLSTATE[HY000] [2002] No such file or directory
+Desculpe, a loja está fora do ar. Tente mais tarde.</pre>
+<p><strong>O que significa:</strong> com <code>host=localhost</code>, o PHP tentou falar com o servidor pelo socket (um arquivo especial) e o arquivo não existe. Quase sempre: o servidor <strong>não está rodando</strong> ou nem foi instalado.</p>
+<p><strong>Como consertar:</strong> confira com <code>systemctl status mariadb</code> (ou <code>mysql</code>) e ligue com <code>sudo systemctl start mariadb</code>. Se o servidor está rodando e o erro continua, o socket está em outro lugar: tente <code>host=127.0.0.1</code> ou informe o caminho com <code>unix_socket=/caminho/do/mysqld.sock</code> no DSN.</p>
+</div>
+
+<div class="cenario">
+<strong><code>SQLSTATE[HY000] [2002] Connection refused</code></strong>
+<pre class="term" data-cwd="~/loja">$ php tres-servidores.php
+mysql:host=localhost;dbname=loja;charset=utf8mb4
+  → SQLSTATE[HY000] [2002] No such file or directory
+mysql:host=127.0.0.1;port=3306;dbname=loja;charset=utf8mb4
+  → SQLSTATE[HY000] [2002] Connection refused
+mysql:host=banco.exemplo.invalid;dbname=loja;charset=utf8mb4
+  → SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for banco.exemplo.invalid failed: Name does not resolve</pre>
+<p><strong>O que significa:</strong> "conexão recusada". A máquina existe, mas nada atende na porta pedida. O servidor está desligado, está em outra porta, ou está configurado para não aceitar conexões pela rede.</p>
+<p><strong>Como consertar:</strong> ligue o servidor; confira a porta (<code>port=</code> no DSN, padrão 3306). Se o banco está em <strong>outra</strong> máquina, o servidor precisa aceitar conexões externas (no MariaDB, a opção <code>bind-address</code>) e o usuário precisa ter sido criado para aquele host.</p>
+</div>
+
+<div class="cenario">
+<strong><code>could not find driver</code></strong>
+<p>A máquina da Ana tem o <code>pdo_mysql</code>, então, para mostrar a mensagem, pedimos um driver que ela não tem (<code>sqlsrv</code>, do SQL Server). Com o MySQL sem extensão, a mensagem é a mesma:</p>
+<pre class="term" data-cwd="~/loja">$ php -r 'new PDO("sqlsrv:Server=localhost;Database=loja");'
+
+Fatal error: Uncaught PDOException: could not find driver in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO-&gt;__construct('sqlsrv:Server=l...')
+#1 {main}
+  thrown in Command line code on line 1</pre>
+<p><strong>O que significa:</strong> "não encontrei o driver". O PHP nem tentou conectar: não sabe falar o "idioma" pedido no começo do DSN.</p>
+<p><strong>Como consertar:</strong> confira o prefixo do DSN (é <code>mysql:</code>, não <code>mariadb:</code> nem <code>mysqli:</code>). Rode <code>php -m | grep -i pdo</code>. Se <code>pdo_mysql</code> não aparecer, instale (<code>sudo apt install php-mysql</code> no Debian/Ubuntu) ou ative <code>extension=pdo_mysql</code> no <code>php.ini</code>, e reinicie o servidor web. Atenção: o PHP do terminal e o do servidor web podem usar <code>php.ini</code> diferentes.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Class "mysqli" not found</code></strong>
+<pre class="term" data-cwd="~/loja">$ php -r 'new mysqli("localhost", "ana", "segredo", "loja");'
+
+Fatal error: Uncaught Error: Class "mysqli" not found in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1</pre>
+<p><strong>O que significa:</strong> a extensão <code>mysqli</code> não está instalada neste PHP. É o que acontece na máquina da Ana, que tem só o PDO. Em código antigo, a mesma situação aparece como <code>Call to undefined function mysqli_connect()</code>.</p>
+<p><strong>Como consertar:</strong> se o código é seu, prefira reescrever com PDO. Se precisa rodar um sistema que usa <code>mysqli</code>, instale a extensão (no Debian/Ubuntu ela vem no mesmo pacote <code>php-mysql</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Os ids ficaram <code>NULL</code> (SQL do MySQL no SQLite)</strong>
+<pre class="term" data-cwd="~/loja">$ php mysql-no-sqlite.php
+id: NULL | nome: Caderno
+id: NULL | nome: Caneta</pre>
+<p><strong>O que significa:</strong> a tabela foi criada com <code>id INT AUTO_INCREMENT PRIMARY KEY</code>, que no SQLite não numera nada. Sem erro nenhum, todos os produtos ficam sem id, e um <code>UPDATE … WHERE id = 1</code> não encontra ninguém.</p>
+<p><strong>Como consertar:</strong> no SQLite, escreva <code>id INTEGER PRIMARY KEY</code> (ou <code>INTEGER PRIMARY KEY AUTOINCREMENT</code>). Se precisa usar os dois bancos, mantenha um arquivo <code>.sql</code> para cada um.</p>
+</div>
+
+<div class="tryphp" data-goal="out:id: 1 | nome: Caderno,out:id: 2 | nome: Caneta,semerro">
+<p class="try-task"><strong>Missão:</strong> este <code>CREATE TABLE</code> foi copiado de um tutorial de MySQL, e os produtos estão saindo com <code>id: NULL</code>. Adapte a tabela para o SQLite (só o <code>CREATE TABLE</code>) até a saída ficar:</p>
+<pre class="out">id: 1 | nome: Caderno
+id: 2 | nome: Caneta</pre>
+<pre class="script">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    preco DECIMAL(10,2) NOT NULL
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caderno', 15.90)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caneta', 2.50)");
+
+foreach ($pdo-&gt;query("SELECT id, nome FROM produtos") as $linha) {
+    echo "id: ", var_export($linha["id"], true), " | nome: ", $linha["nome"], "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caderno', 15.90)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caneta', 2.50)");
+
+foreach ($pdo-&gt;query("SELECT id, nome FROM produtos") as $linha) {
+    echo "id: ", var_export($linha["id"], true), " | nome: ", $linha["nome"], "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O quê</th><th>Como</th></tr>
+<tr><td>DSN do MySQL/MariaDB</td><td><code>mysql:host=localhost;port=3306;dbname=loja;charset=utf8mb4</code></td></tr>
+<tr><td>DSN com socket</td><td><code>mysql:unix_socket=/run/mysqld/mysqld.sock;dbname=loja;charset=utf8mb4</code></td></tr>
+<tr><td>Conectar</td><td><code>new PDO($dsn, $usuario, $senha, $opcoes)</code></td></tr>
+<tr><td>Opções recomendadas</td><td><code>PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION</code>, <code>PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC</code></td></tr>
+<tr><td>Drivers deste PHP</td><td><code>PDO::getAvailableDrivers()</code> ou <code>php -m | grep -i pdo</code></td></tr>
+<tr><td>Driver da conexão atual</td><td><code>$pdo-&gt;getAttribute(PDO::ATTR_DRIVER_NAME)</code></td></tr>
+<tr><td>Criar banco</td><td><code>CREATE DATABASE loja CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;</code></td></tr>
+<tr><td>Criar usuário</td><td><code>CREATE USER 'ana'@'localhost' IDENTIFIED BY 'senha';</code></td></tr>
+<tr><td>Dar acesso a um banco</td><td><code>GRANT ALL PRIVILEGES ON loja.* TO 'ana'@'localhost';</code></td></tr>
+<tr><td>Auto-incremento</td><td>MySQL: <code>INT AUTO_INCREMENT PRIMARY KEY</code> · SQLite: <code>INTEGER PRIMARY KEY</code></td></tr>
+<tr><td>Erro "servidor inalcançável"</td><td><code>SQLSTATE[HY000] [2002] …</code></td></tr>
+<tr><td>Erro "usuário/senha"</td><td><code>[1045] Access denied</code></td></tr>
+<tr><td>Erro "banco não existe"</td><td><code>[1049] Unknown database</code></td></tr>
+<tr><td>Extensão faltando</td><td><code>could not find driver</code> (PDO) · <code>Class "mysqli" not found</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Completar o DSN</h3>
+<p>Complete o DSN para conectar ao banco <code>blog</code>, no servidor <code>localhost</code>, com UTF-8 completo:</p>
+<div class="ex-code">mysql:host=localhost;dbname=<input data-answer="blog;charset=utf8mb4" aria-label="resto do DSN"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O tipo do dinheiro</h3>
+<p>No MySQL, complete o tipo da coluna <code>preco</code> para guardar valores exatos até 99999999,99:</p>
+<div class="ex-code">preco <input data-answer="DECIMAL(10,2)|DECIMAL(10, 2)|decimal(10,2)" aria-label="tipo"> NOT NULL</div>
+</div>
+
+<div class="exercise">
+<h3>3. A chave do SQLite</h3>
+<p>Complete a coluna <code>id</code> para que o <strong>SQLite</strong> a numere sozinho:</p>
+<div class="ex-code">id <input data-answer="INTEGER PRIMARY KEY|INTEGER PRIMARY KEY AUTOINCREMENT|integer primary key|integer primary key autoincrement" aria-label="tipo da chave"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O programa mostra <code>SQLSTATE[HY000] [2002] Connection refused</code>. O que é mais provável?</p>
+<label><input type="radio" name="q4"> A senha está errada.</label>
+<label><input type="radio" name="q4"> O servidor não está atendendo naquele endereço e porta.</label>
+<label><input type="radio" name="q4"> O banco <code>loja</code> não existe.</label>
+<label><input type="radio" name="q4"> A tabela <code>produtos</code> não existe.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Por que usar <code>utf8mb4</code> em vez de <code>utf8</code> no MySQL?</p>
+<label><input type="radio" name="q5"> Porque <code>utf8</code> não guarda acentos.</label>
+<label><input type="radio" name="q5"> Porque <code>utf8mb4</code> é mais rápido.</label>
+<label><input type="radio" name="q5"> Porque o <code>utf8</code> do MySQL não guarda caracteres de 4 bytes, como emoji.</label>
+<label><input type="radio" name="q5"> Porque o PDO só aceita <code>utf8mb4</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. A mensagem é <code>could not find driver</code>. Qual o primeiro passo?</p>
+<label><input type="radio" name="q6"> Conferir o prefixo do DSN e se a extensão <code>pdo_mysql</code> aparece em <code>php -m</code>.</label>
+<label><input type="radio" name="q6"> Trocar a senha do usuário no MySQL.</label>
+<label><input type="radio" name="q6"> Criar o banco com <code>CREATE DATABASE</code>.</label>
+<label><input type="radio" name="q6"> Trocar <code>localhost</code> por <code>127.0.0.1</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Qual destas afirmações sobre <code>mysqli</code> e PDO está correta?</p>
+<label><input type="radio" name="q7"> Só o <code>mysqli</code> tem prepared statements.</label>
+<label><input type="radio" name="q7"> O PDO só funciona com MySQL.</label>
+<label><input type="radio" name="q7"> As funções <code>mysql_query</code> (sem "i") ainda funcionam no PHP 8.</label>
+<label><input type="radio" name="q7"> Com o PDO, o mesmo código PHP pode usar SQLite em casa e MySQL na hospedagem, mudando a conexão.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>MySQL e MariaDB são <strong>servidores</strong>: um programa que fica rodando, com usuários e senhas, e atende muitos acessos ao mesmo tempo. O SQLite é um <strong>arquivo</strong>.</li>
+  <li>Você precisa de duas peças: o <strong>servidor</strong> e a extensão <strong><code>pdo_mysql</code></strong> do PHP. Confira com <code>php -m</code>.</li>
+  <li>Crie um banco e um usuário <strong>só para o sistema</strong>; nunca use o <code>root</code> do MySQL no código.</li>
+  <li>DSN: <code>mysql:host=localhost;dbname=loja;charset=utf8mb4</code>; usuário e senha vão separados no <code>new PDO</code>.</li>
+  <li>Use <code>utf8mb4</code> no banco, nas tabelas e na conexão.</li>
+  <li><code>[2002]</code> = não chegou ao servidor (<em>No such file or directory</em>: socket; <em>Connection refused</em>: porta; <em>getaddrinfo</em>: nome). <code>could not find driver</code> = falta a extensão.</li>
+  <li>Trate o erro de conexão com <code>try</code>/<code>catch</code>: log para você, mensagem amigável para o visitante.</li>
+  <li>O SQL muda nos detalhes: <code>AUTO_INCREMENT</code> × <code>INTEGER PRIMARY KEY</code>, <code>VARCHAR</code>/<code>DECIMAL</code> × <code>TEXT</code>/<code>REAL</code>, tipos rígidos × flexíveis.</li>
+  <li>Prefira PDO a <code>mysqli</code>: uma forma de trabalhar para qualquer banco.</li>
+</ul>
+
+<p>Com isso, você termina o Nível 2. Para ver tudo junto num sistema de verdade, faça o projeto <a href="projeto-tarefas.html">Tarefas com SQLite</a>; no <a href="poo.html">Nível 3</a>, você vai organizar o código da conexão em classes.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
