@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Variáveis — criar, mudar, isset e unset | Guia PHP</title>
+<meta name="description" content="Variáveis em PHP para quem nunca programou: o cifrão, criar e mudar valores, regras de nome, maiúsculas e minúsculas, o aviso Undefined variable, isset, unset e variáveis variáveis, com saídas reais do PHP 8.5 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Variáveis</span></h1>
+
+<p class="intro">Todo programa precisa <strong>guardar coisas</strong> enquanto trabalha: o nome de quem está comprando, o preço de um produto, quantas maçãs sobraram na lojinha. Em PHP, cada coisa guardada fica numa <strong>variável</strong>, e toda variável começa com um cifrão: <code>$nome</code>, <code>$preco</code>, <code>$quantidade</code>. Nesta aula você vai criar suas primeiras variáveis, mudar o valor delas, escolher bons nomes e entender o aviso que o PHP mostra quando você usa uma variável que não existe.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma variável e como criar uma: <code>$nome = "Ana";</code>.</li>
+  <li>Como mostrar o valor de uma variável e como trocá-lo por outro.</li>
+  <li>Quais nomes o PHP aceita e por que <code>$nome</code> e <code>$Nome</code> são variáveis diferentes.</li>
+  <li>O que significa <code>Warning: Undefined variable</code> e como evitá-lo.</li>
+  <li>Como perguntar "esta variável existe?" com <code>isset</code> e como apagar uma com <code>unset</code>.</li>
+  <li>A ideia das "variáveis variáveis" (<code>$$</code>), só para reconhecê-las.</li>
+</ul>
+</div>
+
+<p>Todos os programas desta aula foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), na pasta <code>~/site</code>, com o comando <code>php arquivo.php</code> (veja <a href="linha-comando.html">PHP na Linha de Comando</a>). Você pode repetir cada um no editor do guia, que roda o PHP de verdade no navegador.</p>
+
+<hr>
+
+<h2>A ideia: uma caixa com etiqueta</h2>
+<p>Pense numa mudança de casa. Você guarda as coisas em caixas e escreve uma <strong>etiqueta</strong> em cada uma: "LIVROS", "PANELAS". Depois, quando quer as panelas, não abre todas as caixas: procura pela etiqueta.</p>
+
+<p>Uma variável é isso: um espacinho na memória do computador com uma etiqueta. A etiqueta é o <strong>nome</strong> da variável; o que está dentro é o <strong>valor</strong>. O nome "variável" vem justamente daí: o que está dentro pode <em>variar</em>, ser trocado quantas vezes você quiser.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte da caixa</th><th>Nome técnico</th><th>Exemplo</th></tr>
+<tr><td>A etiqueta</td><td><strong>nome</strong> da variável</td><td><code>$nome</code>, <code>$preco</code></td></tr>
+<tr><td>O que está guardado agora</td><td><strong>valor</strong></td><td><code>"Ana"</code>, <code>4.5</code>, <code>29</code></td></tr>
+<tr><td>O tipo de coisa guardada</td><td><strong>tipo</strong></td><td>texto, número inteiro, número com vírgula…</td></tr>
+</table>
+</div>
+
+<p>Em muitas linguagens (Java, C) você precisa dizer de antemão o <strong>tipo</strong> da caixa: "esta caixa só aceita números". Em PHP, não: a caixa aceita qualquer coisa, e o PHP descobre o tipo olhando o valor que você colocou. Isso se chama <strong>tipagem dinâmica</strong>, e você vai estudá-la na próxima aula, <a href="tipos-dados.html">Tipos de Dados</a>.</p>
+
+<hr>
+
+<h2>1. Criar uma variável</h2>
+<p>Para criar uma variável, escreva o nome dela (com o cifrão), um sinal de igual e o valor. Pronto: não existe um comando especial de "criar". A variável passa a existir na primeira vez que recebe um valor.</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = "Ana";
+echo $nome;
+</pre>
+
+<dl class="anatomy">
+  <dt>&lt;?php</dt><dd>Abre o código PHP. Tudo o que vem depois é programa (veja <a href="sintaxe.html">Sintaxe</a>).</dd>
+  <dt>$</dt><dd>O <strong>cifrão</strong> avisa: "isto é uma variável". Em PHP, <strong>toda</strong> variável começa com <code>$</code>, sem exceção.</dd>
+  <dt>nome</dt><dd>O nome (a etiqueta). Juntos, <code>$nome</code> é o nome completo da variável.</dd>
+  <dt>=</dt><dd>O sinal de <strong>atribuição</strong>. Leia como "recebe": <em>$nome recebe "Ana"</em>. Não é o "igual" da matemática; quem compara valores é o <code>==</code>/<code>===</code> (aula <a href="operadores-comparacao.html">Comparação</a>).</dd>
+  <dt>"Ana"</dt><dd>O valor: um texto. Texto em PHP sempre vai entre aspas (veja <a href="strings.html">Strings</a>).</dd>
+  <dt>;</dt><dd>O ponto e vírgula termina a instrução, como o ponto final de uma frase.</dd>
+  <dt>echo $nome;</dt><dd><code>echo</code> ("ecoar") mostra o valor da variável na tela (veja <a href="echo-print.html">echo e print</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/site">$ php ola.php
+Anaana@notebook:~/site$          « o prompt colou no "Ana": o echo não pula linha</pre>
+
+<p>O <code>echo</code> mostra o que está <strong>dentro</strong> da caixa (<code>Ana</code>), não o nome dela. E ele não pula linha sozinho: o prompt <code>$</code> do terminal apareceu grudado no <code>Ana</code>. Para pular linha, acrescente <code>"\n"</code> (barra invertida + n, a "quebra de linha"):</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = "Ana";
+$idade = 29;
+$preco = 4.5;
+echo $nome, "\n";
+echo $idade, "\n";
+echo $preco, "\n";
+echo "$nome tem $idade anos.\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php ola.php
+Ana
+29
+4.5
+Ana tem 29 anos.</pre>
+
+<p>Repare em três coisas:</p>
+<ul>
+  <li><strong>Números não levam aspas.</strong> <code>29</code> é o número vinte e nove; <code>"29"</code> seria um texto com os caracteres 2 e 9. A diferença importa em contas e comparações (aula <a href="conversao-tipos.html">Conversão de Tipos</a>).</li>
+  <li><strong>Números com vírgula usam ponto</strong>: <code>4.5</code>, e não <code>4,5</code>. O PHP segue a escrita dos Estados Unidos. Para mostrar <code>4,50</code> ao usuário, existe o <code>number_format</code> (aula <a href="number-format.html">Formatar Números</a>).</li>
+  <li><strong>Dentro de aspas duplas, a variável é trocada pelo valor</strong>: <code>"$nome tem $idade anos."</code> virou <code>Ana tem 29 anos.</code>. Isso se chama <strong>interpolação</strong> e tem aula própria: <a href="interpolacao.html">Interpolação</a>. A vírgula em <code>echo $nome, "\n"</code> só separa duas coisas que o <code>echo</code> vai mostrar uma depois da outra.</li>
+</ul>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque o valor de <code>$fruta</code> e de <code>$quantidade</code> e clique em <strong>Rodar</strong>. Depois crie uma terceira variável, <code>$cor</code>, e mostre-a também.</p>
+<pre class="script">&lt;?php
+$fruta = "maçã";
+$quantidade = 6;
+echo "A Ana comprou $quantidade unidades de $fruta.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Mudar o valor</h2>
+<p>Para trocar o que está na caixa, basta atribuir de novo. O valor antigo é jogado fora e o novo entra no lugar:</p>
+
+<pre class="file" data-file="mudar.php">&lt;?php
+$fruta = "maçã";
+echo "Antes: $fruta\n";
+$fruta = "banana";
+echo "Depois: $fruta\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php mudar.php
+Antes: maçã
+Depois: banana</pre>
+
+<p>O PHP executa as linhas <strong>de cima para baixo</strong>. Na linha 3, <code>$fruta</code> ainda vale <code>"maçã"</code>; a linha 4 troca o valor; a linha 5 já vê <code>"banana"</code>.</p>
+
+<h3>Usar o valor antigo para calcular o novo</h3>
+<p>Uma linha como <code>$qtd = $qtd + 2;</code> parece estranha para quem lembra da matemática ("um número igual a ele mais dois?"). Mas lembre: <code>=</code> é "recebe". O PHP <strong>primeiro calcula o lado direito</strong> com o valor atual e <strong>depois</strong> guarda o resultado na caixa:</p>
+
+<pre class="file" data-file="estoque.php">&lt;?php
+$qtd = 3;
+$qtd = $qtd + 2;
+echo $qtd, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php estoque.php
+5</pre>
+
+<ol class="passo">
+  <li><code>$qtd = 3;</code> → a caixa guarda <code>3</code>.</li>
+  <li><code>$qtd + 2</code> → o PHP lê o valor atual (3) e soma: <code>5</code>.</li>
+  <li><code>$qtd = 5</code> → o resultado vai para a caixa, no lugar do 3.</li>
+</ol>
+
+<p>Esse padrão é tão comum que tem um atalho, <code>$qtd += 2;</code>, explicado em <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</p>
+
+<h3>A caixa aceita outro tipo de valor</h3>
+<p>Como o PHP não prende a variável a um tipo, a mesma variável pode guardar um texto agora e um número depois:</p>
+
+<pre class="file" data-file="tipo.php">&lt;?php
+$fruta = "banana";
+$fruta = 10;
+var_dump($fruta);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php tipo.php
+int(10)                  « var_dump mostra o tipo (int = número inteiro) e o valor</pre>
+
+<p>O <code>var_dump</code> é a "lupa" do programador PHP: mostra o tipo e o valor de qualquer coisa. Ele tem aula própria, <a href="var-dump.html">var_dump e print_r</a>. Funcionar, funciona; mas trocar o tipo de uma variável no meio do programa costuma confundir quem lê o código. Prefira que cada variável guarde sempre o mesmo tipo de coisa.</p>
+
+<h3>Copiar uma variável para outra</h3>
+<p>Quando você escreve <code>$b = $a;</code>, o PHP <strong>copia o valor</strong> de <code>$a</code> para <code>$b</code>. Depois disso, as duas caixas são independentes:</p>
+
+<pre class="file" data-file="copia.php">&lt;?php
+$a = 1;
+$b = $a;
+$a = 5;
+echo "a=$a b=$b\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php copia.php
+a=5 b=1                  « mudar $a depois não mexeu em $b</pre>
+
+<p>Existe um jeito de fazer duas variáveis apontarem para a <strong>mesma</strong> caixa (<code>$b = &amp;$a;</code>, a "referência"), apresentado em <a href="operadores-atribuicao.html">Operadores de Atribuição</a>. No dia a dia, a cópia é o que você quer.</p>
+
+<hr>
+
+<h2>3. Regras para o nome</h2>
+<p>O nome de uma variável segue quatro regras. Quebrar qualquer uma delas faz o PHP recusar o programa inteiro, antes de rodar a primeira linha.</p>
+
+<ol>
+  <li>Começa com <code>$</code>.</li>
+  <li>Depois do cifrão, vem uma <strong>letra</strong> ou um <strong>sublinhado</strong> (<code>_</code>). Nunca um número.</li>
+  <li>O resto pode ter letras, números e sublinhados. <strong>Sem espaços, sem hífen</strong>, sem pontuação.</li>
+  <li><code>$this</code> é reservado (ele aparece nas aulas de <a href="classes-objetos.html">Classes e Objetos</a>).</li>
+</ol>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>Vale?</th><th>Por quê</th></tr>
+<tr><td><code>$nome</code></td><td>Sim</td><td>Só letras.</td></tr>
+<tr><td><code>$item2</code></td><td>Sim</td><td>Números podem vir depois da primeira letra.</td></tr>
+<tr><td><code>$_total</code></td><td>Sim</td><td>Pode começar com sublinhado.</td></tr>
+<tr><td><code>$nome_completo</code>, <code>$nomeCompleto</code></td><td>Sim</td><td>Sublinhado ou maiúscula no meio separam as palavras.</td></tr>
+<tr><td><code>$preço</code></td><td>Sim, mas evite</td><td>O PHP aceita letras acentuadas, mas nem todo teclado e editor lida bem com elas. Use <code>$preco</code>.</td></tr>
+<tr><td><code>$1nome</code></td><td>Não</td><td>Começa com número.</td></tr>
+<tr><td><code>$minha-variavel</code></td><td>Não</td><td>O hífen é o sinal de menos: o PHP lê "<code>$minha</code> menos <code>variavel</code>".</td></tr>
+<tr><td><code>$minha variavel</code></td><td>Não</td><td>O espaço corta o nome em dois.</td></tr>
+<tr><td><code>nome</code> (sem <code>$</code>)</td><td>Não</td><td>Sem o cifrão, não é variável.</td></tr>
+<tr><td><code>$this</code></td><td>Não</td><td>Reservado para a programação orientada a objetos.</td></tr>
+</table>
+</div>
+
+<p>Veja o que o PHP responde a cada nome errado. Cada programa abaixo tem só a linha 2 com o erro:</p>
+
+<pre class="term" data-cwd="~/site">$ cat a.php
+&lt;?php
+$1nome = "Ana";
+$ php a.php
+
+Parse error: syntax error, unexpected integer "1", expecting variable or "{" or "$" in /home/ana/site/a.php on line 2
+$ echo $?
+255                      « código de saída 255: o programa nem chegou a rodar</pre>
+
+<pre class="term" data-cwd="~/site">$ php b.php              « $minha-variavel = "Ana";
+
+Parse error: syntax error, unexpected token "=" in /home/ana/site/b.php on line 2
+$ php c.php              « $minha variavel = "Ana";
+
+Parse error: syntax error, unexpected identifier "variavel" in /home/ana/site/c.php on line 2
+$ php e.php              « nome = "Ana";   (sem o cifrão)
+
+Parse error: syntax error, unexpected token "=" in /home/ana/site/e.php on line 2</pre>
+
+<p><strong>Parse error</strong> quer dizer "erro de leitura": o PHP lê o arquivo inteiro antes de executar, e parou porque achou algo que não faz sentido na gramática da linguagem. <em>Unexpected</em> = "inesperado". Em <code>$minha-variavel = "Ana"</code>, o PHP leu <code>$minha - variavel</code> (uma conta) e depois encontrou um <code>=</code> onde não cabe atribuição. Como ler essas mensagens com calma é assunto da aula <a href="erros.html">Lendo Erros do PHP</a>.</p>
+
+<pre class="term" data-cwd="~/site">$ php d.php              « $this = 1;
+
+Fatal error: Cannot re-assign $this in /home/ana/site/d.php on line 2
+Stack trace:
+#0 {main}</pre>
+
+<p><em>Cannot re-assign $this</em> = "não é possível atribuir de novo a <code>$this</code>". Escolha outro nome.</p>
+
+<h3>Convenções: como os programadores PHP costumam escrever</h3>
+<p>Além das regras (que o PHP exige), existem <strong>convenções</strong> (combinados entre programadores, que o PHP não confere):</p>
+<ul>
+  <li><strong>Nomes que dizem o que guardam.</strong> <code>$precoTotal</code> é melhor que <code>$pt</code> ou <code>$x</code>.</li>
+  <li><strong>Um estilo só no projeto.</strong> Os dois mais comuns são <code>$nomeCompleto</code> ("camelCase", a corcova do camelo no meio) e <code>$nome_completo</code> ("snake_case", palavras ligadas por sublinhado). Os padrões modernos da comunidade (<a href="psr.html">PSR</a>) e a maioria dos frameworks usam camelCase; o próprio PHP usa snake_case nos nomes das funções (<code>str_replace</code>). Neste guia, usamos camelCase nas variáveis.</li>
+  <li><strong>Sem acentos e em minúsculas</strong> no começo: <code>$preco</code>, <code>$quantidade</code>.</li>
+</ul>
+
+<hr>
+
+<h2>4. Maiúsculas e minúsculas fazem diferença</h2>
+<p>Para o PHP, <code>$nome</code>, <code>$Nome</code> e <code>$NOME</code> são <strong>três variáveis diferentes</strong>. Uma letra trocada já basta para o PHP não achar a caixa:</p>
+
+<pre class="file" data-file="maiusculas.php">&lt;?php
+$nome = "Ana";
+echo $Nome;
+ECHO $nome, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php maiusculas.php
+
+Warning: Undefined variable $Nome in /home/ana/site/maiusculas.php on line 3
+Ana</pre>
+
+<p>Linha a linha:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que acontece</th></tr>
+<tr><td>2</td><td>Cria <code>$nome</code> (com <strong>n</strong> minúsculo).</td></tr>
+<tr><td>3</td><td>Procura <code>$Nome</code> (com <strong>N</strong> maiúsculo). Não existe: aviso <code>Undefined variable $Nome</code>, e o <code>echo</code> não mostra nada.</td></tr>
+<tr><td>4</td><td><code>ECHO</code> em maiúsculas funciona, e <code>$nome</code> existe: aparece <code>Ana</code>.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Por que <code>ECHO</code> funcionou?</strong>
+<p>No PHP, as <strong>palavras da linguagem</strong> (<code>echo</code>, <code>if</code>, <code>while</code>…) e os <strong>nomes de funções</strong> (<code>strlen</code>, <code>STRLEN</code>) não diferenciam maiúsculas de minúsculas. Já as <strong>variáveis</strong> diferenciam. Na prática, escreva tudo em minúsculas e trate qualquer diferença de letra como erro.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Bem-vinda\, Ana!,semerro">
+<p class="try-task"><strong>Missão:</strong> este programa deveria mostrar <code>Bem-vinda, Ana!</code>, mas mostra um aviso. Rode, leia o aviso (qual variável o PHP não achou?) e corrija só a linha do <code>echo</code>.</p>
+<pre class="script">&lt;?php
+$nomeCliente = "Ana";
+echo "Bem-vinda, $nomecliente!\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nomeCliente = "Ana";
+echo "Bem-vinda, $nomeCliente!\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>5. Usar uma variável que não existe</h2>
+<p>Se você usa uma variável que nunca recebeu valor (ou escreveu o nome errado), o PHP <strong>não para</strong> o programa. Ele mostra um <strong>aviso</strong> (<em>Warning</em>), trata a variável como vazia (o valor <code>null</code>, aula <a href="null.html">null</a>) e segue em frente. Isso pode esconder erros de conta:</p>
+
+<pre class="file" data-file="total.php">&lt;?php
+$total = $preco + 1;
+echo "Total: $total\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php total.php
+
+Warning: Undefined variable $preco in /home/ana/site/total.php on line 2
+Total: 1
+$ echo $?
+0                        « código 0: para o sistema, o programa "deu certo"</pre>
+
+<dl class="anatomy">
+  <dt>Warning:</dt><dd>"Aviso". É um problema, mas o PHP decidiu continuar. Diferente de <code>Fatal error</code> e <code>Parse error</code>, que param tudo.</dd>
+  <dt>Undefined variable $preco</dt><dd>"Variável indefinida <code>$preco</code>": ninguém deu valor a ela antes desta linha.</dd>
+  <dt>in /home/ana/site/total.php</dt><dd>Em qual arquivo. No editor do guia, aparece o caminho do arquivo dentro do navegador, que é outro.</dd>
+  <dt>on line 2</dt><dd>Em qual linha. Comece a procurar por ela.</dd>
+</dl>
+
+<p>A conta continuou como se <code>$preco</code> fosse zero, e o resultado saiu <code>Total: 1</code>: um número <strong>errado</strong>, sem nenhum erro "de verdade". Por isso, <strong>nunca ignore um Warning</strong>. Em uma página web, o aviso aparece no meio do HTML (ou só no registro de erros do servidor, dependendo da configuração), o que é ainda mais fácil de deixar passar. As configurações de exibição de erros são assunto de <a href="tipos-erro.html">Tipos de Erro</a>.</p>
+
+<div class="tip">
+<strong>A linha em branco antes do Warning</strong>
+<p>O PHP sempre escreve uma linha em branco antes da mensagem, para ela não grudar no texto que o seu programa já mostrou. Isso é normal.</p>
+</div>
+
+<hr>
+
+<h2>6. <code>isset</code>: "esta variável existe?" e <code>unset</code>: "apague"</h2>
+<p>Às vezes você não sabe se uma variável existe: ela pode depender de um formulário que o visitante preencheu ou não. Para perguntar sem levar um Warning, use <code>isset</code> (de <em>is set</em>, "está definida?"). Ele responde <code>true</code> (verdadeiro) ou <code>false</code> (falso), os valores <a href="booleanos.html">booleanos</a>.</p>
+
+<p>Para <strong>apagar</strong> uma variável, use <code>unset</code> ("desdefinir"). Depois dele, é como se a variável nunca tivesse existido.</p>
+
+<pre class="file" data-file="isset.php">&lt;?php
+$nome = "Ana";
+var_dump(isset($nome));
+var_dump(isset($idade));
+$vazio = null;
+var_dump(isset($vazio));
+$zero = 0;
+var_dump(isset($zero));
+var_dump(isset($nome, $idade));
+unset($nome);
+var_dump(isset($nome));
+echo $nome;
+echo "fim\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php isset.php
+bool(true)               « linha 3: $nome existe
+bool(false)              « linha 4: $idade nunca foi criada (e não houve Warning!)
+bool(false)              « linha 6: $vazio existe, mas vale null
+bool(true)               « linha 8: zero é um valor como outro qualquer
+bool(false)              « linha 9: com várias, só dá true se TODAS existirem
+bool(false)              « linha 11: depois do unset, $nome sumiu
+
+Warning: Undefined variable $nome in /home/ana/site/isset.php on line 12
+fim</pre>
+
+<p>Os detalhes importantes:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th><code>isset($x)</code></th></tr>
+<tr><td><code>$x</code> nunca foi criada</td><td><code>false</code> (sem Warning)</td></tr>
+<tr><td><code>$x = null;</code></td><td><code>false</code>: para o <code>isset</code>, valer <code>null</code> é o mesmo que não existir</td></tr>
+<tr><td><code>$x = 0;</code>, <code>$x = "";</code>, <code>$x = false;</code></td><td><code>true</code>: são valores (mesmo que "vazios")</td></tr>
+<tr><td>depois de <code>unset($x);</code></td><td><code>false</code></td></tr>
+<tr><td><code>isset($a, $b, $c)</code></td><td><code>true</code> só se as três existirem e não forem <code>null</code></td></tr>
+</table>
+</div>
+
+<p>O uso mais comum do <code>isset</code> é dentro de um <a href="if-else.html">if</a>, para decidir o que fazer. Um atalho moderno para "use a variável se existir, senão use um valor padrão" é o operador <code>??</code>: <code>echo $nome ?? "visitante";</code>. Ele tem aula própria, <a href="null-coalescing.html">?? e ?-&gt;</a>.</p>
+
+<div class="note">
+<strong><code>isset</code> e <code>unset</code> não são funções comuns</strong>
+<p>Eles parecem funções, mas são <strong>construções da linguagem</strong>: só aceitam variáveis entre os parênteses. <code>isset("Ana")</code> para o programa com <code>Fatal error: Cannot use isset() on the result of an expression (you can use "null !== expression" instead)</code> ("não é possível usar isset() no resultado de uma expressão"). É por isso que o <code>isset</code> consegue olhar uma variável inexistente sem provocar o Warning.</p>
+</div>
+
+<p>Você pode apagar várias de uma vez: <code>unset($a, $b);</code>. Apagar é raro em programas pequenos (o PHP joga todas as variáveis fora sozinho quando o programa termina); vai ser mais útil para tirar itens de um <a href="arrays-associativos.html">array</a>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode como está. Depois apague a linha <code>$cupom = "PROMO10";</code> e rode de novo: o que muda? E se trocar por <code>$cupom = null;</code>?</p>
+<pre class="script">&lt;?php
+$cupom = "PROMO10";
+var_dump(isset($cupom));
+unset($cupom);
+var_dump(isset($cupom));
+</pre>
+</div>
+
+<hr>
+
+<h2>7. Variáveis variáveis (<code>$$</code>): só a ideia</h2>
+<p>O PHP tem um recurso curioso: usar o <strong>valor</strong> de uma variável como <strong>nome</strong> de outra. Isso se chama "variável variável" e se escreve com dois cifrões:</p>
+
+<pre class="file" data-file="varvar.php">&lt;?php
+$campo = "cor";
+$$campo = "azul";
+echo $cor, "\n";
+echo ${$campo}, "\n";
+echo ${"cor"}, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php varvar.php
+azul
+azul
+azul</pre>
+
+<dl class="anatomy">
+  <dt>$campo = "cor";</dt><dd>Uma variável comum, que guarda o texto <code>"cor"</code>.</dd>
+  <dt>$$campo = "azul";</dt><dd>O PHP lê de dentro para fora: <code>$campo</code> vale <code>"cor"</code>, então <code>$$campo</code> é <code>$cor</code>. A linha cria a variável <code>$cor</code> com o valor <code>"azul"</code>.</dd>
+  <dt>${$campo} e ${"cor"}</dt><dd>A mesma coisa, com chaves para deixar claro qual parte vira nome.</dd>
+</dl>
+
+<div class="warning">
+<strong>Reconheça, mas quase nunca use</strong>
+<p>Variáveis variáveis deixam o código difícil de ler (de onde veio esse <code>$cor</code>?) e perigoso se o nome vier de um formulário. Quando você quiser guardar "vários valores com nomes", use um <strong>array associativo</strong>: <code>$dados["cor"] = "azul";</code> (aula <a href="arrays-associativos.html">Arrays Associativos</a>). Você vai encontrar <code>$$</code> em código antigo; agora sabe o que é.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined variable $...</code></strong>
+<pre class="term" data-cwd="~/site">$ php total.php
+
+Warning: Undefined variable $preco in /home/ana/site/total.php on line 2
+Total: 1</pre>
+<p><strong>O que significa:</strong> na linha indicada, você usou uma variável que ainda não tem valor. As causas mais comuns: nome digitado diferente (<code>$preco</code> × <code>$preço</code> × <code>$Preco</code>), variável criada <strong>mais abaixo</strong> no arquivo, ou criada dentro de um <code>if</code> que não foi executado.</p>
+<p><strong>Como consertar:</strong> copie o nome exato da mensagem e procure-o no arquivo. Confira se a variável recebe valor <strong>antes</strong> da linha do aviso. Se ela pode mesmo não existir, use <code>isset</code> ou <code>??</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected token "echo"</code></strong>
+<pre class="term" data-cwd="~/site">$ cat f.php
+&lt;?php
+$nome = "Ana"
+echo $nome;
+$ php f.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/site/f.php on line 3</pre>
+<p><strong>O que significa:</strong> faltou o <code>;</code> no fim da linha 2. O PHP continuou lendo, achou o <code>echo</code> "no meio" da atribuição e reclamou na linha <strong>3</strong>.</p>
+<p><strong>Como consertar:</strong> quando o erro aponta uma linha que parece certa, olhe o fim da linha <strong>anterior</strong>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected token "="</code></strong>
+<p><strong>O que significa:</strong> o nome da variável é inválido (tem hífen, como <code>$minha-variavel</code>) ou falta o cifrão (<code>nome = "Ana"</code>).</p>
+<p><strong>Como consertar:</strong> troque o hífen por sublinhado ou camelCase (<code>$minha_variavel</code>, <code>$minhaVariavel</code>) e confira o <code>$</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa roda, mas mostra o nome da variável em vez do valor</strong>
+<pre class="file" data-file="aspas.php">&lt;?php
+$nome = "Ana";
+echo 'Olá, $nome' . "\n";
+</pre>
+<pre class="term" data-cwd="~/site">$ php aspas.php
+Olá, $nome</pre>
+<p><strong>O que significa:</strong> entre <strong>aspas simples</strong>, o PHP não troca variáveis pelo valor.</p>
+<p><strong>Como consertar:</strong> use aspas duplas: <code>echo "Olá, $nome\n";</code>. A diferença entre os dois tipos de aspas está em <a href="strings.html">Strings</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>$x = valor;</code></td><td>Cria a variável (ou troca o valor)</td><td><code>$nome = "Ana";</code></td></tr>
+<tr><td><code>echo $x;</code></td><td>Mostra o valor</td><td><code>echo $nome, "\n";</code></td></tr>
+<tr><td><code>"... $x ..."</code></td><td>Põe o valor no meio de um texto (só aspas duplas)</td><td><code>"Olá, $nome"</code></td></tr>
+<tr><td><code>$b = $a;</code></td><td>Copia o valor de <code>$a</code> para <code>$b</code></td><td><code>$copia = $nome;</code></td></tr>
+<tr><td><code>var_dump($x);</code></td><td>Mostra tipo e valor</td><td><code>int(10)</code></td></tr>
+<tr><td><code>isset($x)</code></td><td><code>true</code> se existe e não é <code>null</code></td><td><code>isset($cupom)</code></td></tr>
+<tr><td><code>unset($x);</code></td><td>Apaga a variável</td><td><code>unset($cupom);</code></td></tr>
+<tr><td><code>$$x</code></td><td>Variável cujo nome é o valor de <code>$x</code></td><td><code>$$campo</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar a variável</h3>
+<p>Complete para criar a variável <code>cidade</code> com o texto Recife:</p>
+<div class="ex-code"><input data-answer="$cidade" aria-label="nome"> = "Recife";</div>
+</div>
+
+<div class="exercise">
+<h3>2. Existe?</h3>
+<p>Complete para perguntar se a variável <code>$email</code> existe, sem provocar Warning:</p>
+<div class="ex-code">var_dump(<input data-answer="isset" aria-label="função">($email));</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Qual destes nomes de variável é válido?</p>
+<label><input type="radio" name="q3"> <code>$2lugar</code></label>
+<label><input type="radio" name="q3"> <code>$valor-total</code></label>
+<label><input type="radio" name="q3"> <code>$valor_total</code></label>
+<label><input type="radio" name="q3"> <code>$valor total</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que este programa mostra? <code>$a = 2; $b = $a; $a = 7; echo $b;</code></p>
+<label><input type="radio" name="q4"> 7</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 9</label>
+<label><input type="radio" name="q4"> Um Warning</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Depois de <code>$x = null;</code>, quanto vale <code>isset($x)</code>?</p>
+<label><input type="radio" name="q5"> <code>true</code>, porque a variável foi criada</label>
+<label><input type="radio" name="q5"> Dá Warning</label>
+<label><input type="radio" name="q5"> <code>null</code></label>
+<label><input type="radio" name="q5"> <code>false</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O programa tem <code>$Total = 10;</code> na linha 2 e <code>echo $total;</code> na linha 3. O que acontece?</p>
+<label><input type="radio" name="q6"> Aparece <code>Warning: Undefined variable $total ... on line 3</code> e o programa continua</label>
+<label><input type="radio" name="q6"> Aparece <code>10</code>, porque o PHP não diferencia maiúsculas</label>
+<label><input type="radio" name="q6"> O programa nem roda: <code>Parse error</code></label>
+<label><input type="radio" name="q6"> Aparece <code>$total</code></label>
+</div>
+
+<h3>Missão final: o recibo da lojinha</h3>
+
+<div class="tryphp" data-goal="out:Cliente: Bruno,out:Produto: caderno,out:Quantidade: 3,semerro,src:\$cliente\s*=,src:\$quantidade\s*=\s*3">
+<p class="try-task"><strong>Missão:</strong> crie as variáveis <code>$cliente</code> (com <code>"Bruno"</code>), <code>$produto</code> (com <code>"caderno"</code>) e <code>$quantidade</code> (com o número <code>3</code>, sem aspas). Depois, mostre as três linhas abaixo usando as variáveis, sem digitar Bruno, caderno ou 3 dentro do texto:</p>
+<pre class="out">Cliente: Bruno
+Produto: caderno
+Quantidade: 3</pre>
+<pre class="script">&lt;?php
+// crie as três variáveis aqui
+
+// e mostre as três linhas aqui
+</pre>
+<pre class="solucao">&lt;?php
+$cliente = "Bruno";
+$produto = "caderno";
+$quantidade = 3;
+echo "Cliente: $cliente\n";
+echo "Produto: $produto\n";
+echo "Quantidade: $quantidade\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Variável = caixa com <strong>nome</strong> (etiqueta) e <strong>valor</strong>. Em PHP, todo nome começa com <code>$</code>.</li>
+  <li>Criar e mudar é a mesma coisa: <code>$nome = "Ana";</code>. O <code>=</code> quer dizer "recebe", e o lado direito é calculado primeiro.</li>
+  <li>Nome: <code>$</code> + letra ou <code>_</code> + letras, números, <code>_</code>. Sem hífen, sem espaço, sem começar com número. Use nomes que dizem o que guardam.</li>
+  <li><code>$nome</code> e <code>$Nome</code> são variáveis diferentes.</li>
+  <li>Usar uma variável sem valor dá <code>Warning: Undefined variable</code>, e o programa continua com um valor vazio. Nunca ignore.</li>
+  <li><code>isset($x)</code> pergunta se existe (e não é <code>null</code>); <code>unset($x)</code> apaga.</li>
+  <li><code>$$x</code> existe, mas prefira arrays associativos.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
