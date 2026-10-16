@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Escopo — variáveis locais, global e static | Guia PHP</title>
+<meta name="description" content="Escopo de variáveis em PHP: por que a função não enxerga a variável de fora (Warning: Undefined variable), variáveis locais, passar por parâmetro e devolver com return, global e $GLOBALS (e por que evitar), static dentro de função e o que if e foreach não isolam.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Escopo</span></h1>
+
+<p class="intro">Você cria <code>$taxa = 0.1;</code> no começo do arquivo, escreve uma função que usa <code>$taxa</code>… e o PHP diz que a variável não existe. Não é defeito: é o <strong>escopo</strong>, a regra que diz <strong>onde</strong> cada variável pode ser vista. Entender essa regra evita um dos avisos mais comuns de quem começa e explica por que funções são tão seguras de usar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é o escopo <strong>global</strong> (o arquivo) e o escopo <strong>local</strong> (cada função).</li>
+  <li>Por que a função não enxerga a variável de fora (<code>Warning: Undefined variable</code>) e vice-versa.</li>
+  <li>O jeito certo de levar dados para dentro e para fora: <strong>parâmetros</strong> e <strong><code>return</code></strong>.</li>
+  <li><code>global</code> e <code>$GLOBALS</code>: como funcionam e por que evitar.</li>
+  <li><code>static</code>: uma variável de função que se lembra do valor entre as chamadas.</li>
+  <li>Uma surpresa do PHP: <code>if</code>, <code>for</code> e <code>foreach</code> <strong>não</strong> criam escopo.</li>
+</ul>
+</div>
+
+<p>Você precisa saber criar <a href="funcoes.html">funções</a> com <a href="parametros.html">parâmetros</a> e <a href="tipos-retorno.html">return</a>. Os exemplos rodam na máquina da Ana, na pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: a cozinha do restaurante</h2>
+<p>Pense na lojinha de doces da Ana. No <strong>salão</strong> ficam os clientes, o caixa, o cardápio. A <strong>cozinha</strong> é uma sala fechada: o confeiteiro lá dentro não vê o que está no salão. Se ele precisa de alguma coisa, alguém tem que <strong>entregar pela janelinha</strong> (o pedido). Quando o doce fica pronto, ele <strong>devolve pela janelinha</strong>. O que acontece na cozinha (as tigelas, a farinha espalhada) fica na cozinha.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na lojinha</th><th>No PHP</th></tr>
+<tr><td>O salão</td><td>O <strong>escopo global</strong>: o arquivo, fora de qualquer função.</td></tr>
+<tr><td>A cozinha (uma sala fechada)</td><td>O <strong>escopo local</strong> de uma função. Cada função tem a sua.</td></tr>
+<tr><td>O pedido entregue pela janelinha</td><td>Os <strong>parâmetros</strong>.</td></tr>
+<tr><td>O doce devolvido pela janelinha</td><td>O <strong><code>return</code></strong>.</td></tr>
+<tr><td>As tigelas sujas</td><td>As variáveis criadas dentro da função: somem quando ela termina.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>A função não vê as variáveis de fora</h2>
+
+<pre class="file" data-file="fora.php">&lt;?php
+$x = 10;
+
+function mostrar()
+{
+    echo "Dentro da função: x = $x\n";
+}
+
+mostrar();
+echo "Fora da função: x = $x\n";
+</pre>
+
+<pre class="term">$ php fora.php
+
+Warning: Undefined variable $x in /home/ana/site/fora.php on line 6
+Dentro da função: x =
+Fora da função: x = 10</pre>
+
+<dl class="anatomy">
+  <dt>Warning</dt><dd>"Aviso": o PHP não parou o programa, mas algo está errado (veja <a href="erros.html">Lendo Erros do PHP</a>).</dd>
+  <dt>Undefined variable $x</dt><dd>"Variável indefinida $x". Dentro da função, <strong>não existe</strong> nenhum <code>$x</code>.</dd>
+  <dt>on line 6</dt><dd>A linha do <code>echo</code> <strong>dentro</strong> da função. A linha 2, onde o <code>$x</code> foi criado, está fora.</dd>
+  <dt>x = </dt><dd>No lugar da variável que não existe, o PHP usa <code>null</code>, que no texto vira nada.</dd>
+</dl>
+
+<p>A última linha mostra que o <code>$x</code> de fora continua lá, valendo 10. Ele só não é visível <strong>dentro</strong> da função. Em PHP, uma função começa sempre com a "sala vazia": as únicas variáveis que existem lá dentro são os parâmetros e as que ela mesma criar.</p>
+
+<div class="note">
+<strong>Isso é diferente de outras linguagens</strong>
+<p>Em JavaScript e Python, uma função enxerga as variáveis de fora automaticamente. Em PHP, <strong>não</strong>. Se você vem dessas linguagens, este é o aviso que mais vai aparecer no começo.</p>
+</div>
+
+<h3>E o contrário: o que nasce na função fica na função</h3>
+
+<pre class="file" data-file="dentro.php">&lt;?php
+function calcular()
+{
+    $resultado = 2 + 3;
+    echo "Dentro: $resultado\n";
+}
+
+calcular();
+echo "Fora: $resultado\n";
+</pre>
+
+<pre class="term">$ php dentro.php
+Dentro: 5
+
+Warning: Undefined variable $resultado in /home/ana/site/dentro.php on line 9
+Fora: </pre>
+
+<p><code>$resultado</code> é uma <strong>variável local</strong>: nasce quando a função começa e é apagada quando ela termina (as tigelas sujas da cozinha). Na linha 9, fora da função, ela não existe mais.</p>
+
+<h3>Mesmo nome, variáveis diferentes</h3>
+<p>Como cada escopo é separado, uma variável de dentro pode ter o mesmo nome de uma de fora sem nenhum conflito. São duas caixas diferentes, com a mesma etiqueta, em salas diferentes:</p>
+
+<pre class="file" data-file="mesmonome.php">&lt;?php
+$nome = "Ana";
+
+function trocarNome()
+{
+    $nome = "Bruno";
+    echo "Dentro: $nome\n";
+}
+
+trocarNome();
+echo "Fora: $nome\n";
+</pre>
+
+<pre class="term">$ php mesmonome.php
+Dentro: Bruno
+Fora: Ana             « o $nome de fora nunca foi tocado</pre>
+
+<p>Essa é a grande vantagem do escopo: você pode usar uma função sem medo de ela bagunçar as suas variáveis. Ela pode ter um <code>$i</code>, um <code>$total</code>, um <code>$nome</code> lá dentro, e os seus continuam intactos.</p>
+
+<h3>Cada chamada começa do zero</h3>
+<p>As variáveis locais são criadas de novo <strong>a cada chamada</strong>. Por isso este contador não conta:</p>
+
+<pre class="file" data-file="recomeca.php">&lt;?php
+function contarVisita()
+{
+    $visitas = 0;
+    $visitas++;
+    echo "Visitas: $visitas\n";
+}
+
+contarVisita();
+contarVisita();
+contarVisita();
+</pre>
+
+<pre class="term">$ php recomeca.php
+Visitas: 1
+Visitas: 1
+Visitas: 1</pre>
+
+<p>Cada chamada cria um <code>$visitas</code> novo valendo 0, soma 1, mostra e joga fora. Guarde este exemplo: ele vai ser consertado com <code>static</code>, mais abaixo.</p>
+
+<hr>
+
+<h2>O jeito certo: parâmetros para dentro, <code>return</code> para fora</h2>
+<p>Se a função precisa de um valor de fora, <strong>entregue pela janelinha</strong>: um parâmetro. Se o resultado precisa sair, <strong>devolva pela janelinha</strong>: <code>return</code>.</p>
+
+<pre class="file" data-file="certo.php">&lt;?php
+$preco = 50;
+$taxa = 0.1;
+
+function comTaxa(float $preco, float $taxa): float
+{
+    return $preco + $preco * $taxa;
+}
+
+$total = comTaxa($preco, $taxa);
+echo "Total: $total\n";
+echo "Outro: ", comTaxa(200, 0.05), "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>function comTaxa(float $preco, float $taxa)</code></td><td>Os parâmetros são variáveis <strong>locais</strong> que já nascem com os valores entregues na chamada.</td></tr>
+<tr><td><code>comTaxa($preco, $taxa)</code></td><td>Entrega os <strong>valores</strong> das variáveis de fora. Os nomes iguais são coincidência: poderiam ser outros.</td></tr>
+<tr><td><code>return …</code></td><td>Devolve o resultado.</td></tr>
+<tr><td><code>$total = …</code></td><td>Quem chamou decide onde guardar o resultado.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php certo.php
+Total: 55
+Outro: 210</pre>
+
+<p>Repare na última linha: como a função não depende de nenhuma variável de fora, ela funciona com <strong>quaisquer</strong> valores. É isso que torna uma função reaproveitável.</p>
+
+<h3>O parâmetro é uma cópia</h3>
+<p>Quando você passa uma variável para uma função, a função recebe uma <strong>cópia do valor</strong>. Mudar o parâmetro lá dentro não muda a variável de fora:</p>
+
+<pre class="file" data-file="parametro.php">&lt;?php
+function dobrar($numero)
+{
+    $numero = $numero * 2;
+    echo "Dentro: $numero\n";
+}
+
+$valor = 5;
+dobrar($valor);
+echo "Fora: $valor\n";
+</pre>
+
+<pre class="term">$ php parametro.php
+Dentro: 10
+Fora: 5</pre>
+
+<p>Para mudar o valor de fora, o caminho normal é devolver e guardar: <code>$valor = dobrar($valor);</code> (com <code>return</code> na função). Existe também a passagem <strong>por referência</strong> (<code>function dobrar(&amp;$numero)</code>), em que a função mexe na própria variável; ela aparece em <a href="parametros.html">Parâmetros</a> e no <a href="foreach.html">foreach</a>, mas use com cuidado, pelo mesmo motivo do <code>global</code>.</p>
+
+<div class="tryphp" data-goal="out:Bem-vinda à Doces da Ana!,semerro,src:function\s+saudacao\s*\(\s*(string\s+)?\$">
+<p class="try-task"><strong>Missão:</strong> a função tenta usar <code>$loja</code>, que está do lado de fora. Rode, veja o aviso e corrija <strong>sem usar <code>global</code></strong>: faça a função receber o nome da loja por parâmetro e passe <code>$loja</code> na chamada. A saída deve ser <code>Bem-vinda à Doces da Ana!</code>.</p>
+<pre class="script">&lt;?php
+$loja = "Doces da Ana";
+
+function saudacao(): string
+{
+    return "Bem-vinda à $loja!";
+}
+
+echo saudacao(), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$loja = "Doces da Ana";
+
+function saudacao(string $loja): string
+{
+    return "Bem-vinda à $loja!";
+}
+
+echo saudacao($loja), "\n";
+</pre>
+</div>
+
+<p>Antes da correção, o PHP real mostra:</p>
+<pre class="term">$ php saudacao.php
+
+Warning: Undefined variable $loja in /home/ana/site/saudacao.php on line 6
+Bem-vinda à !</pre>
+
+<hr>
+
+<h2><code>global</code>: abrir uma porta da cozinha para o salão</h2>
+<p>O PHP tem um jeito de a função usar uma variável do escopo global: a palavra <code>global</code> ("global"), seguida do nome da variável, dentro da função.</p>
+
+<pre class="file" data-file="global.php">&lt;?php
+$x = 10;
+
+function mostrar()
+{
+    global $x;
+    echo "Dentro da função: x = $x\n";
+    $x = 99;
+}
+
+mostrar();
+echo "Fora da função: x = $x\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>global $x;</dt><dd>"Dentro desta função, <code>$x</code> é a variável <code>$x</code> lá de fora." A partir dessa linha, a função lê <strong>e escreve</strong> na variável global.</dd>
+  <dt>$x = 99;</dt><dd>Muda a variável de fora, de verdade.</dd>
+</dl>
+
+<pre class="term">$ php global.php
+Dentro da função: x = 10
+Fora da função: x = 99      « a função mudou a variável de fora</pre>
+
+<p>Existe ainda o array <code>$GLOBALS</code>, que está disponível em qualquer lugar e guarda todas as variáveis globais pelo nome (é uma das <a href="superglobais.html">superglobais</a>):</p>
+
+<pre class="file" data-file="globals.php">&lt;?php
+$loja = "Doces da Ana";
+
+function titulo()
+{
+    return "Bem-vindo à " . $GLOBALS["loja"];
+}
+
+echo titulo(), "\n";
+</pre>
+
+<pre class="term">$ php globals.php
+Bem-vindo à Doces da Ana</pre>
+
+<h3>Por que evitar o <code>global</code></h3>
+<p>Funciona, mas tira da função a maior qualidade dela: ser uma sala fechada. Veja um bug típico. Duas funções de um carrinho de compras usam o mesmo <code>$total</code> global, e uma delas reaproveita o nome sem pensar:</p>
+
+<pre class="file" data-file="globalbug.php">&lt;?php
+$total = 0;
+
+function adicionarAoCarrinho($preco)
+{
+    global $total;
+    $total += $preco;
+}
+
+function calcularFrete()
+{
+    global $total;
+    $total = $total &gt; 100 ? 0 : 15;   // ops: reaproveitou o nome $total
+    return $total;
+}
+
+adicionarAoCarrinho(40);
+adicionarAoCarrinho(30);
+echo "Frete: R$ ", calcularFrete(), "\n";
+echo "Total das compras: R$ $total\n";
+</pre>
+
+<pre class="term">$ php globalbug.php
+Frete: R$ 15
+Total das compras: R$ 15        « deveria ser 70!</pre>
+
+<p>Nenhum aviso: o código é válido. Mas <code>calcularFrete</code> sobrescreveu o total das compras. Num programa grande, descobrir <strong>qual</strong> das funções mexeu na variável global pode levar horas. Os problemas do <code>global</code>:</p>
+<ul>
+  <li><strong>Dependência escondida:</strong> olhando só a primeira linha da função (<code>function calcularFrete()</code>), você não sabe que ela precisa de <code>$total</code> nem que vai mudá-lo.</li>
+  <li><strong>Qualquer função pode estragar o valor</strong>, como no exemplo.</li>
+  <li><strong>Difícil de reaproveitar e de testar:</strong> a função só funciona se existir uma variável com aquele nome exato do lado de fora.</li>
+</ul>
+<p>A versão sem <code>global</code> deixa tudo à vista: <code>function calcularFrete(float $total): float</code>, chamada com <code>calcularFrete($total)</code>. Para valores fixos que todo o programa usa (o nome da loja, a taxa de entrega), prefira <a href="constantes.html">constantes</a>, que são visíveis em todo lugar e não podem ser alteradas por engano.</p>
+
+<hr>
+
+<h2><code>static</code>: uma variável local que não esquece</h2>
+<p>Lembra do contador de visitas que sempre mostrava 1? A palavra <code>static</code> ("estática") muda a regra para uma variável: ela continua <strong>local</strong> (ninguém de fora a vê), mas <strong>não é apagada</strong> quando a função termina. Na próxima chamada, ela ainda tem o valor anterior.</p>
+
+<pre class="file" data-file="static.php">&lt;?php
+function contarVisita()
+{
+    static $visitas = 0;
+    $visitas++;
+    echo "Visitas: $visitas\n";
+}
+
+contarVisita();
+contarVisita();
+contarVisita();
+</pre>
+
+<dl class="anatomy">
+  <dt>static</dt><dd>"Esta variável sobrevive entre as chamadas desta função."</dd>
+  <dt>$visitas = 0</dt><dd>O valor inicial. Atenção: essa atribuição acontece <strong>só na primeira chamada</strong>. Nas seguintes, a linha é pulada e a variável mantém o valor que tinha.</dd>
+</dl>
+
+<pre class="term">$ php static.php
+Visitas: 1
+Visitas: 2
+Visitas: 3</pre>
+
+<p>Um uso prático: gerar números em sequência, como os pedidos da lojinha. E repare que, mesmo sendo <code>static</code>, a variável continua invisível do lado de fora:</p>
+
+<pre class="file" data-file="proximoid.php">&lt;?php
+function proximoPedido(): string
+{
+    static $numero = 1000;
+    $numero++;
+    return "Pedido nº $numero";
+}
+
+echo proximoPedido(), "\n";
+echo proximoPedido(), "\n";
+echo proximoPedido(), "\n";
+echo $numero, "\n";
+</pre>
+
+<pre class="term">$ php proximoid.php
+Pedido nº 1001
+Pedido nº 1002
+Pedido nº 1003
+
+Warning: Undefined variable $numero in /home/ana/site/proximoid.php on line 12
+</pre>
+
+<div class="tip">
+<strong>Valor inicial calculado <span class="versao">PHP 8.3+</span></strong>
+<p>Até o PHP 8.2, o valor inicial de uma <code>static</code> tinha de ser fixo (um número, um texto, uma constante). Desde o 8.3, pode ser qualquer expressão, como <code>static $inicio = date("H:i");</code>, calculada uma única vez, na primeira chamada.</p>
+</div>
+
+<h3>A <code>static</code> não sobrevive entre páginas</h3>
+<p>"Uma variável que não esquece" serve para um contador de visitas do site? <strong>Não.</strong> Ela só lembra enquanto o programa está rodando. Na web, cada vez que alguém abre a página, o PHP roda o script do zero e, no fim, esquece tudo. A Ana testou com o <a href="servidor-embutido.html">servidor embutido</a>:</p>
+
+<pre class="file" data-file="visitas.php">&lt;?php
+function contarVisita(): int
+{
+    static $visitas = 0;
+    $visitas++;
+    return $visitas;
+}
+
+contarVisita();
+echo "Você é o visitante nº ", contarVisita(), "\n";
+</pre>
+
+<pre class="term">$ php -S localhost:8080 &gt; /tmp/servidor.log 2&gt;&amp;1 &amp;     « o servidor, em segundo plano
+[1] 474310
+$ curl -s localhost:8080/visitas.php
+Você é o visitante nº 2            « duas chamadas na mesma página: a static funcionou
+$ curl -s localhost:8080/visitas.php
+Você é o visitante nº 2            « página aberta de novo: tudo recomeçou
+$ kill %1                          « desliga o servidor</pre>
+
+<p>Para guardar algo entre uma página e outra, você precisa de um lugar que dure mais que o script: um arquivo (<a href="arquivos.html">Ler e Escrever Arquivos</a>), a sessão do visitante (<a href="sessoes.html">Sessões</a>) ou um <a href="banco-dados.html">banco de dados</a>.</p>
+
+<hr>
+
+<h2>Uma surpresa: <code>if</code>, <code>for</code> e <code>foreach</code> não criam escopo</h2>
+<p>Em PHP, <strong>só as funções</strong> (e as classes, mais adiante) criam uma sala separada. As chaves de um <code>if</code> ou de um laço <strong>não</strong>: uma variável criada lá dentro continua existindo depois.</p>
+
+<pre class="file" data-file="blocos.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7) {
+    $situacao = "aprovada";
+}
+echo "Situação: $situacao\n";
+
+foreach (["pão", "leite", "café"] as $item) {
+    $ultimo = $item;
+}
+echo "Depois do laço: \$item = $item, \$ultimo = $ultimo\n";
+
+for ($i = 0; $i &lt; 3; $i++) {
+}
+echo "Depois do for: \$i = $i\n";
+</pre>
+
+<pre class="term">$ php blocos.php
+Situação: aprovada
+Depois do laço: $item = café, $ultimo = café
+Depois do for: $i = 3</pre>
+
+<p>O <code>$item</code> do <code>foreach</code> continua valendo o último elemento, e o <code>$i</code> do <code>for</code> ficou em 3 (o valor que fez a condição <code>$i &lt; 3</code> falhar). Isso é útil às vezes, mas também é a origem de um bug famoso do <code>foreach</code> por referência, explicado em <a href="foreach.html">foreach</a>. E cuidado com o <code>if</code>: se a nota fosse 5, <code>$situacao</code> nunca seria criada, e a linha do <code>echo</code> daria <code>Undefined variable $situacao</code>. Crie a variável antes do <code>if</code> com um valor padrão.</p>
+
+<h3>Resumo dos escopos do PHP</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde a variável foi criada</th><th>Onde ela é visível</th><th>Quanto tempo dura</th></tr>
+<tr><td>Fora de funções (global)</td><td>Fora de funções; dentro, só com <code>global</code> ou <code>$GLOBALS</code></td><td>Até o fim do script</td></tr>
+<tr><td>Dentro de uma função (local), inclusive parâmetros</td><td>Só dentro daquela chamada da função</td><td>Até a função terminar</td></tr>
+<tr><td>Dentro de uma função, com <code>static</code></td><td>Só dentro da função</td><td>Até o fim do script (sobrevive entre chamadas)</td></tr>
+<tr><td>Dentro de <code>if</code>, <code>for</code>, <code>foreach</code>, <code>while</code></td><td>No escopo em volta (o bloco não isola nada)</td><td>Como o escopo em volta</td></tr>
+<tr><td>Superglobais: <code>$_GET</code>, <code>$_POST</code>, <code>$GLOBALS</code>…</td><td>Em todo lugar</td><td>Até o fim do script</td></tr>
+<tr><td>Constantes (<code>const</code>, <code>define</code>)</td><td>Em todo lugar</td><td>Até o fim do script</td></tr>
+</table>
+</div>
+
+<p>As funções anônimas têm a sua própria forma de trazer variáveis de fora, o <code>use</code>; veja <a href="closures.html">Funções Anônimas e Arrow Functions</a>. E arquivos carregados com <code>include</code> compartilham o escopo de onde foram incluídos (<a href="include-require.html">include e require</a>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined variable $x</code> dentro de uma função</strong>
+<pre class="term">$ php fora.php
+
+Warning: Undefined variable $x in /home/ana/site/fora.php on line 6
+Dentro da função: x =
+Fora da função: x = 10</pre>
+<p><strong>O que aconteceu:</strong> a função usou uma variável que só existe fora dela.</p>
+<p><strong>Como consertar:</strong> receba o valor por parâmetro (<code>function mostrar($x)</code>, chamada com <code>mostrar($x)</code>). Se for um valor fixo do programa inteiro, transforme em <a href="constantes.html">constante</a>. <code>global</code> é o último recurso.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined variable</code> fora da função</strong>
+<pre class="term">$ php dentro.php
+Dentro: 5
+
+Warning: Undefined variable $resultado in /home/ana/site/dentro.php on line 9
+Fora: </pre>
+<p><strong>O que aconteceu:</strong> você tentou usar, fora, uma variável criada dentro da função. Ela foi apagada quando a função terminou.</p>
+<p><strong>Como consertar:</strong> a função deve <code>return $resultado;</code>, e quem chama guarda: <code>$resultado = calcular();</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O contador sempre mostra 1 (sem erro)</strong>
+<pre class="term">$ php recomeca.php
+Visitas: 1
+Visitas: 1
+Visitas: 1</pre>
+<p><strong>O que aconteceu:</strong> variável local comum é recriada a cada chamada.</p>
+<p><strong>Como consertar:</strong> <code>static $visitas = 0;</code> (se o valor só precisa durar enquanto o script roda), ou guarde o valor fora da função e passe/devolva.</p>
+</div>
+
+<div class="cenario">
+<strong><code>global $x = 5;</code>: <code>unexpected token "="</code></strong>
+<pre class="file" data-file="globalatrib.php">&lt;?php
+function f()
+{
+    global $x = 5;
+}
+</pre>
+<pre class="term">$ php globalatrib.php
+
+Parse error: syntax error, unexpected token "=", expecting "," or ";" in /home/ana/site/globalatrib.php on line 4</pre>
+<p><strong>O que significa:</strong> depois de <code>global $x</code> o PHP espera <code>,</code> (para mais variáveis: <code>global $x, $y;</code>) ou <code>;</code>. O <code>global</code> só "abre a porta", não atribui.</p>
+<p><strong>Como consertar:</strong> duas linhas: <code>global $x;</code> e depois <code>$x = 5;</code>. (Com <code>static</code>, ao contrário, o valor inicial vai na mesma linha: <code>static $x = 5;</code>.)</p>
+</div>
+
+<div class="cenario">
+<strong>Uma variável global mudou "sozinha" (sem erro)</strong>
+<pre class="term">$ php globalbug.php
+Frete: R$ 15
+Total das compras: R$ 15</pre>
+<p><strong>O que aconteceu:</strong> alguma função com <code>global $total</code> alterou a variável.</p>
+<p><strong>Como consertar:</strong> procure todos os <code>global $total</code> do projeto (é por isso que é difícil). A solução duradoura é eliminar o <code>global</code>: parâmetros para dentro, <code>return</code> para fora.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td>variável dentro da função</td><td>Local: só existe naquela chamada.</td></tr>
+<tr><td>parâmetro</td><td>Local, já criado com uma <strong>cópia</strong> do valor passado.</td></tr>
+<tr><td><code>return $valor;</code></td><td>Leva um valor para fora da função.</td></tr>
+<tr><td><code>global $a, $b;</code></td><td>Dentro da função, <code>$a</code> e <code>$b</code> passam a ser as variáveis globais (lê e escreve). Evite.</td></tr>
+<tr><td><code>$GLOBALS["nome"]</code></td><td>Acessa a variável global <code>$nome</code> de qualquer lugar. Evite.</td></tr>
+<tr><td><code>static $n = 0;</code></td><td>Variável local que mantém o valor entre as chamadas; o <code>= 0</code> roda só na primeira. Expressões no valor inicial: <span class="versao">PHP 8.3+</span>.</td></tr>
+<tr><td><code>use ($x)</code></td><td>Em funções anônimas, leva uma cópia de <code>$x</code> (veja <a href="closures.html">Closures</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Lembrar entre as chamadas</h3>
+<p>Complete para o contador continuar de onde parou a cada chamada:</p>
+<div class="ex-code"><input data-answer="static" aria-label="palavra-chave"> $vezes = 0;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Levar o valor para fora</h3>
+<p>Complete a última linha da função para o resultado sair dela:</p>
+<div class="ex-code">function area($l, $a) { $r = $l * $a; <input data-answer="return $r;|return $r" aria-label="instrução"> }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O jeito antigo (e desaconselhado)</h3>
+<p>Complete para a função usar a variável global <code>$loja</code>:</p>
+<div class="ex-code">function titulo() { <input data-answer="global $loja;|global $loja" aria-label="instrução"> return $loja; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que mostra? <code>$a = 1; function f() { $a = 2; } f(); echo $a;</code></p>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> Nada, com <code>Warning: Undefined variable $a</code></label>
+<label><input type="radio" name="q4"> 1</label>
+<label><input type="radio" name="q4"> 3</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que mostra? <code>foreach ([1, 2, 3] as $n) { } echo $n;</code></p>
+<label><input type="radio" name="q5"> Nada, com <code>Warning: Undefined variable $n</code></label>
+<label><input type="radio" name="q5"> 3</label>
+<label><input type="radio" name="q5"> 1</label>
+<label><input type="radio" name="q5"> 4</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual é a melhor forma de uma função usar a taxa de entrega que está numa variável fora dela?</p>
+<label><input type="radio" name="q6"> <code>global $taxa;</code></label>
+<label><input type="radio" name="q6"> <code>$GLOBALS["taxa"]</code></label>
+<label><input type="radio" name="q6"> <code>static $taxa;</code></label>
+<label><input type="radio" name="q6"> Receber <code>$taxa</code> como parâmetro.</label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:Senha 1,out:Senha 2,out:Senha 3,src:static,semerro">
+<p class="try-task"><strong>Missão:</strong> a padaria da esquina distribui senhas, mas a função sempre devolve <code>Senha 1</code>. Mude <strong>uma</strong> linha para as três chamadas mostrarem <code>Senha 1</code>, <code>Senha 2</code> e <code>Senha 3</code>.</p>
+<pre class="script">&lt;?php
+function proximaSenha(): string
+{
+    $senha = 0;
+    $senha++;
+    return "Senha $senha";
+}
+
+echo proximaSenha(), "\n";
+echo proximaSenha(), "\n";
+echo proximaSenha(), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function proximaSenha(): string
+{
+    static $senha = 0;
+    $senha++;
+    return "Senha $senha";
+}
+
+echo proximaSenha(), "\n";
+echo proximaSenha(), "\n";
+echo proximaSenha(), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Cada função é uma "sala fechada": não vê as variáveis de fora, e as de dentro somem quando ela termina. Usar uma variável do outro lado gera <code>Warning: Undefined variable</code>.</li>
+  <li>Variáveis com o mesmo nome dentro e fora são variáveis diferentes.</li>
+  <li>O jeito certo: dados entram por <strong>parâmetros</strong> (cópias) e saem por <strong><code>return</code></strong>.</li>
+  <li><code>global</code> e <code>$GLOBALS</code> dão acesso às variáveis de fora, mas escondem dependências e permitem que qualquer função estrague o valor. Evite; para valores fixos, use constantes.</li>
+  <li><code>static</code> cria uma variável local que lembra o valor entre as chamadas, só enquanto o script roda (na web, cada página recomeça).</li>
+  <li><code>if</code>, <code>for</code>, <code>foreach</code> e <code>while</code> não criam escopo: o que nasce dentro continua existindo depois.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
