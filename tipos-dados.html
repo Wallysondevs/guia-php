@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Tipos de Dados — string, int, float, bool, array e mais | Guia PHP</title>
+<meta name="description" content="Os tipos de dados do PHP para quem nunca programou: string, int, float, bool, array, object, null, callable e resource, a tipagem dinâmica e como descobrir o tipo de um valor com gettype, get_debug_type e as funções is_*, com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Tipos de Dados</span></h1>
+
+<p class="intro">Na aula de <a href="variaveis.html">Variáveis</a> você guardou textos e números em caixas. Cada valor guardado é de um <strong>tipo</strong>: o nome <code>"Ana"</code> é um texto, a idade <code>29</code> é um número inteiro, a altura <code>1.65</code> é um número com casas decimais. O tipo decide <strong>o que dá para fazer</strong> com o valor: números se somam, textos se juntam, listas se percorrem. Nesta aula você conhece todos os tipos do PHP e aprende a perguntar ao PHP "de que tipo é isto?".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os tipos do PHP: <code>string</code>, <code>int</code>, <code>float</code>, <code>bool</code>, <code>array</code>, <code>object</code>, <code>null</code>, <code>callable</code> e <code>resource</code>.</li>
+  <li>O que é <strong>tipagem dinâmica</strong> e por que <code>10</code> e <code>"10"</code> não são a mesma coisa.</li>
+  <li>Como descobrir o tipo de um valor com <code>var_dump</code>, <code>gettype</code> e <code>get_debug_type</code>.</li>
+  <li>Como testar um tipo com as funções <code>is_string</code>, <code>is_int</code>, <code>is_float</code>…</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. Cada tipo tem uma aula própria mais adiante; aqui é o "mapa" de todos eles.</p>
+
+<hr>
+
+<h2>A ideia: cada coisa no seu recipiente</h2>
+<p>Na cozinha da Ana, o leite fica na garrafa, os ovos na caixinha, a farinha no pote. Ninguém tenta "somar" um ovo com um pote de farinha: cada coisa tem o seu jeito de ser usada. Com os valores de um programa é igual:</p>
+
+<ul>
+  <li>Com <strong>números</strong> você faz contas: <code>4.5 * 2</code> dá <code>9</code>.</li>
+  <li>Com <strong>textos</strong> você junta, corta, procura palavras: <code>"Ana" . " Souza"</code>.</li>
+  <li>Com <strong>verdadeiro ou falso</strong> você toma decisões: "se o cliente está logado, mostre o carrinho".</li>
+  <li>Com <strong>listas</strong> você guarda vários valores juntos: a lista de compras inteira numa variável só.</li>
+</ul>
+
+<p>O <strong>tipo de dado</strong> (ou só <strong>tipo</strong>) é essa "categoria" do valor. O PHP olha o tipo para saber o que fazer quando você escreve <code>+</code>, <code>.</code>, <code>if</code> ou <code>foreach</code>.</p>
+
+<hr>
+
+<h2>Os tipos do PHP</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Nome em português</th><th>Guarda</th><th>Exemplos</th><th>Aula</th></tr>
+<tr><td><code>string</code></td><td>texto ("cadeia de caracteres")</td><td>Letras, palavras, frases</td><td><code>"Ana"</code>, <code>'maçã'</code>, <code>""</code></td><td><a href="strings.html">Strings</a></td></tr>
+<tr><td><code>int</code></td><td>inteiro</td><td>Números sem parte decimal</td><td><code>29</code>, <code>-5</code>, <code>0</code></td><td><a href="numeros.html">int e float</a></td></tr>
+<tr><td><code>float</code></td><td>ponto flutuante (decimal)</td><td>Números com parte decimal</td><td><code>1.65</code>, <code>4.5</code>, <code>-0.25</code></td><td><a href="numeros.html">int e float</a></td></tr>
+<tr><td><code>bool</code></td><td>booleano (lógico)</td><td>Só dois valores: sim ou não</td><td><code>true</code>, <code>false</code></td><td><a href="booleanos.html">Booleanos</a></td></tr>
+<tr><td><code>array</code></td><td>arranjo (lista)</td><td>Vários valores numa variável só</td><td><code>["arroz", "feijão"]</code></td><td><a href="arrays.html">Arrays</a></td></tr>
+<tr><td><code>object</code></td><td>objeto</td><td>Dados e ações juntos, criados a partir de uma classe</td><td><code>new DateTime()</code></td><td><a href="classes-objetos.html">Classes e Objetos</a></td></tr>
+<tr><td><code>null</code></td><td>nulo</td><td>"Nenhum valor"</td><td><code>null</code></td><td><a href="null.html">null</a></td></tr>
+<tr><td><code>callable</code></td><td>"chamável"</td><td>Algo que pode ser chamado como uma função</td><td><code>"strlen"</code>, <code>fn($x) =&gt; $x * 2</code></td><td><a href="closures.html">Funções Anônimas</a></td></tr>
+<tr><td><code>resource</code></td><td>recurso</td><td>Uma ligação com algo de fora: um arquivo aberto, uma conexão</td><td>o que <code>fopen()</code> devolve</td><td><a href="arquivos.html">Ler e Escrever Arquivos</a></td></tr>
+</table>
+</div>
+
+<p>Não precisa decorar. Os quatro primeiros (<code>string</code>, <code>int</code>, <code>float</code>, <code>bool</code>) são os <strong>tipos escalares</strong>: guardam um valor só, e são 90% do que você vai usar no Nível 1. <code>array</code> e <code>object</code> são <strong>tipos compostos</strong>: guardam vários valores dentro. <code>null</code> e <code>resource</code> são <strong>tipos especiais</strong>. E <code>callable</code> é mais uma "etiqueta" do que um tipo de verdade, como você vai ver abaixo.</p>
+
+<h3>Vendo todos de uma vez com <code>var_dump</code></h3>
+<p>O <code>var_dump</code> mostra o <strong>tipo</strong> e o <strong>valor</strong> de qualquer coisa. É a ferramenta número um para estudar tipos (ele tem aula própria: <a href="var-dump.html">var_dump e print_r</a>):</p>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+$texto = "Ana";
+$inteiro = 29;
+$decimal = 1.65;
+$logico = true;
+$nada = null;
+var_dump($texto, $inteiro, $decimal, $logico, $nada);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php tipos.php
+string(3) "Ana"           « tipo string, 3 caracteres, valor "Ana"
+int(29)                  « tipo int, valor 29
+float(1.65)              « tipo float, valor 1.65
+bool(true)               « tipo bool, valor true
+NULL                     « null não tem valor para mostrar: só o tipo</pre>
+
+<p>Cada linha é <code>tipo(valor)</code>. No caso da string, o número entre parênteses é o <strong>tamanho</strong> (em bytes; o porquê dos "bytes" está em <a href="strings.html">Strings</a>), e o valor vem depois, entre aspas.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e confira os tipos. Depois troque os valores: o que o <code>var_dump</code> mostra para <code>"29"</code> (com aspas)? E para <code>29.0</code>? E para <code>"true"</code>?</p>
+<pre class="script">&lt;?php
+$a = 29;
+$b = 1.65;
+$c = "Ana";
+$d = false;
+var_dump($a, $b, $c, $d);
+</pre>
+</div>
+
+<hr>
+
+<h2>Um a um</h2>
+
+<h3><code>string</code>: texto</h3>
+<p>Qualquer texto entre aspas simples ou duplas: <code>"Ana"</code>, <code>'Rua das Flores, 10'</code>, <code>"42"</code>. Atenção ao último: <strong>com aspas, 42 é texto</strong>, não número. A string vazia, <code>""</code>, também é uma string (com zero caracteres). Aula: <a href="strings.html">Strings</a>.</p>
+
+<h3><code>int</code>: número inteiro</h3>
+<p>Números sem vírgula, positivos ou negativos: <code>29</code>, <code>-5</code>, <code>0</code>, <code>1000000</code>. Usado para contar coisas: quantidade, idade, ano. Aula: <a href="numeros.html">int e float</a>.</p>
+
+<h3><code>float</code>: número com casas decimais</h3>
+<p>Números com parte decimal, escritos com <strong>ponto</strong>: <code>1.65</code>, <code>4.5</code>. Também é <code>float</code> um número com ponto e zero: <code>10.0</code> aparece no <code>var_dump</code> como <code>float(10)</code>. O nome vem de "ponto flutuante", a forma como o computador guarda esses números (e que tem umas surpresas, vistas em <a href="numeros.html">int e float</a>).</p>
+
+<h3><code>bool</code>: verdadeiro ou falso</h3>
+<p>Só existem dois valores: <code>true</code> (verdadeiro) e <code>false</code> (falso), sem aspas. São a resposta de perguntas como "a idade é maior que 18?" e de funções como <code>isset</code>. Aula: <a href="booleanos.html">Booleanos</a>.</p>
+
+<h3><code>array</code>: vários valores juntos</h3>
+<p>Uma lista (ou tabela) de valores, entre colchetes:</p>
+
+<pre class="file" data-file="lista.php">&lt;?php
+$compras = ["arroz", "feijão"];
+var_dump($compras);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php lista.php
+array(2) {               « um array com 2 itens
+  [0]=&gt;                  « o item da posição 0 (a contagem começa no zero)…
+  string(5) "arroz"       « …é uma string
+  [1]=&gt;
+  string(7) "feijão"      « 7, e não 6: o "ã" ocupa 2 bytes
+}</pre>
+
+<p>Arrays são tão importantes que têm um grupo inteiro de aulas, a partir de <a href="arrays.html">Arrays Indexados</a>.</p>
+
+<h3><code>object</code>: objeto</h3>
+<p>Um "pacote" com dados e ações, criado a partir de um molde chamado <strong>classe</strong>. O PHP já vem com várias classes prontas, como <code>DateTime</code> (para datas). O mais simples de todos é o <code>stdClass</code> ("classe padrão"), um objeto vazio onde você pendura dados:</p>
+
+<pre class="file" data-file="objeto.php">&lt;?php
+$cliente = new stdClass();
+$cliente-&gt;nome = "Ana";
+var_dump($cliente);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php objeto.php
+object(stdClass)#1 (1) {  « objeto da classe stdClass, o 1º criado, com 1 propriedade
+  ["nome"]=&gt;
+  string(3) "Ana"
+}</pre>
+
+<p>A seta <code>-&gt;</code> acessa algo dentro do objeto. Objetos são o assunto do <a href="poo.html">Nível 3</a>; por enquanto, basta reconhecê-los.</p>
+
+<h3><code>null</code>: nenhum valor</h3>
+<p><code>null</code> é o tipo que tem um valor só: <code>null</code>, que quer dizer "nada aqui". É o que uma variável inexistente "vale" (com o Warning que você viu em <a href="variaveis.html">Variáveis</a>). Aula: <a href="null.html">null</a>.</p>
+
+<h3><code>callable</code>: algo que pode ser chamado</h3>
+<p>Em PHP, uma função pode ser guardada numa variável e chamada depois. "Callable" é o nome dado a <strong>qualquer coisa que pode ser chamada como função</strong>: o nome de uma função num texto (<code>"strlen"</code>), uma função anônima (<code>fn($x) =&gt; $x * 2</code>) e outras formas. Repare: <code>"strlen"</code> continua sendo do tipo <code>string</code>, e a função anônima é do tipo <code>object</code>. "Callable" descreve o que dá para <strong>fazer</strong> com eles, e a função <code>is_callable</code> pergunta isso:</p>
+
+<pre class="file" data-file="chamavel.php">&lt;?php
+$dobro = fn($x) =&gt; $x * 2;
+var_dump($dobro(21));
+var_dump(is_callable("strlen"), is_callable($dobro), is_callable("nao_existe"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php chamavel.php
+int(42)                  « $dobro(21) chamou a função guardada na variável
+bool(true)               « "strlen" é o nome de uma função que existe
+bool(true)
+bool(false)              « não existe função chamada nao_existe</pre>
+
+<p>Aula: <a href="closures.html">Funções Anônimas e Arrow Functions</a> e <a href="callables.html">Callables de Primeira Classe</a>.</p>
+
+<h3><code>resource</code>: uma ligação com o mundo de fora</h3>
+<p>Quando o PHP abre um arquivo, ele devolve um "recurso": um número de controle que representa o arquivo aberto. Você não cria recursos com as próprias mãos; eles vêm de funções como <code>fopen</code>:</p>
+
+<pre class="file" data-file="recurso.php">&lt;?php
+$arquivo = fopen("php://memory", "r");
+var_dump($arquivo);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php recurso.php
+resource(5) of type (stream)   « recurso nº 5, do tipo "stream" (fluxo de dados)</pre>
+
+<p>(<code>php://memory</code> é um "arquivo" de mentirinha, guardado na memória.) Recursos aparecem em <a href="arquivos.html">Ler e Escrever Arquivos</a>. O PHP moderno tem trocado muitos recursos por objetos, então você vai vê-los cada vez menos.</p>
+
+<hr>
+
+<h2>Tipagem dinâmica: a caixa não tem tipo, o valor tem</h2>
+<p>Em linguagens como Java, você diz o tipo ao criar a variável (<code>int idade = 29;</code>), e ela só aceita aquele tipo para sempre. Em PHP, <strong>a variável não tem tipo; o valor dentro dela é que tem</strong>. Se você troca o valor, o tipo muda junto:</p>
+
+<pre class="file" data-file="dinamica.php">&lt;?php
+$x = 10;
+echo get_debug_type($x), "\n";
+$x = "dez";
+echo get_debug_type($x), "\n";
+$x = 10.5;
+echo get_debug_type($x), "\n";
+$x = false;
+echo get_debug_type($x), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php dinamica.php
+int
+string
+float
+bool</pre>
+
+<p>Isso se chama <strong>tipagem dinâmica</strong>: o tipo é decidido enquanto o programa roda, olhando o valor. A vantagem é escrever menos. O cuidado é que o PHP <strong>não avisa</strong> se você guardar sem querer um texto onde esperava um número.</p>
+
+<h3><code>10</code> não é <code>"10"</code></h3>
+<p>Com aspas, é texto; sem aspas, é número. O PHP mostra a diferença:</p>
+
+<pre class="file" data-file="dez.php">&lt;?php
+var_dump(10, "10", 10.0);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php dez.php
+int(10)                  « número inteiro
+string(2) "10"          « texto de 2 caracteres: o "1" e o "0"
+float(10)                « número decimal (10.0)</pre>
+
+<p>Isso importa muito na web: <strong>tudo o que chega de um formulário é string</strong>, mesmo que o visitante tenha digitado um número. O PHP é tolerante e, numa conta, transforma <code>"4.50"</code> em número sozinho. Mas, se o texto não tiver cara de número, o programa para:</p>
+
+<pre class="file" data-file="soma.php">&lt;?php
+$preco = "4.50";
+$qtd = 2;
+var_dump($preco * $qtd);
+var_dump("Ana" * 2);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php soma.php
+float(9)                 « "4.50" virou 4.5 para a conta
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string * int in /home/ana/site/soma.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/soma.php on line 5</pre>
+
+<p><em>TypeError</em> = "erro de tipo"; <em>Unsupported operand types: string * int</em> = "tipos de operandos não suportados: string vezes int". Não dá para multiplicar <code>"Ana"</code>. Essas transformações automáticas (e quando elas falham) são o assunto de <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+
+<hr>
+
+<h2>Descobrir o tipo: <code>gettype</code> e <code>get_debug_type</code></h2>
+<p>O <code>var_dump</code> é ótimo para olhar, mas às vezes você quer o <strong>nome do tipo</strong> como texto, para mostrar ou comparar. O PHP tem duas funções para isso:</p>
+
+<dl class="anatomy">
+  <dt>gettype($x)</dt><dd>"pegar o tipo". Existe desde sempre e devolve nomes antigos, alguns diferentes dos atuais.</dd>
+  <dt>get_debug_type($x) <span class="versao">PHP 8.0+</span></dt><dd>"pegar o tipo para depuração". Devolve os nomes modernos, os mesmos que você escreve no código, e o nome da classe dos objetos.</dd>
+</dl>
+
+<pre class="file" data-file="nomes.php">&lt;?php
+$valores = ["Ana", 29, 1.65, true, ["arroz"], new DateTime(), null, fn($x) =&gt; $x, fopen("php://memory", "r")];
+foreach ($valores as $v) {
+    echo str_pad(gettype($v), 12), get_debug_type($v), "\n";
+}
+</pre>
+
+<p>(O <code>foreach</code> repete a linha do <code>echo</code> para cada valor da lista; ele tem aula própria, <a href="foreach.html">foreach</a>. O <code>str_pad</code> só completa o texto com espaços para alinhar as colunas.)</p>
+
+<pre class="term" data-cwd="~/site">$ php nomes.php
+string      string
+integer     int                  « gettype diz "integer"
+double      float                « gettype diz "double" (nome histórico)
+boolean     bool
+array       array
+object      DateTime             « get_debug_type diz QUAL objeto
+NULL        null
+object      Closure              « a função anônima é um objeto da classe Closure
+resource    resource (stream)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th><code>gettype</code></th><th><code>get_debug_type</code></th></tr>
+<tr><td><code>"Ana"</code></td><td><code>string</code></td><td><code>string</code></td></tr>
+<tr><td><code>29</code></td><td><code>integer</code></td><td><code>int</code></td></tr>
+<tr><td><code>1.65</code></td><td><code>double</code></td><td><code>float</code></td></tr>
+<tr><td><code>true</code></td><td><code>boolean</code></td><td><code>bool</code></td></tr>
+<tr><td><code>[...]</code></td><td><code>array</code></td><td><code>array</code></td></tr>
+<tr><td>objeto</td><td><code>object</code></td><td>o nome da classe (<code>DateTime</code>)</td></tr>
+<tr><td><code>null</code></td><td><code>NULL</code></td><td><code>null</code></td></tr>
+<tr><td>recurso</td><td><code>resource</code></td><td><code>resource (stream)</code></td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Em código novo, <code>get_debug_type</code>: os nomes batem com os que você escreve no código e com os que aparecem nas mensagens de erro do PHP 8. Você vai ver <code>gettype</code> em código antigo; lembre que "double" é o <code>float</code>.</p>
+
+<div class="tryphp" data-goal="out:string int float bool,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana cadastrou uma cliente, mas guardou cada valor com o tipo errado. Troque <strong>só os valores</strong> (não mexa no <code>echo</code>) para que a saída seja <code>string int float bool</code>: o nome é texto, a idade é inteiro, a altura tem casas decimais e "ativa" é verdadeiro ou falso.</p>
+<pre class="script">&lt;?php
+$nome = 29;
+$idade = "29";
+$altura = 1;
+$ativa = "sim";
+echo get_debug_type($nome), " ", get_debug_type($idade), " ",
+     get_debug_type($altura), " ", get_debug_type($ativa), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Bia";
+$idade = 29;
+$altura = 1.65;
+$ativa = true;
+echo get_debug_type($nome), " ", get_debug_type($idade), " ",
+     get_debug_type($altura), " ", get_debug_type($ativa), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Testar o tipo: as funções <code>is_*</code></h2>
+<p>Para perguntar "isto é de tal tipo?", use as funções que começam com <code>is_</code> ("é"). Todas devolvem <code>true</code> ou <code>false</code>, prontas para usar num <a href="if-else.html">if</a>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Pergunta</th><th>Exemplo que dá <code>true</code></th></tr>
+<tr><td><code>is_string($x)</code></td><td>É texto?</td><td><code>is_string("Ana")</code></td></tr>
+<tr><td><code>is_int($x)</code></td><td>É inteiro?</td><td><code>is_int(29)</code></td></tr>
+<tr><td><code>is_float($x)</code></td><td>É decimal?</td><td><code>is_float(1.65)</code></td></tr>
+<tr><td><code>is_bool($x)</code></td><td>É booleano?</td><td><code>is_bool(false)</code></td></tr>
+<tr><td><code>is_array($x)</code></td><td>É array?</td><td><code>is_array([])</code></td></tr>
+<tr><td><code>is_object($x)</code></td><td>É objeto?</td><td><code>is_object(new stdClass())</code></td></tr>
+<tr><td><code>is_null($x)</code></td><td>É <code>null</code>?</td><td><code>is_null(null)</code></td></tr>
+<tr><td><code>is_callable($x)</code></td><td>Dá para chamar como função?</td><td><code>is_callable("strlen")</code></td></tr>
+<tr><td><code>is_resource($x)</code></td><td>É um recurso aberto?</td><td><code>is_resource(fopen(...))</code></td></tr>
+<tr><td><code>is_numeric($x)</code></td><td>É número <strong>ou texto com cara de número</strong>?</td><td><code>is_numeric("29")</code></td></tr>
+</table>
+</div>
+
+<p>As funções olham o <strong>tipo</strong>, não a aparência:</p>
+
+<pre class="file" data-file="is.php">&lt;?php
+var_dump(is_int(29));
+var_dump(is_int("29"));
+var_dump(is_numeric("29"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php is.php
+bool(true)
+bool(false)              « "29" com aspas é string, não int
+bool(true)               « mas tem cara de número</pre>
+
+<p>Por isso, para conferir o que veio de um formulário (sempre string), use <code>is_numeric</code>, explicado em <a href="numeros.html">int e float</a>, ou as funções de <a href="validacao.html">Validar Dados</a>.</p>
+
+<hr>
+
+<h2>Dizer o tipo nas funções (só a ideia)</h2>
+<p>A tipagem dinâmica não impede você de <strong>exigir</strong> um tipo. Ao criar suas próprias funções, você pode escrever o tipo de cada entrada e da saída, e o PHP confere:</p>
+
+<pre class="file" data-file="trecho">function dobro(int $n): int
+{
+    return $n * 2;
+}</pre>
+
+<p>Aqui, <code>int $n</code> diz "esta função recebe um inteiro" e <code>: int</code> diz "e devolve um inteiro". Isso é chamado de <strong>declaração de tipos</strong> e é como se escreve PHP moderno. Você vai aprender em <a href="tipos-retorno.html">Tipos e Retorno</a> e, com tipos mais elaborados (<code>int|string</code>, <code>?int</code>, <code>mixed</code>), em <a href="tipos-avancados.html">Tipos Avançados</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught TypeError: Unsupported operand types</code></strong>
+<pre class="term" data-cwd="~/site">$ php soma.php
+float(9)
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string * int in /home/ana/site/soma.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/soma.php on line 5</pre>
+<p><strong>O que significa:</strong> você fez uma conta com um valor que não é número nem texto com cara de número. A mensagem diz os tipos envolvidos (<code>string * int</code>) e a linha.</p>
+<p><strong>Como consertar:</strong> mostre o valor com <code>var_dump</code> logo antes da linha do erro para ver o que ele realmente é. Muitas vezes é uma variável que você achava que tinha um número e tem um nome, ou um array.</p>
+</div>
+
+<div class="cenario">
+<strong><code>gettype</code> devolveu <code>double</code> e o seu <code>if</code> não funcionou</strong>
+<p><strong>O que significa:</strong> você comparou <code>gettype($x) === "float"</code>, mas o <code>gettype</code> usa o nome antigo <code>"double"</code> (e <code>"integer"</code>, <code>"boolean"</code>).</p>
+<p><strong>Como consertar:</strong> use <code>is_float($x)</code>, que é mais direto, ou <code>get_debug_type($x) === "float"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>is_int</code> diz <code>false</code> para um número digitado no formulário</strong>
+<p><strong>O que significa:</strong> o valor é a string <code>"29"</code>; <code>is_int</code> só aceita o tipo <code>int</code>.</p>
+<p><strong>Como consertar:</strong> use <code>is_numeric</code> para conferir e converta com <code>(int)</code> ou <code>intval</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Use</th><th>Resultado</th></tr>
+<tr><td>ver tipo e valor</td><td><code>var_dump($x)</code></td><td><code>int(29)</code></td></tr>
+<tr><td>nome do tipo (moderno)</td><td><code>get_debug_type($x)</code></td><td><code>"int"</code>, <code>"float"</code>, <code>"DateTime"</code></td></tr>
+<tr><td>nome do tipo (antigo)</td><td><code>gettype($x)</code></td><td><code>"integer"</code>, <code>"double"</code></td></tr>
+<tr><td>testar um tipo</td><td><code>is_string</code>, <code>is_int</code>, <code>is_float</code>, <code>is_bool</code>, <code>is_array</code>, <code>is_object</code>, <code>is_null</code></td><td><code>true</code> / <code>false</code></td></tr>
+<tr><td>número ou texto numérico?</td><td><code>is_numeric($x)</code></td><td><code>true</code> para <code>29</code> e <code>"29"</code></td></tr>
+<tr><td>pode ser chamado?</td><td><code>is_callable($x)</code></td><td><code>true</code> para <code>"strlen"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O tipo moderno</h3>
+<p>Complete para mostrar <code>float</code>:</p>
+<div class="ex-code">echo <input data-answer="get_debug_type" aria-label="função">(1.65);</div>
+</div>
+
+<div class="exercise">
+<h3>2. É texto?</h3>
+<p>Complete com a função que responde <code>true</code> para <code>"Ana"</code>:</p>
+<div class="ex-code">var_dump(<input data-answer="is_string" aria-label="função">("Ana"));</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que <code>var_dump("42");</code> mostra?</p>
+<label><input type="radio" name="q3"> <code>int(42)</code></label>
+<label><input type="radio" name="q3"> <code>string(2) "42"</code></label>
+<label><input type="radio" name="q3"> <code>float(42)</code></label>
+<label><input type="radio" name="q3"> <code>string(42)</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual o resultado de <code>gettype(1.5)</code>?</p>
+<label><input type="radio" name="q4"> <code>"float"</code></label>
+<label><input type="radio" name="q4"> <code>"decimal"</code></label>
+<label><input type="radio" name="q4"> <code>"double"</code></label>
+<label><input type="radio" name="q4"> <code>"number"</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que significa dizer que o PHP tem "tipagem dinâmica"?</p>
+<label><input type="radio" name="q5"> O tipo vem do valor; a mesma variável pode guardar um int agora e uma string depois</label>
+<label><input type="radio" name="q5"> Toda variável precisa ter o tipo declarado ao ser criada</label>
+<label><input type="radio" name="q5"> O PHP não tem tipos</label>
+<label><input type="radio" name="q5"> Os tipos só existem em objetos</label>
+</div>
+
+<h3>Missão final: o detetive de tipos</h3>
+
+<div class="tryphp" data-goal="out:array,out:null,out:bool,semerro,src:get_debug_type">
+<p class="try-task"><strong>Missão:</strong> o programa já mostra o tipo de <code>$a</code>. Crie mais três variáveis: <code>$b</code> com uma lista de compras (um array), <code>$c</code> com <code>null</code> e <code>$d</code> com <code>false</code>. Mostre o tipo de cada uma com <code>get_debug_type</code>, uma por linha. A saída deve ter <code>array</code>, <code>null</code> e <code>bool</code>.</p>
+<pre class="script">&lt;?php
+$a = "Ana";
+echo get_debug_type($a), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$a = "Ana";
+echo get_debug_type($a), "\n";
+$b = ["arroz", "feijão"];
+$c = null;
+$d = false;
+echo get_debug_type($b), "\n";
+echo get_debug_type($c), "\n";
+echo get_debug_type($d), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Todo valor tem um <strong>tipo</strong>, e o tipo decide o que dá para fazer com ele.</li>
+  <li>Escalares: <code>string</code> (texto), <code>int</code> (inteiro), <code>float</code> (decimal, com ponto), <code>bool</code> (<code>true</code>/<code>false</code>). Compostos: <code>array</code>, <code>object</code>. Especiais: <code>null</code>, <code>resource</code>. E <code>callable</code>: o que pode ser chamado como função.</li>
+  <li><strong>Tipagem dinâmica</strong>: a variável não tem tipo; o valor tem. <code>10</code>, <code>"10"</code> e <code>10.0</code> são três coisas diferentes.</li>
+  <li><code>var_dump</code> mostra tipo e valor; <code>get_debug_type</code> dá o nome moderno do tipo; <code>gettype</code> dá o antigo (<code>"double"</code>, <code>"integer"</code>).</li>
+  <li><code>is_int</code>, <code>is_string</code>… testam o tipo; <code>is_numeric</code> aceita texto com cara de número.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
