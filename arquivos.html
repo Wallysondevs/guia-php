@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Ler e Escrever Arquivos — file_get_contents, fopen e pastas | Guia PHP</title>
+<meta name="description" content="Ler e escrever arquivos no PHP: file_get_contents, file_put_contents com FILE_APPEND, file() linha a linha, fopen, fgets, fwrite e fclose, file_exists, is_dir, mkdir, scandir, unlink, permissões e caminhos relativos ao script, com as mensagens reais de erro.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Ler e Escrever Arquivos</span></h1>
+
+<p class="intro">Tudo o que um programa guarda em variáveis some quando ele termina. Para lembrar de alguma coisa até a próxima vez (a lista de compras, os recados dos clientes, o registro das vendas do dia), o programa precisa <strong>gravar num arquivo</strong>. Nesta aula você vai ler e escrever arquivos de texto, criar pastas, listar e apagar arquivos, e entender as mensagens que o PHP mostra quando algo dá errado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O jeito curto: <code>file_put_contents</code> (gravar) e <code>file_get_contents</code> (ler), e como <strong>acrescentar</strong> com <code>FILE_APPEND</code>.</li>
+  <li>Ler um arquivo como uma lista de linhas com <code>file()</code>.</li>
+  <li>O jeito "passo a passo": <code>fopen</code>, <code>fgets</code>, <code>fwrite</code> e <code>fclose</code>, e quando ele vale a pena.</li>
+  <li>Perguntar se algo existe: <code>file_exists</code>, <code>is_file</code>, <code>is_dir</code>.</li>
+  <li>Pastas: <code>mkdir</code>, <code>scandir</code>, <code>rmdir</code>; apagar com <code>unlink</code>.</li>
+  <li>Os erros reais: arquivo inexistente, <code>Permission denied</code>, <code>File exists</code>.</li>
+</ul>
+</div>
+
+<p>Os exemplos rodam na pasta <code>/home/ana/arq</code> da máquina da Ana. No editor do guia, os arquivos são criados num disco de mentira, na memória do navegador: pode gravar à vontade.</p>
+
+<hr>
+
+<h2>A ideia: um caderno na gaveta</h2>
+<p>Um arquivo é como um caderno guardado numa gaveta. Para usar, você precisa saber o <strong>nome</strong> do caderno e em que <strong>gaveta</strong> (pasta) ele está. Aí pode <strong>ler</strong> o que está escrito, <strong>escrever por cima</strong> (apagando o que havia) ou <strong>continuar</strong> escrevendo na próxima linha em branco. O PHP tem uma função para cada uma dessas ações.</p>
+
+<hr>
+
+<h2>Gravar e ler de uma vez</h2>
+<p>As duas funções mais usadas fazem tudo numa linha só:</p>
+<ul>
+  <li><code>file_put_contents</code> ("pôr o conteúdo no arquivo"): grava um texto num arquivo. Se o arquivo não existe, ele é criado.</li>
+  <li><code>file_get_contents</code> ("pegar o conteúdo do arquivo"): devolve todo o texto do arquivo, como uma string.</li>
+</ul>
+
+<pre class="file" data-file="escrever.php">&lt;?php
+$bytes = file_put_contents('compras.txt', "arroz\nfeijão\nleite\n");
+var_dump($bytes);
+echo file_get_contents('compras.txt');
+</pre>
+
+<dl class="anatomy">
+  <dt>file_put_contents(</dt><dd>A função que grava.</dd>
+  <dt>'compras.txt',</dt><dd>1º argumento: o nome do arquivo. Sem pasta na frente, ele fica na <strong>pasta atual</strong>.</dd>
+  <dt>"arroz\nfeijão\nleite\n"</dt><dd>2º argumento: o texto. Cada <code>\n</code> é uma quebra de linha (por isso aspas duplas; veja <a href="strings.html">Strings</a>).</dd>
+  <dt>$bytes = </dt><dd>A função devolve quantos <strong>bytes</strong> gravou (ou <code>false</code> se falhou).</dd>
+  <dt>file_get_contents('compras.txt')</dt><dd>Lê o arquivo inteiro e devolve o texto, que o <code>echo</code> mostra.</dd>
+</dl>
+
+<pre class="term">$ cd arq
+$ php escrever.php
+int(20)            « 20 bytes gravados
+arroz
+feijão
+leite
+$ cat compras.txt  « o arquivo ficou no disco, mesmo depois de o PHP terminar
+arroz
+feijão
+leite</pre>
+
+<div class="note">
+<strong>Por que 20, se são 19 caracteres?</strong>
+<p>Conte: <code>arroz</code> (5) + <code>feijão</code> (6) + <code>leite</code> (5) + 3 quebras de linha = 19 caracteres. Mas o <code>ã</code> ocupa <strong>2 bytes</strong> em UTF-8, então o arquivo tem 20 bytes. A mesma história do <a href="mbstring.html">strlen com acentos</a>.</p>
+</div>
+
+<h3>Escrever por cima × acrescentar no fim</h3>
+<p>Cuidado: por padrão, <code>file_put_contents</code> <strong>apaga</strong> o que havia no arquivo e grava o texto novo. Para <strong>acrescentar</strong> no fim, passe a "bandeira" (<em>flag</em>) <code>FILE_APPEND</code> ("anexar ao arquivo") como terceiro argumento:</p>
+
+<pre class="file" data-file="acrescentar.php">&lt;?php
+file_put_contents('compras.txt', "café\n", FILE_APPEND);
+file_put_contents('compras.txt', "açúcar\n", FILE_APPEND);
+echo file_get_contents('compras.txt');
+</pre>
+
+<pre class="term">$ php acrescentar.php
+arroz
+feijão
+leite
+café              « acrescentado
+açúcar            « acrescentado</pre>
+
+<p>E sem o <code>FILE_APPEND</code>:</p>
+
+<pre class="file" data-file="sobrescrever.php">&lt;?php
+file_put_contents('compras.txt', "pão\n");
+echo file_get_contents('compras.txt');
+</pre>
+
+<pre class="term">$ php sobrescrever.php
+pão               « o resto da lista sumiu: o arquivo foi reescrito do zero</pre>
+
+<div class="warning">
+<strong>Não existe "desfazer"</strong>
+<p>Quando o PHP grava por cima, o conteúdo antigo é perdido para sempre: não vai para a lixeira. Antes de testar algo com arquivos importantes, faça uma cópia (<code>copy('dados.txt', 'dados-copia.txt');</code>).</p>
+</div>
+
+<div class="tryphp" data-goal="out:café,out:açúcar,out:arroz,src:FILE_APPEND">
+<p class="try-task"><strong>Missão:</strong> o programa grava a lista e depois tenta acrescentar <code>café</code> e <code>açúcar</code>, mas a lista começa do zero a cada linha. Conserte as duas últimas gravações para que a lista final tenha os cinco itens.</p>
+<pre class="script">&lt;?php
+file_put_contents('compras.txt', "arroz\nfeijão\nleite\n");
+file_put_contents('compras.txt', "café\n");
+file_put_contents('compras.txt', "açúcar\n");
+echo file_get_contents('compras.txt');
+</pre>
+<pre class="solucao">&lt;?php
+file_put_contents('compras.txt', "arroz\nfeijão\nleite\n");
+file_put_contents('compras.txt', "café\n", FILE_APPEND);
+file_put_contents('compras.txt', "açúcar\n", FILE_APPEND);
+echo file_get_contents('compras.txt');
+</pre>
+</div>
+
+<hr>
+
+<h2>Ler linha por linha com <code>file()</code></h2>
+<p>Muitas vezes você não quer o texto inteiro, e sim <strong>cada linha separada</strong>, para contar, filtrar ou mostrar numa lista. A função <code>file()</code> lê o arquivo e devolve um <a href="arrays.html">array</a>, com uma linha em cada posição:</p>
+
+<pre class="file" data-file="linhas.php">&lt;?php
+file_put_contents('compras.txt', "arroz\nfeijão\n\nleite\n");
+$linhas = file('compras.txt');
+var_dump($linhas);
+</pre>
+
+<pre class="term">$ php linhas.php
+array(4) {
+  [0]=&gt;
+  string(6) "arroz
+"                       « a quebra de linha veio junto!
+  [1]=&gt;
+  string(8) "feijão
+"
+  [2]=&gt;
+  string(1) "
+"                       « a linha em branco virou um item
+  [3]=&gt;
+  string(6) "leite
+"
+}</pre>
+
+<p>Duas surpresas: cada item <strong>termina com a quebra de linha</strong> (<code>"arroz\n"</code>, por isso o <code>string(6)</code>), e a linha vazia também entrou. Quase sempre você quer o contrário, e para isso existem duas bandeiras, que se combinam com <code>|</code>:</p>
+
+<pre class="file" data-file="linhas.php (fim do arquivo)">$limpas = file('compras.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+var_dump($limpas);
+echo "Itens: " . count($limpas) . "\n";
+</pre>
+
+<pre class="term">« (continuação da saída de php linhas.php)
+array(3) {
+  [0]=&gt;
+  string(5) "arroz"
+  [1]=&gt;
+  string(7) "feijão"
+  [2]=&gt;
+  string(5) "leite"
+}
+Itens: 3</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Bandeira</th><th>Tradução</th><th>Efeito</th></tr>
+<tr><td><code>FILE_IGNORE_NEW_LINES</code></td><td>"ignorar as quebras de linha"</td><td>Tira o <code>\n</code> do fim de cada item.</td></tr>
+<tr><td><code>FILE_SKIP_EMPTY_LINES</code></td><td>"pular as linhas vazias"</td><td>Não coloca as linhas em branco no array (só funciona junto com a de cima).</td></tr>
+</table>
+</div>
+
+<p>O <code>|</code> entre elas é o "ou" de bits: um jeito de passar várias bandeiras num argumento só. Você não precisa entender a matemática, só a receita: <code>BANDEIRA_1 | BANDEIRA_2</code>.</p>
+
+<hr>
+
+<h2>O jeito passo a passo: <code>fopen</code>, <code>fgets</code>, <code>fwrite</code>, <code>fclose</code></h2>
+<p><code>file_get_contents</code> e <code>file()</code> carregam o arquivo <strong>inteiro</strong> na memória. Para arquivos pequenos, perfeito. Para um arquivo de registro com 2 GB, o programa estouraria a memória. O jeito "clássico", herdado da linguagem C, abre o arquivo e lê ou escreve <strong>um pedaço por vez</strong>:</p>
+
+<ol class="passo">
+  <li><code>fopen</code> (<em>file open</em>, "abrir arquivo"): abre e devolve um <strong>identificador</strong> (um "marcador de página" do caderno).</li>
+  <li><code>fgets</code> (<em>file get string</em>, "pegar uma linha"): lê a próxima linha. Ou <code>fwrite</code> (<em>file write</em>, "escrever"): escreve um texto.</li>
+  <li><code>fclose</code> (<em>file close</em>, "fechar"): fecha o arquivo e libera o identificador.</li>
+</ol>
+
+<pre class="file" data-file="fopen.php">&lt;?php
+$arquivo = fopen('diario.txt', 'w');
+fwrite($arquivo, "16/10: vendi 3 bolos\n");
+fwrite($arquivo, "17/10: vendi 5 bolos\n");
+fclose($arquivo);
+
+$arquivo = fopen('diario.txt', 'r');
+$numero = 1;
+while (($linha = fgets($arquivo)) !== false) {
+    echo $numero . ": " . $linha;
+    $numero++;
+}
+fclose($arquivo);
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$arquivo = fopen('diario.txt', 'w');</code></td><td>Abre para <strong>escrever</strong> (<code>'w'</code> = <em>write</em>). Cria o arquivo ou apaga o conteúdo antigo. <code>$arquivo</code> guarda o identificador.</td></tr>
+<tr><td><code>fwrite($arquivo, "…\n");</code></td><td>Escreve o texto no ponto onde o "marcador" está, e o marcador anda para depois dele.</td></tr>
+<tr><td><code>fclose($arquivo);</code></td><td>Fecha. Garante que tudo foi gravado no disco.</td></tr>
+<tr><td><code>fopen('diario.txt', 'r')</code></td><td>Abre de novo, agora para <strong>ler</strong> (<code>'r'</code> = <em>read</em>), com o marcador no começo.</td></tr>
+<tr><td><code>while (($linha = fgets($arquivo)) !== false)</code></td><td>Lê uma linha e guarda em <code>$linha</code>; quando acabar o arquivo, <code>fgets</code> devolve <code>false</code> e o <a href="while.html"><code>while</code></a> para. Os parênteses extras fazem a atribuição acontecer antes da comparação.</td></tr>
+<tr><td><code>echo $numero . ": " . $linha;</code></td><td>Mostra a linha com o número. Sem <code>\n</code> no fim, porque a linha já traz a sua quebra.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php fopen.php
+1: 16/10: vendi 3 bolos
+2: 17/10: vendi 5 bolos
+$ cat diario.txt
+16/10: vendi 3 bolos
+17/10: vendi 5 bolos</pre>
+
+<div class="tip">
+<strong>Por que <code>!== false</code> e não só <code>while ($linha = fgets($arquivo))</code>?</strong>
+<p>Uma linha com o texto <code>"0"</code> (sem quebra, a última do arquivo) é considerada "falsa" pelo PHP (veja <a href="booleanos.html">Booleanos</a>), e o laço pararia antes da hora. Comparar com <code>!== false</code> só para quando o arquivo realmente acabou.</p>
+</div>
+
+<h3>Os modos do <code>fopen</code></h3>
+<p>O segundo argumento do <code>fopen</code> diz o que você pretende fazer com o arquivo:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Modo</th><th>Vem de</th><th>Lê?</th><th>Escreve?</th><th>Se não existe</th><th>Se já existe</th></tr>
+<tr><td><code>'r'</code></td><td><em>read</em></td><td>sim</td><td>não</td><td>Warning, devolve <code>false</code></td><td>começa do início</td></tr>
+<tr><td><code>'w'</code></td><td><em>write</em></td><td>não</td><td>sim</td><td>cria</td><td><strong>apaga tudo</strong></td></tr>
+<tr><td><code>'a'</code></td><td><em>append</em></td><td>não</td><td>sim, no fim</td><td>cria</td><td>mantém e escreve no fim</td></tr>
+<tr><td><code>'x'</code></td><td><em>exclusive</em></td><td>não</td><td>sim</td><td>cria</td><td>Warning <code>File exists</code>, devolve <code>false</code></td></tr>
+<tr><td><code>'r+'</code>, <code>'w+'</code>, <code>'a+'</code>, <code>'x+'</code></td><td></td><td colspan="4">O mesmo do modo sem <code>+</code>, mas permitindo ler <strong>e</strong> escrever.</td></tr>
+</table>
+</div>
+
+<p>O modo <code>'x'</code> é útil para "crie só se ainda não existir", sem risco de apagar nada:</p>
+<pre class="term">$ php modos.php      « $f = fopen('compras.txt', 'x'); var_dump($f);
+
+Warning: fopen(compras.txt): Failed to open stream: File exists in /home/ana/arq/modos.php on line 2
+bool(false)</pre>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Ler um arquivo pequeno inteiro (um texto, um JSON, um modelo de e-mail)</td><td><code>file_get_contents</code></td></tr>
+<tr><td>Ler um arquivo pequeno como lista de linhas</td><td><code>file(…, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)</code></td></tr>
+<tr><td>Gravar ou acrescentar um texto</td><td><code>file_put_contents</code> (com <code>FILE_APPEND</code> para acrescentar)</td></tr>
+<tr><td>Arquivo grande (registros, exportações), ler ou escrever em partes</td><td><code>fopen</code> + <code>fgets</code>/<code>fwrite</code> + <code>fclose</code></td></tr>
+<tr><td>CSV (planilhas)</td><td><code>fopen</code> + <code>fgetcsv</code>/<code>fputcsv</code> (aula <a href="csv.html">CSV</a>)</td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-goal="out:1: 16/10,out:3: 18/10,out:Total: 3 dias,semerro">
+<p class="try-task"><strong>Missão:</strong> o <code>diario.txt</code> (na segunda aba) tem as vendas de três dias. Complete o programa para mostrar cada linha numerada (<code>1: 16/10: …</code>) e, no fim, a linha <code>Total: 3 dias</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$arquivo = fopen('diario.txt', 'r');
+$numero = 0;
+// leia as linhas aqui
+
+fclose($arquivo);
+</pre>
+<pre class="script" data-file="diario.txt">16/10: vendi 3 bolos
+17/10: vendi 5 bolos
+18/10: vendi 2 tortas
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$arquivo = fopen('diario.txt', 'r');
+$numero = 0;
+while (($linha = fgets($arquivo)) !== false) {
+    $numero++;
+    echo $numero . ": " . $linha;
+}
+fclose($arquivo);
+echo "Total: $numero dias\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Perguntar antes: existe? é pasta?</h2>
+<p>Ler um arquivo que não existe dá aviso. Antes, você pode perguntar:</p>
+
+<pre class="file" data-file="existe.php">&lt;?php
+var_dump(file_exists('compras.txt'));
+var_dump(file_exists('receitas.txt'));
+var_dump(is_file('compras.txt'));
+var_dump(is_dir('compras.txt'));
+var_dump(is_dir('/home/ana'));
+echo filesize('compras.txt'), " bytes\n";
+</pre>
+
+<pre class="term">$ php existe.php
+bool(true)       « compras.txt existe
+bool(false)      « receitas.txt não existe
+bool(true)       « compras.txt é um arquivo comum
+bool(false)      « …e não é uma pasta
+bool(true)       « /home/ana é uma pasta
+21 bytes</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Pergunta</th></tr>
+<tr><td><code>file_exists($c)</code></td><td>"Existe algo com esse nome?" (arquivo <strong>ou</strong> pasta)</td></tr>
+<tr><td><code>is_file($c)</code></td><td>"É um arquivo comum?"</td></tr>
+<tr><td><code>is_dir($c)</code></td><td>"É uma pasta (<em>directory</em>)?"</td></tr>
+<tr><td><code>is_readable($c)</code> / <code>is_writable($c)</code></td><td>"Posso ler?" / "Posso escrever?"</td></tr>
+<tr><td><code>filesize($c)</code></td><td>Tamanho em bytes.</td></tr>
+<tr><td><code>filemtime($c)</code></td><td>Quando foi modificado (um <em>timestamp</em>; veja <a href="datas.html">Datas e Horas</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Pastas: criar, listar, apagar</h2>
+<p>A Ana quer guardar cada pedido num arquivo, dentro de uma pasta <code>pedidos</code>:</p>
+
+<pre class="file" data-file="pastas.php">&lt;?php
+if (!is_dir('pedidos')) {
+    mkdir('pedidos');
+    echo "Pasta criada.\n";
+}
+file_put_contents('pedidos/001.txt', "2 bolos de cenoura\n");
+file_put_contents('pedidos/002.txt', "1 torta de limão\n");
+print_r(scandir('pedidos'));
+</pre>
+
+<pre class="term">$ php pastas.php
+Pasta criada.
+Array
+(
+    [0] =&gt; .
+    [1] =&gt; ..
+    [2] =&gt; 001.txt
+    [3] =&gt; 002.txt
+)</pre>
+
+<dl class="anatomy">
+  <dt>mkdir('pedidos')</dt><dd><em>make directory</em>, "criar pasta" (o mesmo nome do comando do terminal).</dd>
+  <dt>scandir('pedidos')</dt><dd><em>scan directory</em>, "varrer a pasta": devolve um array com os nomes, em ordem alfabética.</dd>
+  <dt>. e ..</dt><dd>Toda pasta tem essas duas entradas especiais: <code>.</code> é a própria pasta e <code>..</code> é a pasta de cima. Quase sempre você vai querer tirá-las.</dd>
+</dl>
+
+<p>Para listar só os arquivos de verdade, tire o <code>.</code> e o <code>..</code> com <code>array_diff</code>, ou use <code>glob</code>, que aceita curingas como no terminal:</p>
+
+<pre class="file" data-file="glob.php">&lt;?php
+foreach (array_diff(scandir('pedidos'), ['.', '..']) as $nome) {
+    echo "$nome\n";
+}
+print_r(glob('pedidos/*.txt'));
+</pre>
+
+<pre class="term">$ php glob.php
+001.txt
+002.txt
+Array
+(
+    [0] =&gt; pedidos/001.txt         « glob devolve o caminho junto
+    [1] =&gt; pedidos/002.txt
+)</pre>
+
+<h3>Pastas dentro de pastas</h3>
+<p><code>mkdir</code> só cria <strong>uma</strong> pasta por vez, e reclama se ela já existir:</p>
+
+<pre class="file" data-file="mkdir-erro.php">&lt;?php
+mkdir('pedidos');
+mkdir('fotos/2026/outubro');
+var_dump(mkdir('fotos/2026/outubro', 0755, true));
+</pre>
+
+<pre class="term">$ php mkdir-erro.php
+
+Warning: mkdir(): File exists in /home/ana/arq/mkdir-erro.php on line 2
+
+Warning: mkdir(): No such file or directory in /home/ana/arq/mkdir-erro.php on line 3
+bool(true)
+$ ls -R fotos
+fotos:
+2026
+
+fotos/2026:
+outubro
+
+fotos/2026/outubro:</pre>
+
+<p>A linha 2 falhou porque <code>pedidos</code> já existia (<em>File exists</em>). A linha 3 falhou porque <code>fotos</code> e <code>fotos/2026</code> não existiam (<em>No such file or directory</em>). A linha 4 funcionou graças ao terceiro argumento, <code>true</code> ("recursivo"), que cria todas as pastas do caminho, como o <code>mkdir -p</code> do terminal. O <code>0755</code> é a permissão das pastas novas, no mesmo formato do <code>chmod</code> (o <code>0</code> na frente é obrigatório: é um número em octal).</p>
+
+<h3>Apagar e mover</h3>
+<pre class="file" data-file="apagar.php">&lt;?php
+unlink('pedidos/001.txt');
+print_r(scandir('pedidos'));
+unlink('pedidos/001.txt');
+</pre>
+
+<pre class="term">$ php apagar.php
+Array
+(
+    [0] =&gt; .
+    [1] =&gt; ..
+    [2] =&gt; 002.txt          « o 001.txt sumiu
+)
+
+Warning: unlink(pedidos/001.txt): No such file or directory in /home/ana/arq/apagar.php on line 4</pre>
+
+<p><code>unlink</code> ("desvincular") é o nome histórico de "apagar arquivo", vindo do Unix. Para apagar uma pasta, use <code>rmdir</code>, que só funciona com a pasta <strong>vazia</strong>:</p>
+
+<pre class="term">$ php rmdir.php      « rmdir('pedidos'); com o 002.txt ainda lá dentro
+
+Warning: rmdir(pedidos): Directory not empty in /home/ana/arq/rmdir.php on line 2</pre>
+
+<p>E para copiar, mover e desmontar caminhos:</p>
+
+<pre class="file" data-file="outros.php">&lt;?php
+copy('diario.txt', 'diario-backup.txt');
+rename('diario-backup.txt', 'pedidos/diario-antigo.txt');
+print_r(scandir('pedidos'));
+$caminho = '/home/ana/arq/pedidos/002.txt';
+echo basename($caminho), "\n";
+echo dirname($caminho), "\n";
+print_r(pathinfo($caminho));
+echo realpath('pedidos/../diario.txt'), "\n";
+</pre>
+
+<pre class="term">$ php outros.php
+Array
+(
+    [0] =&gt; .
+    [1] =&gt; ..
+    [2] =&gt; 002.txt
+    [3] =&gt; diario-antigo.txt       « copiado e depois movido (rename também move)
+)
+002.txt                            « basename: só o nome
+/home/ana/arq/pedidos              « dirname: só a pasta
+Array
+(
+    [dirname] =&gt; /home/ana/arq/pedidos
+    [basename] =&gt; 002.txt
+    [extension] =&gt; txt
+    [filename] =&gt; 002
+)
+/home/ana/arq/diario.txt           « realpath: o caminho completo, sem ".."</pre>
+
+<hr>
+
+<h2>Caminhos: relativos a quê?</h2>
+<p>Um nome como <code>'compras.txt'</code> ou <code>'pedidos/001.txt'</code> é um <strong>caminho relativo</strong>: o PHP o procura a partir da <strong>pasta atual</strong> do programa, que é a pasta de onde ele foi chamado, e não a pasta onde o arquivo <code>.php</code> está. Veja:</p>
+
+<pre class="file" data-file="dir.php">&lt;?php
+echo getcwd(), "\n";
+echo __DIR__, "\n";
+file_put_contents(__DIR__ . '/registro.txt', "ok\n");
+var_dump(file_exists(__DIR__ . '/registro.txt'));
+</pre>
+
+<pre class="term">$ cd ~
+$ php arq/dir.php
+/home/ana             « getcwd(): a pasta atual (de onde a Ana chamou)
+/home/ana/arq         « __DIR__: a pasta do arquivo dir.php
+bool(true)</pre>
+
+<p>Se o programa tivesse gravado só <code>'registro.txt'</code>, o arquivo iria parar em <code>/home/ana</code>, e não ao lado do script. Num site, a "pasta atual" depende do servidor. Por isso, a regra é a mesma da aula <a href="include-require.html">include e require</a>: para arquivos que acompanham o seu programa, monte o caminho com <code>__DIR__ . '/nome.txt'</code>.</p>
+
+<hr>
+
+<h2>Um mural de recados (modo web)</h2>
+<p>Juntando tudo: uma página com um formulário onde os clientes deixam recados, guardados num arquivo de texto, um por linha. Cada vez que alguém envia, a página <strong>acrescenta</strong> uma linha e mostra todas.</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+$arquivo = __DIR__ . '/recados.txt';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nome = trim($_POST['nome'] ?? '');
+    $recado = trim($_POST['recado'] ?? '');
+    if ($nome !== '' &amp;&amp; $recado !== '') {
+        $linha = str_replace("\n", ' ', "$nome: $recado") . "\n";
+        file_put_contents($arquivo, $linha, FILE_APPEND | LOCK_EX);
+    }
+}
+
+$recados = file_exists($arquivo)
+    ? file($arquivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+    : [];
+?&gt;
+&lt;h1&gt;Mural de recados da Lojinha&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="nome" placeholder="Seu nome"&gt;
+  &lt;input name="recado" placeholder="Seu recado"&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul&gt;
+&lt;?php foreach ($recados as $r): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($r) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;?= count($recados) ?&gt; recado(s).&lt;/p&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Por quê</th></tr>
+<tr><td><code>str_replace("\n", ' ', …)</code></td><td>Um recado com várias linhas quebraria a regra "um recado por linha". Trocamos as quebras por espaços.</td></tr>
+<tr><td><code>FILE_APPEND | LOCK_EX</code></td><td>Acrescenta no fim e <strong>tranca</strong> o arquivo (<em>exclusive lock</em>) durante a gravação: se dois clientes enviarem no mesmo instante, um espera o outro, e as linhas não se misturam.</td></tr>
+<tr><td><code>file_exists(…) ? file(…) : []</code></td><td>Na primeira visita o arquivo ainda não existe: em vez de um Warning, começamos com uma lista vazia.</td></tr>
+<tr><td><code>htmlspecialchars($r)</code></td><td>O recado foi escrito por um visitante. Sem escapar, um <code>&lt;script&gt;</code> no recado rodaria no navegador de todo mundo (veja <a href="escapar-saida.html">XSS</a>).</td></tr>
+</table>
+</div>
+
+<p>A Ana testou com o servidor embutido e o <code>curl</code>, mandando dois recados (o primeiro com HTML de propósito):</p>
+
+<pre class="term">$ curl -s -X POST --data "nome=Bia&amp;recado=Adorei o bolo de &lt;b&gt;cenoura&lt;/b&gt;!" localhost:8000/
+&lt;h1&gt;Mural de recados da Lojinha&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="nome" placeholder="Seu nome"&gt;
+  &lt;input name="recado" placeholder="Seu recado"&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul&gt;
+  &lt;li&gt;Bia: Adorei o bolo de &amp;lt;b&amp;gt;cenoura&amp;lt;/b&amp;gt;!&lt;/li&gt;       « o HTML virou texto inofensivo
+&lt;/ul&gt;
+&lt;p&gt;1 recado(s).&lt;/p&gt;
+$ curl -s -X POST --data "nome=Caio&amp;recado=Quero encomendar" localhost:8000/ | tail -6
+&lt;/form&gt;
+&lt;ul&gt;
+  &lt;li&gt;Bia: Adorei o bolo de &amp;lt;b&amp;gt;cenoura&amp;lt;/b&amp;gt;!&lt;/li&gt;
+  &lt;li&gt;Caio: Quero encomendar&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2 recado(s).&lt;/p&gt;
+$ cat recados.txt
+Bia: Adorei o bolo de &lt;b&gt;cenoura&lt;/b&gt;!            « no arquivo, o texto fica original
+Caio: Quero encomendar</pre>
+
+<div class="tryphp" data-modo="web" data-post="nome=Bia&amp;recado=Adorei o bolo" data-goal="html:Ana: Bem-vindos ao mural!,html:Bia: Adorei o bolo,html:2 recado(s)">
+<p class="try-task"><strong>Missão:</strong> o mural já tem um recado da Ana (aba <code>recados.txt</code>), e a caixa abre enviando um recado da Bia. Mas o programa apaga os recados antigos a cada envio e não mostra a lista. Conserte a gravação (acrescentar, não substituir) e complete a parte que lê o arquivo em <code>$recados</code>. Depois, deixe outros recados pela aba <strong>Resultado</strong>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$arquivo = __DIR__ . '/recados.txt';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nome = trim($_POST['nome'] ?? '');
+    $recado = trim($_POST['recado'] ?? '');
+    if ($nome !== '' &amp;&amp; $recado !== '') {
+        $linha = str_replace("\n", ' ', "$nome: $recado") . "\n";
+        file_put_contents($arquivo, $linha);
+    }
+}
+
+$recados = [];   // leia as linhas do arquivo aqui
+?&gt;
+&lt;h1&gt;Mural de recados da Lojinha&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="nome" placeholder="Seu nome"&gt;
+  &lt;input name="recado" placeholder="Seu recado"&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul&gt;
+&lt;?php foreach ($recados as $r): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($r) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;?= count($recados) ?&gt; recado(s).&lt;/p&gt;
+</pre>
+<pre class="script" data-file="recados.txt">Ana: Bem-vindos ao mural!
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$arquivo = __DIR__ . '/recados.txt';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nome = trim($_POST['nome'] ?? '');
+    $recado = trim($_POST['recado'] ?? '');
+    if ($nome !== '' &amp;&amp; $recado !== '') {
+        $linha = str_replace("\n", ' ', "$nome: $recado") . "\n";
+        file_put_contents($arquivo, $linha, FILE_APPEND | LOCK_EX);
+    }
+}
+
+$recados = file_exists($arquivo)
+    ? file($arquivo, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+    : [];
+?&gt;
+&lt;h1&gt;Mural de recados da Lojinha&lt;/h1&gt;
+&lt;form method="post"&gt;
+  &lt;input name="nome" placeholder="Seu nome"&gt;
+  &lt;input name="recado" placeholder="Seu recado"&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul&gt;
+&lt;?php foreach ($recados as $r): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($r) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;?= count($recados) ?&gt; recado(s).&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Failed to open stream: No such file or directory"</strong>
+<pre class="term">$ php nao-existe.php     « $texto = file_get_contents('receitas.txt'); var_dump($texto); …
+
+Warning: file_get_contents(receitas.txt): Failed to open stream: No such file or directory in /home/ana/arq/nao-existe.php on line 2
+bool(false)
+
+Warning: fopen(receitas.txt): Failed to open stream: No such file or directory in /home/ana/arq/nao-existe.php on line 4
+bool(false)</pre>
+<p><strong>O que significa:</strong> "falhou ao abrir: arquivo ou diretório inexistente". O PHP avisa e devolve <code>false</code> no lugar do texto (ou do identificador).</p>
+<p><strong>Como consertar:</strong> confira o nome (maiúsculas contam), a pasta atual (<code>getcwd()</code>) e use <code>__DIR__</code>. Se o arquivo pode legitimamente não existir, pergunte antes com <code>file_exists</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"must be of type resource, false given" (o fopen falhou e ninguém conferiu)</strong>
+<pre class="term">$ php fgets-false.php    « $f = fopen('receitas.txt', 'r'); echo fgets($f);
+
+Warning: fopen(receitas.txt): Failed to open stream: No such file or directory in /home/ana/arq/fgets-false.php on line 2
+
+Fatal error: Uncaught TypeError: fgets(): Argument #1 ($stream) must be of type resource, false given in /home/ana/arq/fgets-false.php:3
+Stack trace:
+#0 /home/ana/arq/fgets-false.php(3): fgets(false)
+#1 {main}
+  thrown in /home/ana/arq/fgets-false.php on line 3</pre>
+<p><strong>O que significa:</strong> o <code>fopen</code> devolveu <code>false</code> (primeiro aviso), e o programa passou esse <code>false</code> para o <code>fgets</code>, que esperava um arquivo aberto (um <em>resource</em>). O erro de verdade é o da linha 2; o da linha 3 é consequência.</p>
+<p><strong>Como consertar:</strong> confira o resultado do <code>fopen</code> antes de usar: <code>if ($f === false) { echo "Não consegui abrir.\n"; exit(1); }</code>. Na aula de <a href="excecoes.html">exceções</a> você vai ver formas mais elegantes.</p>
+</div>
+
+<div class="cenario">
+<strong>"Permission denied"</strong>
+<p>A Ana tirou a permissão de escrita de um arquivo (<code>chmod 444</code>, veja as permissões no Guia Bash) e tentou gravar nele:</p>
+<pre class="term">$ chmod 444 trancado.txt
+$ ls -l trancado.txt
+-r--r--r-- 1 ana ana 9 out 16 20:47 trancado.txt
+$ php permissao.php      « $ok = file_put_contents('trancado.txt', "novo texto\n"); var_dump($ok);
+
+Warning: file_put_contents(trancado.txt): Failed to open stream: Permission denied in /home/ana/arq/permissao.php on line 2
+bool(false)</pre>
+<p><strong>O que significa:</strong> "permissão negada". O arquivo existe, mas o usuário que roda o PHP não pode escrever nele (ou na pasta).</p>
+<p><strong>Como consertar:</strong> no seu computador, ajuste as permissões (<code>chmod u+w trancado.txt</code>). Num servidor, o PHP roda como outro usuário (no Ubuntu/Debian, <code>www-data</code>), e é <strong>esse</strong> usuário que precisa poder escrever na pasta de dados. Nunca resolva com <code>chmod 777</code>: isso deixa qualquer um no servidor alterar os arquivos.</p>
+</div>
+
+<div class="cenario">
+<strong>"mkdir(): File exists"</strong>
+<pre class="term">Warning: mkdir(): File exists in /home/ana/arq/mkdir-erro.php on line 2</pre>
+<p><strong>O que significa:</strong> a pasta já existe.</p>
+<p><strong>Como consertar:</strong> pergunte antes: <code>if (!is_dir('pedidos')) { mkdir('pedidos'); }</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Devolve</th></tr>
+<tr><td><code>file_get_contents($c)</code></td><td>Lê o arquivo inteiro</td><td>string ou <code>false</code></td></tr>
+<tr><td><code>file_put_contents($c, $texto, $flags)</code></td><td>Grava (por cima, ou no fim com <code>FILE_APPEND</code>; <code>LOCK_EX</code> tranca)</td><td>bytes gravados ou <code>false</code></td></tr>
+<tr><td><code>file($c, $flags)</code></td><td>Lê como array de linhas</td><td>array ou <code>false</code></td></tr>
+<tr><td><code>fopen($c, $modo)</code></td><td>Abre (<code>r w a x</code>, com <code>+</code>)</td><td>identificador ou <code>false</code></td></tr>
+<tr><td><code>fgets($f)</code></td><td>Lê a próxima linha</td><td>string ou <code>false</code> no fim</td></tr>
+<tr><td><code>fwrite($f, $texto)</code></td><td>Escreve</td><td>bytes ou <code>false</code></td></tr>
+<tr><td><code>feof($f)</code></td><td>"Chegou ao fim?" (<em>end of file</em>)</td><td>bool</td></tr>
+<tr><td><code>fclose($f)</code></td><td>Fecha</td><td>bool</td></tr>
+<tr><td><code>file_exists</code>, <code>is_file</code>, <code>is_dir</code></td><td>Perguntas sobre o caminho</td><td>bool</td></tr>
+<tr><td><code>filesize</code>, <code>filemtime</code></td><td>Tamanho, data de modificação</td><td>int</td></tr>
+<tr><td><code>mkdir($c, 0755, true)</code></td><td>Cria pasta (com <code>true</code>: o caminho todo)</td><td>bool</td></tr>
+<tr><td><code>scandir($c)</code> / <code>glob('*.txt')</code></td><td>Lista uma pasta / por curinga</td><td>array</td></tr>
+<tr><td><code>unlink($c)</code> / <code>rmdir($c)</code></td><td>Apaga arquivo / pasta vazia</td><td>bool</td></tr>
+<tr><td><code>copy($de, $para)</code> / <code>rename($de, $para)</code></td><td>Copia / renomeia ou move</td><td>bool</td></tr>
+<tr><td><code>basename</code>, <code>dirname</code>, <code>pathinfo</code>, <code>realpath</code></td><td>Desmontam e arrumam caminhos</td><td>string / array</td></tr>
+<tr><td><code>getcwd()</code>, <code>__DIR__</code></td><td>Pasta atual / pasta do script</td><td>string</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Acrescentar</h3>
+<p>Complete para acrescentar uma linha ao fim do arquivo, sem apagar o que já existe:</p>
+<div class="ex-code">file_put_contents('log.txt', "venda ok\n", <input data-answer="FILE_APPEND" aria-label="bandeira">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Modo de leitura</h3>
+<p>Complete o modo do <code>fopen</code> para apenas ler:</p>
+<div class="ex-code">$f = fopen('diario.txt', '<input data-answer="r" aria-label="modo" size="3">');</div>
+</div>
+
+<div class="exercise">
+<h3>3. Pastas aninhadas</h3>
+<p>Complete para criar <code>fotos/2026/outubro</code> de uma vez, mesmo que <code>fotos</code> não exista:</p>
+<div class="ex-code">mkdir('fotos/2026/outubro', 0755, <input data-answer="true" aria-label="recursivo" size="6">);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>file('lista.txt')</code> devolve, sem bandeiras?</p>
+<label><input type="radio" name="q4"> Uma string com o arquivo inteiro.</label>
+<label><input type="radio" name="q4"> Um array só com as linhas não vazias, sem as quebras.</label>
+<label><input type="radio" name="q4"> Um array com uma linha por item, cada uma com o <code>\n</code> no fim.</label>
+<label><input type="radio" name="q4"> O número de linhas.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que acontece com <code>fopen('dados.txt', 'w')</code> se <code>dados.txt</code> já tem conteúdo?</p>
+<label><input type="radio" name="q5"> Dá um Warning e devolve <code>false</code>.</label>
+<label><input type="radio" name="q5"> O conteúdo antigo é apagado.</label>
+<label><input type="radio" name="q5"> O novo texto vai para o fim.</label>
+<label><input type="radio" name="q5"> Abre só para leitura.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O site da Ana mostra <code>Permission denied</code> ao gravar <code>recados.txt</code> no servidor. O que fazer?</p>
+<label><input type="radio" name="q6"> <code>chmod 777</code> em tudo.</label>
+<label><input type="radio" name="q6"> Usar <code>@</code> na frente do <code>file_put_contents</code>.</label>
+<label><input type="radio" name="q6"> Trocar <code>file_put_contents</code> por <code>fwrite</code>.</label>
+<label><input type="radio" name="q6"> Dar permissão de escrita na pasta de dados ao usuário que roda o PHP (como <code>www-data</code>).</label>
+</div>
+
+<div class="tryphp" data-goal="out:001.txt,out:003.txt,out:3 pedidos,semerro">
+<p class="try-task"><strong>Missão final:</strong> crie a pasta <code>pedidos</code> (só se ela não existir), grave três arquivos (<code>001.txt</code>, <code>002.txt</code>, <code>003.txt</code>, cada um com um pedido) e depois liste os nomes, um por linha, sem o <code>.</code> e o <code>..</code>. Termine com a linha <code>3 pedidos</code>, calculada com <code>count</code>. Rode duas vezes: não pode aparecer nenhum Warning.</p>
+<pre class="script">&lt;?php
+$pasta = __DIR__ . '/pedidos';
+
+</pre>
+<pre class="solucao">&lt;?php
+$pasta = __DIR__ . '/pedidos';
+if (!is_dir($pasta)) {
+    mkdir($pasta);
+}
+file_put_contents("$pasta/001.txt", "2 bolos de cenoura\n");
+file_put_contents("$pasta/002.txt", "1 torta de limão\n");
+file_put_contents("$pasta/003.txt", "12 brigadeiros\n");
+
+$nomes = array_diff(scandir($pasta), ['.', '..']);
+foreach ($nomes as $nome) {
+    echo "$nome\n";
+}
+echo count($nomes) . " pedidos\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>file_put_contents</code> grava (por cima!) e <code>file_get_contents</code> lê o arquivo inteiro. <code>FILE_APPEND</code> acrescenta no fim.</li>
+  <li><code>file()</code> devolve as linhas num array; use <code>FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES</code>.</li>
+  <li>Para arquivos grandes: <code>fopen</code> → <code>fgets</code>/<code>fwrite</code> → <code>fclose</code>, com <code>while (($linha = fgets($f)) !== false)</code>.</li>
+  <li>Pergunte antes com <code>file_exists</code>/<code>is_dir</code>; crie pastas com <code>mkdir</code> (<code>true</code> para o caminho todo), liste com <code>scandir</code>/<code>glob</code>, apague com <code>unlink</code>/<code>rmdir</code>.</li>
+  <li>Falhas viram <code>Warning</code> + <code>false</code>: confira o retorno antes de usar.</li>
+  <li>Caminhos relativos partem da pasta atual; use <code>__DIR__</code>.</li>
+  <li>Texto de visitante gravado em arquivo: escape com <code>htmlspecialchars</code> na hora de mostrar.</li>
+</ul>
+
+<p>Próxima aula: <a href="csv.html">CSV</a>, o formato das planilhas, lido e gravado linha a linha.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
