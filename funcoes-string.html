@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções de String — strlen, strpos, str_replace, substr, explode… | Guia PHP</title>
+<meta name="description" content="As funções de texto mais usadas do PHP, uma por vez e com saída real: strlen, str_word_count, strrev, strpos (e a armadilha do 0 com if), str_contains, str_replace, substr, ucfirst, ucwords, strtoupper, trim, explode, implode, str_pad, str_repeat, wordwrap e nl2br.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções de String</span></h1>
+
+<p class="intro">Quase todo programa mexe com texto: um nome digitado num formulário, um e-mail, uma linha de um arquivo. O PHP traz <strong>prontas</strong> dezenas de funções para medir, procurar, trocar, cortar e arrumar textos. Nesta aula você conhece as mais usadas, uma de cada vez, sempre com a saída real do PHP.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma <strong>função</strong> e como "chamar" uma: nome, parênteses, argumentos e o valor que ela devolve.</li>
+  <li>Medir (<code>strlen</code>, <code>str_word_count</code>), inverter (<code>strrev</code>) e procurar (<code>strpos</code>, <code>str_contains</code>, <code>str_starts_with</code>, <code>str_ends_with</code>).</li>
+  <li>A armadilha mais clássica do PHP: <code>strpos</code> devolvendo <code>0</code> dentro de um <code>if</code>.</li>
+  <li>Trocar (<code>str_replace</code>), cortar (<code>substr</code>), mudar maiúsculas (<code>ucfirst</code>, <code>ucwords</code>, <code>strtoupper</code>, <code>strtolower</code>) e limpar espaços (<code>trim</code>).</li>
+  <li>Quebrar e juntar (<code>explode</code>, <code>implode</code>), completar e repetir (<code>str_pad</code>, <code>str_repeat</code>), quebrar linhas (<code>wordwrap</code>, <code>nl2br</code>).</li>
+</ul>
+</div>
+
+<p>Você já sabe o que é uma <a href="strings.html">string</a> (um texto entre aspas) e como juntar textos com o ponto (veja <a href="operadores-string.html">Operadores de String</a>). Agora vamos <strong>trabalhar</strong> com esses textos. Os exemplos rodam com <code>php arquivo.php</code> no terminal da Ana (veja <a href="linha-comando.html">PHP na Linha de Comando</a>) e você pode repetir todos no editor do guia.</p>
+
+<hr>
+
+<h2>Antes: o que é "chamar uma função"</h2>
+<p>Pense numa <strong>máquina de suco</strong>: você coloca laranjas (a entrada), aperta o botão e sai suco (o resultado). Você não precisa saber como a máquina funciona por dentro. Uma <strong>função</strong> do PHP é igual: você entrega um valor, ela faz um trabalho e <strong>devolve</strong> um resultado.</p>
+
+<pre class="file" data-file="tamanho.php">&lt;?php
+$nome = "Ana Souza";
+echo strlen($nome), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>strlen</dt><dd>O <strong>nome</strong> da função. Vem de <em>string length</em>, "comprimento do texto".</dd>
+  <dt>( )</dt><dd>Os parênteses dizem "execute a função agora". Sem eles, não é uma chamada.</dd>
+  <dt>$nome</dt><dd>O <strong>argumento</strong>: o valor que você entrega para a função trabalhar. Algumas funções recebem vários, separados por vírgula.</dd>
+  <dt>echo …</dt><dd>A função <strong>devolve</strong> um valor (aqui, o número <code>9</code>), e o <code>echo</code> mostra esse valor na tela. Você também pode guardá-lo numa variável: <code>$tamanho = strlen($nome);</code>.</dd>
+  <dt>, "\n"</dt><dd>O <code>echo</code> aceita vários valores separados por vírgula. O <code>"\n"</code> é uma quebra de linha, para o prompt do terminal não grudar no resultado (veja <a href="echo-print.html">echo e print</a>).</dd>
+</dl>
+
+<pre class="term">$ php tamanho.php
+9</pre>
+
+<p><code>Ana Souza</code> tem 9 caracteres: 3 do "Ana", 1 espaço e 5 do "Souza". O espaço conta.</p>
+
+<div class="warning">
+<strong>A função não muda a variável</strong>
+<p>Quase todas as funções de string <strong>devolvem um texto novo</strong> e deixam o original como estava. Se você quer guardar o resultado, atribua: <code>$nome = strtoupper($nome);</code>. Você vai ver esse erro acontecer na seção do <a href="#str-replace"><code>str_replace</code></a>.</p>
+</div>
+
+<hr>
+
+<h2>Medir e inverter</h2>
+
+<h3><code>strlen</code>: quantos caracteres?</h3>
+<pre class="file" data-file="medir.php">&lt;?php
+$nome = "Ana Souza";
+echo strlen($nome), "\n";
+echo strlen(""), "\n";
+echo strlen("  oi  "), "\n";
+</pre>
+
+<pre class="term">$ php medir.php
+9
+0         « texto vazio: zero
+6         « os 4 espaços contam</pre>
+
+<p>Como no exemplo anterior, o <code>"\n"</code> depois de cada resultado só pula a linha.</p>
+
+<div class="warning">
+<strong><code>strlen</code> conta bytes, não letras</strong>
+<p>Para o PHP, <code>strlen("maçã")</code> é <code>6</code>, não <code>4</code>: cada letra acentuada ocupa 2 "pedacinhos" (bytes). Com texto em português isso faz diferença. A solução, <code>mb_strlen</code>, está na próxima aula: <a href="mbstring.html">Acentos e mbstring</a>.</p>
+</div>
+
+<h3><code>str_word_count</code>: quantas palavras?</h3>
+<pre class="file" data-file="palavras.php">&lt;?php
+echo str_word_count("Bom dia turma"), "\n";
+echo str_word_count("Bom dia, turma!"), "\n";
+echo str_word_count("Olá, você está aí?"), "\n";
+print_r(str_word_count("Olá, você está aí?", 1));
+</pre>
+
+<pre class="term">$ php palavras.php
+3
+3          « vírgula e exclamação não atrapalham
+4          « parece certo... mas veja as palavras que ele achou:
+Array
+(
+    [0] =&gt; Ol
+    [1] =&gt; voc
+    [2] =&gt; est
+    [3] =&gt; a
+)</pre>
+
+<p>Com o segundo argumento <code>1</code>, a função devolve a <strong>lista</strong> de palavras (um <a href="arrays.html">array</a>, que o <code>print_r</code> mostra; veja <a href="var-dump.html">var_dump e print_r</a>). E a lista revela o problema: <code>str_word_count</code> só entende letras <strong>sem acento</strong>. O <code>á</code> de "Olá" foi tratado como separador, e "aí" virou só "a". O total deu 4 por sorte. Para português, prefira contar com <code>explode</code> (mais abaixo) ou com as técnicas da aula de <a href="mbstring.html">mbstring</a>.</p>
+
+<h3><code>strrev</code>: texto ao contrário</h3>
+<pre class="file" data-file="inverter.php">&lt;?php
+echo strrev("Ana Souza"), "\n";
+echo strrev("roma"), "\n";
+</pre>
+<pre class="term">$ php inverter.php
+azuoS anA
+amor</pre>
+<p>O nome vem de <em>string reverse</em>, "inverter o texto". Serve para brincadeiras (palíndromos: palavras que se leem igual de trás para frente). Assim como o <code>strlen</code>, ele não se dá bem com acentos: <code>strrev("maçã")</code> vira lixo, e a aula de <a href="mbstring.html">mbstring</a> mostra por quê.</p>
+
+<hr>
+
+<h2>Procurar dentro do texto</h2>
+
+<h3><code>strpos</code>: em que posição está?</h3>
+<p><code>strpos</code> (de <em>string position</em>) procura um pedaço de texto dentro de outro e devolve <strong>a posição</strong> onde ele começa. A contagem começa do <strong>zero</strong>: o primeiro caractere é a posição 0, o segundo é a 1, e assim por diante.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Posição</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>…</td></tr>
+<tr><th>Caractere</th><td><code>b</code></td><td><code>a</code></td><td><code>n</code></td><td><code>a</code></td><td><code>n</code></td><td><code>a</code></td><td>(espaço)</td><td><code>c</code></td><td><code>o</code></td><td><code>m</code></td><td>…</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="procurar.php">&lt;?php
+$frase = "banana com canela";
+var_dump(strpos($frase, "na"));
+var_dump(strpos($frase, "com"));
+var_dump(strpos($frase, "Com"));
+var_dump(stripos($frase, "Com"));
+var_dump(strrpos($frase, "na"));
+var_dump(strpos($frase, "na", 3));
+var_dump(strpos($frase, "uva"));
+</pre>
+
+<dl class="anatomy">
+  <dt>strpos($frase, "na")</dt><dd>Primeiro argumento: <strong>onde</strong> procurar (o "palheiro"). Segundo: <strong>o que</strong> procurar (a "agulha").</dd>
+  <dt>var_dump(…)</dt><dd>Mostra o valor <strong>e o tipo</strong>. Usamos <code>var_dump</code> e não <code>echo</code> porque o <code>echo</code> não mostra <code>false</code> (ele vira texto vazio).</dd>
+</dl>
+
+<pre class="term">$ php procurar.php
+int(2)          « o primeiro "na" de "banana" começa na posição 2
+int(7)
+bool(false)     « "Com" com C maiúsculo não existe: strpos diferencia maiúsculas
+int(7)          « stripos (i = ignora maiúsculas) acha
+int(4)          « strrpos (r = right, da direita) acha o ÚLTIMO "na" de "banana"
+int(4)          « o terceiro argumento manda começar a procurar da posição 3
+bool(false)     « não achou: devolve false</pre>
+
+<p>Repare nos dois tipos de resposta: um <strong>número</strong> (<code>int</code>) quando acha, ou <code>false</code> quando não acha. É daí que vem a armadilha.</p>
+
+<h3 id="armadilha">A armadilha do <code>0</code> × <code>false</code></h3>
+<p>A Ana quer saber se um e-mail tem "ana" dentro. Ela escreve o que parece óbvio:</p>
+
+<pre class="file" data-file="armadilha.php">&lt;?php
+$email = "ana@escola.com.br";
+if (strpos($email, "ana")) {
+    echo "Achei 'ana'\n";
+} else {
+    echo "Não achei 'ana'\n";
+}
+</pre>
+
+<pre class="term">$ php armadilha.php
+Não achei 'ana'          « mas "ana" está bem ali no começo!</pre>
+
+<p>O que aconteceu, passo a passo:</p>
+<ol class="passo">
+  <li><code>"ana"</code> está no <strong>começo</strong> do e-mail, na posição <code>0</code>. O <code>strpos</code> devolveu <code>0</code>.</li>
+  <li>O <code>if</code> precisa de verdadeiro ou falso. Ele converte o <code>0</code> em booleano, e <strong><code>0</code> vira <code>false</code></strong> (veja <a href="booleanos.html">Booleanos</a>).</li>
+  <li>O PHP foi para o <code>else</code>. Sem erro, sem aviso: só a resposta errada.</li>
+</ol>
+
+<p>A correção é comparar <strong>com <code>false</code></strong>, usando <code>!==</code> ("diferente e de tipo diferente"; veja <a href="operadores-comparacao.html">Comparação (== e ===)</a>). Assim, <code>0</code> (um <code>int</code>) não é confundido com <code>false</code> (um <code>bool</code>):</p>
+
+<pre class="file" data-file="armadilha-certa.php">&lt;?php
+$email = "ana@escola.com.br";
+if (strpos($email, "ana") !== false) {
+    echo "Achei 'ana'\n";
+} else {
+    echo "Não achei 'ana'\n";
+}
+</pre>
+<pre class="term">$ php armadilha-certa.php
+Achei 'ana'</pre>
+
+<div class="tip">
+<strong>Regra de ouro do <code>strpos</code></strong>
+<p>Nunca escreva <code>if (strpos(…))</code>. Escreva <code>if (strpos(…) !== false)</code>. Ou, melhor ainda, se você só quer saber "tem ou não tem", use <code>str_contains</code>, que devolve <code>true</code>/<code>false</code> e acaba com o problema.</p>
+</div>
+
+<h3><code>str_contains</code>, <code>str_starts_with</code>, <code>str_ends_with</code> <span class="versao">PHP 8.0+</span></h3>
+<p>Essas três funções respondem só "sim" ou "não". Os nomes já dizem tudo: "o texto <strong>contém</strong>…?", "<strong>começa com</strong>…?", "<strong>termina com</strong>…?".</p>
+
+<pre class="file" data-file="contem.php">&lt;?php
+$email = "ana@escola.com.br";
+var_dump(str_contains($email, "@"));
+var_dump(str_contains($email, "ANA"));
+var_dump(str_contains($email, ""));
+var_dump(str_starts_with($email, "ana"));
+var_dump(str_ends_with($email, ".br"));
+var_dump(str_ends_with("foto.JPG", ".jpg"));
+</pre>
+<pre class="term">$ php contem.php
+bool(true)
+bool(false)      « diferencia maiúsculas: "ANA" não é "ana"
+bool(true)       « curiosidade: todo texto "contém" o texto vazio
+bool(true)
+bool(true)
+bool(false)      « ".JPG" não é ".jpg"</pre>
+
+<p>Como elas já devolvem <code>true</code> ou <code>false</code>, o <code>if</code> fica natural: <code>if (str_contains($email, "@"))</code>. Para ignorar maiúsculas, converta antes: <code>str_ends_with(strtolower($arquivo), ".jpg")</code>.</p>
+
+<div class="note">
+<strong>E antes do PHP 8.0?</strong>
+<p>Em sistemas antigos (PHP 7), essas funções não existem e dão <code>Call to undefined function str_contains()</code>. O equivalente é <code>strpos($texto, $parte) !== false</code> (contém) e <code>strpos($texto, $parte) === 0</code> (começa com). Você vai ver muito isso em códigos antigos.</p>
+</div>
+
+<div class="tryphp" data-goal="out:E-mail válido,src:str_contains">
+<p class="try-task"><strong>Missão:</strong> complete o programa para mostrar <code>E-mail válido</code> se o e-mail tiver <code>@</code> e <code>E-mail inválido</code> se não tiver. Use <code>str_contains</code>. Depois troque o e-mail por <code>"ana.escola.com.br"</code> e veja a outra mensagem.</p>
+<pre class="script">&lt;?php
+$email = "ana@escola.com.br";
+
+if (false) {   // troque o false por str_contains(...)
+    echo "...";
+} else {
+    echo "...";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$email = "ana@escola.com.br";
+
+if (str_contains($email, "@")) {
+    echo "E-mail válido";
+} else {
+    echo "E-mail inválido";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="str-replace">Trocar: <code>str_replace</code></h2>
+<p><code>str_replace</code> ("substituir no texto") troca <strong>todas</strong> as ocorrências de um pedaço por outro. A ordem dos argumentos é: <strong>o que procurar</strong>, <strong>pelo que trocar</strong>, <strong>em qual texto</strong>.</p>
+
+<pre class="file" data-file="trocar.php">&lt;?php
+echo str_replace("mundo", "Ana", "Olá, mundo!"), "\n";
+echo str_replace("a", "4", "banana"), "\n";
+echo str_replace("Banana", "Maçã", "banana e Banana"), "\n";
+echo str_ireplace("banana", "maçã", "banana e Banana"), "\n";
+echo str_replace(["á", "ã", "ç"], ["a", "a", "c"], "maçã e pão"), "\n";
+str_replace("a", "o", "banana", $quantas);
+echo "Trocas: $quantas\n";
+</pre>
+
+<pre class="term">$ php trocar.php
+Olá, Ana!
+b4n4n4                « trocou TODOS os "a"
+banana e Maçã         « só o "Banana" com B maiúsculo
+maçã e maçã           « str_ireplace ignora maiúsculas
+maca e pao            « listas: cada item da primeira troca pelo item da segunda
+Trocas: 3             « o 4º argumento recebe quantas trocas foram feitas</pre>
+
+<dl class="anatomy">
+  <dt>["á", "ã", "ç"]</dt><dd>Uma lista (array) do que procurar. O PHP troca o primeiro item pelo primeiro item da outra lista, o segundo pelo segundo…</dd>
+  <dt>$quantas</dt><dd>O quarto argumento é opcional. Você passa uma variável e a função a preenche com o número de trocas.</dd>
+</dl>
+
+<p>Agora o erro mais comum com <code>str_replace</code> (e com todas as funções desta aula):</p>
+
+<pre class="file" data-file="esqueci.php">&lt;?php
+$frase = "Olá, mundo!";
+str_replace("mundo", "Ana", $frase);
+echo $frase, "\n";
+</pre>
+<pre class="term">$ php esqueci.php
+Olá, mundo!          « nada mudou!</pre>
+
+<p>O <code>str_replace</code> criou o texto novo <code>Olá, Ana!</code>, mas ninguém o guardou: ele foi jogado fora. A variável <code>$frase</code> continua igual. O certo é <code>$frase = str_replace("mundo", "Ana", $frase);</code>.</p>
+
+<hr>
+
+<h2>Cortar: <code>substr</code></h2>
+<p><code>substr</code> (de <em>substring</em>, "pedaço do texto") recorta uma parte. Você diz <strong>de onde começa</strong> e, se quiser, <strong>quantos caracteres</strong> pegar. A contagem começa do zero, como no <code>strpos</code>. Números <strong>negativos</strong> contam a partir do fim.</p>
+
+<pre class="file" data-file="cortar.php">&lt;?php
+$nome = "Ana Souza";
+echo substr($nome, 0, 3), "\n";
+echo substr($nome, 4), "\n";
+echo substr($nome, -5), "\n";
+echo substr($nome, -5, 2), "\n";
+echo substr($nome, 0, -6), "\n";
+var_dump(substr($nome, 20));
+echo $nome[0], "\n";
+echo $nome[-1], "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th><th>Saída</th></tr>
+<tr><td><code>substr($nome, 0, 3)</code></td><td>Começa na posição 0 e pega 3 caracteres</td><td><code>Ana</code></td></tr>
+<tr><td><code>substr($nome, 4)</code></td><td>Começa na posição 4 e vai até o fim</td><td><code>Souza</code></td></tr>
+<tr><td><code>substr($nome, -5)</code></td><td>Começa 5 caracteres antes do fim</td><td><code>Souza</code></td></tr>
+<tr><td><code>substr($nome, -5, 2)</code></td><td>5 antes do fim, pega 2</td><td><code>So</code></td></tr>
+<tr><td><code>substr($nome, 0, -6)</code></td><td>Do começo, deixando 6 de fora no fim</td><td><code>Ana</code></td></tr>
+<tr><td><code>substr($nome, 20)</code></td><td>Começa depois do fim do texto</td><td><code>""</code> (vazio, sem erro)</td></tr>
+<tr><td><code>$nome[0]</code></td><td>Um caractere só, pela posição (como num array)</td><td><code>A</code></td></tr>
+<tr><td><code>$nome[-1]</code></td><td>O último caractere</td><td><code>a</code></td></tr>
+</table>
+</div>
+
+<pre class="term">$ php cortar.php
+Ana
+Souza
+Souza
+So
+Ana
+string(0) ""
+A
+a</pre>
+
+<p>Um uso clássico: pegar as iniciais. <code>substr("Ana", 0, 1) . substr("Souza", 0, 1)</code> dá <code>AS</code>. Com nomes como "Érica", porém, <code>substr</code> corta a letra no meio; para isso existe o <code>mb_substr</code> (veja <a href="mbstring.html">mbstring</a>).</p>
+
+<hr>
+
+<h2>Maiúsculas e minúsculas</h2>
+
+<pre class="file" data-file="maiusculas.php">&lt;?php
+echo ucfirst("ana souza"), "\n";
+echo ucwords("ana souza da silva"), "\n";
+echo lcfirst("Ana"), "\n";
+echo strtoupper("ana souza"), "\n";
+echo strtolower("ANA SOUZA"), "\n";
+echo ucwords(strtolower("ANA SOUZA")), "\n";
+echo ucwords("ana-maria souza", " -"), "\n";
+</pre>
+
+<pre class="term">$ php maiusculas.php
+Ana souza                « ucfirst: só a primeira letra do texto
+Ana Souza Da Silva       « ucwords: a primeira letra de cada palavra
+ana                      « lcfirst: primeira letra minúscula
+ANA SOUZA                « strtoupper: tudo maiúsculo
+ana souza                « strtolower: tudo minúsculo
+Ana Souza                « funções encaixadas: primeiro minúsculo, depois capitaliza
+Ana-Maria Souza          « o 2º argumento diz o que separa as palavras</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Origem do nome</th></tr>
+<tr><td><code>ucfirst</code></td><td><em>upper case first</em>: "primeira em maiúscula"</td></tr>
+<tr><td><code>ucwords</code></td><td><em>upper case words</em>: "palavras com maiúscula"</td></tr>
+<tr><td><code>lcfirst</code></td><td><em>lower case first</em>: "primeira em minúscula"</td></tr>
+<tr><td><code>strtoupper</code></td><td><em>string to upper</em>: "texto para maiúsculas"</td></tr>
+<tr><td><code>strtolower</code></td><td><em>string to lower</em>: "texto para minúsculas"</td></tr>
+</table>
+</div>
+
+<p>Na linha <code>ucwords(strtolower("ANA SOUZA"))</code>, uma função está <strong>dentro</strong> da outra. O PHP resolve de dentro para fora: primeiro <code>strtolower</code> devolve <code>"ana souza"</code>, depois esse resultado entra no <code>ucwords</code>. Repare também que <code>ucwords</code> fez "Da Silva", com "Da" maiúsculo: ele não sabe que em português "da" fica minúsculo.</p>
+
+<div class="warning">
+<strong>E os acentos?</strong>
+<pre class="term">$ php -r 'echo ucfirst("érica"), " ", strtoupper("joão"), "\n";'
+érica JOãO</pre>
+<p>Essas funções só mexem nas letras sem acento. <code>"érica"</code> continuou minúsculo e <code>"joão"</code> virou <code>JOãO</code>. A solução (<code>mb_strtoupper</code>, <code>mb_convert_case</code>) está em <a href="mbstring.html">Acentos e mbstring</a>.</p>
+</div>
+
+<hr>
+
+<h2>Limpar espaços: <code>trim</code></h2>
+<p>Quando alguém digita num formulário, é comum vir espaço sobrando no começo ou no fim (e às vezes um "Enter"). <code>trim</code> ("aparar") remove os espaços, tabs e quebras de linha <strong>das pontas</strong>. O meio fica intacto.</p>
+
+<pre class="file" data-file="aparar.php">&lt;?php
+$digitado = "   Ana Souza  \n";
+echo "[" . $digitado . "]\n";
+echo "[" . trim($digitado) . "]\n";
+echo "[" . ltrim($digitado) . "]\n";
+echo "[" . rtrim($digitado) . "]\n";
+echo "[" . trim("--Ana--", "-") . "]\n";
+</pre>
+
+<pre class="term">$ php aparar.php
+[   Ana Souza
+]                    « o original: espaços e um \n no fim
+[Ana Souza]          « trim: as duas pontas
+[Ana Souza
+]                    « ltrim (left): só a esquerda
+[   Ana Souza]       « rtrim (right): só a direita
+[Ana]                « o 2º argumento diz QUAIS caracteres tirar</pre>
+
+<p>Os colchetes <code>[ ]</code> estão ali só para você <strong>ver</strong> onde o texto começa e termina. É um truque ótimo para depurar espaços invisíveis.</p>
+
+<div class="tryphp" data-goal="out:[Ana Souza]">
+<p class="try-task"><strong>Missão:</strong> a Ana recebeu o nome <code>"   aNA sOUZA  "</code> de um formulário, todo bagunçado. Arrume para a tela mostrar exatamente <code>[Ana Souza]</code>: sem espaços nas pontas e com só as iniciais maiúsculas. Dica: combine <code>trim</code>, <code>strtolower</code> e <code>ucwords</code>.</p>
+<pre class="script">&lt;?php
+$digitado = "   aNA sOUZA  ";
+$nome = $digitado;
+echo "[" . $nome . "]";
+</pre>
+<pre class="solucao">&lt;?php
+$digitado = "   aNA sOUZA  ";
+$nome = ucwords(strtolower(trim($digitado)));
+echo "[" . $nome . "]";
+</pre>
+</div>
+
+<hr>
+
+<h2>Quebrar e juntar: <code>explode</code> e <code>implode</code></h2>
+<p><code>explode</code> ("explodir") quebra um texto em pedaços, cortando num separador, e devolve uma <strong>lista</strong> (array). <code>implode</code> faz o contrário: junta uma lista num texto só, com um "cola" entre os itens.</p>
+
+<pre class="file" data-file="quebrar.php">&lt;?php
+$linha = "maçã,banana,uva";
+$frutas = explode(",", $linha);
+print_r($frutas);
+echo $frutas[1], "\n";
+echo implode(" - ", $frutas), "\n";
+echo implode(", ", ["pão", "leite", "café"]), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>explode(",", $linha)</dt><dd>Primeiro o <strong>separador</strong>, depois o texto. Corta em cada vírgula.</dd>
+  <dt>$frutas[1]</dt><dd>Pega o item da posição 1 da lista (a contagem começa do zero). Arrays são o assunto de <a href="arrays.html">Arrays Indexados</a>.</dd>
+  <dt>implode(" - ", $frutas)</dt><dd>Primeiro a <strong>cola</strong>, depois a lista. Junta os itens com <code> - </code> entre eles.</dd>
+</dl>
+
+<pre class="term">$ php quebrar.php
+Array
+(
+    [0] =&gt; maçã
+    [1] =&gt; banana
+    [2] =&gt; uva
+)
+banana
+maçã - banana - uva
+pão, leite, café</pre>
+
+<p>Três detalhes que pegam muita gente:</p>
+<pre class="file" data-file="quebrar2.php">&lt;?php
+print_r(explode(",", "maçã, banana, uva"));
+print_r(explode(",", "a,b,c,d", 2));
+print_r(explode(";", "sem separador"));
+</pre>
+<pre class="term">$ php quebrar2.php
+Array
+(
+    [0] =&gt; maçã
+    [1] =&gt;  banana       « o espaço depois da vírgula veio junto!
+    [2] =&gt;  uva
+)
+Array
+(
+    [0] =&gt; a
+    [1] =&gt; b,c,d         « o 3º argumento limita a 2 pedaços
+)
+Array
+(
+    [0] =&gt; sem separador « sem o separador: uma lista com o texto inteiro
+)</pre>
+
+<p>No primeiro caso, o separador era só a vírgula, então o espaço ficou nos pedaços. Use <code>explode(", ", …)</code> ou passe cada pedaço pelo <code>trim</code> (você vai aprender a fazer isso para cada item em <a href="foreach.html">foreach</a> e <a href="funcoes-array.html">Funções de Array</a>).</p>
+
+<div class="tip">
+<strong>Contar palavras em português</strong>
+<p>Como <code>str_word_count</code> se perde com acentos, uma forma simples é quebrar nos espaços e contar os pedaços: <code>count(explode(" ", "Olá, você está aí?"))</code> dá <code>4</code>. O <code>count</code> conta os itens de uma lista.</p>
+</div>
+
+<hr>
+
+<h2>Completar e repetir: <code>str_pad</code> e <code>str_repeat</code></h2>
+<p><code>str_pad</code> ("acolchoar o texto") completa um texto até um tamanho, com o caractere que você escolher. É ótimo para números com zeros à esquerda e para alinhar colunas.</p>
+
+<pre class="file" data-file="completar.php">&lt;?php
+echo str_pad("7", 3, "0", STR_PAD_LEFT), "\n";
+echo str_pad("Ana", 10, "."), "|\n";
+echo str_pad("Ana", 10, ".", STR_PAD_LEFT), "|\n";
+echo str_pad("Ana", 10, "*", STR_PAD_BOTH), "|\n";
+echo str_pad("Ana Souza", 5, "."), "|\n";
+echo str_repeat("-", 20), "\n";
+echo str_repeat("ha", 3), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>"7"</dt><dd>O texto original.</dd>
+  <dt>3</dt><dd>O tamanho final desejado.</dd>
+  <dt>"0"</dt><dd>Com o que completar (se você não disser, é um espaço).</dd>
+  <dt>STR_PAD_LEFT</dt><dd>De que lado completar: <code>STR_PAD_RIGHT</code> (direita, o padrão), <code>STR_PAD_LEFT</code> (esquerda) ou <code>STR_PAD_BOTH</code> (os dois). São <a href="constantes.html">constantes</a> do PHP.</dd>
+</dl>
+
+<pre class="term">$ php completar.php
+007
+Ana.......|
+.......Ana|
+***Ana****|           « nos dois lados; quando sobra um, vai para a direita
+Ana Souza|            « já era maior que 5: nada muda (str_pad nunca corta)
+--------------------
+hahaha</pre>
+
+<p><code>str_repeat</code> ("repetir o texto") só repete um texto N vezes. É o jeito mais fácil de desenhar linhas e separadores na saída.</p>
+
+<hr>
+
+<h2>Quebrar linhas: <code>wordwrap</code> e <code>nl2br</code></h2>
+
+<h3><code>wordwrap</code>: cabe na largura</h3>
+<p><code>wordwrap</code> ("quebra de palavras") insere quebras para que nenhuma linha passe de uma largura, sem cortar palavras no meio.</p>
+
+<pre class="file" data-file="quebra-linha.php">&lt;?php
+$aviso = "Amanhã não haverá aula por causa da reunião de professores.";
+echo wordwrap($aviso, 20, "\n"), "\n";
+</pre>
+<pre class="term">$ php quebra-linha.php
+Amanhã não haverá
+aula por causa da
+reunião de
+professores.</pre>
+
+<p>Argumentos: o texto, a largura máxima (20) e o que colocar na quebra (<code>"\n"</code>; numa página web, poderia ser <code>"&lt;br&gt;"</code>). Um quarto argumento <code>true</code> força o corte de palavras maiores que a largura, mas com acentos ele pode partir uma letra ao meio (veja <a href="mbstring.html">mbstring</a>).</p>
+
+<h3><code>nl2br</code>: quebras de linha no HTML</h3>
+<p>No navegador, um <code>\n</code> dentro do HTML <strong>não</strong> pula linha: o navegador junta tudo. <code>nl2br</code> (<em>new line to br</em>, "quebra de linha para <code>&lt;br&gt;</code>") coloca um <code>&lt;br /&gt;</code> antes de cada quebra. É o que você usa para mostrar um texto digitado num <code>&lt;textarea&gt;</code>.</p>
+
+<pre class="file" data-file="nl2br.php">&lt;?php
+echo nl2br("Linha 1\nLinha 2"), "\n";
+</pre>
+<pre class="term">$ php nl2br.php
+Linha 1&lt;br /&gt;
+Linha 2</pre>
+
+<p>No terminal você vê a tag <code>&lt;br /&gt;</code>; no navegador, ela vira a quebra de linha. Quando o texto vem do usuário, a ordem certa é <strong>primeiro escapar, depois quebrar</strong>: <code>nl2br(htmlspecialchars($texto))</code>. O porquê está em <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> rode e veja, na aba <strong>Resultado</strong>, a diferença entre o texto com e sem <code>nl2br</code>. Depois olhe a aba <strong>Código-fonte HTML</strong>.</p>
+<pre class="script">&lt;?php
+$recado = "Ana,\nnão esqueça a reunião.\nAbraço!";
+?&gt;
+&lt;h3&gt;Sem nl2br&lt;/h3&gt;
+&lt;p&gt;&lt;?= htmlspecialchars($recado) ?&gt;&lt;/p&gt;
+&lt;h3&gt;Com nl2br&lt;/h3&gt;
+&lt;p&gt;&lt;?= nl2br(htmlspecialchars($recado)) ?&gt;&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O <code>if</code> com <code>strpos</code> diz "não achei", mas o texto está lá</strong>
+<pre class="term">$ php armadilha.php
+Não achei 'ana'</pre>
+<p><strong>O que aconteceu:</strong> o texto procurado estava na posição <code>0</code>, e o <code>if</code> tratou o <code>0</code> como falso. Não aparece nenhuma mensagem de erro, por isso é tão traiçoeiro.</p>
+<p><strong>Como consertar:</strong> <code>if (strpos($texto, $parte) !== false)</code> ou, no PHP 8, <code>if (str_contains($texto, $parte))</code>. Veja <a href="#armadilha">a armadilha</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Call to undefined function</strong>
+<pre class="term">$ php erro-nome.php
+
+Fatal error: Uncaught Error: Call to undefined function strlenght() in /home/ana/php/erro-nome.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/erro-nome.php on line 2</pre>
+<p><strong>O que significa:</strong> "chamada a uma função que não existe". A Ana escreveu <code>strlenght</code> (como em inglês, <em>length</em>), mas a função é <code>strlen</code>. O <code>:2</code> e o <code>on line 2</code> mostram a linha. <em>Fatal error</em> quer dizer que o programa parou ali (veja <a href="erros.html">Lendo Erros do PHP</a>).</p>
+<p><strong>Como consertar:</strong> confira o nome na tabela abaixo ou na <a href="ref-string.html">referência de funções de string</a>. Nomes do PHP são abreviados e nem sempre seguem um padrão (<code>strlen</code>, mas <code>str_replace</code> com <code>_</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Passing null to parameter … is deprecated</strong>
+<pre class="file" data-file="nulo.php">&lt;?php
+echo strlen(null), "\n";
+echo "fim\n";
+</pre>
+<pre class="term">$ php nulo.php
+
+Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /home/ana/php/nulo.php on line 2
+0
+fim</pre>
+<p><strong>O que significa:</strong> "passar <code>null</code> para o parâmetro nº 1, do tipo string, está obsoleto". O programa continua (a resposta foi <code>0</code>), mas o PHP avisa que isso vai virar erro numa versão futura. Na prática, acontece quando uma variável que você esperava ter texto está vazia, como um campo de formulário que não veio (veja <a href="null.html">null</a>).</p>
+<p><strong>Como consertar:</strong> garanta que o valor é um texto antes: <code>strlen($nome ?? "")</code> (o <code>??</code> está em <a href="null-coalescing.html">?? e ?-&gt;</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>must be of type string, array given</strong>
+<pre class="file" data-file="lista.php">&lt;?php
+$frutas = ["maçã", "uva"];
+echo strlen($frutas);
+</pre>
+<pre class="term">$ php lista.php
+
+Fatal error: Uncaught TypeError: strlen(): Argument #1 ($string) must be of type string, array given in /home/ana/php/lista.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/lista.php on line 3</pre>
+<p><strong>O que significa:</strong> "o argumento nº 1 precisa ser do tipo string, mas foi dado um array". Funções de string trabalham com <strong>um</strong> texto; uma lista é outra coisa.</p>
+<p><strong>Como consertar:</strong> para saber quantos itens a lista tem, use <code>count($frutas)</code>. Para medir um item, <code>strlen($frutas[0])</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>explode(): Argument #1 ($separator) must not be empty</strong>
+<pre class="term">$ php -r 'print_r(explode("", "Ana"));'
+
+Fatal error: Uncaught ValueError: explode(): Argument #1 ($separator) must not be empty in Command line code:1
+Stack trace:
+#0 Command line code(1): explode('', 'Ana')
+#1 {main}
+  thrown in Command line code on line 1</pre>
+<p><strong>O que significa:</strong> o separador do <code>explode</code> não pode ser vazio. A Ana queria quebrar o nome em letras.</p>
+<p><strong>Como consertar:</strong> para separar letra por letra, use <code>str_split("Ana")</code> (ou <code>mb_str_split</code> com acentos, em <a href="mbstring.html">mbstring</a>).</p>
+</div>
+
+<hr>
+
+<h2>Tabela das funções desta aula</h2>
+<p>A lista completa, com todas as opções, está na <a href="ref-string.html">Referência: Funções de String</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>strlen($s)</code></td><td>Tamanho em bytes</td><td><code>strlen("Ana")</code> → <code>3</code></td></tr>
+<tr><td><code>str_word_count($s)</code></td><td>Conta palavras (sem acentos!)</td><td><code>str_word_count("Bom dia")</code> → <code>2</code></td></tr>
+<tr><td><code>strrev($s)</code></td><td>Inverte</td><td><code>strrev("roma")</code> → <code>amor</code></td></tr>
+<tr><td><code>strpos($s, $p)</code></td><td>Posição da 1ª ocorrência, ou <code>false</code></td><td><code>strpos("banana", "na")</code> → <code>2</code></td></tr>
+<tr><td><code>stripos</code> / <code>strrpos</code></td><td>Igual, ignorando maiúsculas / a última</td><td><code>strrpos("banana", "na")</code> → <code>4</code></td></tr>
+<tr><td><code>str_contains($s, $p)</code> <span class="versao">8.0+</span></td><td>Contém?</td><td><code>str_contains("ana@x", "@")</code> → <code>true</code></td></tr>
+<tr><td><code>str_starts_with</code> <span class="versao">8.0+</span></td><td>Começa com?</td><td><code>str_starts_with("Ana", "A")</code> → <code>true</code></td></tr>
+<tr><td><code>str_ends_with</code> <span class="versao">8.0+</span></td><td>Termina com?</td><td><code>str_ends_with("a.pdf", ".pdf")</code> → <code>true</code></td></tr>
+<tr><td><code>str_replace($de, $para, $s)</code></td><td>Troca todas as ocorrências</td><td><code>str_replace("a", "4", "banana")</code> → <code>b4n4n4</code></td></tr>
+<tr><td><code>str_ireplace</code></td><td>Igual, ignorando maiúsculas</td><td></td></tr>
+<tr><td><code>substr($s, $ini, $qtd)</code></td><td>Recorta um pedaço</td><td><code>substr("Ana Souza", 4)</code> → <code>Souza</code></td></tr>
+<tr><td><code>substr_count($s, $p)</code></td><td>Quantas vezes aparece</td><td><code>substr_count("banana", "a")</code> → <code>3</code></td></tr>
+<tr><td><code>ucfirst</code> / <code>lcfirst</code></td><td>1ª letra maiúscula / minúscula</td><td><code>ucfirst("ana")</code> → <code>Ana</code></td></tr>
+<tr><td><code>ucwords($s)</code></td><td>1ª letra de cada palavra</td><td><code>ucwords("ana souza")</code> → <code>Ana Souza</code></td></tr>
+<tr><td><code>strtoupper</code> / <code>strtolower</code></td><td>Tudo maiúsculo / minúsculo</td><td><code>strtoupper("ana")</code> → <code>ANA</code></td></tr>
+<tr><td><code>trim</code> / <code>ltrim</code> / <code>rtrim</code></td><td>Tira espaços das pontas</td><td><code>trim("  Ana ")</code> → <code>Ana</code></td></tr>
+<tr><td><code>explode($sep, $s)</code></td><td>Quebra em lista</td><td><code>explode(",", "a,b")</code> → <code>["a", "b"]</code></td></tr>
+<tr><td><code>implode($cola, $lista)</code></td><td>Junta a lista num texto</td><td><code>implode("-", ["a", "b"])</code> → <code>a-b</code></td></tr>
+<tr><td><code>str_split($s)</code></td><td>Quebra em pedaços de 1 byte</td><td><code>str_split("oi")</code> → <code>["o", "i"]</code></td></tr>
+<tr><td><code>str_pad($s, $tam, $com, $lado)</code></td><td>Completa até um tamanho</td><td><code>str_pad("7", 3, "0", STR_PAD_LEFT)</code> → <code>007</code></td></tr>
+<tr><td><code>str_repeat($s, $n)</code></td><td>Repete</td><td><code>str_repeat("-", 5)</code> → <code>-----</code></td></tr>
+<tr><td><code>wordwrap($s, $larg, $quebra)</code></td><td>Quebra linhas numa largura</td><td></td></tr>
+<tr><td><code>nl2br($s)</code></td><td>Põe <code>&lt;br /&gt;</code> antes das quebras</td><td><code>nl2br("a\nb")</code> → <code>a&lt;br /&gt;</code>↵<code>b</code></td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Com acentos, use as versões <code>mb_</code></strong>
+<p><code>strlen</code>, <code>strrev</code>, <code>substr</code>, <code>strtoupper</code>, <code>ucfirst</code>, <code>str_pad</code>, <code>str_split</code> e <code>wordwrap</code> contam <strong>bytes</strong>. Com "ç", "ã", "é", os resultados saem errados. A próxima aula, <a href="mbstring.html">Acentos e mbstring</a>, mostra o porquê e as funções certas.</p>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Tamanho</h3>
+<p>Complete para mostrar quantos caracteres tem <code>$senha</code>:</p>
+<div class="ex-code">echo <input data-answer="strlen($senha)|strlen( $senha )" aria-label="função">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Contém, do jeito seguro</h3>
+<p>Complete o <code>if</code> para funcionar mesmo quando "ana" estiver na posição 0 (sem usar <code>str_contains</code>):</p>
+<div class="ex-code">if (strpos($email, "ana") <input data-answer="!== false|!==false" aria-label="comparação">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Os 3 primeiros</h3>
+<p>Complete para pegar os 3 primeiros caracteres de <code>$cpf</code>:</p>
+<div class="ex-code">echo substr($cpf, <input data-answer="0, 3|0,3" aria-label="argumentos">);</div>
+</div>
+
+<div class="exercise">
+<h3>4. Zeros à esquerda</h3>
+<p>Complete para o número da matrícula <code>"42"</code> virar <code>"00042"</code>:</p>
+<div class="ex-code">echo str_pad("42", <input data-answer="5, &quot;0&quot;, STR_PAD_LEFT|5,&quot;0&quot;,STR_PAD_LEFT|5, '0', STR_PAD_LEFT" aria-label="argumentos">);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que mostra <code>$s = "Olá"; strtoupper($s); echo $s;</code>?</p>
+<label><input type="radio" name="q5"> <code>OLÁ</code></label>
+<label><input type="radio" name="q5"> <code>OLá</code></label>
+<label><input type="radio" name="q5"> <code>Olá</code></label>
+<label><input type="radio" name="q5"> Um erro</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Qual o resultado de <code>strpos("Ana Souza", "Ana")</code>?</p>
+<label><input type="radio" name="q6"> <code>true</code></label>
+<label><input type="radio" name="q6"> <code>0</code></label>
+<label><input type="radio" name="q6"> <code>1</code></label>
+<label><input type="radio" name="q6"> <code>false</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Qual função transforma <code>"pão;leite;café"</code> numa lista de 3 itens?</p>
+<label><input type="radio" name="q7"> <code>implode(";", …)</code></label>
+<label><input type="radio" name="q7"> <code>str_split(…)</code></label>
+<label><input type="radio" name="q7"> <code>substr(…, ";")</code></label>
+<label><input type="radio" name="q7"> <code>explode(";", …)</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:maçã | banana | uva,out:3 frutas,src:explode">
+<p class="try-task"><strong>Missão final:</strong> a Ana leu de um arquivo a linha <code>"maçã,banana,uva"</code>. Faça o programa mostrar, em duas linhas:<br><code>maçã | banana | uva</code><br><code>3 frutas</code><br>Use <code>explode</code> para quebrar, <code>implode</code> para juntar com <code> | </code> e <code>count</code> para contar.</p>
+<pre class="script">&lt;?php
+$linha = "maçã,banana,uva";
+
+echo $linha, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$linha = "maçã,banana,uva";
+$frutas = explode(",", $linha);
+echo implode(" | ", $frutas), "\n";
+echo count($frutas), " frutas\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma função recebe argumentos entre parênteses e <strong>devolve</strong> um valor. As funções de string não mudam a variável: guarde o resultado (<code>$s = trim($s);</code>).</li>
+  <li><code>strlen</code> mede, <code>strrev</code> inverte, <code>str_word_count</code> conta palavras (mas não entende acentos).</li>
+  <li><code>strpos</code> devolve a posição (a partir de 0) ou <code>false</code>. Compare sempre com <code>!== false</code>.</li>
+  <li>No PHP 8, para "sim ou não", use <code>str_contains</code>, <code>str_starts_with</code> e <code>str_ends_with</code>.</li>
+  <li><code>str_replace</code> troca, <code>substr</code> recorta (negativos contam do fim), <code>trim</code> limpa as pontas.</li>
+  <li><code>ucfirst</code>, <code>ucwords</code>, <code>strtoupper</code>, <code>strtolower</code> mudam maiúsculas, mas só das letras sem acento.</li>
+  <li><code>explode</code> quebra um texto em lista; <code>implode</code> junta uma lista num texto.</li>
+  <li><code>str_pad</code> completa, <code>str_repeat</code> repete, <code>wordwrap</code> quebra na largura, <code>nl2br</code> prepara quebras para o HTML.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
