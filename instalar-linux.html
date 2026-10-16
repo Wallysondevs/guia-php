@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Instalar no Linux — apt, dnf, pacman, extensões e php.ini | Guia PHP</title>
+<meta name="description" content="Instalar o PHP no Linux: apt install php-cli no Ubuntu e Debian (PHP 8.5.4 no Ubuntu 26.04), dnf no Fedora, pacman no Arch. Por que não instalar o pacote php sozinho, extensões como pacotes (mbstring, sqlite3), conferir com php -v e php -m, e onde fica o php.ini (php --ini).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Instalar no Linux</span></h1>
+
+<p class="intro">No Linux, instalar o PHP é um comando só: o PHP vem pronto nos repositórios de todas as distribuições. Nesta aula você vai instalar o PHP de linha de comando no Ubuntu, no Debian, no Fedora e no Arch, acrescentar <strong>extensões</strong> (pedaços opcionais, como o suporte a acentos e ao SQLite), conferir se tudo deu certo e descobrir onde fica o arquivo de configuração, o <code>php.ini</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Descobrir se o PHP já está instalado.</li>
+  <li>Instalar com <code>apt</code> (Ubuntu e Debian), <code>dnf</code> (Fedora) e <code>pacman</code> (Arch).</li>
+  <li>Por que pedir o pacote <code>php-cli</code>, e não o <code>php</code> sozinho.</li>
+  <li>O que são extensões, como listá-las (<code>php -m</code>) e como instalar as que faltam.</li>
+  <li>Onde fica o <code>php.ini</code> (<code>php --ini</code>) e por que as mensagens de erro mudam de um computador para outro.</li>
+</ul>
+</div>
+
+<div class="tip">
+<strong>Não quer instalar nada agora?</strong>
+<p>Tudo bem. As caixas Experimente do guia rodam o PHP 8.5 no navegador, e o Nível 1 inteiro pode ser feito sem instalar nada. Volte a esta aula quando quiser rodar o PHP no seu computador. Usa Windows ou macOS? Veja <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>.</p>
+</div>
+
+<hr>
+
+<h2>A ideia: a loja de aplicativos do Linux</h2>
+<p>No celular, você instala aplicativos pela loja (Play Store, App Store), sem procurar instaladores na internet. O Linux tem isso há muito mais tempo: o <strong>gerenciador de pacotes</strong>. Cada distribuição mantém um grande catálogo de programas, os <strong>pacotes</strong>, já testados e prontos para aquela distribuição. Você pede pelo nome, e o gerenciador baixa, instala e depois mantém o programa atualizado junto com o resto do sistema.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Distribuição</th><th>Gerenciador de pacotes</th></tr>
+<tr><td>Ubuntu, Debian, Linux Mint, Pop!_OS</td><td><code>apt</code></td></tr>
+<tr><td>Fedora, Red Hat, Rocky, AlmaLinux</td><td><code>dnf</code></td></tr>
+<tr><td>Arch, Manjaro, EndeavourOS</td><td><code>pacman</code></td></tr>
+</table>
+</div>
+
+<p>Instalar programas mexe no sistema inteiro, então esses comandos precisam de permissão de administrador: por isso começam com <code>sudo</code> ("faça como administrador"), que pede a <strong>sua</strong> senha.</p>
+
+<hr>
+
+<h2>1. O PHP já está instalado?</h2>
+<p>Antes de instalar, pergunte ao próprio PHP. Abra o terminal e digite:</p>
+
+<pre class="term">$ php -v</pre>
+
+<p>Se aparecer algo começando com <code>PHP 8.</code>, ele já está instalado (veja o que cada parte quer dizer em <a href="versoes.html">Versões do PHP</a>) e você pode pular para a <a href="#extensoes">seção de extensões</a>. Se não estiver, o Ubuntu responde assim (saída real do Ubuntu 26.04):</p>
+
+<pre class="file" data-file="terminal do Ubuntu 26.04">Comando 'php' não encontrado, mas poder ser instalado com:
+sudo apt install php8.5-cli  # version 8.5.4-0ubuntu1.1, or
+sudo apt install php-cli     # version 2:8.5+99ubuntu1</pre>
+
+<p>(O "poder ser" é um erro de digitação da própria tradução do Ubuntu.) O Ubuntu já sugere o comando de instalação. Em outras distribuições, a mensagem é a do Bash, mais seca:</p>
+
+<pre class="file" data-file="terminal sem sugestões">bash: php: comando não encontrado</pre>
+
+<hr>
+
+<h2>2. Ubuntu e Debian: <code>apt</code></h2>
+
+<h3>Qual versão vou receber?</h3>
+<p>Antes de instalar, dá para perguntar ao <code>apt</code> que versão ele tem no catálogo. O comando <code>apt-cache policy</code> mostra a versão <strong>instalada</strong> e a <strong>candidata</strong> (a que seria instalada). Não precisa de <code>sudo</code>, porque só consulta:</p>
+
+<pre class="term">$ apt-cache policy php8.5-cli
+php8.5-cli:
+  Instalado: (nenhum)                   « ainda não está instalado
+  Candidato: 8.5.4-0ubuntu1.3           « a versão que o apt instalaria
+  Tabela de versão:
+     8.5.4-0ubuntu1.3 500
+        500 http://archive.ubuntu.com/ubuntu resolute-updates/main amd64 Packages
+        500 http://security.ubuntu.com/ubuntu resolute-security/main amd64 Packages
+     8.5.4-0ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages</pre>
+
+<p>No <strong>Ubuntu 26.04</strong> (de codinome <code>resolute</code>), o PHP é o <strong>8.5.4</strong>. O <code>-0ubuntu1.3</code> do fim é a "revisão" do Ubuntu: o 8.5.4 com as correções de segurança que o Ubuntu foi aplicando (veja a nota sobre distribuições em <a href="versoes.html">Versões do PHP</a>). A versão <code>8.5.4-0ubuntu1</code> é a original do lançamento do Ubuntu; a <code>1.3</code> veio depois, pelos repositórios de atualização (<code>-updates</code>) e de segurança (<code>-security</code>).</p>
+
+<p>O <code>php-cli</code> (sem número) é um pacote "apelido" que sempre aponta para a versão padrão da distribuição:</p>
+
+<pre class="term">$ apt-cache policy php-cli
+php-cli:
+  Instalado: (nenhum)
+  Candidato: 2:8.5+99ubuntu1            « "8.5": aponta para o php8.5-cli
+  Tabela de versão:
+     2:8.5+99ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu resolute/main amd64 Packages
+        500 http://archive.ubuntu.com/ubuntu resolute/main i386 Packages</pre>
+
+<h3>Instalando</h3>
+<p>São dois comandos. O primeiro atualiza o catálogo (a lista do que existe nos repositórios); o segundo instala:</p>
+
+<pre class="file" data-file="comandos">sudo apt update
+sudo apt install php-cli</pre>
+
+<dl class="anatomy">
+  <dt>sudo</dt><dd>Roda o comando como administrador. Pede a sua senha (nada aparece enquanto você digita; é normal).</dd>
+  <dt>apt update</dt><dd>Baixa a lista atualizada de pacotes. Não instala nada.</dd>
+  <dt>apt install</dt><dd>Instala os pacotes pedidos e tudo de que eles dependem.</dd>
+  <dt>php-cli</dt><dd>O PHP de <strong>linha de comando</strong> (<em>Command Line Interface</em>). É ele que traz o comando <code>php</code> e o servidor embutido <code>php -S</code>. Pode trocar por <code>php8.5-cli</code> para pedir a versão exata.</dd>
+</dl>
+
+<p>Quer ver o que vai ser instalado sem instalar nada? A opção <code>-s</code> (de <em>simulate</em>, "simular") do <code>apt-get</code> faz um ensaio, e funciona até sem <code>sudo</code>. Veja o ensaio real no Ubuntu 26.04:</p>
+
+<pre class="term">$ apt-get -s install php-cli
+NOTA: Esta é apenas uma simulação!
+      apt-get precisa de privilégios de root para execução real.
+      Lembre-se também de que a trava está desativada e,
+      portanto, não dependa da relevância para a situação real atual!
+Lendo listas de pacotes...
+Construindo árvore de dependências...
+Lendo informação de estado...
+Resolvendo dependências...
+Os pacotes adicionais a seguir serão instalados:
+  php-common php8.5-cli php8.5-common php8.5-readline
+Pacotes sugeridos:
+  php-pear
+Os NOVOS pacotes a seguir serão instalados:
+  php-cli php-common php8.5-cli php8.5-common php8.5-readline    « só 5 pacotes, todos do PHP
+0 pacotes atualizados, 5 pacotes novos instalados, 0 a serem removidos e 12 não atualizados.
+Inst php-common (2:99ubuntu1 Ubuntu:26.04/resolute [all])
+Inst php8.5-common (8.5.4-0ubuntu1.3 Ubuntu:26.04/resolute-updates, Ubuntu:26.04/resolute-security [amd64])
+Inst php8.5-readline (8.5.4-0ubuntu1.3 Ubuntu:26.04/resolute-updates, Ubuntu:26.04/resolute-security [amd64])
+Inst php8.5-cli (8.5.4-0ubuntu1.3 Ubuntu:26.04/resolute-updates, Ubuntu:26.04/resolute-security [amd64])
+Inst php-cli (2:8.5+99ubuntu1 Ubuntu:26.04/resolute [all])
+Conf php-common (2:99ubuntu1 Ubuntu:26.04/resolute [all])
+Conf php8.5-common (8.5.4-0ubuntu1.3 Ubuntu:26.04/resolute-updates, Ubuntu:26.04/resolute-security [amd64])
+Conf php8.5-readline (8.5.4-0ubuntu1.3 Ubuntu:26.04/resolute-updates, Ubuntu:26.04/resolute-security [amd64])
+Conf php8.5-cli (8.5.4-0ubuntu1.3 Ubuntu:26.04/resolute-updates, Ubuntu:26.04/resolute-security [amd64])
+Conf php-cli (2:8.5+99ubuntu1 Ubuntu:26.04/resolute [all])</pre>
+
+<p>As linhas <code>Inst</code> e <code>Conf</code> são o que o <code>apt</code> faria: instalar (<em>install</em>) e configurar cada pacote. Na instalação de verdade, com <code>sudo apt install php-cli</code>, aparece a mesma lista de pacotes novos, depois a pergunta <code>Continuar? [S/n]</code> (aperte <kbd>Enter</kbd> para aceitar) e as linhas de download e configuração.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pacote</th><th>O que traz</th></tr>
+<tr><td><code>php8.5-cli</code></td><td>O programa <code>php</code> em si.</td></tr>
+<tr><td><code>php8.5-common</code></td><td>Extensões básicas (<code>ctype</code>, <code>pdo</code>, <code>iconv</code>, <code>tokenizer</code>…) e arquivos comuns a todas as formas de rodar o PHP.</td></tr>
+<tr><td><code>php8.5-readline</code></td><td>Edição de linha (setas, histórico) no PHP interativo, o <code>php -a</code>.</td></tr>
+<tr><td><code>php-cli</code>, <code>php-common</code></td><td>Os pacotes "apelido", que apontam para a versão 8.5.</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Cuidado com <code>apt install php</code> (sem o <code>-cli</code>)</strong>
+<p>O pacote <code>php</code> sozinho foi pensado para servidores e puxa um servidor web inteiro junto. Veja o ensaio:</p>
+<pre class="term">$ apt-get -s install php | grep -A3 "NOVOS"
+Os NOVOS pacotes a seguir serão instalados:
+  apache2 apache2-bin apache2-data apache2-utils libapache2-mod-php8.5
+  libapr1t64 libaprutil1-dbd-sqlite3 libaprutil1-ldap libaprutil1t64 php
+  php-common php8.5 php8.5-cli php8.5-common php8.5-readline</pre>
+<p>Veio o <strong>Apache</strong> (<code>apache2</code>), que fica ligado o tempo todo ocupando a porta 80, mesmo que você nunca o use. Para estudar, o <code>php-cli</code> basta: o servidor embutido (<a href="servidor-embutido.html">php -S</a>) faz o papel do Apache. O motivo está nas dependências do pacote <code>php8.5</code>, que exige <strong>um</strong> destes três (a barra <code>|</code> quer dizer "ou"), e o <code>apt</code> escolhe o primeiro:</p>
+<pre class="term">$ apt-cache depends php8.5 | head
+php8.5
+ |Depende: libapache2-mod-php8.5
+ |Depende: php8.5-fpm
+  Depende: php8.5-cgi
+  Depende: php8.5-common</pre>
+</div>
+
+<h3>Conferindo</h3>
+<p>Terminada a instalação, o comando <code>php</code> passa a existir. No Ubuntu 26.04, a resposta do <code>php -v</code> é esta:</p>
+
+<pre class="term">$ php -v
+PHP 8.5.4 (cli) (built: Sep  2 2026 14:42:18) (NTS)
+Copyright (c) The PHP Group
+Built by Ubuntu                                « montado pelo Ubuntu
+Zend Engine v4.5.4, Copyright (c) Zend Technologies
+    with Zend OPcache v8.5.4, Copyright (c), by Zend Technologies</pre>
+
+<p>Compare com o PHP do laboratório do guia, que foi montado de outro jeito (por uma ferramenta chamada static-php-cli) e é uma versão de correção mais nova:</p>
+
+<pre class="term">$ php -v
+PHP 8.5.8 (cli) (built: Jul  7 2026 05:21:52) (NTS gcc 14.2.0)
+Copyright (c) The PHP Group
+Built by static-php-cli 2.8.6
+Zend Engine v4.5.8, Copyright (c) Zend Technologies
+    with Zend OPcache v8.5.8, Copyright (c), by Zend Technologies</pre>
+
+<p>Os dois são PHP 8.5 e se comportam igual em tudo o que o guia ensina.</p>
+
+<h3>E no Debian?</h3>
+<p>Os comandos são <strong>os mesmos</strong>: <code>sudo apt update</code> e <code>sudo apt install php-cli</code>. Muda a versão: o <strong>Debian 13</strong> ("trixie") traz o <strong>PHP 8.4</strong>, e os pacotes se chamam <code>php8.4-cli</code>, <code>php8.4-mbstring</code> e assim por diante (o apelido <code>php-cli</code> aponta para o <code>php8.4-cli</code>, conforme <a href="https://packages.debian.org/trixie/php-cli">packages.debian.org</a>, consultado em 16/10/2026). O PHP 8.4 roda quase todo o guia; só os recursos com selo <span class="versao">PHP 8.5+</span> (como o operador <code>|&gt;</code>) não funcionam. No Debian, se o seu usuário não usa <code>sudo</code>, rode os comandos como root (<code>su -</code>). <strong>Ilustrativo:</strong> o laboratório do guia é um Ubuntu; os nomes de pacote do Debian foram conferidos no site oficial.</p>
+
+<hr>
+
+<h2>3. Fedora: <code>dnf</code></h2>
+<p>No Fedora, o pacote também se chama <code>php-cli</code>:</p>
+
+<pre class="file" data-file="comando · ilustrativo">sudo dnf install php-cli</pre>
+
+<p>O <code>dnf</code> mostra a lista de pacotes, pergunta <code>Is this ok [y/N]:</code> (aqui o padrão é "não": digite <kbd>y</kbd> e <kbd>Enter</kbd>) e instala. Conforme <a href="https://packages.fedoraproject.org/pkgs/php/php-cli/">packages.fedoraproject.org</a> (16/10/2026), o Fedora 44 e o 45 trazem o PHP <strong>8.5.11</strong>, e o Fedora 43, o <strong>8.4.26</strong>. O Fedora acompanha as versões de correção do PHP de perto. Depois, confira com <code>php -v</code>. <strong>Ilustrativo:</strong> não rodou no laboratório do guia.</p>
+
+<hr>
+
+<h2>4. Arch Linux: <code>pacman</code></h2>
+<p>No Arch, o pacote é só <code>php</code> (ele já é o de linha de comando; o Apache e o PHP-FPM vêm em pacotes separados, <code>php-apache</code> e <code>php-fpm</code>):</p>
+
+<pre class="file" data-file="comando · ilustrativo">sudo pacman -S php</pre>
+
+<p>O <code>-S</code> (maiúsculo) quer dizer "sincronizar": baixar do repositório e instalar. Conforme <a href="https://archlinux.org/packages/extra/x86_64/php/">archlinux.org</a> (16/10/2026), a versão é a <strong>8.5.11</strong>. O Arch sempre tem a versão mais nova logo depois do lançamento. <strong>Ilustrativo:</strong> não rodou no laboratório do guia.</p>
+
+<h3>Resumo das distribuições</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Distribuição</th><th>Comando</th><th>Versão do PHP (out/2026)</th></tr>
+<tr><td>Ubuntu 26.04</td><td><code>sudo apt install php-cli</code></td><td>8.5.4 (conferido no laboratório)</td></tr>
+<tr><td>Debian 13</td><td><code>sudo apt install php-cli</code></td><td>8.4</td></tr>
+<tr><td>Fedora 44 e 45</td><td><code>sudo dnf install php-cli</code></td><td>8.5.11</td></tr>
+<tr><td>Fedora 43</td><td><code>sudo dnf install php-cli</code></td><td>8.4.26</td></tr>
+<tr><td>Arch</td><td><code>sudo pacman -S php</code></td><td>8.5.11</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Quero o PHP 8.5 numa distribuição que tem uma versão mais antiga</strong>
+<p>Existem repositórios extras mantidos por voluntários que oferecem várias versões do PHP lado a lado: no Ubuntu e no Debian, o de Ondřej Surý (<code>ppa:ondrej/php</code> no Ubuntu, <code>packages.sury.org</code> no Debian); no Fedora e derivados, o de Remi Collet (<code>rpms.remirepo.net</code>). São muito usados em servidores, mas são repositórios de terceiros: siga as instruções do site de cada um. Para estudar, a versão da sua distribuição costuma bastar.</p>
+</div>
+
+<hr>
+
+<h2 id="extensoes">5. Extensões: as peças opcionais</h2>
+<p>O PHP é feito de um "núcleo" mais um monte de <strong>extensões</strong>: módulos que acrescentam funções. Por exemplo, a extensão <code>mbstring</code> traz as funções que lidam direito com acentos (<code>mb_strtoupper</code>, <code>mb_strlen</code>), e a <code>pdo_sqlite</code> permite usar o banco de dados SQLite. Algumas vêm sempre; outras são pacotes separados, para você instalar só o que precisa.</p>
+
+<h3>Quais extensões eu tenho? <code>php -m</code></h3>
+<p>O <code>-m</code> (de <em>modules</em>, "módulos") lista as extensões carregadas. Logo depois do <code>apt install php-cli</code>, no Ubuntu 26.04, a lista é esta:</p>
+
+<pre class="term">$ php -m
+[PHP Modules]
+calendar
+Core
+ctype
+date
+exif
+FFI
+fileinfo
+filter
+ftp
+gettext
+hash
+iconv
+json
+lexbor
+libxml
+openssl
+pcntl
+pcre
+PDO
+Phar
+posix
+random
+readline
+Reflection
+session
+shmop
+sockets
+sodium
+SPL
+standard
+sysvmsg
+sysvsem
+sysvshm
+tokenizer
+uri
+Zend OPcache
+zlib
+
+[Zend Modules]
+Zend OPcache</pre>
+
+<p>Repare no que <strong>não</strong> está na lista: <code>mbstring</code>, <code>pdo_sqlite</code>, <code>sqlite3</code>, <code>mysqli</code>, <code>curl</code>, <code>xml</code>, <code>intl</code>. O laboratório do guia, ao contrário, foi montado com 50 extensões, incluindo essas. Por isso, no seu Ubuntu, alguns exemplos das próximas aulas podem falhar até você instalar a extensão certa. Veja o que acontece com uma função da <code>mbstring</code>:</p>
+
+<pre class="term">$ php -r 'echo mb_strtoupper("ação"), "\n";'
+PHP Fatal error:  Uncaught Error: Call to undefined function mb_strtoupper() in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1</pre>
+
+<p>"Call to undefined function" = "chamada a uma função não definida". A função existe no PHP, mas mora numa extensão que não está instalada. (O <code>Command line code</code> aparece no lugar do nome do arquivo porque o código veio do <code>-r</code>.)</p>
+
+<h3>Instalando extensões</h3>
+<p>No Ubuntu e no Debian, cada extensão é um pacote <code>php8.5-NOME</code> (ou o apelido <code>php-NOME</code>, que aponta para a versão padrão). Para as duas mais usadas no guia:</p>
+
+<pre class="file" data-file="comando">sudo apt install php8.5-mbstring php8.5-sqlite3</pre>
+
+<pre class="term">$ apt-get -s install php-mbstring php-sqlite3 | grep -A3 NOVOS
+Os NOVOS pacotes a seguir serão instalados:
+  php-common php-mbstring php-sqlite3 php8.5-common php8.5-mbstring
+  php8.5-sqlite3
+0 pacotes atualizados, 6 pacotes novos instalados, 0 a serem removidos e 12 não atualizados.</pre>
+
+<p>(No ensaio, o <code>php-common</code> e o <code>php8.5-common</code> aparecem como novos porque o PHP ainda não estava instalado; num computador com o <code>php-cli</code>, só vêm as duas extensões.) O pacote liga a extensão sozinho; não precisa editar nada. Depois da instalação, as três extensões aparecem no <code>php -m</code> e a função funciona:</p>
+
+<pre class="term">$ php -m | grep -E -i 'mbstring|sqlite'
+mbstring
+pdo_sqlite
+sqlite3
+$ php -r 'echo mb_strtoupper("ação"), "\n";'
+AÇÃO</pre>
+
+<p>O pacote <code>php8.5-sqlite3</code> traz duas extensões: a <code>sqlite3</code> e a <code>pdo_sqlite</code> (o "motorista" do SQLite para o PDO, que o guia usa nas aulas de banco de dados).</p>
+
+<h3>Os nomes em cada distribuição</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Extensão</th><th>Ubuntu / Debian</th><th>Fedora</th><th>Arch</th></tr>
+<tr><td>Acentos em textos</td><td><code>mbstring</code></td><td><code>php8.5-mbstring</code></td><td><code>php-mbstring</code></td><td>já vem no <code>php</code></td></tr>
+<tr><td>SQLite</td><td><code>pdo_sqlite</code>, <code>sqlite3</code></td><td><code>php8.5-sqlite3</code></td><td><code>php-pdo</code></td><td><code>php-sqlite</code></td></tr>
+<tr><td>MySQL / MariaDB</td><td><code>pdo_mysql</code>, <code>mysqli</code></td><td><code>php8.5-mysql</code></td><td><code>php-mysqlnd</code></td><td>já vem no <code>php</code></td></tr>
+<tr><td>XML e DOM</td><td><code>dom</code>, <code>xml</code>, <code>simplexml</code></td><td><code>php8.5-xml</code></td><td><code>php-xml</code></td><td>já vem no <code>php</code></td></tr>
+<tr><td>Acessar outros sites</td><td><code>curl</code></td><td><code>php8.5-curl</code></td><td>já vem no <code>php-common</code></td><td>já vem no <code>php</code></td></tr>
+<tr><td>Imagens</td><td><code>gd</code></td><td><code>php8.5-gd</code></td><td><code>php-gd</code></td><td><code>php-gd</code></td></tr>
+<tr><td>Idiomas e datas por país</td><td><code>intl</code></td><td><code>php8.5-intl</code></td><td><code>php-intl</code></td><td>já vem no <code>php</code></td></tr>
+<tr><td>Arquivos <code>.zip</code></td><td><code>zip</code></td><td><code>php8.5-zip</code></td><td><code>php-pecl-zip</code></td><td>já vem no <code>php</code></td></tr>
+</table>
+</div>
+
+<p>A coluna do Ubuntu foi conferida no catálogo do Ubuntu 26.04 (<code>apt-cache search --names-only "^php8.5-"</code> lista 75 pacotes); as do Fedora e do Arch, nos sites oficiais de pacotes, e são <strong>ilustrativas</strong>. No <strong>Arch</strong>, muitas extensões já vêm dentro do pacote <code>php</code>, mas <strong>desligadas</strong>: para ligar uma, edite o <code>/etc/php/php.ini</code> como administrador e apague o <code>;</code> do começo da linha dela (por exemplo, <code>;extension=pdo_sqlite</code> vira <code>extension=pdo_sqlite</code>).</p>
+
+<p>Você pode conferir as extensões do PHP do navegador também. Rode a caixa abaixo: ela pergunta ao PHP se cada extensão está carregada.</p>
+
+<div class="tryphp">
+<pre class="script">&lt;?php
+echo "PHP " . PHP_VERSION . "\n";
+var_dump(extension_loaded("mbstring"));
+var_dump(extension_loaded("pdo_sqlite"));
+var_dump(extension_loaded("extensao_que_nao_existe"));
+</pre>
+</div>
+
+<p>O <code>extension_loaded("…")</code> pergunta "esta extensão está carregada?", e o <code>var_dump</code> mostra a resposta: <code>bool(true)</code> (sim) ou <code>bool(false)</code> (não). O PHP do navegador vem com as extensões que o guia usa; a aula <a href="simulador.html">O Editor do Guia</a> diz exatamente quais.</p>
+
+<hr>
+
+<h2>6. O <code>php.ini</code>: a configuração do PHP</h2>
+<p>O PHP tem dezenas de ajustes: quanta memória um programa pode usar, se as mensagens de erro aparecem na tela, quanto tempo uma página pode demorar. Eles ficam num arquivo de texto chamado <code>php.ini</code>. Para descobrir onde ele está, use <code>php --ini</code>:</p>
+
+<pre class="term">$ php --ini
+Configuration File (php.ini) Path: "/usr/local/etc/php"
+Loaded Configuration File:         (none)
+Scan for additional .ini files in: "/usr/local/etc/php/conf.d"
+Additional .ini files parsed:      (none)</pre>
+
+<dl class="anatomy">
+  <dt>Configuration File (php.ini) Path</dt><dd>A pasta onde o PHP <strong>procura</strong> o <code>php.ini</code>.</dd>
+  <dt>Loaded Configuration File</dt><dd>O arquivo que ele <strong>achou e carregou</strong>. No laboratório do guia é <code>(none)</code>, "nenhum": esse PHP roda com os valores de fábrica.</dd>
+  <dt>Scan for additional .ini files in</dt><dd>Uma pasta com arquivos <code>.ini</code> extras, lidos depois do principal. É ali que as distribuições colocam um arquivinho para cada extensão.</dd>
+  <dt>Additional .ini files parsed</dt><dd>Os arquivos extras que foram lidos.</dd>
+</dl>
+
+<p>No Ubuntu, a pasta de procura é outra, e cada forma de rodar o PHP tem o seu próprio <code>php.ini</code>. A primeira linha abaixo é a real do PHP do Ubuntu 26.04; as outras são <strong>ilustrativas</strong>, porque mostram arquivos que o pacote cria ao ser instalado:</p>
+
+<pre class="file" data-file="php --ini no Ubuntu 26.04 · ilustrativo a partir da 2ª linha">Configuration File (php.ini) Path: "/etc/php/8.5/cli"
+Loaded Configuration File:         /etc/php/8.5/cli/php.ini
+Scan for additional .ini files in: "/etc/php/8.5/cli/conf.d"
+Additional .ini files parsed:      /etc/php/8.5/cli/conf.d/10-pdo.ini,
+/etc/php/8.5/cli/conf.d/20-calendar.ini,
+/etc/php/8.5/cli/conf.d/20-ctype.ini,
+…</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo (Ubuntu e Debian)</th><th>Vale para</th></tr>
+<tr><td><code>/etc/php/8.5/cli/php.ini</code></td><td>O comando <code>php</code> no terminal e o <code>php -S</code>.</td></tr>
+<tr><td><code>/etc/php/8.5/fpm/php.ini</code></td><td>Sites servidos pelo nginx com PHP-FPM.</td></tr>
+<tr><td><code>/etc/php/8.5/apache2/php.ini</code></td><td>Sites servidos pelo Apache com o módulo do PHP.</td></tr>
+<tr><td><code>/etc/php/8.5/cli/conf.d/20-mbstring.ini</code></td><td>Um arquivo por extensão; contém só <code>extension=mbstring.so</code>.</td></tr>
+</table>
+</div>
+
+<p>Um detalhe que confunde muita gente: mudar o <code>php.ini</code> do <code>cli</code> não muda o do site, e vice-versa. Em Fedora e Arch há um só: <code>/etc/php.ini</code> (Fedora) e <code>/etc/php/php.ini</code> (Arch).</p>
+
+<h3>Por que as mensagens de erro mudam de um computador para outro</h3>
+<p>Este arquivo tem um erro de propósito: usa a variável <code>$nome</code> sem ter criado:</p>
+
+<pre class="file" data-file="aviso.php · erro de propósito">&lt;?php
+echo "Olá, $nome!\n";
+</pre>
+
+<p>No laboratório do guia (sem <code>php.ini</code>), o aviso sai assim:</p>
+
+<pre class="term">$ php aviso.php
+
+Warning: Undefined variable $nome in /home/ana/site/aviso.php on line 2
+Olá, !</pre>
+
+<p>No Ubuntu, com o <code>php.ini</code> que vem no pacote, o mesmo arquivo dá:</p>
+
+<pre class="term">$ php aviso.php
+PHP Warning:  Undefined variable $nome in /home/ana/site/aviso.php on line 2   « começa com "PHP "
+Olá, !</pre>
+
+<p>A mensagem é a mesma; o que mudou foi <strong>por onde</strong> ela saiu. O <code>php.ini</code> do Ubuntu é a versão "de produção" (pensada para servidores de verdade): ele desliga a exibição de erros na saída (<code>display_errors = Off</code>) e liga o registro de erros (<code>log_errors = On</code>). No terminal, o "registro" vai para a <strong>saída de erros</strong>, com o prefixo <code>PHP </code> e dois espaços depois dos dois-pontos. Em sites, isso evita que visitantes vejam detalhes internos. A aula <a href="erros.html">Lendo Erros do PHP</a> explica os dois formatos.</p>
+
+<p>Para estudar, é melhor ver os erros sempre. O próprio pacote do Ubuntu traz um modelo "de desenvolvimento", o <code>php.ini-development</code>. Para usar no terminal:</p>
+
+<pre class="file" data-file="comando">sudo cp /usr/lib/php/8.5/php.ini-development /etc/php/8.5/cli/php.ini</pre>
+
+<p>Com ele, o PHP mostra o aviso <strong>duas vezes</strong>: uma pela exibição (<code>Warning:</code>) e outra pelo registro (<code>PHP Warning:</code>). Parece estranho, mas é o normal em desenvolvimento no terminal:</p>
+
+<pre class="term">$ php aviso.php
+PHP Warning:  Undefined variable $nome in /home/ana/site/aviso.php on line 2
+
+Warning: Undefined variable $nome in /home/ana/site/aviso.php on line 2
+Olá, !</pre>
+
+<div class="tip">
+<strong>Uma configuração só para um comando</strong>
+<p>Sem mexer no <code>php.ini</code>, a opção <code>-d</code> muda um ajuste só naquela execução: <code>php -d display_errors=On aviso.php</code>. E, a partir do PHP 8.5, <code>php --ini=diff</code> <span class="versao">PHP 8.5+</span> lista só os ajustes que estão diferentes do valor de fábrica. No laboratório:</p>
+<pre class="term">$ php --ini=diff
+Non-default INI settings:
+html_errors: "1" -&gt; "0"
+implicit_flush: "0" -&gt; "1"
+max_execution_time: "30" -&gt; "0"</pre>
+<p>Mesmo sem <code>php.ini</code>, o PHP de linha de comando já muda três valores: desliga o HTML nas mensagens de erro, manda a saída na hora e tira o limite de tempo (que é de 30 segundos nas páginas).</p>
+</div>
+
+<hr>
+
+<h2>7. O teste final: o primeiro arquivo</h2>
+<p>Com o PHP instalado, crie uma pasta, um arquivo e rode:</p>
+
+<pre class="term">$ mkdir -p site &amp;&amp; cd site
+$ cat &gt; ola.php &lt;&lt;'FIM'
+&gt; &lt;?php
+&gt; echo "Olá, mundo!\n";
+&gt; FIM
+$ php ola.php
+Olá, mundo!</pre>
+
+<p>O <code>cat &gt; ola.php &lt;&lt;'FIM'</code> é um jeito de criar um arquivo pelo terminal: tudo o que você digita até a palavra <code>FIM</code> vai para dentro do <code>ola.php</code> (os <code>&gt;</code> no começo das linhas são o terminal pedindo a continuação). Você também pode criar o arquivo num editor de código; a aula <a href="editores.html">Editores e IDEs</a> mostra como, e a aula <a href="primeiro-script.html">Olá, Mundo</a> explica cada linha.</p>
+
+<h3>Atualizando</h3>
+<p>Como o PHP veio do gerenciador de pacotes, ele é atualizado junto com o resto do sistema: <code>sudo apt update &amp;&amp; sudo apt upgrade</code> (Ubuntu e Debian), <code>sudo dnf upgrade</code> (Fedora), <code>sudo pacman -Syu</code> (Arch). Para remover: <code>sudo apt remove php-cli php8.5-cli</code>, <code>sudo dnf remove php-cli</code>, <code>sudo pacman -R php</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"você é root?"</strong>
+<pre class="term">$ apt install php-cli
+Erro: Não foi possível abrir arquivo de trava /var/lib/dpkg/lock-frontend - open (13: Permissão negada)
+Erro: Não é possível adquirir a trava da interface do dpkg (/var/lib/dpkg/lock-frontend), você é root?</pre>
+<p><strong>O que aconteceu:</strong> faltou o <code>sudo</code>. Instalar programas exige permissão de administrador; sem ela, o <code>apt</code> não consegue nem "trancar" o catálogo para trabalhar. O comando termina com o código de saída <code>100</code>.</p>
+<p><strong>Como resolver:</strong> <code>sudo apt install php-cli</code>. Dica: <code>sudo !!</code> repete o último comando com <code>sudo</code> na frente.</p>
+</div>
+
+<div class="cenario">
+<strong>"Call to undefined function mb_strtoupper()" (ou outra <code>mb_</code>)</strong>
+<pre class="term">$ php -r 'echo mb_strtoupper("ação"), "\n";'
+PHP Fatal error:  Uncaught Error: Call to undefined function mb_strtoupper() in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1</pre>
+<p><strong>O que aconteceu:</strong> a extensão <code>mbstring</code> não está instalada. O mesmo vale para <code>simplexml_load_string</code> (extensão <code>xml</code>), <code>curl_init</code> (<code>curl</code>), <code>imagecreate</code> (<code>gd</code>).</p>
+<p><strong>Como resolver:</strong> <code>php -m</code> para conferir, e instale o pacote da tabela acima (<code>sudo apt install php8.5-mbstring</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>"could not find driver" ao usar o banco de dados</strong>
+<pre class="term">$ php -r 'new PDO("sqlite:loja.db"); echo "ok\n";'
+PHP Fatal error:  Uncaught PDOException: could not find driver in Command line code:1
+Stack trace:
+#0 Command line code(1): PDO-&gt;__construct()
+#1 {main}
+  thrown in Command line code on line 1</pre>
+<p><strong>O que aconteceu:</strong> o PDO (a extensão de bancos de dados) está instalado, mas não o "motorista" (<em>driver</em>) do banco pedido. Aqui, faltou o do SQLite; com MySQL seria o <code>pdo_mysql</code>.</p>
+<p><strong>Como resolver:</strong> <code>sudo apt install php8.5-sqlite3</code> (ou <code>php8.5-mysql</code>). Veja <a href="pdo.html">Conectar com PDO</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Instalei a extensão, mas o site continua sem ela</strong>
+<p><strong>O que aconteceu:</strong> o terminal já vê a extensão, mas o servidor web (Apache ou PHP-FPM) carregou o PHP antes da instalação e continua com a configuração antiga na memória.</p>
+<p><strong>Como resolver:</strong> reinicie o serviço: <code>sudo systemctl restart apache2</code> ou <code>sudo systemctl restart php8.5-fpm</code>. Com o <code>php -S</code>, basta pará-lo (<kbd>Ctrl</kbd>+<kbd>C</kbd>) e ligar de novo.</p>
+</div>
+
+<div class="cenario">
+<strong>Instalei o <code>php</code> e agora tem um Apache rodando</strong>
+<p><strong>O que aconteceu:</strong> o pacote <code>php</code> (sem <code>-cli</code>) puxa o Apache, que liga sozinho e ocupa a porta 80.</p>
+<p><strong>Como resolver:</strong> se não vai usar, remova: <code>sudo apt remove apache2 libapache2-mod-php8.5</code> (o <code>php-cli</code> continua instalado), ou só desligue: <code>sudo systemctl disable --now apache2</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th></tr>
+<tr><td><code>php -v</code></td><td>Mostra a versão (e se o PHP está instalado).</td></tr>
+<tr><td><code>apt-cache policy php-cli</code></td><td>Mostra a versão instalada e a disponível (Ubuntu e Debian).</td></tr>
+<tr><td><code>sudo apt install php-cli</code></td><td>Instala o PHP de linha de comando (Ubuntu e Debian).</td></tr>
+<tr><td><code>apt-get -s install …</code></td><td>Ensaio: mostra o que seria instalado, sem instalar.</td></tr>
+<tr><td><code>sudo dnf install php-cli</code></td><td>Instala no Fedora.</td></tr>
+<tr><td><code>sudo pacman -S php</code></td><td>Instala no Arch.</td></tr>
+<tr><td><code>sudo apt install php8.5-mbstring php8.5-sqlite3</code></td><td>Instala extensões (Ubuntu e Debian).</td></tr>
+<tr><td><code>php -m</code></td><td>Lista as extensões carregadas.</td></tr>
+<tr><td><code>php --ini</code></td><td>Mostra onde está o <code>php.ini</code> e os <code>.ini</code> extras.</td></tr>
+<tr><td><code>php --ini=diff</code></td><td>Lista os ajustes diferentes do padrão <span class="versao">PHP 8.5+</span>.</td></tr>
+<tr><td><code>php -d ajuste=valor arquivo.php</code></td><td>Muda um ajuste só nesta execução.</td></tr>
+<tr><td><code>php -r 'código'</code></td><td>Roda um trecho de código sem criar arquivo.</td></tr>
+</table>
+</div>
+
+<p>Para fechar, use a extensão <code>mbstring</code> no editor do guia (que já a tem). Compare a função comum com a da extensão:</p>
+
+<div class="tryphp" data-goal="out:CAFÉ COM PÃO,src:mb_strtoupper">
+<p class="try-task"><strong>Missão:</strong> rode e repare: o <code>strtoupper</code> (sem <code>mb_</code>) não sabe passar letras acentuadas para maiúsculas e deixa <code>é</code> e <code>ã</code> como estão. Acrescente uma linha que use <code>mb_strtoupper</code> no mesmo texto, para aparecer <code>CAFÉ COM PÃO</code>.</p>
+<pre class="script">&lt;?php
+echo strtoupper("café com pão") . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo strtoupper("café com pão") . "\n";
+echo mb_strtoupper("café com pão") . "\n";
+</pre>
+</div>
+
+<p>Por que isso acontece? Letras acentuadas ocupam mais de um "pedaço" (byte) na memória, e as funções antigas do PHP trabalham pedaço por pedaço. A aula <a href="mbstring.html">Acentos e mbstring</a> explica com calma.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Instalar no Ubuntu</h3>
+<p>Complete o comando que instala o PHP de linha de comando no Ubuntu, sem trazer o Apache junto:</p>
+<div class="ex-code">sudo apt install <input data-answer="php-cli|php8.5-cli" aria-label="pacote"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Listar extensões</h3>
+<p>Qual opção do <code>php</code> lista as extensões carregadas?</p>
+<div class="ex-code">php <input data-answer="-m" aria-label="opção"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Onde está o php.ini?</h3>
+<p>Complete o comando que mostra qual <code>php.ini</code> foi carregado:</p>
+<div class="ex-code">php <input data-answer="--ini" aria-label="opção"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Você viu <code>Call to undefined function mb_strlen()</code>. O que fazer?</p>
+<label><input type="radio" name="q4"> Reinstalar o sistema operacional.</label>
+<label><input type="radio" name="q4"> Instalar a extensão <code>mbstring</code> (no Ubuntu, <code>php8.5-mbstring</code>).</label>
+<label><input type="radio" name="q4"> Trocar <code>mb_strlen</code> por <code>MB_STRLEN</code>.</label>
+<label><input type="radio" name="q4"> Instalar o Apache.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. No Ubuntu, um aviso aparece como <code>PHP Warning:  …</code>, e no laboratório do guia como <code>Warning: …</code>. Por quê?</p>
+<label><input type="radio" name="q5"> São versões diferentes da linguagem.</label>
+<label><input type="radio" name="q5"> O Ubuntu traduz as mensagens.</label>
+<label><input type="radio" name="q5"> O <code>php.ini</code> do Ubuntu desliga a exibição e liga o registro de erros, que sai com o prefixo <code>PHP </code>.</label>
+<label><input type="radio" name="q5"> O laboratório está com defeito.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Ubuntu e Debian: <code>sudo apt install php-cli</code>; Fedora: <code>sudo dnf install php-cli</code>; Arch: <code>sudo pacman -S php</code>.</li>
+  <li>Ubuntu 26.04 traz o PHP 8.5.4; Debian 13, o 8.4; Fedora 44 e Arch, o 8.5.11 (outubro de 2026).</li>
+  <li>Evite o pacote <code>php</code> sozinho no Ubuntu e no Debian: ele instala o Apache.</li>
+  <li>Confira com <code>php -v</code> (versão) e <code>php -m</code> (extensões).</li>
+  <li>Extensões são pacotes: <code>php8.5-mbstring</code>, <code>php8.5-sqlite3</code>, <code>php8.5-mysql</code>… "Call to undefined function" ou "could not find driver" costumam ser extensão faltando.</li>
+  <li><code>php --ini</code> mostra o <code>php.ini</code>. No Ubuntu, CLI, FPM e Apache têm um cada; o de produção manda os erros para o registro (<code>PHP Warning:</code>).</li>
+  <li>Próximo passo: <a href="servidor-embutido.html">O Servidor Embutido</a> (ou <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
