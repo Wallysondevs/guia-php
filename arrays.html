@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Arrays Indexados — listas numeradas a partir do 0 | Guia PHP</title>
+<meta name="description" content="Arrays indexados no PHP do zero: criar com [] ou array(), índices a partir de 0, acessar e mudar itens, count, adicionar com [], o aviso Undefined array key e como imprimir com print_r e var_dump, com saídas reais e exercícios no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Arrays Indexados</span></h1>
+
+<p class="intro">Até agora, cada <a href="variaveis.html">variável</a> guardou <strong>um</strong> valor: um nome, uma idade, um preço. Mas a vida é cheia de listas: a lista de compras, as notas de uma turma, os produtos de uma loja. Um <strong>array</strong> é uma variável que guarda <strong>vários valores</strong>, um atrás do outro, cada um numa posição numerada. Esta aula mostra o tipo mais simples, o <strong>array indexado</strong>, em que as posições são números: 0, 1, 2…</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um array e por que ele existe.</li>
+  <li>Como criar um array com <code>[ ]</code> e com <code>array()</code> (e que os dois são a mesma coisa).</li>
+  <li>Por que a primeira posição é <strong>0</strong>, e não 1.</li>
+  <li>Como ler, mudar e adicionar itens, e contar quantos são com <code>count</code>.</li>
+  <li>O que acontece quando você pede uma posição que não existe (<code>Warning: Undefined array key</code>).</li>
+  <li>Como ver o array inteiro com <code>print_r</code> e <code>var_dump</code>.</li>
+</ul>
+</div>
+
+<p>Os exemplos rodam na máquina fictícia da Ana (usuária <code>ana</code>, computador <code>notebook</code>), com os arquivos na pasta <code>~/site</code>. As saídas mostradas são as do PHP 8.5 de verdade.</p>
+
+<hr>
+
+<h2>O problema: uma variável para cada coisa</h2>
+<p>A Ana quer guardar a lista de compras da semana. Com o que você já sabe, ela faria assim:</p>
+
+<pre class="file" data-file="sem-array.php">&lt;?php
+$item1 = "arroz";
+$item2 = "feijão";
+$item3 = "café";
+echo $item1, "\n", $item2, "\n", $item3, "\n";
+</pre>
+
+<p>Funciona, mas pense no que vem depois: se a lista tiver 30 itens, são 30 variáveis. Para mostrar todos, 30 <code>echo</code>s. Para saber <strong>quantos</strong> itens há, você teria de contar no olho. E se ela lembrar de mais um item, precisa inventar <code>$item31</code> e mudar o resto do programa.</p>
+
+<p>O array resolve isso: <strong>uma variável só</strong>, com todos os itens dentro.</p>
+
+<h3>A ideia: um armário com gavetas numeradas</h3>
+<p>Imagine um armário com gavetas. Cada gaveta tem um <strong>número</strong> na frente e guarda <strong>uma coisa</strong>. O armário inteiro tem um nome (<code>$compras</code>); para pegar algo, você diz o nome do armário e o número da gaveta.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Gaveta (índice)</th><th>0</th><th>1</th><th>2</th></tr>
+<tr><td>Conteúdo (valor)</td><td><code>"arroz"</code></td><td><code>"feijão"</code></td><td><code>"café"</code></td></tr>
+</table>
+</div>
+
+<p>Dois nomes que você vai ver o tempo todo:</p>
+<ul>
+  <li><strong>Índice</strong> (ou <strong>chave</strong>, em inglês <em>key</em>): o número da gaveta.</li>
+  <li><strong>Valor</strong> (<em>value</em>): o que está guardado nela.</li>
+</ul>
+<p>Cada par "índice + valor" é um <strong>elemento</strong> (ou <strong>item</strong>) do array.</p>
+
+<hr>
+
+<h2>Criar um array</h2>
+
+<pre class="file" data-file="compras.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+echo $compras[0], "\n";
+echo $compras[1], "\n";
+echo $compras[2], "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>$compras</dt><dd>O nome da variável, como qualquer outra. É costume usar um nome no <strong>plural</strong>, porque ela guarda várias coisas.</dd>
+  <dt>=</dt><dd>Atribuição: "guarde à esquerda o que está à direita".</dd>
+  <dt>[ ]</dt><dd>Os colchetes criam o array. Tudo o que estiver entre eles vira item.</dd>
+  <dt>"arroz", "feijão", "café"</dt><dd>Os valores, separados por <strong>vírgula</strong>. O PHP numera sozinho: o primeiro ganha o índice 0, o segundo o 1, o terceiro o 2.</dd>
+  <dt>$compras[0]</dt><dd>Lê o valor da gaveta 0: o nome do array, colchetes e o índice dentro.</dd>
+</dl>
+
+<pre class="term">$ php compras.php
+arroz
+feijão
+café</pre>
+
+<p>Repare que os colchetes aparecem em dois papéis: <strong>criando</strong> o array (<code>["arroz", …]</code>) e <strong>acessando</strong> uma posição (<code>$compras[0]</code>). Quando vêm logo depois do nome de uma variável, é acesso.</p>
+
+<h3>Um item por linha (e a vírgula no final)</h3>
+<p>Quando a lista é grande, escreva um item por linha. O PHP aceita uma vírgula depois do último item, e isso é até recomendado: para acrescentar um item no fim, você só escreve uma linha nova, sem mexer na anterior.</p>
+
+<pre class="file" data-file="virgula.php">&lt;?php
+$compras = [
+    "arroz",
+    "feijão",
+    "café",     // esta vírgula final é permitida
+];
+echo count($compras), "\n";
+</pre>
+
+<pre class="term">$ php virgula.php
+3</pre>
+
+<h3><code>[ ]</code> ou <code>array()</code>?</h3>
+<p>Existe uma segunda forma de criar arrays, mais antiga: a palavra <code>array</code> com parênteses. As duas criam <strong>exatamente</strong> o mesmo array. Veja a prova, com o <code>var_dump</code> (que mostra tudo por dentro) e a comparação <code>===</code> ("idêntico", da aula <a href="operadores-comparacao.html">Comparação</a>):</p>
+
+<pre class="file" data-file="iguais.php">&lt;?php
+$a = ["arroz", "feijão", "café"];
+$b = array("arroz", "feijão", "café");
+var_dump($a);
+var_dump($b);
+var_dump($a === $b);
+</pre>
+
+<pre class="term">$ php iguais.php
+array(3) {
+  [0]=&gt;
+  string(5) "arroz"
+  [1]=&gt;
+  string(7) "feijão"
+  [2]=&gt;
+  string(5) "café"
+}
+array(3) {
+  [0]=&gt;
+  string(5) "arroz"
+  [1]=&gt;
+  string(7) "feijão"
+  [2]=&gt;
+  string(5) "café"
+}
+bool(true)              « os dois arrays são idênticos</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Desde</th><th>Quando você vai ver</th></tr>
+<tr><td><code>["arroz", "café"]</code></td><td>PHP 5.4 (2012)</td><td>Código moderno. <strong>Use esta.</strong></td></tr>
+<tr><td><code>array("arroz", "café")</code></td><td>Sempre existiu</td><td>Código antigo, tutoriais velhos, WordPress. Leia sem susto: é a mesma coisa.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Por que <code>"feijão"</code> tem <code>string(7)</code>, se são 6 letras?</strong>
+<p>O <code>var_dump</code> conta <strong>bytes</strong>, não letras. Letras acentuadas como <code>ã</code> e <code>é</code> ocupam 2 bytes cada em UTF-8. Por isso <code>"café"</code> aparece como <code>string(5)</code>. Isso é explicado na aula <a href="mbstring.html">Acentos e mbstring</a>.</p>
+</div>
+
+<hr>
+
+<h2>Os índices começam no 0</h2>
+<p>Esta é a parte que mais confunde no começo: a <strong>primeira</strong> posição é a <strong>0</strong>. Pense no índice como "quantos passos eu ando a partir do começo". Para pegar o primeiro item você anda zero passos; para o segundo, um passo.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você diz…</th><th>Índice</th><th>Código</th></tr>
+<tr><td>o 1º item</td><td>0</td><td><code>$compras[0]</code></td></tr>
+<tr><td>o 2º item</td><td>1</td><td><code>$compras[1]</code></td></tr>
+<tr><td>o 3º item</td><td>2</td><td><code>$compras[2]</code></td></tr>
+<tr><td>o último item (de 3)</td><td>3 − 1 = 2</td><td><code>$compras[count($compras) - 1]</code></td></tr>
+</table>
+</div>
+
+<p>Regra prática: num array de <strong>N</strong> itens, os índices vão de <strong>0</strong> até <strong>N − 1</strong>. Um array de 3 itens <strong>não tem</strong> o índice 3.</p>
+
+<p>Quase todas as linguagens de programação contam assim (C, Java, JavaScript, Python…). Vale se acostumar logo.</p>
+
+<hr>
+
+<h2>Mudar, contar e adicionar</h2>
+
+<pre class="file" data-file="mudar.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+$compras[1] = "feijão preto";
+echo "Quantos itens: ", count($compras), "\n";
+$compras[] = "leite";
+$compras[] = "pão";
+echo "Quantos itens: ", count($compras), "\n";
+print_r($compras);
+echo "Último: ", $compras[count($compras) - 1], "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$compras[1] = "feijão preto";</code></td><td><strong>Troca</strong> o valor da gaveta 1. O valor antigo (<code>"feijão"</code>) é jogado fora.</td></tr>
+<tr><td><code>count($compras)</code></td><td><strong>Conta</strong> os itens (<em>count</em> = contar). Devolve um número inteiro.</td></tr>
+<tr><td><code>$compras[] = "leite";</code></td><td><strong>Acrescenta</strong> no fim. Colchetes <strong>vazios</strong> querem dizer "a próxima gaveta livre". O PHP escolhe o índice sozinho: aqui, o 3.</td></tr>
+<tr><td><code>print_r($compras);</code></td><td>Mostra o array inteiro, com índices e valores.</td></tr>
+<tr><td><code>$compras[count($compras) - 1]</code></td><td>O último item: 5 itens, último índice 4.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php mudar.php
+Quantos itens: 3
+Quantos itens: 5
+Array
+(
+    [0] =&gt; arroz
+    [1] =&gt; feijão preto
+    [2] =&gt; café
+    [3] =&gt; leite
+    [4] =&gt; pão
+)
+Último: pão</pre>
+
+<p>O <code>[]</code> vazio é a forma mais usada de "colocar mais um na lista". Ele funciona até se a variável ainda não existir: o PHP cria um array novo na hora.</p>
+
+<pre class="file" data-file="do-zero.php">&lt;?php
+$lista[] = "ovo";       // $lista não existia: vira ["ovo"]
+print_r($lista);
+</pre>
+
+<pre class="term">$ php do-zero.php
+Array
+(
+    [0] =&gt; ovo
+)</pre>
+
+<p>Mesmo assim, é mais claro começar com um array vazio, <code>$lista = [];</code>, e depois ir acrescentando. Quem lê o código entende na hora que <code>$lista</code> é uma lista.</p>
+
+<div class="tryphp">
+<p class="try-task">Mude à vontade: troque itens, acrescente outros com <code>$compras[] = …;</code> e veja como o <code>print_r</code> e o <code>count</code> respondem.</p>
+<pre class="script">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+
+$compras[] = "leite";
+$compras[0] = "arroz integral";
+
+echo "A lista tem ", count($compras), " itens\n";
+echo "O primeiro é: ", $compras[0], "\n";
+print_r($compras);
+</pre>
+</div>
+
+<h3>Um array pode guardar qualquer tipo</h3>
+<p>Os itens não precisam ser todos textos. Um array pode ter números, booleanos, <code>null</code>, até outros arrays (veja <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>). Na prática, porém, uma lista costuma ter itens do mesmo tipo: só nomes, só preços.</p>
+
+<pre class="file" data-file="imprimir.php">&lt;?php
+$coisas = ["café", 3, 4.5, true, null];
+print_r($coisas);
+var_dump($coisas);
+</pre>
+
+<p>Este exemplo serve também para comparar as duas formas de "olhar dentro" de um array.</p>
+
+<hr>
+
+<h2>Imprimir um array: <code>print_r</code> e <code>var_dump</code></h2>
+<p>A primeira coisa que todo mundo tenta é o <code>echo</code>. Não dá certo:</p>
+
+<pre class="file" data-file="echoarray.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+echo $compras;
+echo "\n";
+echo "Lista: $compras\n";
+</pre>
+
+<pre class="term">$ php echoarray.php
+
+Warning: Array to string conversion in /home/ana/site/echoarray.php on line 3
+Array
+
+Warning: Array to string conversion in /home/ana/site/echoarray.php on line 5
+Lista: Array</pre>
+
+<p>O <code>echo</code> só sabe escrever texto. Quando recebe um array, o PHP avisa <em>Array to string conversion</em> ("conversão de array para string") e escreve a palavra <code>Array</code> no lugar, o que não ajuda ninguém. Para ver o conteúdo, use uma destas funções:</p>
+
+<pre class="term">$ php imprimir.php
+Array
+(
+    [0] =&gt; café
+    [1] =&gt; 3
+    [2] =&gt; 4.5
+    [3] =&gt; 1                « o true aparece como 1
+    [4] =&gt;                  « o null aparece vazio
+)
+array(5) {
+  [0]=&gt;
+  string(5) "café"
+  [1]=&gt;
+  int(3)
+  [2]=&gt;
+  float(4.5)
+  [3]=&gt;
+  bool(true)
+  [4]=&gt;
+  NULL
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Mostra</th><th>Use para</th></tr>
+<tr><td><code>print_r($a)</code></td><td>Índices e valores, de forma enxuta. Não mostra os tipos: <code>true</code> vira <code>1</code>, <code>null</code> e <code>false</code> somem.</td><td>Dar uma olhada rápida no conteúdo.</td></tr>
+<tr><td><code>var_dump($a)</code></td><td>Tudo: quantos itens (<code>array(5)</code>), o tipo e o tamanho de cada valor.</td><td>Investigar um problema, ver se algo é <code>"3"</code> (texto) ou <code>3</code> (número).</td></tr>
+</table>
+</div>
+
+<p>As duas foram apresentadas na aula <a href="var-dump.html">var_dump e print_r</a>. Lá você também vê o truque de envolver a saída com <code>&lt;pre&gt;</code> quando o PHP gera uma página web, para o navegador respeitar as quebras de linha.</p>
+
+<h3>Mostrar a lista bonita para o usuário</h3>
+<p><code>print_r</code> e <code>var_dump</code> são ferramentas do <strong>programador</strong>. Para mostrar a lista a quem usa o site, percorra o array com um <a href="foreach.html">foreach</a>, ou junte os itens num texto com <code>implode</code> ("juntar", com um separador):</p>
+
+<pre class="file" data-file="percorrer.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+foreach ($compras as $item) {
+    echo "- $item\n";
+}
+for ($i = 0; $i &lt; count($compras); $i++) {
+    echo "$i: {$compras[$i]}\n";
+}
+echo "Primeiro item: $compras[0]\n";
+echo implode(", ", $compras), "\n";
+</pre>
+
+<pre class="term">$ php percorrer.php
+- arroz
+- feijão
+- café
+0: arroz
+1: feijão
+2: café
+Primeiro item: arroz
+arroz, feijão, café</pre>
+
+<ul>
+  <li>O <code>foreach</code> passa por cada item, do primeiro ao último, sem você se preocupar com índices. É a forma mais usada (aula <a href="foreach.html">foreach</a>).</li>
+  <li>O <code>for</code> com <code>$i</code> de <code>0</code> até <code>count - 1</code> também funciona, quando você precisa do número da posição (aula <a href="for.html">for</a>).</li>
+  <li>Dentro de aspas duplas, <code>$compras[0]</code> funciona direto; com uma expressão no índice, como <code>$i</code>, prefira as chaves: <code>{$compras[$i]}</code> (aula <a href="interpolacao.html">Interpolação</a>).</li>
+</ul>
+
+<hr>
+
+<h2>Pedir um índice que não existe</h2>
+<p>O array da Ana tem 3 itens (índices 0, 1 e 2). O que acontece se o programa pedir o índice 5?</p>
+
+<pre class="file" data-file="inexistente.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+echo "Item: ", $compras[5], "\n";
+echo "Fim do programa\n";
+</pre>
+
+<pre class="term">$ php inexistente.php
+Item:
+Warning: Undefined array key 5 in /home/ana/site/inexistente.php on line 3
+
+Fim do programa</pre>
+
+<p>Leia a mensagem por partes (o jeito de ler qualquer erro está na aula <a href="erros.html">Lendo Erros do PHP</a>):</p>
+<dl class="anatomy">
+  <dt>Warning</dt><dd>"Aviso". Não é um erro fatal: o programa <strong>continua</strong> (repare no "Fim do programa").</dd>
+  <dt>Undefined array key 5</dt><dd>"Chave de array indefinida: 5". Não existe gaveta número 5.</dd>
+  <dt>in /home/ana/site/inexistente.php on line 3</dt><dd>Em que arquivo e em que linha aconteceu.</dd>
+</dl>
+
+<p>No lugar do valor que não existe, o PHP usa <code>null</code> (nada), e o <code>echo</code> de <code>null</code> não escreve nada. O <code>"Item: "</code> saiu antes do aviso porque o <code>echo</code> com vírgulas escreve cada parte na ordem: escreveu <code>"Item: "</code>, foi buscar <code>$compras[5]</code>, avisou, e seguiu.</p>
+
+<h3>Índices negativos não contam de trás para frente</h3>
+<p>Em algumas linguagens, <code>[-1]</code> é "o último". No PHP, não: <code>-1</code> é só mais um índice, que aqui não existe.</p>
+
+<pre class="file" data-file="negativo.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+echo $compras[-1], "\n";
+var_dump($compras[5]);
+echo $compras[5] ?? "não tem", "\n";
+</pre>
+
+<pre class="term">$ php negativo.php
+
+Warning: Undefined array key -1 in /home/ana/site/negativo.php on line 3
+
+
+Warning: Undefined array key 5 in /home/ana/site/negativo.php on line 4
+NULL                    « o valor de uma posição que não existe é null
+não tem                 « com ??, nenhum aviso</pre>
+
+<p>A última linha mostra a forma certa de ler uma posição que <strong>talvez</strong> não exista: o operador <code>??</code> (aula <a href="null-coalescing.html">?? e ?-&gt;</a>). <code>$compras[5] ?? "não tem"</code> quer dizer "o item 5, ou, se ele não existir, <code>"não tem"</code>", sem aviso nenhum. Para pegar o último item, use <code>count($compras) - 1</code> como índice, ou a função <code>array_last</code> do PHP 8.5 (veja <a href="funcoes-array.html">Funções de Array</a>).</p>
+
+<div class="note">
+<strong>Por que as linhas em branco antes do <code>Warning</code>?</strong>
+<p>No terminal, o PHP escreve uma linha vazia antes de cada aviso, para ele não grudar no texto que veio antes. Num navegador, o mesmo aviso aparece como <strong>Warning</strong>: … em negrito, no meio da página. Em sites de verdade os avisos ficam escondidos do público e vão para um arquivo de log (aula <a href="tipos-erro.html">Tipos de Erro</a>).</p>
+</div>
+
+<hr>
+
+<h2>Tirar um item com <code>unset</code> (e o buraco que fica)</h2>
+<p>Para apagar um item, use <code>unset</code> ("desdefinir"). Mas atenção: os outros itens <strong>não mudam de índice</strong>. Fica um buraco.</p>
+
+<pre class="file" data-file="unset.php">&lt;?php
+$compras = ["arroz", "feijão", "café", "leite"];
+unset($compras[1]);
+print_r($compras);
+echo count($compras), "\n";
+$compras[] = "pão";
+print_r($compras);
+$compras = array_values($compras);
+print_r($compras);
+</pre>
+
+<pre class="term">$ php unset.php
+Array
+(
+    [0] =&gt; arroz
+    [2] =&gt; café             « o índice 1 sumiu; o café continua no 2
+    [3] =&gt; leite
+)
+3
+Array
+(
+    [0] =&gt; arroz
+    [2] =&gt; café
+    [3] =&gt; leite
+    [4] =&gt; pão              « o [] usa o maior índice + 1, e não preenche o buraco
+)
+Array
+(
+    [0] =&gt; arroz            « array_values renumerou: 0, 1, 2, 3
+    [1] =&gt; café
+    [2] =&gt; leite
+    [3] =&gt; pão
+)</pre>
+
+<p>Depois de um <code>unset</code>, um laço <code>for</code> de 0 até <code>count - 1</code> vai tropeçar no buraco (pediria o índice 1, que não existe). O <code>foreach</code> não tem esse problema. Se precisar dos índices em sequência de novo, use <code>array_values</code>, que devolve uma cópia renumerada. Outras formas de tirar itens (do começo, do fim, do meio) estão em <a href="funcoes-array.html">Funções de Array</a>.</p>
+
+<p>O mesmo acontece se você escrever num índice "lá na frente": o PHP não preenche o caminho.</p>
+
+<pre class="file" data-file="buraco.php">&lt;?php
+$numeros = [10, 20, 30];
+$numeros[10] = 99;
+$numeros[] = 100;
+print_r($numeros);
+echo count($numeros), "\n";
+</pre>
+
+<pre class="term">$ php buraco.php
+Array
+(
+    [0] =&gt; 10
+    [1] =&gt; 20
+    [2] =&gt; 30
+    [10] =&gt; 99
+    [11] =&gt; 100
+)
+5                       « 5 itens, e não 12: as gavetas 3 a 9 não existem</pre>
+
+<p>Isso mostra uma verdade importante sobre o PHP: os índices são <strong>etiquetas</strong>, não posições fixas. Na próxima aula, <a href="arrays-associativos.html">Arrays Associativos</a>, as etiquetas deixam de ser números e passam a ser nomes, como <code>"nome"</code> e <code>"idade"</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key 3</code></strong>
+<pre class="term">$ php mostra.php
+
+Warning: Undefined array key 3 in /home/ana/site/mostra.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> o código pediu um índice que não existe. As causas mais comuns: esquecer que o primeiro índice é 0 (um array de 3 itens vai até o 2); usar <code>count($a)</code> como índice do último em vez de <code>count($a) - 1</code>; um <code>for</code> com <code>&lt;=</code> no lugar de <code>&lt;</code>; ou um buraco deixado por <code>unset</code>.</p>
+<p><strong>Como resolver:</strong> faça um <code>print_r</code> do array para ver os índices que existem de verdade. Se a posição pode mesmo faltar, use <code>$a[3] ?? "padrão"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Array to string conversion</code> e aparece <code>Array</code> na tela</strong>
+<pre class="term">$ php echoarray.php
+
+Warning: Array to string conversion in /home/ana/site/echoarray.php on line 3
+Array</pre>
+<p><strong>O que aconteceu:</strong> você mandou o <code>echo</code> (ou uma string entre aspas) escrever o array inteiro. O <code>echo</code> só escreve textos e números.</p>
+<p><strong>Como resolver:</strong> para depurar, <code>print_r</code> ou <code>var_dump</code>. Para o usuário, <code>foreach</code> ou <code>implode(", ", $a)</code>. Se a ideia era escrever um item, faltou o índice: <code>echo $compras[0];</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Cannot use [] for reading</code></strong>
+<pre class="file" data-file="leitura.php">&lt;?php
+$compras = ["arroz", "feijão"];
+echo $compras[];
+</pre>
+<pre class="term">$ php leitura.php
+
+Fatal error: Cannot use [] for reading in /home/ana/site/leitura.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que aconteceu:</strong> os colchetes vazios significam "a próxima posição livre". Isso só faz sentido para <strong>guardar</strong> (<code>$compras[] = "x";</code>), nunca para <strong>ler</strong>: não há nada lá ainda. É um erro <em>fatal</em>: o PHP nem começa a rodar o arquivo. As linhas <code>Stack trace</code> são o "caminho" até o erro, que o PHP 8.5 passou a mostrar também nos erros fatais.</p>
+<p><strong>Como resolver:</strong> coloque o índice que você quer ler (<code>$compras[0]</code>) ou, se a intenção era acrescentar, use <code>=</code>: <code>$compras[] = "leite";</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Undefined variable</code> seguido de <code>Trying to access array offset on null</code></strong>
+<pre class="file" data-file="semvar.php">&lt;?php
+$compras = ["arroz", "feijão"];
+echo $compra[0];
+</pre>
+<pre class="term">$ php semvar.php
+
+Warning: Undefined variable $compra in /home/ana/site/semvar.php on line 3
+
+Warning: Trying to access array offset on null in /home/ana/site/semvar.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> um erro de digitação: <code>$compra</code> (singular) no lugar de <code>$compras</code>. O primeiro aviso diz que a variável não existe; como uma variável que não existe vale <code>null</code>, o segundo diz "tentando acessar uma posição (<em>offset</em>) de array em <code>null</code>".</p>
+<p><strong>Como resolver:</strong> confira o nome da variável letra por letra. Quando vierem dois avisos na mesma linha, resolva sempre o <strong>primeiro</strong>: o segundo costuma ser consequência dele.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th><th>Resultado</th></tr>
+<tr><td>Criar um array</td><td><code>$a = ["x", "y", "z"];</code></td><td>Índices 0, 1, 2</td></tr>
+<tr><td>Criar (forma antiga)</td><td><code>$a = array("x", "y", "z");</code></td><td>O mesmo array</td></tr>
+<tr><td>Criar vazio</td><td><code>$a = [];</code></td><td><code>count($a)</code> é 0</td></tr>
+<tr><td>Ler um item</td><td><code>$a[0]</code></td><td><code>"x"</code></td></tr>
+<tr><td>Ler, com valor padrão</td><td><code>$a[9] ?? "nada"</code></td><td><code>"nada"</code>, sem aviso</td></tr>
+<tr><td>Trocar um item</td><td><code>$a[1] = "Y";</code></td><td><code>["x", "Y", "z"]</code></td></tr>
+<tr><td>Acrescentar no fim</td><td><code>$a[] = "w";</code></td><td>Índice = maior índice + 1</td></tr>
+<tr><td>Contar</td><td><code>count($a)</code></td><td>Número de itens</td></tr>
+<tr><td>Último item</td><td><code>$a[count($a) - 1]</code></td><td>Se os índices estiverem em sequência</td></tr>
+<tr><td>Apagar um item</td><td><code>unset($a[1]);</code></td><td>Fica um buraco no índice 1</td></tr>
+<tr><td>Renumerar</td><td><code>$a = array_values($a);</code></td><td>Índices 0, 1, 2… de novo</td></tr>
+<tr><td>Ver o conteúdo</td><td><code>print_r($a);</code> / <code>var_dump($a);</code></td><td>Para o programador</td></tr>
+<tr><td>Juntar num texto</td><td><code>implode(", ", $a)</code></td><td><code>"x, y, z"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="out:Itens: 4,out:Último: leite,semerro,src:count\(">
+<p class="try-task"><strong>Missão:</strong> o programa abaixo tem dois problemas. Ele mostra <code>Array</code> em vez da quantidade de itens, e pede o último item com um índice que não existe (veja o aviso). Corrija para a saída ser <code>Itens: 4</code> e <code>Último: leite</code>, sem nenhum aviso. Use <code>count</code> nas duas linhas, para o programa continuar certo se a lista crescer.</p>
+<pre class="script">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+$compras[] = "leite";
+
+echo "Itens: " . $compras . "\n";
+echo "Último: " . $compras[4] . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+$compras[] = "leite";
+
+echo "Itens: " . count($compras) . "\n";
+echo "Último: " . $compras[count($compras) - 1] . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O primeiro item</h3>
+<p>Complete para mostrar <code>arroz</code>, o primeiro item da lista:</p>
+<div class="ex-code">$compras = ["arroz", "feijão", "café"];<br>echo $compras[<input data-answer="0" aria-label="índice">];</div>
+</div>
+
+<div class="exercise">
+<h3>2. Mais um na lista</h3>
+<p>Complete para acrescentar <code>"pão"</code> no fim do array, sem escrever o índice:</p>
+<div class="ex-code">$compras<input data-answer="[]" aria-label="colchetes"> = "pão";</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quantos são?</h3>
+<p>Complete com a função que conta os itens de um array:</p>
+<div class="ex-code">echo <input data-answer="count" aria-label="função">($compras);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Em <code>$cores = ["azul", "verde", "rosa", "preto"];</code>, qual é o valor de <code>$cores[2]</code>?</p>
+<label><input type="radio" name="q4"> <code>"azul"</code></label>
+<label><input type="radio" name="q4"> <code>"verde"</code></label>
+<label><input type="radio" name="q4"> <code>"rosa"</code></label>
+<label><input type="radio" name="q4"> <code>"preto"</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que acontece em <code>echo $cores[4];</code> com o array da pergunta anterior?</p>
+<label><input type="radio" name="q5"> Mostra <code>"preto"</code>, o 4º item.</label>
+<label><input type="radio" name="q5"> Aparece <code>Warning: Undefined array key 4</code> e o programa continua.</label>
+<label><input type="radio" name="q5"> Aparece um <code>Fatal error</code> e o programa para.</label>
+<label><input type="radio" name="q5"> Mostra o último item, porque o índice passou do fim.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual função mostra o <strong>tipo</strong> de cada item (por exemplo, se é <code>int(3)</code> ou <code>string(1) "3"</code>)?</p>
+<label><input type="radio" name="q6"> <code>echo</code></label>
+<label><input type="radio" name="q6"> <code>print_r</code></label>
+<label><input type="radio" name="q6"> <code>count</code></label>
+<label><input type="radio" name="q6"> <code>var_dump</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Depois de <code>$a = ["x", "y", "z"]; unset($a[0]); $a[] = "w";</code>, quais são os índices de <code>$a</code>?</p>
+<label><input type="radio" name="q7"> 1, 2, 3</label>
+<label><input type="radio" name="q7"> 0, 1, 2</label>
+<label><input type="radio" name="q7"> 0, 1, 2, 3</label>
+<label><input type="radio" name="q7"> 1, 2, 0</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>array</strong> guarda vários valores numa variável só. No array <strong>indexado</strong>, cada valor tem um número: o <strong>índice</strong>.</li>
+  <li>Crie com <code>["a", "b"]</code> (moderno) ou <code>array("a", "b")</code> (antigo): são iguais.</li>
+  <li>Os índices começam no <strong>0</strong>; num array de N itens, o último é o <strong>N − 1</strong>. Índice negativo não conta de trás para frente.</li>
+  <li><code>$a[i]</code> lê, <code>$a[i] = …</code> troca, <code>$a[] = …</code> acrescenta no fim, <code>count($a)</code> conta.</li>
+  <li>Índice que não existe: <code>Warning: Undefined array key</code> e o valor vira <code>null</code>. Use <code>??</code> quando a posição puder faltar.</li>
+  <li><code>echo</code> não mostra arrays (sai <code>Array</code> e um aviso). Use <code>print_r</code>/<code>var_dump</code> para depurar e <code>foreach</code>/<code>implode</code> para o usuário.</li>
+  <li><code>unset</code> deixa buracos; <code>array_values</code> renumera.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
