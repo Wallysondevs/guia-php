@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Ordenar Arrays — sort, asort, ksort e usort | Guia PHP</title>
+<meta name="description" content="Como ordenar arrays no PHP: sort e rsort, asort e arsort (que mantêm a chave), ksort e krsort, usort com o operador &lt;=&gt;, ordenar a tabela de alunos por nota e por nome, maiúsculas, números como texto, acentos (Ágata no fim) e por que sort devolve true, com saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Ordenar Arrays</span></h1>
+
+<p class="intro">Colocar coisas em ordem é uma das tarefas mais comuns de um programa: nomes em ordem alfabética, produtos do mais barato ao mais caro, alunos da maior nota para a menor. O PHP tem uma família de funções para isso, todas terminadas em <code>sort</code> ("ordenar"). As letras antes do <code>sort</code> dizem <strong>o que</strong> é ordenado e <strong>se as chaves são mantidas</strong>. Esta aula mostra cada uma, com saídas reais, e as armadilhas: maiúsculas, números guardados como texto e acentos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Ordenar listas com <code>sort</code> (crescente) e <code>rsort</code> (decrescente).</li>
+  <li>Por que as funções de ordenar <strong>mudam o array</strong> e devolvem só <code>true</code>.</li>
+  <li>Ordenar arrays associativos sem perder as chaves: <code>asort</code>, <code>arsort</code>, <code>ksort</code>, <code>krsort</code>.</li>
+  <li>Ordenar do seu jeito com <code>usort</code> e o operador "nave espacial" <code>&lt;=&gt;</code>.</li>
+  <li>Ordenar a tabela de alunos por nota, por nome, e pelos dois.</li>
+  <li>O que acontece com maiúsculas, com <code>"10"</code> e <code>"9"</code>, e com nomes acentuados como <code>"Ágata"</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2><code>sort</code> e <code>rsort</code>: ordenar uma lista</h2>
+
+<pre class="file" data-file="o-sort.php">&lt;?php
+$notas = [8.5, 6.0, 9.5, 7.0];
+sort($notas);
+echo implode(" ", $notas), "\n";
+rsort($notas);
+echo implode(" ", $notas), "\n";
+
+$nomes = ["Diego", "Ana", "Carla", "Bruno"];
+sort($nomes);
+echo implode(", ", $nomes), "\n";
+rsort($nomes);
+echo implode(", ", $nomes), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>sort($notas);</dt><dd>Ordena <code>$notas</code> do menor para o maior (ordem <strong>crescente</strong>). Números por valor, textos em ordem alfabética.</dd>
+  <dt>rsort($notas);</dt><dd>O <code>r</code> é de <em>reverse</em> ("ao contrário"): do maior para o menor (ordem <strong>decrescente</strong>).</dd>
+</dl>
+
+<pre class="term">$ php o-sort.php
+6 7 8.5 9.5
+9.5 8.5 7 6
+Ana, Bruno, Carla, Diego
+Diego, Carla, Bruno, Ana</pre>
+
+<p>Repare que a linha é só <code>sort($notas);</code>, sem <code>=</code>. A função <strong>mexe no próprio array</strong>: depois dela, <code>$notas</code> está ordenado.</p>
+
+<h3>As funções de ordenar devolvem <code>true</code>, não o array</h3>
+<p>Quem vem de outras linguagens costuma escrever <code>$ordenados = sort($nomes);</code>. Veja o que acontece:</p>
+
+<pre class="file" data-file="o-retorno.php">&lt;?php
+$nomes = ["Diego", "Ana", "Carla"];
+$ordenados = sort($nomes);
+var_dump($ordenados);
+print_r($nomes);
+foreach ($ordenados as $n) {
+    echo $n, "\n";
+}
+</pre>
+
+<pre class="term">$ php o-retorno.php
+bool(true)              « sort devolve só true ("deu certo")
+Array
+(
+    [0] =&gt; Ana          « quem ficou ordenado foi o próprio $nomes
+    [1] =&gt; Carla
+    [2] =&gt; Diego
+)
+
+Warning: foreach() argument must be of type array|object, true given in /home/ana/site/o-retorno.php on line 6</pre>
+
+<p>Todas as funções desta aula funcionam assim: <strong>ordenam no lugar</strong> e devolvem <code>true</code>. O aviso da última linha diz que o <code>foreach</code> precisa de um array, mas recebeu <code>true</code>. Esse comportamento vem da forma como o array é passado à função ("por referência", explicada em <a href="parametros.html">Parâmetros</a>).</p>
+
+<h3>E se eu quiser manter a ordem original?</h3>
+<p>Faça uma cópia antes e ordene a cópia. No PHP, <code>$b = $a;</code> copia o array inteiro: mexer em um não mexe no outro.</p>
+
+<pre class="file" data-file="o-copia.php">&lt;?php
+$chegada = ["Diego", "Ana", "Carla"];
+$alfabetica = $chegada;      // cópia
+sort($alfabetica);
+echo "Ordem de chegada: ", implode(", ", $chegada), "\n";
+echo "Ordem alfabética: ", implode(", ", $alfabetica), "\n";
+</pre>
+
+<pre class="term">$ php o-copia.php
+Ordem de chegada: Diego, Ana, Carla
+Ordem alfabética: Ana, Carla, Diego</pre>
+
+<hr>
+
+<h2>Arrays associativos: <code>asort</code>, <code>arsort</code>, <code>ksort</code>, <code>krsort</code></h2>
+<p>O <code>sort</code> tem um efeito colateral sério: ele <strong>joga fora as chaves</strong> e renumera tudo a partir de 0. Numa lista, tudo bem. Numa tabela de preços, é um desastre:</p>
+
+<pre class="file" data-file="o-assoc.php">&lt;?php
+$precos = ["café" =&gt; 18.9, "pão" =&gt; 0.75, "leite" =&gt; 5.49, "arroz" =&gt; 6.2];
+$copia = $precos;
+sort($copia);
+print_r($copia);
+
+asort($precos);
+print_r($precos);
+arsort($precos);
+print_r($precos);
+ksort($precos);
+print_r($precos);
+krsort($precos);
+print_r($precos);
+</pre>
+
+<pre class="term">$ php o-assoc.php
+Array
+(
+    [0] =&gt; 0.75             « sort: os preços em ordem, mas de quê? os nomes sumiram
+    [1] =&gt; 5.49
+    [2] =&gt; 6.2
+    [3] =&gt; 18.9
+)
+Array
+(
+    [pão] =&gt; 0.75           « asort: ordena pelo VALOR e mantém cada chave com o seu valor
+    [leite] =&gt; 5.49
+    [arroz] =&gt; 6.2
+    [café] =&gt; 18.9
+)
+Array
+(
+    [café] =&gt; 18.9          « arsort: pelo valor, do maior para o menor
+    [arroz] =&gt; 6.2
+    [leite] =&gt; 5.49
+    [pão] =&gt; 0.75
+)
+Array
+(
+    [arroz] =&gt; 6.2          « ksort: pela CHAVE, em ordem alfabética
+    [café] =&gt; 18.9
+    [leite] =&gt; 5.49
+    [pão] =&gt; 0.75
+)
+Array
+(
+    [pão] =&gt; 0.75           « krsort: pela chave, de Z para A
+    [leite] =&gt; 5.49
+    [café] =&gt; 18.9
+    [arroz] =&gt; 6.2
+)</pre>
+
+<p>Para lembrar, leia as letras do nome:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Letra</th><th>Significa</th><th>Exemplo</th></tr>
+<tr><td><code>a</code></td><td><em>associative</em>: mantém a associação chave =&gt; valor e ordena pelo valor</td><td><code>asort</code>, <code>arsort</code></td></tr>
+<tr><td><code>k</code></td><td><em>key</em>: ordena pela chave (e também mantém a associação)</td><td><code>ksort</code>, <code>krsort</code></td></tr>
+<tr><td><code>r</code></td><td><em>reverse</em>: ordem decrescente</td><td><code>rsort</code>, <code>arsort</code>, <code>krsort</code></td></tr>
+<tr><td><code>u</code></td><td><em>user</em>: você escreve a regra de comparação</td><td><code>usort</code>, <code>uasort</code>, <code>uksort</code></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Regra prática</strong>
+<p>Lista (chaves 0, 1, 2…)? <code>sort</code>/<code>rsort</code>. Array com chaves que importam? <code>asort</code>/<code>arsort</code> (pelo valor) ou <code>ksort</code>/<code>krsort</code> (pela chave). Nunca use <code>sort</code> num array associativo.</p>
+</div>
+
+<div class="tryphp">
+<p class="try-task">Troque <code>asort</code> por <code>arsort</code>, <code>ksort</code>, <code>krsort</code> e <code>sort</code> e compare os resultados. Qual delas perde os nomes dos produtos?</p>
+<pre class="script">&lt;?php
+$estoque = ["café" =&gt; 12, "pão" =&gt; 4, "leite" =&gt; 15, "açúcar" =&gt; 7];
+
+asort($estoque);
+print_r($estoque);
+
+ksort($estoque);
+print_r($estoque);
+</pre>
+</div>
+
+<hr>
+
+<h2><code>usort</code>: a sua própria regra</h2>
+<p>E a tabela de alunos da aula <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>? Cada aluno é um array com nome, idade e nota. Ordenar "os alunos" não tem resposta óbvia: por nome? por nota? O <code>usort</code> deixa você dizer. Ele recebe o array e uma <strong>função de comparação</strong>.</p>
+
+<h3>A função de comparação e o operador <code>&lt;=&gt;</code></h3>
+<p>Durante a ordenação, o PHP pega dois itens, <code>$a</code> e <code>$b</code>, e pergunta à sua função: "qual vem primeiro?". A função responde com um número:</p>
+<ul>
+  <li><strong>negativo</strong>: <code>$a</code> vem antes;</li>
+  <li><strong>zero</strong>: tanto faz (são "iguais" para a ordem);</li>
+  <li><strong>positivo</strong>: <code>$b</code> vem antes.</li>
+</ul>
+<p>O operador <code>&lt;=&gt;</code>, apelidado de <strong>nave espacial</strong> (<em>spaceship</em>) pelo formato, dá exatamente essa resposta:</p>
+
+<pre class="file" data-file="o-nave.php">&lt;?php
+var_dump(1 &lt;=&gt; 2);
+var_dump(2 &lt;=&gt; 2);
+var_dump(3 &lt;=&gt; 2);
+var_dump("Ana" &lt;=&gt; "Bruno");
+</pre>
+
+<pre class="term">$ php o-nave.php
+int(-1)                 « o da esquerda é menor
+int(0)                  « iguais
+int(1)                  « o da esquerda é maior
+int(-1)                 « "Ana" vem antes de "Bruno"</pre>
+
+<p>Com isso, a regra "do menor para o maior" é <code>$a &lt;=&gt; $b</code>, e "do maior para o menor" é <strong>trocar a ordem</strong>: <code>$b &lt;=&gt; $a</code>. O operador também aparece em <a href="operadores-comparacao.html">Comparação</a>.</p>
+
+<h3>Ordenar os alunos por nota e por nome</h3>
+
+<pre class="file" data-file="o-usort.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Diego", "idade" =&gt; 41, "nota" =&gt; 6.0],
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "nota" =&gt; 9.5],
+    ["nome" =&gt; "Elisa", "idade" =&gt; 19, "nota" =&gt; 8.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "nota" =&gt; 8.5],
+];
+
+usort($alunos, fn($a, $b) =&gt; $b["nota"] &lt;=&gt; $a["nota"]);
+echo "Por nota (maior primeiro):\n";
+foreach ($alunos as $al) {
+    echo "  {$al['nome']}: {$al['nota']}\n";
+}
+
+usort($alunos, fn($a, $b) =&gt; $a["nome"] &lt;=&gt; $b["nome"]);
+echo "Por nome:\n";
+foreach ($alunos as $al) {
+    echo "  {$al['nome']}: {$al['nota']}\n";
+}
+
+usort($alunos, fn($a, $b) =&gt; [$b["nota"], $a["nome"]] &lt;=&gt; [$a["nota"], $b["nome"]]);
+echo "Por nota e, no empate, por nome:\n";
+foreach ($alunos as $al) {
+    echo "  {$al['nome']}: {$al['nota']}\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>usort($alunos, …)</dt><dd>Ordena <code>$alunos</code> no lugar, usando a sua regra. Como o <code>sort</code>, renumera as chaves (0, 1, 2…).</dd>
+  <dt>fn($a, $b) =&gt; …</dt><dd>Uma <strong>arrow function</strong>: uma função curta, escrita ali mesmo, que recebe dois alunos e devolve o resultado da expressão depois do <code>=&gt;</code>. Ela é explicada em <a href="closures.html">Funções Anônimas e Arrow Functions</a>.</dd>
+  <dt>$b["nota"] &lt;=&gt; $a["nota"]</dt><dd>Compara as notas com <code>$b</code> à esquerda: maior nota primeiro.</dd>
+  <dt>[$b["nota"], $a["nome"]] &lt;=&gt; [$a["nota"], $b["nome"]]</dt><dd>Compara dois arrays, item por item: primeiro as notas (decrescente, <code>$b</code> à esquerda); se empatarem, os nomes (crescente, <code>$a</code> à esquerda).</dd>
+</dl>
+
+<pre class="term">$ php o-usort.php
+Por nota (maior primeiro):
+  Ana: 9.5
+  Elisa: 8.5            « empate com a Carla: ficou a ordem em que estavam
+  Carla: 8.5
+  Bruno: 7
+  Diego: 6
+Por nome:
+  Ana: 9.5
+  Bruno: 7
+  Carla: 8.5
+  Diego: 6
+  Elisa: 8.5
+Por nota e, no empate, por nome:
+  Ana: 9.5
+  Carla: 8.5            « agora o empate é decidido pelo nome
+  Elisa: 8.5
+  Bruno: 7
+  Diego: 6</pre>
+
+<p>Na primeira ordenação, Elisa e Carla empataram com 8.5, e a Elisa ficou na frente porque <strong>já estava</strong> na frente no array original. Desde o PHP 8.0, a ordenação é <strong>estável</strong>: itens "iguais" mantêm a ordem que tinham. Para não depender disso, use o critério de desempate, como no terceiro exemplo.</p>
+
+<p>Existem também <code>uasort</code> (como o <code>usort</code>, mas mantém as chaves) e <code>uksort</code> (sua regra, aplicada às chaves).</p>
+
+<hr>
+
+<h2>Armadilhas: maiúsculas, números como texto e acentos</h2>
+
+<h3>Maiúsculas vêm antes</h3>
+<p>Para o computador, cada letra é um número (o código dela na tabela de caracteres), e <strong>todas as maiúsculas vêm antes de todas as minúsculas</strong>. Por isso:</p>
+
+<pre class="file" data-file="o-maiusc.php">&lt;?php
+$frutas = ["banana", "Abacate", "cereja", "Damasco", "amora"];
+sort($frutas);
+echo implode(", ", $frutas), "\n";
+sort($frutas, SORT_STRING | SORT_FLAG_CASE);
+echo implode(", ", $frutas), "\n";
+</pre>
+
+<pre class="term">$ php o-maiusc.php
+Abacate, Damasco, amora, banana, cereja     « primeiro as maiúsculas, depois as minúsculas
+Abacate, amora, banana, cereja, Damasco     « ignorando maiúsculas</pre>
+
+<p>O segundo argumento do <code>sort</code> é uma "opção" (<em>flag</em>). <code>SORT_STRING | SORT_FLAG_CASE</code> quer dizer "compare como texto, sem diferenciar maiúsculas". As mesmas opções valem para <code>rsort</code>, <code>asort</code>, <code>ksort</code> etc.</p>
+
+<h3>Números guardados como texto</h3>
+<p>Dados de formulários e arquivos chegam como texto (<code>"10"</code>, não <code>10</code>). O <code>sort</code> percebe que são números e compara pelo valor, o que normalmente é o que você quer. Já nomes de arquivo com números no meio ficam em ordem "de computador":</p>
+
+<pre class="file" data-file="o-numstr.php">&lt;?php
+$a = ["10", "9", "2", "1"];
+sort($a);
+echo implode(" ", $a), "\n";
+sort($a, SORT_STRING);
+echo implode(" ", $a), "\n";
+$fotos = ["foto10.jpg", "foto2.jpg", "foto1.jpg", "Foto3.jpg"];
+sort($fotos);
+echo implode(" ", $fotos), "\n";
+sort($fotos, SORT_NATURAL | SORT_FLAG_CASE);
+echo implode(" ", $fotos), "\n";
+</pre>
+
+<pre class="term">$ php o-numstr.php
+1 2 9 10                                    « textos numéricos: comparados como números
+1 10 2 9                                    « SORT_STRING: letra por letra ("10" começa com "1")
+Foto3.jpg foto1.jpg foto10.jpg foto2.jpg    « texto: F maiúsculo primeiro, e foto10 antes de foto2
+foto1.jpg foto2.jpg Foto3.jpg foto10.jpg    « ordem "natural", como uma pessoa ordenaria</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>Compara</th></tr>
+<tr><td>(nenhuma) = <code>SORT_REGULAR</code></td><td>Números como números, textos como texto; textos numéricos como números</td></tr>
+<tr><td><code>SORT_NUMERIC</code></td><td>Tudo como número</td></tr>
+<tr><td><code>SORT_STRING</code></td><td>Tudo como texto, caractere por caractere</td></tr>
+<tr><td><code>SORT_NATURAL</code></td><td>Texto, mas com os números do meio comparados pelo valor (<code>foto2</code> antes de <code>foto10</code>)</td></tr>
+<tr><td><code>| SORT_FLAG_CASE</code></td><td>Somado a <code>SORT_STRING</code> ou <code>SORT_NATURAL</code>: ignora maiúsculas</td></tr>
+</table>
+</div>
+
+<h3>Acentos: a Ágata vai para o fim</h3>
+<p>Este é o problema que mais aparece em sistemas em português:</p>
+
+<pre class="file" data-file="o-acento.php">&lt;?php
+$nomes = ["Bruno", "Ágata", "Carla", "Ana", "Élcio", "Eduardo"];
+sort($nomes);
+echo implode(", ", $nomes), "\n";
+</pre>
+
+<pre class="term">$ php o-acento.php
+Ana, Bruno, Carla, Eduardo, Ágata, Élcio</pre>
+
+<p>A Ágata deveria vir logo depois (ou antes) da Ana, e o Élcio junto do Eduardo. Mas as funções de ordenar comparam <strong>bytes</strong>: o <code>Á</code>, em UTF-8, é formado por bytes que vêm depois de todas as letras sem acento, então todo nome com letra acentuada no começo vai para o fim. Nenhuma opção do <code>sort</code> resolve isso.</p>
+
+<p><strong>A solução completa</strong> é a classe <code>Collator</code>, da extensão <strong>intl</strong> (de "internacionalização"), que conhece as regras de ordenação de cada idioma:</p>
+
+<pre class="file" data-file="collator.php">&lt;?php
+$nomes = ["Bruno", "Ágata", "Carla", "Ana", "Élcio", "Eduardo"];
+$collator = new Collator("pt_BR");
+$collator-&gt;sort($nomes);
+echo implode(", ", $nomes), "\n";
+</pre>
+
+<p>Mas a <code>intl</code> nem sempre está instalada. No laboratório deste guia, ela não está (e o editor do guia também não a tem):</p>
+
+<pre class="term">$ php -m | grep intl
+$ echo $?
+1                       « o grep não achou nada: sem a extensão intl</pre>
+
+<p>Sem ela, o código acima para logo na linha 3:</p>
+
+<pre class="term">$ php collator.php
+
+Fatal error: Uncaught Error: Class "Collator" not found in /home/ana/site/collator.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/collator.php on line 3</pre>
+
+<p>Num servidor Debian ou Ubuntu, ela se instala com o pacote <code>php-intl</code> (veja <a href="instalar-linux.html">Instalar no Linux</a>); com ela instalada, o <code>Collator</code> põe a Ágata no começo e o Élcio depois do Eduardo, como num dicionário.</p>
+
+<p><strong>A solução sem extensão</strong>: ordenar por uma "versão sem acentos" de cada nome. A função <code>strtr</code> troca letras usando uma tabela (um array associativo), e <code>mb_strtolower</code> passa tudo para minúsculas respeitando os acentos (aula <a href="mbstring.html">Acentos e mbstring</a>):</p>
+
+<pre class="file" data-file="o-acento2.php">&lt;?php
+$nomes = ["Bruno", "Ágata", "Carla", "Ana", "Élcio", "Eduardo"];
+
+$mapa = ["á" =&gt; "a", "à" =&gt; "a", "â" =&gt; "a", "ã" =&gt; "a", "é" =&gt; "e", "ê" =&gt; "e",
+         "í" =&gt; "i", "ó" =&gt; "o", "ô" =&gt; "o", "õ" =&gt; "o", "ú" =&gt; "u", "ç" =&gt; "c"];
+$chave = fn($nome) =&gt; strtr(mb_strtolower($nome), $mapa);
+
+usort($nomes, fn($a, $b) =&gt; $chave($a) &lt;=&gt; $chave($b));
+echo implode(", ", $nomes), "\n";
+echo $chave("Ágata"), "\n";
+</pre>
+
+<pre class="term">$ php o-acento2.php
+Ágata, Ana, Bruno, Carla, Eduardo, Élcio
+agata                   « a "chave de ordenação" da Ágata</pre>
+
+<p>Os nomes continuam com acento na saída: só a <strong>comparação</strong> usa a versão simplificada. É uma solução boa para nomes em português; para outros idiomas, ou regras mais finas, prefira o <code>Collator</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>foreach() argument must be of type array|object, true given</code></strong>
+<pre class="term">$ php o-retorno.php
+bool(true)
+Array
+(
+    [0] =&gt; Ana
+    [1] =&gt; Carla
+    [2] =&gt; Diego
+)
+
+Warning: foreach() argument must be of type array|object, true given in /home/ana/site/o-retorno.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> o código guardou o retorno de <code>sort</code> (<code>$ordenados = sort($nomes);</code>) e depois tentou percorrê-lo. O retorno é <code>true</code>, não o array.</p>
+<p><strong>Como resolver:</strong> chame <code>sort($nomes);</code> sozinho e use <code>$nomes</code> depois. Se precisar manter o original, copie antes: <code>$ordenados = $nomes; sort($ordenados);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Deprecated: usort(): Returning bool from comparison function is deprecated</code></strong>
+<pre class="file" data-file="o-bool.php">&lt;?php
+$notas = [8.5, 6.0, 9.5];
+usort($notas, fn($a, $b) =&gt; $a &gt; $b);
+echo implode(" ", $notas), "\n";
+</pre>
+<pre class="term">$ php o-bool.php
+
+Deprecated: usort(): Returning bool from comparison function is deprecated, return an integer less than, equal to, or greater than zero in /home/ana/site/o-bool.php on line 3
+6 8.5 9.5</pre>
+<p><strong>O que aconteceu:</strong> a função de comparação devolveu <code>true</code>/<code>false</code> (resultado de <code>$a &gt; $b</code>), mas o <code>usort</code> espera um número negativo, zero ou positivo. Ainda funciona (o PHP dá um jeito), mas está "desaprovado" e pode virar erro.</p>
+<p><strong>Como resolver:</strong> use a nave espacial: <code>fn($a, $b) =&gt; $a &lt;=&gt; $b</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>sort(): Argument #1 ($array) must be of type array, string given</code></strong>
+<pre class="file" data-file="o-string.php">&lt;?php
+$nomes = "Diego, Ana, Carla";
+sort($nomes);
+</pre>
+<pre class="term">$ php o-string.php
+
+Fatal error: Uncaught TypeError: sort(): Argument #1 ($array) must be of type array, string given in /home/ana/site/o-string.php:3
+Stack trace:
+#0 /home/ana/site/o-string.php(3): sort('Diego, Ana, Car...')
+#1 {main}
+  thrown in /home/ana/site/o-string.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> <code>$nomes</code> é um <strong>texto</strong> com vírgulas, não um array. O <code>Stack trace</code> mostra até o valor que foi passado (cortado em <code>...</code>).</p>
+<p><strong>Como resolver:</strong> transforme o texto em array antes: <code>$nomes = explode(", ", $nomes);</code> (aula <a href="funcoes-string.html">Funções de String</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Os nomes dos produtos sumiram depois de ordenar</strong>
+<p><strong>O que aconteceu:</strong> foi usado <code>sort</code> ou <code>rsort</code> num array associativo; as chaves foram trocadas por 0, 1, 2… (veja a primeira parte de <code>o-assoc.php</code>). O mesmo vale para <code>usort</code>.</p>
+<p><strong>Como resolver:</strong> <code>asort</code>/<code>arsort</code> para ordenar pelo valor, <code>ksort</code>/<code>krsort</code> pela chave, <code>uasort</code> com uma regra sua.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Ordena por</th><th>Ordem</th><th>Mantém as chaves?</th></tr>
+<tr><td><code>sort($a)</code></td><td>valor</td><td>crescente</td><td>não (renumera)</td></tr>
+<tr><td><code>rsort($a)</code></td><td>valor</td><td>decrescente</td><td>não</td></tr>
+<tr><td><code>asort($a)</code></td><td>valor</td><td>crescente</td><td>sim</td></tr>
+<tr><td><code>arsort($a)</code></td><td>valor</td><td>decrescente</td><td>sim</td></tr>
+<tr><td><code>ksort($a)</code></td><td>chave</td><td>crescente</td><td>sim</td></tr>
+<tr><td><code>krsort($a)</code></td><td>chave</td><td>decrescente</td><td>sim</td></tr>
+<tr><td><code>usort($a, fn)</code></td><td>sua regra (valores)</td><td>a da regra</td><td>não</td></tr>
+<tr><td><code>uasort($a, fn)</code></td><td>sua regra (valores)</td><td>a da regra</td><td>sim</td></tr>
+<tr><td><code>uksort($a, fn)</code></td><td>sua regra (chaves)</td><td>a da regra</td><td>sim</td></tr>
+</table>
+</div>
+<p>Todas mudam o array e devolvem <code>true</code>. Opções: <code>SORT_STRING</code>, <code>SORT_NUMERIC</code>, <code>SORT_NATURAL</code>, <code>| SORT_FLAG_CASE</code>. Regra do <code>usort</code>: <code>$a &lt;=&gt; $b</code> crescente, <code>$b &lt;=&gt; $a</code> decrescente.</p>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="out:Elisa\, Carla\, Ana\, Bruno\, Diego,src:usort,src:&lt;=&gt;,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana quer a lista de alunos do <strong>mais novo para o mais velho</strong>. Use <code>usort</code> com o operador <code>&lt;=&gt;</code> comparando a <code>"idade"</code>, para a saída ser <code>Elisa, Carla, Ana, Bruno, Diego</code>.</p>
+<pre class="script">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Diego", "idade" =&gt; 41, "nota" =&gt; 6.0],
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "nota" =&gt; 9.5],
+    ["nome" =&gt; "Elisa", "idade" =&gt; 19, "nota" =&gt; 8.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "nota" =&gt; 8.5],
+];
+
+// ordene aqui
+
+echo implode(", ", array_column($alunos, "nome")), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Diego", "idade" =&gt; 41, "nota" =&gt; 6.0],
+    ["nome" =&gt; "Ana",   "idade" =&gt; 29, "nota" =&gt; 9.5],
+    ["nome" =&gt; "Elisa", "idade" =&gt; 19, "nota" =&gt; 8.5],
+    ["nome" =&gt; "Bruno", "idade" =&gt; 34, "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "idade" =&gt; 22, "nota" =&gt; 8.5],
+];
+
+usort($alunos, fn($a, $b) =&gt; $a["idade"] &lt;=&gt; $b["idade"]);
+
+echo implode(", ", array_column($alunos, "nome")), "\n";
+</pre>
+</div>
+
+<pre class="term">$ php idades.php
+Elisa, Carla, Ana, Bruno, Diego</pre>
+
+<p>Desafio extra: mude para o mais velho primeiro, trocando só a ordem de <code>$a</code> e <code>$b</code>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Do maior para o menor</h3>
+<p>Complete com a função que ordena uma lista em ordem decrescente:</p>
+<div class="ex-code"><input data-answer="rsort" aria-label="função">($pontos);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Preços do mais barato ao mais caro, sem perder os nomes</h3>
+<div class="ex-code"><input data-answer="asort" aria-label="função">($precos);</div>
+</div>
+
+<div class="exercise">
+<h3>3. A nave espacial</h3>
+<p>Complete para ordenar os produtos pelo preço, do mais <strong>caro</strong> para o mais barato:</p>
+<div class="ex-code">usort($produtos, fn($a, $b) =&gt; <input data-answer="$b[&quot;preco&quot;] &lt;=&gt; $a[&quot;preco&quot;]|$b['preco'] &lt;=&gt; $a['preco']" aria-label="comparação">);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Depois de <code>$r = sort($lista);</code>, o que há em <code>$r</code>?</p>
+<label><input type="radio" name="q4"> A lista ordenada.</label>
+<label><input type="radio" name="q4"> Uma cópia da lista original.</label>
+<label><input type="radio" name="q4"> <code>true</code>.</label>
+<label><input type="radio" name="q4"> <code>null</code>.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Quanto vale <code>5 &lt;=&gt; 3</code>?</p>
+<label><input type="radio" name="q5"> <code>-1</code></label>
+<label><input type="radio" name="q5"> <code>1</code></label>
+<label><input type="radio" name="q5"> <code>0</code></label>
+<label><input type="radio" name="q5"> <code>true</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que <code>sort(["Bruno", "Ágata", "Ana"])</code> coloca "Ágata" por último?</p>
+<label><input type="radio" name="q6"> Porque o <code>sort</code> ordena pelo tamanho do nome.</label>
+<label><input type="radio" name="q6"> Porque "Ágata" tem mais vogais.</label>
+<label><input type="radio" name="q6"> É um erro do PHP que será corrigido.</label>
+<label><input type="radio" name="q6"> Porque compara bytes, e o "Á" em UTF-8 vem depois de todas as letras sem acento.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>sort</code>/<code>rsort</code> ordenam listas; <code>asort</code>/<code>arsort</code> ordenam pelo valor mantendo as chaves; <code>ksort</code>/<code>krsort</code> ordenam pela chave.</li>
+  <li>Todas <strong>ordenam no lugar</strong> e devolvem <code>true</code>. Para manter o original, copie antes.</li>
+  <li><code>usort($a, fn($a, $b) =&gt; $a[…] &lt;=&gt; $b[…])</code> ordena com a sua regra; troque <code>$a</code> e <code>$b</code> para inverter. Para desempatar, compare arrays: <code>[x1, y1] &lt;=&gt; [x2, y2]</code>.</li>
+  <li>Desde o PHP 8.0 a ordenação é estável: empates mantêm a ordem anterior.</li>
+  <li>Maiúsculas vêm antes (<code>SORT_FLAG_CASE</code> resolve); <code>SORT_NATURAL</code> põe <code>foto2</code> antes de <code>foto10</code>.</li>
+  <li>Acentos vão para o fim; use <code>Collator</code> (extensão intl) ou ordene por uma versão sem acentos.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
