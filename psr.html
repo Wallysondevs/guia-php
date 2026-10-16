@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Padrões PSR — PSR-1, PSR-12, PSR-4, PSR-3, PSR-7 e PHP-FIG | Guia PHP</title>
+<meta name="description" content="Os padrões PSR do PHP: o que é o PHP-FIG, estilo de código com PSR-1 e PSR-12 (e o PER Coding Style), autoload PSR-4, logs com PSR-3 (LoggerInterface), a ideia de PSR-7 e PSR-15 para HTTP, e ferramentas de estilo como PHP_CodeSniffer e PHP-CS-Fixer, com saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Padrões PSR</span></h1>
+
+<p class="intro">Cada programador tem as suas manias: chaves na mesma linha ou na de baixo, <code>calcular_total</code> ou <code>calcularTotal</code>, tab ou espaços. E cada biblioteca tinha o seu jeito de registrar logs, de carregar classes, de representar uma requisição HTTP. As <strong>PSRs</strong> são acordos da comunidade PHP para que todo mundo escreva do mesmo jeito e para que bibliotecas diferentes se encaixem como peças de LEGO.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma PSR e quem é o <strong>PHP-FIG</strong>.</li>
+  <li>As regras de estilo: <strong>PSR-1</strong> (o básico) e <strong>PSR-12</strong> (a formatação), e o sucessor PER Coding Style.</li>
+  <li>A <strong>PSR-4</strong> (autoload), em uma frase.</li>
+  <li>A <strong>PSR-3</strong>: uma interface de log que todas as bibliotecas entendem.</li>
+  <li>A ideia da <strong>PSR-7</strong> e da <strong>PSR-15</strong> (requisições HTTP e middlewares).</li>
+  <li>Ferramentas que conferem e consertam o estilo: <strong>PHP_CodeSniffer</strong> e <strong>PHP-CS-Fixer</strong>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: tomadas padronizadas</h2>
+<p>Qualquer aparelho comprado no Brasil encaixa em qualquer tomada brasileira, porque fabricantes concordaram com um padrão. Ninguém é <em>obrigado</em> por lei da física a seguir o padrão, mas quem não segue fica sem clientes.</p>
+<p>As PSRs são isso para o PHP. <strong>PSR</strong> quer dizer <em>PHP Standards Recommendation</em>, "Recomendação de Padrão do PHP". São documentos numerados (PSR-1, PSR-3, PSR-4…) escritos pelo <strong>PHP-FIG</strong> (<em>PHP Framework Interop Group</em>, "Grupo de Interoperabilidade de Frameworks PHP"), um grupo formado em 2009 por representantes de grandes projetos PHP. "Interoperabilidade" é a palavra-chave: fazer peças de projetos diferentes funcionarem juntas.</p>
+
+<div class="note">
+<strong>Recomendação, não lei</strong>
+<p>O PHP roda código que não segue nenhuma PSR (você vai ver isso daqui a pouco). As PSRs não fazem parte da linguagem; são acordos. Mas o ecossistema inteiro (Composer, Laravel, Symfony, as bibliotecas do Packagist) segue as principais, e quem trabalha em equipe também.</p>
+</div>
+
+<p>Existem dois tipos de PSR:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>O que define</th><th>Exemplos</th></tr>
+<tr><td><strong>Regras de escrita</strong></td><td>Como escrever e organizar o código</td><td>PSR-1, PSR-12 (estilo), PSR-4 (autoload)</td></tr>
+<tr><td><strong>Interfaces</strong></td><td>Um contrato (uma <a href="interfaces.html">interface</a>) que várias bibliotecas implementam, para serem trocáveis</td><td>PSR-3 (log), PSR-7 (HTTP), PSR-11 (contêiner), PSR-15 (middleware), PSR-18 (cliente HTTP)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>PSR-1: o estilo básico</h2>
+<p>A PSR-1 tem poucas regras, e todas importantes. As principais:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Certo</th><th>Errado</th></tr>
+<tr><td>Arquivos começam com <code>&lt;?php</code> (ou <code>&lt;?=</code>), nunca <code>&lt;?</code> sozinho</td><td><code>&lt;?php</code></td><td><code>&lt;?</code></td></tr>
+<tr><td>Arquivos em UTF-8 sem BOM</td><td>"UTF-8"</td><td>"UTF-8 com BOM"</td></tr>
+<tr><td>Um arquivo <strong>declara</strong> coisas (classes, funções) <strong>ou</strong> <strong>faz</strong> coisas (<code>echo</code>, mudar configurações), não os dois</td><td><code>Produto.php</code> só com a classe</td><td>Classe e <code>echo</code> no mesmo arquivo</td></tr>
+<tr><td>Classes em <strong>PascalCase</strong> (cada palavra com maiúscula, sem separador)</td><td><code>CarrinhoDeCompras</code></td><td><code>carrinho_de_compras</code></td></tr>
+<tr><td>Métodos em <strong>camelCase</strong> (como PascalCase, mas começando minúsculo)</td><td><code>calcularTotal()</code></td><td><code>Calcular_Total()</code></td></tr>
+<tr><td>Constantes de classe em MAIÚSCULAS com <code>_</code></td><td><code>TAXA_ENTREGA</code></td><td><code>taxaEntrega</code></td></tr>
+<tr><td>Namespaces e classes seguem uma PSR de autoload (a PSR-4)</td><td><code>Ana\Lojinha\Pedido</code> em <code>src/Pedido.php</code></td><td>Várias classes num arquivo só</td></tr>
+</table>
+</div>
+
+<p>A PSR-1 não decide o estilo das <strong>propriedades</strong> e variáveis; o importante é ser consistente. A maioria dos projetos usa camelCase também (<code>$precoTotal</code>).</p>
+
+<hr>
+
+<h2>PSR-12: a formatação</h2>
+<p>A PSR-12 continua a PSR-1 e decide o resto: espaços, chaves, linhas em branco. É um documento longo; você não precisa decorá-lo, porque as ferramentas conferem e consertam sozinhas (próxima seção). Mas reconheça o formato:</p>
+
+<pre class="file" data-file="src/Carrinho.php">&lt;?php
+
+declare(strict_types=1);
+
+namespace Ana\Lojinha;
+
+use InvalidArgumentException;
+
+class Carrinho
+{
+    public const TAXA = 0.05;
+
+    private array $itens = [];
+
+    public function adicionarItem(string $nome, float $preco): void
+    {
+        if ($preco &lt;= 0) {
+            throw new InvalidArgumentException("Preço inválido: $preco");
+        }
+
+        $this-&gt;itens[$nome] = $preco;
+    }
+
+    public function calcularTotal(): float
+    {
+        $total = array_sum($this-&gt;itens);
+
+        return $total &gt; 100 ? $total : $total * (1 + self::TAXA);
+    }
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra da PSR-12</th><th>No exemplo</th></tr>
+<tr><td>Indentação de <strong>4 espaços</strong>, nunca tab</td><td>Todo o corpo da classe</td></tr>
+<tr><td>Uma linha em branco entre os blocos do topo: <code>&lt;?php</code>, <code>declare</code>, <code>namespace</code>, <code>use</code></td><td>Linhas 2, 4, 6 e 8</td></tr>
+<tr><td>Chave de <strong>classe e método</strong> na linha de baixo</td><td><code>class Carrinho</code> ↵ <code>{</code></td></tr>
+<tr><td>Chave de <strong><code>if</code>, <code>foreach</code>, <code>while</code></strong> na mesma linha</td><td><code>if ($preco &lt;= 0) {</code></td></tr>
+<tr><td>Um espaço depois de <code>if</code>, <code>foreach</code>…, e nenhum depois do <code>(</code></td><td><code>if ($preco</code>, não <code>if( $preco</code></td></tr>
+<tr><td>Espaço dos dois lados dos operadores</td><td><code>$total * (1 + self::TAXA)</code></td></tr>
+<tr><td>Visibilidade sempre declarada (<code>public</code>, <code>private</code>…), inclusive nas constantes</td><td><code>public const TAXA</code></td></tr>
+<tr><td>Espaço depois da vírgula, nenhum antes</td><td><code>adicionarItem(string $nome, float $preco)</code></td></tr>
+<tr><td>Palavras do PHP em minúsculas</td><td><code>true</code>, <code>null</code>, <code>array</code></td></tr>
+<tr><td>Arquivo só com PHP termina sem <code>?&gt;</code> e com uma linha em branco</td><td>Último <code>}</code> seguido de quebra de linha</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>PSR-2, PSR-12 e PER Coding Style</strong>
+<p>Você vai encontrar três nomes. A <strong>PSR-2</strong> foi a primeira regra de formatação (2012) e está <strong>obsoleta</strong>. A <strong>PSR-12</strong> (2019) a substituiu. Como o PHP ganhou recursos depois disso (enums, <code>match</code>, atributos, property hooks), o PHP-FIG passou a manter o <strong>PER Coding Style</strong> (<em>PER</em> = "PHP Evolving Recommendation", recomendação que evolui), que estende a PSR-12 para a sintaxe nova. Na prática, quem segue a PSR-12 já segue quase tudo.</p>
+</div>
+
+<hr>
+
+<h2>Conferindo o estilo com ferramentas</h2>
+<p>A Ana escreveu este arquivo com pressa:</p>
+
+<pre class="file" data-file="ruim.php">&lt;?php
+namespace Ana\Lojinha;
+class carrinho_de_compras {
+    const taxa=0.05;
+    private $Itens = array();
+    function Adicionar_Item($nome,$preco){
+      $this-&gt;Itens[$nome]=$preco;
+    }
+    public function calcular_total() {
+        $total=0;
+        foreach($this-&gt;Itens as $preco){ $total+=$preco; }
+        if($total&gt;100) {return $total;}
+        else {
+            return $total*(1+self::taxa);
+        }
+    }
+}
+</pre>
+
+<p>Para o PHP, está tudo certo:</p>
+
+<pre class="term">$ php ruim.php &amp;&amp; echo "rodou sem erro"
+rodou sem erro</pre>
+
+<p>A ferramenta mais tradicional para conferir estilo é o <strong>PHP_CodeSniffer</strong> (o "farejador de código"), que traz dois comandos: <code>phpcs</code> (aponta os problemas) e <code>phpcbf</code> (conserta o que der). Ele se instala com o <a href="composer.html">Composer</a>, como ferramenta de desenvolvimento:</p>
+
+<pre class="term">$ composer require --dev squizlabs/php_codesniffer
+./composer.json has been created
+Running composer update squizlabs/php_codesniffer
+…
+  - Installing squizlabs/php_codesniffer (4.0.4): Extracting archive
+…
+Using version ^4.0 for squizlabs/php_codesniffer
+$ vendor/bin/phpcs --standard=PSR12 ruim.php
+
+FILE: /home/ana/estilo/ruim.php
+--------------------------------------------------------------------------------
+FOUND 34 ERRORS AND 1 WARNING AFFECTING 11 LINES
+--------------------------------------------------------------------------------
+  1 | ERROR   | [x] Header blocks must be separated by a single blank line
+  2 | ERROR   | [x] Header blocks must be separated by a single blank line
+  3 | ERROR   | [ ] Class name "carrinho_de_compras" is not in PascalCase
+    |         |     format
+  3 | ERROR   | [x] Opening brace of a class must be on the line after the
+    |         |     definition
+  4 | WARNING | [ ] Visibility must be declared on all constants if your
+    |         |     project supports PHP 7.1 or later
+  4 | ERROR   | [ ] Class constants must be uppercase; expected TAXA but found
+    |         |     taxa
+  4 | ERROR   | [x] Expected at least 1 space before "="; 0 found
+  4 | ERROR   | [x] Expected at least 1 space after "="; 0 found
+  6 | ERROR   | [ ] Method name "carrinho_de_compras::Adicionar_Item" is not in
+    |         |     camel caps format
+  6 | ERROR   | [ ] Visibility must be declared on method "Adicionar_Item"
+  6 | ERROR   | [x] Expected 1 space between comma and argument "$preco"; 0
+    |         |     found
+  6 | ERROR   | [x] Opening brace should be on a new line
+  7 | ERROR   | [x] Line indented incorrectly; expected at least 8 spaces,
+    |         |     found 6
+…
+ 12 | ERROR   | [x] Expected 1 space after IF keyword; 0 found
+…
+ 14 | ERROR   | [x] Expected at least 1 space after "+"; 0 found
+--------------------------------------------------------------------------------
+PHPCBF CAN FIX THE 29 MARKED SNIFF VIOLATIONS AUTOMATICALLY
+--------------------------------------------------------------------------------
+
+Time: 52ms; Memory: 6MB</pre>
+
+<dl class="anatomy">
+  <dt>vendor/bin/phpcs</dt><dd>O programa instalado pelo Composer. Ferramentas de pacotes ficam em <code>vendor/bin/</code>.</dd>
+  <dt>--standard=PSR12</dt><dd>Qual padrão usar para conferir.</dd>
+  <dt>FOUND 34 ERRORS AND 1 WARNING</dt><dd>35 problemas de estilo em 11 linhas. Cada linha da tabela: número da linha do arquivo, gravidade, e a regra quebrada (em inglês).</dd>
+  <dt>[x]</dt><dd>Problema que o <code>phpcbf</code> consegue consertar sozinho (espaços, chaves). <code>[ ]</code> = só você pode consertar (nomes, porque mudar um nome pode quebrar quem o usa).</dd>
+</dl>
+
+<p>Algumas mensagens traduzidas: <em>Class name … is not in PascalCase format</em> = "o nome da classe não está em PascalCase"; <em>Visibility must be declared on method</em> = "declare a visibilidade do método"; <em>Expected at least 1 space before "="; 0 found</em> = "esperava pelo menos 1 espaço antes do =; encontrei 0". Agora o conserto automático:</p>
+
+<pre class="term">$ cp ruim.php consertado.php
+$ vendor/bin/phpcbf --standard=PSR12 consertado.php
+
+PHPCBF RESULT SUMMARY
+----------------------------------------------------------------------
+FILE                                                  FIXED  REMAINING
+----------------------------------------------------------------------
+/home/ana/estilo/consertado.php                       29     6
+----------------------------------------------------------------------
+A TOTAL OF 29 ERRORS WERE FIXED IN 1 FILE
+----------------------------------------------------------------------
+
+
+Time: 62ms; Memory: 6MB
+$ cat consertado.php
+&lt;?php
+
+namespace Ana\Lojinha;
+
+class carrinho_de_compras
+{
+    const taxa = 0.05;
+    private $Itens = array();
+    function Adicionar_Item($nome, $preco)
+    {
+        $this-&gt;Itens[$nome] = $preco;
+    }
+    public function calcular_total()
+    {
+        $total = 0;
+        foreach ($this-&gt;Itens as $preco) {
+            $total += $preco;
+        }
+        if ($total &gt; 100) {
+            return $total;
+        } else {
+            return $total * (1 + self::taxa);
+        }
+    }
+}
+$ vendor/bin/phpcs --standard=PSR12 consertado.php
+
+FILE: /home/ana/estilo/consertado.php
+--------------------------------------------------------------------------------
+FOUND 5 ERRORS AND 1 WARNING AFFECTING 4 LINES
+--------------------------------------------------------------------------------
+  5 | ERROR   | Class name "carrinho_de_compras" is not in PascalCase format
+  7 | WARNING | Visibility must be declared on all constants if your project
+    |         | supports PHP 7.1 or later
+  7 | ERROR   | Class constants must be uppercase; expected TAXA but found taxa
+  9 | ERROR   | Method name "carrinho_de_compras::Adicionar_Item" is not in
+    |         | camel caps format
+  9 | ERROR   | Visibility must be declared on method "Adicionar_Item"
+ 13 | ERROR   | Method name "carrinho_de_compras::calcular_total" is not in
+    |         | camel caps format
+--------------------------------------------------------------------------------
+
+Time: 51ms; Memory: 6MB</pre>
+
+<p>E o <code>Carrinho.php</code> do exemplo da seção anterior, escrito no padrão, passa sem nenhuma reclamação (só a linha do tempo gasto aparece):</p>
+
+<pre class="term">$ vendor/bin/phpcs --standard=PSR12 Carrinho.php &amp;&amp; echo "sem problemas"
+Time: 59ms; Memory: 6MB
+sem problemas</pre>
+
+<p>Todos os espaços, chaves e linhas em branco foram arrumados. Sobraram os 6 problemas de <strong>nomes e visibilidade</strong>, que são decisões suas. Esse é exatamente o trabalho da missão abaixo.</p>
+
+<div class="tryphp" data-goal="src:class CarrinhoDeCompras,src:public const TAXA,src:public function adicionarItem,src:public function calcularTotal,out:Total: 52.5,semerro">
+<p class="try-task"><strong>Missão:</strong> termine o trabalho que o <code>phpcbf</code> não pode fazer. Renomeie a classe para <code>CarrinhoDeCompras</code> (PascalCase), os métodos para <code>adicionarItem</code> e <code>calcularTotal</code> (camelCase), a constante para <code>TAXA</code>, e declare <code>public</code> na constante e no método que está sem visibilidade. Lembre de atualizar também as linhas que <strong>usam</strong> esses nomes. A saída deve continuar <code>Total: 52.5</code>.</p>
+<pre class="script">&lt;?php
+class carrinho_de_compras
+{
+    const taxa = 0.05;
+
+    private array $itens = [];
+
+    function Adicionar_Item(string $nome, float $preco): void
+    {
+        $this-&gt;itens[$nome] = $preco;
+    }
+
+    public function calcular_total(): float
+    {
+        return array_sum($this-&gt;itens) * (1 + self::taxa);
+    }
+}
+
+$c = new carrinho_de_compras();
+$c-&gt;Adicionar_Item("Caneca", 20);
+$c-&gt;Adicionar_Item("Camiseta", 30);
+echo "Total: ", $c-&gt;calcular_total(), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class CarrinhoDeCompras
+{
+    public const TAXA = 0.05;
+
+    private array $itens = [];
+
+    public function adicionarItem(string $nome, float $preco): void
+    {
+        $this-&gt;itens[$nome] = $preco;
+    }
+
+    public function calcularTotal(): float
+    {
+        return array_sum($this-&gt;itens) * (1 + self::TAXA);
+    }
+}
+
+$c = new CarrinhoDeCompras();
+$c-&gt;adicionarItem("Caneca", 20);
+$c-&gt;adicionarItem("Camiseta", 30);
+echo "Total: ", $c-&gt;calcularTotal(), "\n";
+</pre>
+</div>
+
+<p>(Este exemplo junta a classe e o código que a usa num arquivo só, para caber no editor; num projeto, a PSR-1 pede arquivos separados.)</p>
+
+<h3>As ferramentas de estilo</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>Pacote</th><th>Como usar</th></tr>
+<tr><td><strong>PHP_CodeSniffer</strong> (<code>phpcs</code>/<code>phpcbf</code>)</td><td><code>squizlabs/php_codesniffer</code></td><td>Confere e conserta; ótimo para "barrar" código fora do padrão</td></tr>
+<tr><td><strong>PHP-CS-Fixer</strong></td><td><code>friendsofphp/php-cs-fixer</code></td><td>Focado em <strong>consertar</strong>; muitas regras configuráveis (<code>vendor/bin/php-cs-fixer fix src</code>)</td></tr>
+<tr><td><strong>Laravel Pint</strong></td><td><code>laravel/pint</code></td><td>Uma "casca" do PHP-CS-Fixer com configuração pronta</td></tr>
+<tr><td>O seu editor</td><td>—</td><td>VS Code e PhpStorm formatam no padrão PSR-12 ao salvar (veja <a href="editores.html">Editores e IDEs</a>)</td></tr>
+</table>
+</div>
+
+<p>O jeito mais comum de usar: um <a href="composer.html">script do Composer</a> (<code>"estilo": "phpcs --standard=PSR12 src"</code>) que todo mundo roda antes de enviar o código.</p>
+
+<hr>
+
+<h2>PSR-4: o autoload</h2>
+<p>Você já conhece: é a regra "prefixo de namespace → pasta base; o resto do nome vira subpastas; a classe vira <code>Classe.php</code>". <code>Ana\Lojinha\Pagamento\Pix</code> com o prefixo <code>Ana\Lojinha\</code> em <code>src/</code> fica em <code>src/Pagamento/Pix.php</code>. Veja os detalhes em <a href="autoload.html">Autoload e PSR-4</a>. (A antiga <strong>PSR-0</strong>, que fazia algo parecido, está obsoleta.)</p>
+
+<hr>
+
+<h2>PSR-3: uma interface de log para todos</h2>
+<p>Na aula do <a href="composer.html">Composer</a>, a classe <code>Pedido</code> da Ana recebia um <code>LoggerInterface</code>, e não um <code>Monolog\Logger</code>. Essa interface vem do pacote <code>psr/log</code>, que é a PSR-3 em forma de código. Ela define os métodos que todo "registrador de log" deve ter:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Para quê</th></tr>
+<tr><td><code>emergency()</code></td><td>O sistema está fora do ar</td></tr>
+<tr><td><code>alert()</code></td><td>Alguém precisa agir já (ex.: banco de dados inacessível)</td></tr>
+<tr><td><code>critical()</code></td><td>Erro grave (ex.: exceção não esperada)</td></tr>
+<tr><td><code>error()</code></td><td>Erro que não para o sistema, mas deve ser investigado</td></tr>
+<tr><td><code>warning()</code></td><td>Algo estranho que não é erro (estoque baixo, recurso obsoleto)</td></tr>
+<tr><td><code>notice()</code></td><td>Evento normal, mas importante</td></tr>
+<tr><td><code>info()</code></td><td>Evento interessante (pedido fechado, usuário entrou)</td></tr>
+<tr><td><code>debug()</code></td><td>Detalhes para depurar</td></tr>
+<tr><td><code>log($nivel, …)</code></td><td>Registra em qualquer nível</td></tr>
+</table>
+</div>
+
+<p>Todos recebem <code>(string|Stringable $message, array $context = [])</code>. A PSR-3 também combina que a mensagem pode ter <strong>marcadores</strong> entre chaves, como <code>{cliente}</code>, trocados pelos valores do <code>$context</code>.</p>
+
+<h3>Por que isso importa: trocar sem mexer</h3>
+<p>Como o <code>Pedido</code> depende só da interface, qualquer classe que a implemente serve. A Ana escreveu um logger caseiro, que só mostra na tela, estendendo a classe <code>AbstractLogger</code> do próprio <code>psr/log</code> (ela já implementa os oito métodos chamando o <code>log()</code>; basta escrever esse):</p>
+
+<pre class="file" data-file="src/LoggerDeTela.php">&lt;?php
+
+declare(strict_types=1);
+
+namespace Ana\Lojinha;
+
+use Psr\Log\AbstractLogger;
+use Stringable;
+
+class LoggerDeTela extends AbstractLogger
+{
+    public function log($level, string|Stringable $message, array $context = []): void
+    {
+        // troca {chave} pelo valor do contexto, como a PSR-3 sugere
+        $trocas = [];
+        foreach ($context as $chave =&gt; $valor) {
+            $trocas['{' . $chave . '}'] = $valor;
+        }
+        echo strtoupper($level), ": ", strtr((string) $message, $trocas), "\n";
+    }
+}
+</pre>
+
+<pre class="file" data-file="troca.php">&lt;?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Ana\Lojinha\LoggerDeTela;
+use Ana\Lojinha\Pedido;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+
+$monolog = new Logger('loja');
+$monolog-&gt;pushHandler(new StreamHandler('php://stdout'));
+
+$caseiro = new LoggerDeTela();
+
+(new Pedido($monolog))-&gt;fechar('Bruno', 69.8);
+(new Pedido($caseiro))-&gt;fechar('Bruno', 69.8);
+$caseiro-&gt;warning('Estoque baixo: {produto}', ['produto' =&gt; 'Caneca']);
+</pre>
+
+<pre class="term">$ php troca.php
+[2026-10-16T23:53:07.283831+00:00] loja.INFO: Pedido fechado {"cliente":"Bruno","total":69.8} []
+INFO: Pedido fechado
+WARNING: Estoque baixo: Caneca</pre>
+
+<p>A mesma classe <code>Pedido</code>, sem nenhuma mudança, funcionou com o Monolog e com o logger caseiro. E uma classe que <strong>parece</strong> um logger, mas não declara a interface, é recusada pelo tipo do parâmetro:</p>
+
+<pre class="file" data-file="errado.php">&lt;?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Ana\Lojinha\Pedido;
+
+class MeuLog
+{
+    public function info(string $m, array $c = []): void { echo $m, "\n"; }
+}
+
+(new Pedido(new MeuLog()))-&gt;fechar('Bruno', 69.8);
+</pre>
+
+<pre class="term">$ php errado.php
+
+Fatal error: Uncaught TypeError: Ana\Lojinha\Pedido::__construct(): Argument #1 ($log) must be of type Psr\Log\LoggerInterface, MeuLog given, called in /home/ana/lojinha/errado.php on line 14 and defined in /home/ana/lojinha/src/Pedido.php:11
+Stack trace:
+#0 /home/ana/lojinha/errado.php(14): Ana\Lojinha\Pedido-&gt;__construct(Object(MeuLog))
+#1 {main}
+  thrown in /home/ana/lojinha/src/Pedido.php on line 11</pre>
+
+<p>"O argumento 1 precisa ser do tipo <code>LoggerInterface</code>, mas veio um <code>MeuLog</code>". Ter um método <code>info()</code> não basta: a classe precisa dizer <code>implements LoggerInterface</code> (ou estender <code>AbstractLogger</code>). Veja <a href="interfaces.html">Interfaces</a>.</p>
+
+<div class="tryphp" data-goal="out:INFO: Pedido de Bruno fechado: R$ 69.8,semerro">
+<p class="try-task"><strong>Missão:</strong> o editor do guia não tem o pacote <code>psr/log</code>, então este exemplo traz uma versão mínima da interface. Complete o método <code>log()</code> para trocar cada marcador <code>{chave}</code> pelo valor do <code>$context</code>, como a PSR-3 descreve. Dica: monte um array <code>['{cliente}' =&gt; 'Bruno', …]</code> e use <code>strtr()</code>. A saída deve ser <code>INFO: Pedido de Bruno fechado: R$ 69.8</code>.</p>
+<pre class="script">&lt;?php
+// Versão mínima da LoggerInterface da PSR-3 (a real tem 9 métodos)
+interface LoggerInterface
+{
+    public function info(string $message, array $context = []): void;
+}
+
+class LoggerDeTela implements LoggerInterface
+{
+    public function info(string $message, array $context = []): void
+    {
+        $this-&gt;log('info', $message, $context);
+    }
+
+    private function log(string $level, string $message, array $context): void
+    {
+        // troque os {marcadores} aqui
+        echo strtoupper($level), ": ", $message, "\n";
+    }
+}
+
+$log = new LoggerDeTela();
+$log-&gt;info('Pedido de {cliente} fechado: R$ {total}', ['cliente' =&gt; 'Bruno', 'total' =&gt; 69.8]);
+</pre>
+<pre class="solucao">&lt;?php
+// Versão mínima da LoggerInterface da PSR-3 (a real tem 9 métodos)
+interface LoggerInterface
+{
+    public function info(string $message, array $context = []): void;
+}
+
+class LoggerDeTela implements LoggerInterface
+{
+    public function info(string $message, array $context = []): void
+    {
+        $this-&gt;log('info', $message, $context);
+    }
+
+    private function log(string $level, string $message, array $context): void
+    {
+        $trocas = [];
+        foreach ($context as $chave =&gt; $valor) {
+            $trocas['{' . $chave . '}'] = $valor;
+        }
+        echo strtoupper($level), ": ", strtr($message, $trocas), "\n";
+    }
+}
+
+$log = new LoggerDeTela();
+$log-&gt;info('Pedido de {cliente} fechado: R$ {total}', ['cliente' =&gt; 'Bruno', 'total' =&gt; 69.8]);
+</pre>
+</div>
+
+<hr>
+
+<h2>PSR-7 e PSR-15: HTTP como objetos (só a ideia)</h2>
+<p>Até aqui, no guia, uma requisição web é lida pelas <a href="superglobais.html">superglobais</a> (<code>$_GET</code>, <code>$_POST</code>, <code>$_SERVER</code>) e a resposta é feita com <code>echo</code> e <a href="redirecionar.html"><code>header()</code></a>. Funciona, mas espalha a requisição por variáveis globais e deixa a resposta "já enviada" assim que o primeiro <code>echo</code> roda.</p>
+<p>A <strong>PSR-7</strong> define <strong>interfaces</strong> para representar a conversa HTTP como objetos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Interface (PSR-7)</th><th>Representa</th><th>Exemplos de métodos</th></tr>
+<tr><td><code>ServerRequestInterface</code></td><td>A requisição que chegou</td><td><code>getMethod()</code>, <code>getQueryParams()</code> (o <code>$_GET</code>), <code>getParsedBody()</code> (o <code>$_POST</code>), <code>getHeaderLine('Accept')</code></td></tr>
+<tr><td><code>ResponseInterface</code></td><td>A resposta que vai sair</td><td><code>withStatus(404)</code>, <code>withHeader('Content-Type', 'application/json')</code>, <code>getBody()</code></td></tr>
+<tr><td><code>UriInterface</code>, <code>StreamInterface</code>…</td><td>O endereço, o corpo</td><td><code>getPath()</code>, <code>write()</code></td></tr>
+</table>
+</div>
+
+<p>Um detalhe marcante: esses objetos são <strong>imutáveis</strong>. <code>$resposta-&gt;withStatus(404)</code> não muda a resposta; devolve uma <strong>cópia</strong> com o status novo (por isso o nome começa com <code>with</code>, "com").</p>
+
+<p>A <strong>PSR-15</strong> usa a PSR-7 para definir <strong>middlewares</strong>: "camadas" por onde a requisição passa antes de chegar à sua página (conferir login, registrar log, comprimir a resposta). Cada camada é uma classe com um único método:</p>
+
+<pre class="file" data-file="ideia-psr15.php">&lt;?php
+// Só a forma da interface (do pacote psr/http-server-middleware):
+interface MiddlewareInterface
+{
+    public function process(
+        ServerRequestInterface $request,
+        RequestHandlerInterface $handler
+    ): ResponseInterface;
+}
+// Cada middleware recebe a requisição, faz o seu trabalho
+// e chama $handler-&gt;handle($request) para passar adiante.
+</pre>
+
+<p>Como são interfaces padrão, um middleware de login escrito para um framework funciona em outro. Frameworks como Slim e Mezzio são construídos assim; o Laravel e o Symfony têm formatos próprios, mas sabem converter para PSR-7. Você não precisa usar nada disso agora: quando encontrar <code>$request-&gt;getParsedBody()</code> num tutorial, já sabe de onde veio.</p>
+
+<hr>
+
+<h2>As PSRs que você vai encontrar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>PSR</th><th>Assunto</th><th>Situação</th></tr>
+<tr><td>PSR-1</td><td>Estilo básico (nomes, arquivos)</td><td>Aceita</td></tr>
+<tr><td>PSR-12</td><td>Formatação do código (substitui a PSR-2); continuada pelo PER Coding Style</td><td>Aceita</td></tr>
+<tr><td>PSR-4</td><td>Autoload (substitui a PSR-0)</td><td>Aceita</td></tr>
+<tr><td>PSR-3</td><td>Interface de log (<code>psr/log</code>)</td><td>Aceita</td></tr>
+<tr><td>PSR-6 e PSR-16</td><td>Cache (a 16 é a versão simples)</td><td>Aceitas</td></tr>
+<tr><td>PSR-7</td><td>Mensagens HTTP (requisição e resposta)</td><td>Aceita</td></tr>
+<tr><td>PSR-11</td><td>Contêiner de dependências (<code>$container-&gt;get(…)</code>)</td><td>Aceita</td></tr>
+<tr><td>PSR-14</td><td>Eventos</td><td>Aceita</td></tr>
+<tr><td>PSR-15</td><td>Middlewares HTTP</td><td>Aceita</td></tr>
+<tr><td>PSR-17</td><td>Fábricas de objetos HTTP</td><td>Aceita</td></tr>
+<tr><td>PSR-18</td><td>Cliente HTTP (fazer requisições para outras APIs)</td><td>Aceita</td></tr>
+<tr><td>PSR-20</td><td>Relógio (<code>ClockInterface</code>, útil em testes)</td><td>Aceita</td></tr>
+<tr><td>PSR-0, PSR-2</td><td>Autoload e estilo antigos</td><td><strong>Obsoletas</strong></td></tr>
+</table>
+</div>
+
+<p>Os números pulados (5, 8, 9, 10…) são propostas que foram abandonadas ou ainda estão em discussão. A lista oficial fica em php-fig.org.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Funciona, mas o revisor recusou"</strong>
+<p><strong>O que significa:</strong> o projeto exige PSR-12, e o seu código está fora do padrão. O PHP não reclama de estilo; a equipe, sim.</p>
+<p><strong>Como consertar:</strong> rode <code>vendor/bin/phpcbf --standard=PSR12 src</code> (ou o PHP-CS-Fixer) antes de enviar; depois confira com <code>phpcs</code> e conserte à mão os nomes.</p>
+</div>
+
+<div class="cenario">
+<strong>must be of type Psr\Log\LoggerInterface, MeuLog given</strong>
+<p><strong>O que significa:</strong> você passou um objeto que tem os métodos certos, mas a classe não declara a interface. Para o PHP, "parecer" não basta.</p>
+<p><strong>Como consertar:</strong> <code>class MeuLog implements LoggerInterface</code> (com todos os métodos) ou <code>class MeuLog extends AbstractLogger</code> (só o <code>log()</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>phpcs: "Class name … is not in PascalCase format" depois do phpcbf</strong>
+<p><strong>O que significa:</strong> o conserto automático não muda nomes, porque trocar o nome de uma classe ou método quebraria todo código que os usa.</p>
+<p><strong>Como consertar:</strong> renomeie à mão, ou com a função "Renomear" do editor, que atualiza todos os usos de uma vez.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que é</th></tr>
+<tr><td>PHP-FIG</td><td>O grupo que escreve as PSRs (php-fig.org)</td></tr>
+<tr><td>PascalCase</td><td>Classes, interfaces, enums: <code>CarrinhoDeCompras</code></td></tr>
+<tr><td>camelCase</td><td>Métodos (e, por costume, variáveis e propriedades): <code>calcularTotal</code></td></tr>
+<tr><td>MAIÚSCULAS_COM_SUBLINHADO</td><td>Constantes: <code>TAXA_ENTREGA</code></td></tr>
+<tr><td><code>vendor/bin/phpcs --standard=PSR12 arquivo</code></td><td>Aponta problemas de estilo</td></tr>
+<tr><td><code>vendor/bin/phpcbf --standard=PSR12 arquivo</code></td><td>Conserta o que der automaticamente</td></tr>
+<tr><td><code>vendor/bin/php-cs-fixer fix src</code></td><td>Conserta com o PHP-CS-Fixer</td></tr>
+<tr><td><code>Psr\Log\LoggerInterface</code></td><td>A interface da PSR-3 (pacote <code>psr/log</code>)</td></tr>
+<tr><td><code>Psr\Http\Message\ServerRequestInterface</code></td><td>A requisição da PSR-7 (pacote <code>psr/http-message</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Nome de classe</h3>
+<p>Escreva o nome <code>pedido_de_venda</code> no formato que a PSR-1 pede para classes:</p>
+<div class="ex-code">class <input data-answer="PedidoDeVenda" aria-label="nome da classe"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Nome de método</h3>
+<p>Escreva o método <code>Fechar_Pedido</code> no formato da PSR-1:</p>
+<div class="ex-code">public function <input data-answer="fecharPedido" aria-label="nome do método">()</div>
+</div>
+
+<div class="exercise">
+<h3>3. Indentação</h3>
+<p>Quantos espaços a PSR-12 usa em cada nível de indentação?</p>
+<div class="ex-code"><input data-answer="4|quatro" aria-label="número de espaços"> espaços</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que acontece se você rodar um código fora da PSR-12 no PHP?</p>
+<label><input type="radio" name="q4"> Dá <code>Parse error</code></label>
+<label><input type="radio" name="q4"> Roda normalmente: PSR é recomendação, não regra da linguagem</label>
+<label><input type="radio" name="q4"> Aparece um <code>Warning</code></label>
+<label><input type="radio" name="q4"> Roda, mas mais devagar</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual a vantagem de uma classe receber <code>LoggerInterface</code> em vez de <code>Monolog\Logger</code>?</p>
+<label><input type="radio" name="q5"> Os logs ficam mais rápidos</label>
+<label><input type="radio" name="q5"> Não precisa do Composer</label>
+<label><input type="radio" name="q5"> Qualquer biblioteca de log compatível com a PSR-3 pode ser usada, sem mudar a classe</label>
+<label><input type="radio" name="q5"> O Monolog deixa de ser necessário em todos os projetos</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Na PSR-12, onde fica a chave <code>{</code> de um <code>if</code> e a de um método?</p>
+<label><input type="radio" name="q6"> As duas na linha de baixo</label>
+<label><input type="radio" name="q6"> As duas na mesma linha</label>
+<label><input type="radio" name="q6"> <code>if</code> na linha de baixo; método na mesma linha</label>
+<label><input type="radio" name="q6"> <code>if</code> na mesma linha; método na linha de baixo</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>PSRs são recomendações do <strong>PHP-FIG</strong> para padronizar o estilo e permitir que bibliotecas se encaixem. O PHP não as exige; o ecossistema, sim.</li>
+  <li><strong>PSR-1</strong>: <code>&lt;?php</code>, UTF-8, classes em PascalCase, métodos em camelCase, constantes em MAIÚSCULAS. <strong>PSR-12</strong> (e o PER Coding Style): 4 espaços, chaves de classe/método na linha de baixo, de <code>if</code> na mesma linha, visibilidade sempre.</li>
+  <li><code>phpcs</code> aponta, <code>phpcbf</code> e PHP-CS-Fixer consertam; nomes você troca à mão.</li>
+  <li><strong>PSR-4</strong>: namespace → pasta (autoload).</li>
+  <li><strong>PSR-3</strong>: <code>LoggerInterface</code>, com <code>info()</code>, <code>warning()</code>, <code>error()</code>… e marcadores <code>{chave}</code>. Dependa da interface, não da biblioteca.</li>
+  <li><strong>PSR-7</strong>: requisição e resposta HTTP como objetos imutáveis; <strong>PSR-15</strong>: middlewares que usam esses objetos.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
