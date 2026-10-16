@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Enums — enum puro, enum com valor, from, tryFrom e match | Guia PHP</title>
+<meta name="description" content="Enums no PHP (8.1+) explicados do zero com o status de um pedido (Pendente, Pago, Enviado): enum puro e com valor string/int, cases(), from e tryFrom (com o ValueError real), métodos dentro do enum e match com enum, com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Enums</span></h1>
+
+<p class="intro">Um pedido da lojinha da Ana pode estar <strong>Pendente</strong>, <strong>Pago</strong> ou <strong>Enviado</strong>, e nada além disso. Um tamanho de camiseta é P, M ou G. Um dia da semana é um de sete. Quando um valor só pode ser <strong>um de uma lista fechada</strong>, o PHP tem um tipo feito para isso: o <strong>enum</strong> (de <em>enumeration</em>, "enumeração", uma lista de opções). <span class="versao">PHP 8.1+</span></p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O problema de guardar opções em strings soltas.</li>
+  <li>Como criar um <strong>enum puro</strong> e usar os seus casos.</li>
+  <li><code>cases()</code>: a lista de todas as opções.</li>
+  <li><strong>Enums com valor</strong> (<code>string</code> ou <code>int</code>), <code>-&gt;value</code>, <code>from()</code> e <code>tryFrom()</code>, e o <code>ValueError</code> real.</li>
+  <li><strong>Métodos</strong> dentro do enum e o <code>match</code> com enum.</li>
+  <li>Os erros mais comuns, com as mensagens reais.</li>
+</ul>
+</div>
+
+<p>Pré-requisitos: <a href="classes-objetos.html">classes e objetos</a>, <a href="tipos-retorno.html">tipos em parâmetros</a> e <a href="match.html">match</a>. Os exemplos rodam na máquina fictícia da Ana, na pasta <code>~/poo</code>.</p>
+
+<hr>
+
+<h2>O problema: opções escritas como texto</h2>
+<p>Sem enum, a Ana guarda o status do pedido como string. Funciona… até alguém digitar diferente:</p>
+
+<pre class="file" data-file="status-texto.php">&lt;?php
+function descrever(string $status): string
+{
+    if ($status === "pago") {
+        return "Pagamento confirmado";
+    }
+    return "Aguardando";
+}
+echo descrever("pago"), "\n";
+echo descrever("Pago"), "\n";
+echo descrever("pgo"), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php status-texto.php
+Pagamento confirmado
+Aguardando          « "Pago" com P maiúsculo: errado, e sem aviso
+Aguardando          « "pgo": erro de digitação, e sem aviso</pre>
+
+<p>O PHP não tem como saber que <code>"Pago"</code> e <code>"pgo"</code> estão errados: para ele, são só textos. O pedido pago aparece como "Aguardando" e ninguém percebe. A ideia do enum é <strong>trocar o texto livre por uma lista fechada</strong> que o PHP conhece e confere.</p>
+
+<h3>A ideia: um cardápio, não um papel em branco</h3>
+<p>Num restaurante, se você escreve o pedido num papel em branco, pode sair "fejoada". Se aponta no cardápio, só dá para escolher o que existe. O enum é o cardápio: o PHP conhece a lista inteira e recusa qualquer coisa fora dela.</p>
+
+<hr>
+
+<h2>1. Enum puro</h2>
+
+<pre class="file" data-file="status.php">&lt;?php
+enum Status
+{
+    case Pendente;
+    case Pago;
+    case Enviado;
+}
+
+$s = Status::Pago;
+var_dump($s);
+echo $s-&gt;name, "\n";
+var_dump($s === Status::Pago);
+var_dump($s === Status::Enviado);
+var_dump($s instanceof Status);
+</pre>
+
+<dl class="anatomy">
+  <dt>enum Status</dt><dd>Cria um enum chamado <code>Status</code>. Como uma classe, o nome começa com maiúscula.</dd>
+  <dt>case Pendente;</dt><dd>Cada <code>case</code> ("caso") é uma das opções. Aqui são três, e serão sempre só essas três.</dd>
+  <dt>Status::Pago</dt><dd>Para usar um caso: nome do enum, <code>::</code>, nome do caso. É um valor que você guarda em variável, passa para funções, compara.</dd>
+  <dt>$s-&gt;name</dt><dd>Todo caso tem a propriedade <code>name</code> ("nome"), com o nome do caso como texto.</dd>
+  <dt>$s === Status::Pago</dt><dd>Compare casos com <code>===</code>. Cada caso existe uma vez só, então "é o mesmo caso?" é sempre uma pergunta exata.</dd>
+  <dt>instanceof Status</dt><dd>Por baixo, cada caso é um objeto do tipo <code>Status</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/poo">$ php status.php
+enum(Status::Pago)       « o var_dump mostra que é um enum, e qual caso
+Pago
+bool(true)
+bool(false)
+bool(true)</pre>
+
+<h3>O enum como tipo: o PHP confere por você</h3>
+<p>A grande vantagem aparece quando o enum vira o <strong>tipo do parâmetro</strong>. A mesma função de antes, agora exigindo um <code>Status</code>:</p>
+
+<pre class="file" data-file="descrever.php">&lt;?php
+enum Status
+{
+    case Pendente;
+    case Pago;
+    case Enviado;
+}
+
+function descrever(Status $status): string
+{
+    if ($status === Status::Pago) {
+        return "Pagamento confirmado";
+    }
+    return "Aguardando";
+}
+echo descrever(Status::Pago), "\n";
+echo descrever(Status::Pendente), "\n";
+echo descrever("pago"), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php descrever.php
+Pagamento confirmado
+Aguardando
+
+Fatal error: Uncaught TypeError: descrever(): Argument #1 ($status) must be of type Status, string given, called in /home/ana/poo/descrever.php on line 18 and defined in /home/ana/poo/descrever.php:9
+Stack trace:
+#0 /home/ana/poo/descrever.php(18): descrever('pago')
+#1 {main}
+  thrown in /home/ana/poo/descrever.php on line 9</pre>
+<p>"O argumento nº 1 precisa ser do tipo Status, foi passada uma string". Agora o texto solto <strong>não passa</strong>. E um erro de digitação no caso também é pego na hora:</p>
+
+<pre class="term" data-cwd="~/poo">$ php digitacao.php
+
+Fatal error: Uncaught Error: Undefined constant Status::Pgo in /home/ana/poo/digitacao.php:8
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/digitacao.php on line 8</pre>
+<p>(O programa tinha <code>echo Status::Pgo-&gt;name;</code>. Para o PHP, os casos funcionam como constantes do enum, daí "constante indefinida".) Compare com a versão de strings, em que <code>"pgo"</code> passava em silêncio.</p>
+
+<h3><code>cases()</code>: todas as opções</h3>
+<p>Todo enum ganha o método estático <code>cases()</code>, que devolve um array com todos os casos, na ordem em que foram escritos. Útil para montar um menu, um <code>&lt;select&gt;</code> de formulário, um relatório:</p>
+<pre class="file" data-file="cases.php">&lt;?php
+enum Status
+{
+    case Pendente;
+    case Pago;
+    case Enviado;
+}
+
+foreach (Status::cases() as $caso) {
+    echo "- ", $caso-&gt;name, "\n";
+}
+echo count(Status::cases()), " opções\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php cases.php
+- Pendente
+- Pago
+- Enviado
+3 opções</pre>
+
+<div class="tryphp" data-goal="out:Tamanho: M,out:Casos: 3,src:enum Tamanho,semerro">
+<p class="try-task"><strong>Missão:</strong> crie um enum <code>Tamanho</code> com os casos <code>P</code>, <code>M</code> e <code>G</code>. O resto do código já está pronto: ele guarda <code>Tamanho::M</code> e mostra o nome e quantos casos existem.</p>
+<pre class="script">&lt;?php
+// crie o enum Tamanho aqui
+
+
+$camiseta = Tamanho::M;
+echo "Tamanho: ", $camiseta-&gt;name, "\n";
+echo "Casos: ", count(Tamanho::cases()), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+enum Tamanho
+{
+    case P;
+    case M;
+    case G;
+}
+
+$camiseta = Tamanho::M;
+echo "Tamanho: ", $camiseta-&gt;name, "\n";
+echo "Casos: ", count(Tamanho::cases()), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>2. Enum com valor (<em>backed enum</em>)</h2>
+<p>O enum puro vive só dentro do programa. Mas o status do pedido precisa ser <strong>guardado</strong> num banco de dados, mandado num JSON, recebido de um formulário. Nesses lugares só existem textos e números. Para isso, cada caso pode ter um <strong>valor</strong> associado, uma <code>string</code> ou um <code>int</code>. Em inglês, esse tipo se chama <em>backed enum</em> ("enum com lastro").</p>
+
+<pre class="file" data-file="status-valor.php">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+}
+
+echo Status::Pago-&gt;name, "\n";
+echo Status::Pago-&gt;value, "\n";
+var_dump(Status::from("enviado"));
+var_dump(Status::tryFrom("cancelado"));
+echo json_encode(["pedido" =&gt; 1001, "status" =&gt; Status::Pago]), "\n";
+foreach (Status::cases() as $caso) {
+    echo $caso-&gt;name, " = ", $caso-&gt;value, "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>enum Status: string</dt><dd>O <code>: string</code> diz que todo caso tem um valor do tipo string. Pode ser <code>: int</code>. Nenhum outro tipo é aceito.</dd>
+  <dt>case Pago = "pago";</dt><dd>O caso <code>Pago</code> tem o valor <code>"pago"</code>. Os valores precisam ser diferentes entre si.</dd>
+  <dt>-&gt;value</dt><dd>O valor do caso (<code>"pago"</code>). É o que você grava no banco ou manda no JSON.</dd>
+  <dt>Status::from("enviado")</dt><dd>O caminho de volta: "de" um valor, encontra o caso. Se o valor não existir, lança um erro.</dd>
+  <dt>Status::tryFrom("cancelado")</dt><dd>"Tenta de": igual ao <code>from</code>, mas devolve <code>null</code> em vez de erro.</dd>
+  <dt>json_encode(…)</dt><dd>Um enum com valor vira o próprio valor no JSON (veja <a href="json.html">JSON</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/poo">$ php status-valor.php
+Pago                          « name: o nome do caso, no código
+pago                          « value: o valor, para fora do programa
+enum(Status::Enviado)         « from achou o caso
+NULL                          « tryFrom não achou: null
+{"pedido":1001,"status":"pago"}
+Pendente = pendente
+Pago = pago
+Enviado = enviado</pre>
+
+<div class="tip">
+<strong><code>name</code> × <code>value</code></strong>
+<p><code>name</code> é para o <strong>programador</strong> (o nome no código, como <code>Pago</code>). <code>value</code> é para o <strong>mundo de fora</strong> (banco, JSON, URL). Assim você pode renomear um caso no código sem mexer nos dados já gravados, desde que mantenha o valor.</p>
+</div>
+
+<h3><code>from</code> × <code>tryFrom</code>: quando o valor não existe</h3>
+<p>Valores de fora do programa podem vir errados. Veja o que o <code>from</code> faz com um valor que não está no enum (repare: <code>"Pago"</code> com maiúscula é diferente de <code>"pago"</code>):</p>
+
+<pre class="file" data-file="from-erro.php">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+}
+var_dump(Status::from("Pago"));
+</pre>
+<pre class="term" data-cwd="~/poo">$ php from-erro.php
+
+Fatal error: Uncaught ValueError: "Pago" is not a valid backing value for enum Status in /home/ana/poo/from-erro.php:8
+Stack trace:
+#0 /home/ana/poo/from-erro.php(8): Status::from('Pago')
+#1 {main}
+  thrown in /home/ana/poo/from-erro.php on line 8</pre>
+<p>"<code>"Pago"</code> não é um valor válido para o enum Status". É um <code>ValueError</code>, uma exceção: dá para capturar com <a href="excecoes.html">try/catch</a>. Na prática, escolha assim:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Use</th><th>Quando</th><th>Valor inválido</th></tr>
+<tr><td><code>from($v)</code></td><td>O valor <strong>deveria</strong> estar certo (veio do seu próprio banco). Valor errado é um bug que precisa aparecer.</td><td><code>ValueError</code></td></tr>
+<tr><td><code>tryFrom($v)</code></td><td>O valor veio de <strong>fora</strong> (formulário, URL, arquivo) e pode estar errado. Você trata o <code>null</code>.</td><td><code>null</code></td></tr>
+</table>
+</div>
+
+<p>Um padrão muito comum junta o <code>tryFrom</code> com o <a href="null-coalescing.html">??</a> para ter um valor padrão. Aqui o status vem da linha de comando (<code>$argv[1]</code>, veja <a href="linha-comando.html">PHP na Linha de Comando</a>); num site viria de <code>$_GET</code>:</p>
+
+<pre class="file" data-file="filtro.php">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+}
+
+$texto = $argv[1] ?? "";
+$status = Status::tryFrom($texto) ?? Status::Pendente;
+echo "Mostrando pedidos: ", $status-&gt;name, "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php filtro.php enviado
+Mostrando pedidos: Enviado
+$ php filtro.php Enviado
+Mostrando pedidos: Pendente     « "Enviado" não é um valor: caiu no padrão
+$ php filtro.php
+Mostrando pedidos: Pendente     « sem nada: também o padrão</pre>
+
+<h3>Enum com valor <code>int</code></h3>
+<p>Com <code>: int</code>, os valores são números. Bom para níveis, prioridades, códigos:</p>
+<pre class="file" data-file="prioridade.php">&lt;?php
+enum Prioridade: int
+{
+    case Baixa = 1;
+    case Media = 2;
+    case Alta = 3;
+}
+var_dump(Prioridade::from(3));
+var_dump(Prioridade::tryFrom(7));
+var_dump(Prioridade::from("2"));
+var_dump(Prioridade::from(9));
+</pre>
+<pre class="term" data-cwd="~/poo">$ php prioridade.php
+enum(Prioridade::Alta)
+NULL
+enum(Prioridade::Media)        « o texto "2" foi convertido para o número 2
+
+Fatal error: Uncaught ValueError: 9 is not a valid backing value for enum Prioridade in /home/ana/poo/prioridade.php:11
+Stack trace:
+#0 /home/ana/poo/prioridade.php(11): Prioridade::from(9)
+#1 {main}
+  thrown in /home/ana/poo/prioridade.php on line 11</pre>
+
+<div class="tryphp" data-goal="out:pago: Pago,out:enviado: Enviado,out:perdido: inválido,src:tryFrom,semerro">
+<p class="try-task"><strong>Missão:</strong> as entradas vieram de um formulário, e uma delas (<code>"perdido"</code>) está errada. Rode e veja o <code>ValueError</code>. Troque o <code>from</code> por <code>tryFrom</code> e, quando o resultado for <code>null</code>, mostre <code>perdido: inválido</code> em vez de parar o programa.</p>
+<pre class="script">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+}
+
+$entradas = ["pago", "enviado", "perdido"];
+foreach ($entradas as $texto) {
+    $status = Status::from($texto);
+    echo "$texto: ", $status-&gt;name, "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+}
+
+$entradas = ["pago", "enviado", "perdido"];
+foreach ($entradas as $texto) {
+    $status = Status::tryFrom($texto);
+    if ($status === null) {
+        echo "$texto: inválido\n";
+    } else {
+        echo "$texto: ", $status-&gt;name, "\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Métodos dentro do enum e <code>match</code></h2>
+<p>Um enum pode ter <strong>métodos</strong>, como uma classe. Dentro deles, <code>$this</code> é o caso atual. E a ferramenta perfeita para "fazer uma coisa diferente para cada caso" é o <a href="match.html">match</a>. A Ana quer, para cada status do pedido, um texto para o cliente, o próximo passo e se o pedido ainda pode ser cancelado:</p>
+
+<pre class="file" data-file="pedido-status.php">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+
+    public function rotulo(): string
+    {
+        return match ($this) {
+            Status::Pendente =&gt; "Aguardando pagamento",
+            Status::Pago =&gt; "Pagamento confirmado",
+            Status::Enviado =&gt; "A caminho",
+        };
+    }
+
+    public function proximo(): ?Status
+    {
+        return match ($this) {
+            self::Pendente =&gt; self::Pago,
+            self::Pago =&gt; self::Enviado,
+            self::Enviado =&gt; null,
+        };
+    }
+
+    public function podeCancelar(): bool
+    {
+        return $this === self::Pendente;
+    }
+
+    public static function padrao(): self
+    {
+        return self::Pendente;
+    }
+}
+
+$s = Status::padrao();
+while ($s !== null) {
+    $cancelar = $s-&gt;podeCancelar() ? "sim" : "não";
+    echo "{$s-&gt;name}: {$s-&gt;rotulo()} (pode cancelar? $cancelar)\n";
+    $s = $s-&gt;proximo();
+}
+</pre>
+
+<pre class="term" data-cwd="~/poo">$ php pedido-status.php
+Pendente: Aguardando pagamento (pode cancelar? sim)
+Pago: Pagamento confirmado (pode cancelar? não)
+Enviado: A caminho (pode cancelar? não)</pre>
+
+<dl class="anatomy">
+  <dt>public function rotulo(): string</dt><dd>Um método comum. Chamado num caso: <code>Status::Pago-&gt;rotulo()</code>.</dd>
+  <dt>match ($this) { … }</dt><dd>Compara o caso atual com cada opção (usando <code>===</code>) e devolve o texto correspondente.</dd>
+  <dt>self::Pendente</dt><dd>Dentro do enum, <code>self</code> é o próprio enum: <code>self::Pago</code> é o mesmo que <code>Status::Pago</code>.</dd>
+  <dt>?Status</dt><dd>O <code>proximo()</code> devolve um <code>Status</code> ou <code>null</code> (depois de Enviado, não há próximo). O <code>?</code> antes do tipo permite o <code>null</code>.</dd>
+  <dt>public static function padrao()</dt><dd>Métodos estáticos também são permitidos: <code>Status::padrao()</code> (veja <a href="static.html">static</a>).</dd>
+  <dt>while ($s !== null)</dt><dd>Começa em Pendente e vai pedindo o próximo até acabar.</dd>
+</dl>
+
+<h3>Por que <code>match</code> combina tanto com enum</h3>
+<p>O <code>match</code> não tem "caso nenhum, faça qualquer coisa" a menos que você escreva um <code>default</code>. Se aparecer um caso que ele não conhece, ele <strong>para com erro</strong>. Com enum, isso é uma rede de segurança: a Ana acrescentou o caso <code>Cancelado</code> e esqueceu do <code>rotulo()</code>:</p>
+
+<pre class="file" data-file="cancelado.php">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+    case Cancelado = "cancelado";
+
+    public function rotulo(): string
+    {
+        return match ($this) {
+            Status::Pendente =&gt; "Aguardando pagamento",
+            Status::Pago =&gt; "Pagamento confirmado",
+            Status::Enviado =&gt; "A caminho",
+        };
+    }
+}
+echo Status::Pago-&gt;rotulo(), "\n";
+echo Status::Cancelado-&gt;rotulo(), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php cancelado.php
+Pagamento confirmado
+
+Fatal error: Uncaught UnhandledMatchError: Unhandled match case Status::Cancelado in /home/ana/poo/cancelado.php:14
+Stack trace:
+#0 /home/ana/poo/cancelado.php(19): Status-&gt;rotulo()
+#1 {main}
+  thrown in /home/ana/poo/cancelado.php on line 14</pre>
+<p>"Caso do match não tratado: <code>Status::Cancelado</code>". O erro diz exatamente qual caso faltou. Por isso, com enums, evite o <code>default</code> no <code>match</code>: sem ele, todo caso novo que você esquecer aparece logo no primeiro teste, em vez de cair num texto genérico. (Com <code>switch</code>, o caso esquecido passaria em silêncio; veja <a href="switch.html">switch</a>.)</p>
+
+<h3>Constantes e interfaces</h3>
+<p>Um enum também pode ter <strong>constantes</strong> (<code>const PADRAO = self::Pendente;</code>) e <strong>implementar interfaces</strong> (<code>enum Status: string implements TemCor</code>), com os métodos que a interface exige (veja <a href="interfaces.html">Interfaces</a>). O que ele <strong>não</strong> pode ter são propriedades: os únicos dados de um caso são <code>name</code> e <code>value</code>. Informação extra (um rótulo, uma cor) vem de métodos com <code>match</code>, como você viu.</p>
+
+<hr>
+
+<h2>Enum puro ou com valor?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Puro: <code>enum Status</code></th><th>Com valor: <code>enum Status: string</code></th></tr>
+<tr><td><code>-&gt;name</code></td><td>sim</td><td>sim</td></tr>
+<tr><td><code>-&gt;value</code></td><td>não</td><td>sim</td></tr>
+<tr><td><code>cases()</code></td><td>sim</td><td>sim</td></tr>
+<tr><td><code>from()</code> / <code>tryFrom()</code></td><td>não</td><td>sim</td></tr>
+<tr><td>No <code>json_encode</code></td><td>falha: <code>Non-backed enums have no default serialization</code></td><td>vira o valor</td></tr>
+<tr><td>Use quando</td><td>a opção só existe dentro do programa</td><td>precisa ser gravada, enviada ou recebida (banco, JSON, formulário)</td></tr>
+</table>
+</div>
+<p>Na dúvida, se o valor um dia vai sair do programa, use enum com valor <code>string</code>: fica legível no banco (<code>"pago"</code> diz mais que <code>2</code>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Tentar criar um enum com <code>new</code></strong>
+<pre class="term" data-cwd="~/poo">$ php new-enum.php
+
+Fatal error: Uncaught Error: Cannot instantiate enum Status in /home/ana/poo/new-enum.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/new-enum.php on line 7</pre>
+<p><strong>O que significa:</strong> o programa tinha <code>$s = new Status();</code>. "Não é possível instanciar o enum". Os casos já existem prontos; não se cria caso novo em tempo de execução.</p>
+<p><strong>Como consertar:</strong> use um dos casos: <code>$s = Status::Pendente;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Usar o enum como texto</strong>
+<pre class="file" data-file="enum-texto.php">&lt;?php
+enum Status
+{
+    case Pendente;
+    case Pago;
+}
+echo "Status: " . Status::Pago . "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php enum-texto.php
+
+Fatal error: Uncaught Error: Object of class Status could not be converted to string in /home/ana/poo/enum-texto.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/enum-texto.php on line 7</pre>
+<p><strong>O que significa:</strong> um caso é um objeto, não um texto, e enums não podem ter <a href="metodos-magicos.html"><code>__toString</code></a>.</p>
+<p><strong>Como consertar:</strong> escolha o texto que você quer: <code>Status::Pago-&gt;name</code>, <code>-&gt;value</code> (se tiver valor) ou um método como <code>-&gt;rotulo()</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Valor num enum puro (ou falta de valor num enum com valor)</strong>
+<pre class="file" data-file="puro-valor.php">&lt;?php
+enum Status
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+}
+</pre>
+<pre class="term" data-cwd="~/poo">$ php puro-valor.php
+
+Fatal error: Case Pendente of non-backed enum Status must not have a value in /home/ana/poo/puro-valor.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "o caso Pendente de um enum sem valor não pode ter valor". Faltou o <code>: string</code> depois do nome. O contrário (enum <code>: string</code> com um caso sem <code>= "…"</code>) dá <code>Case Pago of backed enum Status must have a value</code>.</p>
+<p><strong>Como consertar:</strong> ou todos os casos têm valor e o enum declara o tipo (<code>enum Status: string</code>), ou nenhum tem.</p>
+</div>
+
+<div class="cenario">
+<strong><code>-&gt;value</code> ou <code>from()</code> num enum puro</strong>
+<pre class="term" data-cwd="~/poo">$ php puro-from.php
+
+Warning: Undefined property: Status::$value in /home/ana/poo/puro-from.php on line 7
+
+Fatal error: Uncaught Error: Call to undefined method Status::from() in /home/ana/poo/puro-from.php:8
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/puro-from.php on line 8</pre>
+<p><strong>O que significa:</strong> o programa fazia <code>echo Status::Pago-&gt;value;</code> e <code>Status::from("Pago")</code> num enum <strong>puro</strong>. Ele não tem <code>value</code>, nem <code>from</code>/<code>tryFrom</code>.</p>
+<p><strong>Como consertar:</strong> se você precisa converter de/para texto, transforme-o em enum com valor.</p>
+</div>
+
+<div class="cenario">
+<strong>Caso como chave de array</strong>
+<pre class="file" data-file="chave.php">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+}
+$contagem = [];
+$contagem[Status::Pago] = 1;
+</pre>
+<pre class="term" data-cwd="~/poo">$ php chave.php
+
+Fatal error: Uncaught TypeError: Cannot access offset of type Status on array in /home/ana/poo/chave.php:8
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/chave.php on line 8</pre>
+<p><strong>O que significa:</strong> chaves de array só podem ser <code>int</code> ou <code>string</code>.</p>
+<p><strong>Como consertar:</strong> use o valor ou o nome como chave: <code>$contagem[Status::Pago-&gt;value] = 1;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Propriedades num enum</strong>
+<p>Escrever <code>public string $cor;</code> dentro de um enum dá <code>Fatal error: Enum Status cannot include properties</code>. E <code>name</code>/<code>value</code> são somente leitura: <code>$x-&gt;value = "x";</code> dá <code>Cannot modify readonly property Status::$value</code>. Use métodos para informação extra.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>enum Nome { case A; case B; }</code></td><td>Enum puro</td></tr>
+<tr><td><code>enum Nome: string { case A = "a"; }</code></td><td>Enum com valor string (ou <code>: int</code>)</td></tr>
+<tr><td><code>Nome::A</code></td><td>Um caso</td></tr>
+<tr><td><code>$caso-&gt;name</code></td><td>Nome do caso (<code>"A"</code>)</td></tr>
+<tr><td><code>$caso-&gt;value</code></td><td>Valor do caso (só com valor)</td></tr>
+<tr><td><code>Nome::cases()</code></td><td>Array com todos os casos, em ordem</td></tr>
+<tr><td><code>Nome::from($v)</code></td><td>Caso com esse valor, ou <code>ValueError</code></td></tr>
+<tr><td><code>Nome::tryFrom($v)</code></td><td>Caso com esse valor, ou <code>null</code></td></tr>
+<tr><td><code>$a === Nome::A</code></td><td>Comparar casos</td></tr>
+<tr><td><code>match ($this) { self::A =&gt; … }</code></td><td>Um resultado para cada caso (sem <code>default</code>, de propósito)</td></tr>
+<tr><td><code>function f(Nome $x)</code></td><td>Aceita só casos desse enum</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Cancelado: Pedido cancelado,out:Pago: Pagamento confirmado,semerro">
+<p class="try-task"><strong>Missão:</strong> a lojinha passou a aceitar cancelamentos, e o caso <code>Cancelado</code> já está no enum. Rode e veja o <code>UnhandledMatchError</code>. Conserte o <code>match</code> do <code>rotulo()</code> para que o caso <code>Cancelado</code> mostre <code>Pedido cancelado</code> (sem usar <code>default</code>).</p>
+<pre class="script">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+    case Cancelado = "cancelado";
+
+    public function rotulo(): string
+    {
+        return match ($this) {
+            Status::Pendente =&gt; "Aguardando pagamento",
+            Status::Pago =&gt; "Pagamento confirmado",
+            Status::Enviado =&gt; "A caminho",
+        };
+    }
+}
+
+foreach (Status::cases() as $s) {
+    echo $s-&gt;name, ": ", $s-&gt;rotulo(), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+enum Status: string
+{
+    case Pendente = "pendente";
+    case Pago = "pago";
+    case Enviado = "enviado";
+    case Cancelado = "cancelado";
+
+    public function rotulo(): string
+    {
+        return match ($this) {
+            Status::Pendente =&gt; "Aguardando pagamento",
+            Status::Pago =&gt; "Pagamento confirmado",
+            Status::Enviado =&gt; "A caminho",
+            Status::Cancelado =&gt; "Pedido cancelado",
+        };
+    }
+}
+
+foreach (Status::cases() as $s) {
+    echo $s-&gt;name, ": ", $s-&gt;rotulo(), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar</h3>
+<p>Complete a palavra que cria uma lista fechada de opções:</p>
+<div class="ex-code"><input data-answer="enum" aria-label="palavra-chave"> Naipe { case Copas; case Espadas; case Ouros; case Paus; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Do banco para o enum</h3>
+<p>O banco devolveu o texto <code>"enviado"</code> em <code>$linha["status"]</code>, e ele com certeza é válido. Complete para obter o caso (com erro se o valor estiver errado):</p>
+<div class="ex-code">$status = Status::<input data-answer="from" aria-label="método">($linha["status"]);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Do enum para o banco</h3>
+<p>Complete para obter o texto <code>"pago"</code> a partir de <code>Status::Pago</code>:</p>
+<div class="ex-code">$texto = Status::Pago-&gt;<input data-answer="value" aria-label="propriedade">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que <code>Status::tryFrom("cancelado")</code> devolve se <code>Status</code> não tem nenhum caso com o valor <code>"cancelado"</code>?</p>
+<label><input type="radio" name="q4"> Um <code>ValueError</code>.</label>
+<label><input type="radio" name="q4"> <code>null</code>.</label>
+<label><input type="radio" name="q4"> <code>false</code>.</label>
+<label><input type="radio" name="q4"> O primeiro caso do enum.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Em <code>enum Status: string { case Pago = "pago"; }</code>, o que mostram <code>Status::Pago-&gt;name</code> e <code>Status::Pago-&gt;value</code>?</p>
+<label><input type="radio" name="q5"> <code>pago</code> e <code>Pago</code></label>
+<label><input type="radio" name="q5"> <code>Status::Pago</code> e <code>pago</code></label>
+<label><input type="radio" name="q5"> <code>Pago</code> e <code>pago</code></label>
+<label><input type="radio" name="q5"> <code>Pago</code> e <code>1</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que é bom <strong>não</strong> usar <code>default</code> num <code>match</code> sobre um enum?</p>
+<label><input type="radio" name="q6"> Porque o <code>match</code> não aceita <code>default</code>.</label>
+<label><input type="radio" name="q6"> Porque o programa fica mais rápido.</label>
+<label><input type="radio" name="q6"> Porque o <code>default</code> transforma o enum em string.</label>
+<label><input type="radio" name="q6"> Porque, se um caso novo for esquecido, o PHP avisa com <code>UnhandledMatchError</code> em vez de cair num valor genérico.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Qual destas coisas um enum <strong>não</strong> pode ter?</p>
+<label><input type="radio" name="q7"> Propriedades, como <code>public string $cor;</code>.</label>
+<label><input type="radio" name="q7"> Métodos.</label>
+<label><input type="radio" name="q7"> Constantes.</label>
+<label><input type="radio" name="q7"> Implementar uma interface.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>enum</strong> é uma lista fechada de opções (<code>case</code>). Use quando um valor só pode ser um de poucos.</li>
+  <li>Use o enum como tipo de parâmetro: o PHP recusa qualquer outra coisa (<code>must be of type Status, string given</code>).</li>
+  <li>Compare com <code>===</code>; <code>-&gt;name</code> dá o nome; <code>cases()</code> dá a lista toda.</li>
+  <li>Enum com valor (<code>: string</code> ou <code>: int</code>) tem <code>-&gt;value</code>, <code>from()</code> (erro <code>ValueError</code> se não achar) e <code>tryFrom()</code> (<code>null</code> se não achar).</li>
+  <li><code>from</code> para dados confiáveis; <code>tryFrom … ?? padrão</code> para dados de fora.</li>
+  <li>Enums podem ter métodos, métodos estáticos, constantes e interfaces, mas não propriedades.</li>
+  <li><code>match ($this)</code> sem <code>default</code> é a dupla perfeita: esquecer um caso vira <code>UnhandledMatchError</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
