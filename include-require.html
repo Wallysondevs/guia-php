@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP include e require — reaproveitar arquivos | Guia PHP</title>
+<meta name="description" content="include, require, include_once e require_once no PHP: juntar arquivos, cabeçalho e rodapé reaproveitados, a diferença entre Warning e Fatal error quando o arquivo não existe, caminhos com __DIR__ e arquivos de configuração que devolvem um array.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">include e require</span></h1>
+
+<p class="intro">Um site de verdade tem dezenas de páginas, e todas repetem o mesmo cabeçalho, o mesmo menu e o mesmo rodapé. Copiar e colar esse HTML em cada página seria um pesadelo: para mudar um telefone, você teria que editar todas. Com <code>include</code> e <code>require</code>, você escreve o pedaço repetido <strong>uma vez</strong>, num arquivo separado, e manda o PHP "colar" esse arquivo onde precisar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que <code>include</code> e <code>require</code> fazem (e que eles "colam" o arquivo no lugar).</li>
+  <li>A diferença entre os dois quando o arquivo não existe: um <strong>aviso</strong> (<code>Warning</code>) × um <strong>erro fatal</strong>.</li>
+  <li>Para que servem <code>include_once</code> e <code>require_once</code>.</li>
+  <li>Como montar um site com cabeçalho e rodapé reaproveitados.</li>
+  <li>Por que caminhos como <code>../cabecalho.php</code> quebram, e como <code>__DIR__</code> resolve.</li>
+  <li>Como um arquivo de configuração pode <strong>devolver</strong> um array com <code>return</code>.</li>
+</ul>
+</div>
+
+<p>Os exemplos acontecem na máquina fictícia da Ana (<code>ana@notebook</code>), que está montando o site da sua lojinha de bolos. Antes desta aula, vale ter visto <a href="funcoes.html">Funções</a> e <a href="php-e-html.html">PHP Dentro do HTML</a>.</p>
+
+<hr>
+
+<h2>A ideia: um carimbo</h2>
+<p>Pense num carimbo com o endereço da loja. A Ana não escreve o endereço à mão em cada envelope: ela carimba. Se a loja mudar de endereço, ela troca <strong>o carimbo</strong>, e todos os envelopes novos saem certos.</p>
+<p>No PHP, o "carimbo" é um arquivo (<code>cabecalho.php</code>, por exemplo) e o ato de carimbar é a linha <code>include 'cabecalho.php';</code>. Quando o PHP encontra essa linha, ele:</p>
+<ol>
+  <li>procura o arquivo <code>cabecalho.php</code>;</li>
+  <li>lê o arquivo e executa o que estiver dentro, <strong>como se o código estivesse escrito ali</strong>, no lugar da linha do <code>include</code>;</li>
+  <li>continua o arquivo original da linha seguinte em diante.</li>
+</ol>
+<p>Os nomes vêm do inglês: <em>include</em> = "incluir"; <em>require</em> = "exigir". A diferença entre "incluir" e "exigir" é justamente o que acontece quando o arquivo não está lá, como você vai ver.</p>
+
+<hr>
+
+<h2>O primeiro include</h2>
+<p>A Ana criou três arquivos na pasta <code>inc</code>. Primeiro, o cabeçalho:</p>
+
+<pre class="file" data-file="cabecalho.php">&lt;?php
+echo "=== Lojinha da Ana ===\n";
+</pre>
+
+<p>Depois, o rodapé:</p>
+
+<pre class="file" data-file="rodape.php">&lt;?php
+echo "--- (c) 2026 Lojinha da Ana ---\n";
+</pre>
+
+<p>E a página principal, que usa os dois:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+include 'cabecalho.php';
+echo "Bem-vindo! Hoje temos bolos e doces.\n";
+include 'rodape.php';
+</pre>
+
+<dl class="anatomy">
+  <dt>include</dt><dd>A instrução "inclua aqui o arquivo…". Não é uma função: é uma palavra da própria linguagem, por isso não precisa de parênteses (escrever <code>include('cabecalho.php');</code> também funciona, mas os parênteses são enfeite).</dd>
+  <dt>'cabecalho.php'</dt><dd>O nome do arquivo, entre aspas, como qualquer texto. Pode ser um caminho (<code>'partes/cabecalho.php'</code>) ou uma variável.</dd>
+  <dt>;</dt><dd>Como toda instrução do PHP, termina com ponto e vírgula.</dd>
+</dl>
+
+<pre class="term">$ cd inc
+$ php index.php
+=== Lojinha da Ana ===                       « veio do cabecalho.php
+Bem-vindo! Hoje temos bolos e doces.         « do próprio index.php
+--- (c) 2026 Lojinha da Ana ---              « veio do rodape.php</pre>
+
+<p>O resultado é exatamente o mesmo que você teria se as três linhas <code>echo</code> estivessem no <code>index.php</code>. A vantagem: o cabeçalho e o rodapé agora podem ser usados por <strong>qualquer</strong> outra página.</p>
+
+<div class="note">
+<strong>O arquivo incluído também começa com <code>&lt;?php</code></strong>
+<p>Todo arquivo incluído é lido do zero, em "modo HTML". Se você esquecer o <code>&lt;?php</code> no começo dele, o PHP mostra o código como texto em vez de executá-lo. É por isso que um arquivo só com HTML (sem nenhum PHP) também pode ser incluído: ele simplesmente sai como está.</p>
+</div>
+
+<h3>As variáveis são compartilhadas</h3>
+<p>Como o código incluído "entra no lugar" do <code>include</code>, ele enxerga as variáveis que já existiam ali, e as variáveis que ele cria continuam existindo depois:</p>
+
+<pre class="file" data-file="variaveis.php">&lt;?php
+$titulo = "Promoções";
+include 'mostra-titulo.php';
+echo "De volta: $saudacao\n";
+</pre>
+
+<pre class="file" data-file="mostra-titulo.php">&lt;?php
+echo "Título recebido: $titulo\n";
+$saudacao = "olá do arquivo incluído";
+</pre>
+
+<pre class="term">$ php variaveis.php
+Título recebido: Promoções                 « o incluído leu $titulo
+De volta: olá do arquivo incluído          « e criou $saudacao para o principal</pre>
+
+<p>Isso é muito usado para passar o título da página para o cabeçalho. Mas atenção: se o <code>include</code> estiver <strong>dentro de uma função</strong>, as variáveis do arquivo ficam presas dentro da função (é o <a href="escopo.html">escopo</a> local):</p>
+
+<pre class="file" data-file="dentro-func.php">&lt;?php
+function carrega(): void
+{
+    include 'config-var.php';     // config-var.php só tem: $loja = 'Lojinha da Ana';
+    echo "Dentro da função: $loja\n";
+}
+carrega();
+echo "Fora da função: $loja\n";
+</pre>
+
+<pre class="term">$ php dentro-func.php
+Dentro da função: Lojinha da Ana
+
+Warning: Undefined variable $loja in /home/ana/inc/dentro-func.php on line 8
+Fora da função: </pre>
+
+<p>Experimente: a página abaixo esqueceu de incluir o rodapé. Os três arquivos estão nas abas da caixa.</p>
+
+<div class="tryphp" data-goal="out:Obrigada pela visita,out:Bem-vindo,src:(include|require)(_once)?\s*\(?\s*['&quot;]rodape\.php">
+<p class="try-task"><strong>Missão:</strong> no <code>index.php</code>, acrescente uma linha que inclua o <code>rodape.php</code> depois da mensagem de boas-vindas. Clique em Rodar e veja as três partes.</p>
+<pre class="script" data-file="index.php">&lt;?php
+include 'cabecalho.php';
+echo "Bem-vindo! Hoje temos bolos e doces.\n";
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;?php
+echo "=== Lojinha da Ana ===\n";
+</pre>
+<pre class="script" data-file="rodape.php">&lt;?php
+echo "--- Obrigada pela visita! ---\n";
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+include 'cabecalho.php';
+echo "Bem-vindo! Hoje temos bolos e doces.\n";
+include 'rodape.php';
+</pre>
+</div>
+
+<hr>
+
+<h2>include × require: quando o arquivo não existe</h2>
+<p>Os dois fazem a mesma coisa quando o arquivo existe. A diferença aparece quando ele <strong>não</strong> existe (nome errado, arquivo apagado, pasta errada). Veja o mesmo programa com cada um. O arquivo <code>menu.php</code> não existe:</p>
+
+<pre class="file" data-file="falta-include.php">&lt;?php
+include 'menu.php';
+echo "A página continuou depois do include.\n";
+</pre>
+
+<pre class="term">$ php falta-include.php; echo "código: $?"
+
+Warning: include(menu.php): Failed to open stream: No such file or directory in /home/ana/inc/falta-include.php on line 2
+
+Warning: include(): Failed opening 'menu.php' for inclusion (include_path='.:') in /home/ana/inc/falta-include.php on line 2
+A página continuou depois do include.        « o programa seguiu em frente
+código: 0</pre>
+
+<p>Com <code>include</code>, o PHP dá dois <strong>avisos</strong> (<code>Warning</code>) e <strong>continua</strong>. Agora com <code>require</code>:</p>
+
+<pre class="file" data-file="falta-require.php">&lt;?php
+require 'menu.php';
+echo "A página continuou depois do require.\n";
+</pre>
+
+<pre class="term">$ php falta-require.php; echo "código: $?"
+
+Warning: require(menu.php): Failed to open stream: No such file or directory in /home/ana/inc/falta-require.php on line 2
+
+Fatal error: Uncaught Error: Failed opening required 'menu.php' (include_path='.:') in /home/ana/inc/falta-require.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/inc/falta-require.php on line 2
+código: 255                                  « o echo nunca rodou</pre>
+
+<p>Com <code>require</code>, o PHP para tudo com um <strong>erro fatal</strong> (<code>Fatal error</code>). A linha do <code>echo</code> nunca é executada, e o programa termina com o código 255 (erro).</p>
+
+<h3>Lendo as mensagens</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço da mensagem</th><th>O que quer dizer</th></tr>
+<tr><td><code>Failed to open stream</code></td><td>"Falhou ao abrir o fluxo": o PHP tentou abrir o arquivo e não conseguiu.</td></tr>
+<tr><td><code>No such file or directory</code></td><td>"Arquivo ou diretório inexistente": o motivo. Outro motivo comum é <code>Permission denied</code> (sem permissão de leitura).</td></tr>
+<tr><td><code>Failed opening 'menu.php' for inclusion</code></td><td>"Falhou ao abrir para inclusão": o resumo do <code>include</code>.</td></tr>
+<tr><td><code>Failed opening required 'menu.php'</code></td><td>O mesmo, para o <code>require</code>, que vira um erro (<code>Error</code>) e para o programa.</td></tr>
+<tr><td><code>include_path='.:'</code></td><td>As pastas onde o PHP procurou, separadas por <code>:</code>. O <code>.</code> é a pasta atual. No PHP instalado pelo <code>apt</code> do Ubuntu/Debian aparece <code>'.:/usr/share/php'</code>.</td></tr>
+<tr><td><code>Uncaught Error</code></td><td>"Erro não capturado": no PHP 8, o erro do <code>require</code> é uma <a href="excecoes.html">exceção</a> do tipo <code>Error</code>.</td></tr>
+</table>
+</div>
+
+<h3>Qual usar?</h3>
+<p>Pergunte-se: <strong>a página faz sentido sem esse arquivo?</strong></p>
+<ul>
+  <li>Arquivo de funções, de configuração, a conexão com o banco, o cabeçalho com o <code>&lt;html&gt;</code>: sem eles a página quebra de qualquer jeito. Use <strong><code>require</code></strong>: é melhor parar logo, com uma mensagem clara, do que continuar e gerar dez erros confusos depois.</li>
+  <li>Um pedaço opcional (um banner de promoção, um aviso que às vezes existe): use <strong><code>include</code></strong>, e a página segue sem ele.</li>
+</ul>
+<p>Na prática, a maior parte do código PHP moderno usa <code>require</code> (ou <code>require_once</code>) quase sempre.</p>
+
+<div class="tryphp" data-goal="erro:Failed opening required,src:\brequire\b">
+<p class="try-task"><strong>Missão:</strong> rode como está e veja os dois <code>Warning</code> do <code>include</code> e a frase final. Depois troque <code>include</code> por <code>require</code> e rode de novo: a frase final some e aparece o <code>Fatal error</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+include 'menu.php';
+echo "A página continuou.\n";
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require 'menu.php';
+echo "A página continuou.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>include_once e require_once: só uma vez</h2>
+<p>Às vezes o mesmo arquivo acaba sendo incluído duas vezes: a página inclui <code>funcoes.php</code>, e o cabeçalho, que ela também inclui, inclui <code>funcoes.php</code> de novo. Com um arquivo que só tem <code>echo</code>, o texto apareceria duas vezes. Com um arquivo que <strong>define funções</strong>, é pior:</p>
+
+<pre class="file" data-file="funcoes.php">&lt;?php
+function preco_com_desconto(float $preco): float
+{
+    return $preco * 0.9;
+}
+</pre>
+
+<pre class="file" data-file="duas-vezes.php">&lt;?php
+include 'funcoes.php';
+include 'funcoes.php';
+echo preco_com_desconto(20), "\n";
+</pre>
+
+<pre class="term">$ php duas-vezes.php; echo "código: $?"
+
+Fatal error: Cannot redeclare function preco_com_desconto() (previously declared in /home/ana/inc/funcoes.php:2) in /home/ana/inc/funcoes.php on line 2
+Stack trace:
+#0 {main}
+código: 255</pre>
+
+<p>"<em>Cannot redeclare function</em>" = "não é possível declarar a função de novo": uma função só pode ser criada uma vez. A versão <code>_once</code> ("uma vez") resolve: ela anota quais arquivos já foram incluídos e <strong>ignora</strong> os pedidos repetidos.</p>
+
+<pre class="file" data-file="duas-once.php">&lt;?php
+include_once 'funcoes.php';
+include_once 'funcoes.php';     // ignorado: já foi incluído
+echo preco_com_desconto(20), "\n";
+</pre>
+
+<pre class="term">$ php duas-once.php
+18</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Instrução</th><th>Arquivo não existe</th><th>Arquivo já incluído antes</th><th>Uso típico</th></tr>
+<tr><td><code>include</code></td><td>Warning, continua</td><td>Inclui de novo</td><td>Pedaços de HTML opcionais, que podem repetir</td></tr>
+<tr><td><code>require</code></td><td>Fatal error, para</td><td>Inclui de novo</td><td>Cabeçalho e rodapé de página</td></tr>
+<tr><td><code>include_once</code></td><td>Warning, continua</td><td>Ignora</td><td>Raro</td></tr>
+<tr><td><code>require_once</code></td><td>Fatal error, para</td><td>Ignora</td><td>Arquivos com funções, classes, configuração, conexão com o banco</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Regra prática</strong>
+<p>Arquivo que <strong>define</strong> coisas (funções, classes, constantes): <code>require_once</code>. Arquivo que <strong>mostra</strong> coisas (pedaços de HTML): <code>require</code> (ou <code>include</code>, se for opcional). Mais adiante, no Nível 3, o <a href="autoload.html">autoload</a> vai carregar as classes sozinho, e você vai escrever bem menos <code>require_once</code>.</p>
+</div>
+
+<hr>
+
+<h2>Cabeçalho e rodapé de um site</h2>
+<p>Agora o uso mais comum de todos. A Ana quer que todas as páginas do site tenham o mesmo topo (com o menu) e o mesmo rodapé. Ela separa o HTML em três arquivos:</p>
+
+<pre class="file" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;&lt;?= htmlspecialchars($titulo) ?&gt;&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="?pagina=inicio"&gt;Início&lt;/a&gt; | &lt;a href="?pagina=contato"&gt;Contato&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+</pre>
+
+<pre class="file" data-file="rodape.php">&lt;footer&gt;
+  &lt;p&gt;© &lt;?= date('Y') ?&gt; Lojinha da Ana — Campinas/SP&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<pre class="file" data-file="index.php">&lt;?php
+$pagina = $_GET['pagina'] ?? 'inicio';
+
+$titulo = match ($pagina) {
+    'contato' =&gt; 'Contato',
+    default   =&gt; 'Início',
+};
+
+require __DIR__ . '/cabecalho.php';
+
+if ($pagina === 'contato') {
+    echo "&lt;p&gt;Fale com a Ana: (19) 99999-0000&lt;/p&gt;\n";
+} else {
+    echo "&lt;p&gt;Bolos e doces feitos em casa.&lt;/p&gt;\n";
+}
+
+require __DIR__ . '/rodape.php';
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$pagina = $_GET['pagina'] ?? 'inicio';</code></td><td>Lê qual página foi pedida no endereço (<code>?pagina=contato</code>); se não veio nada, usa <code>'inicio'</code>. Veja <a href="get-post.html">$_GET e $_POST</a>.</td></tr>
+<tr><td><code>$titulo = match (…)</code></td><td>Escolhe o título da aba. O cabeçalho vai usar essa variável.</td></tr>
+<tr><td><code>require __DIR__ . '/cabecalho.php';</code></td><td>Cola o topo da página. O <code>__DIR__</code> você vai entender na próxima seção.</td></tr>
+<tr><td><code>if … else</code></td><td>O conteúdo próprio de cada página.</td></tr>
+<tr><td><code>require __DIR__ . '/rodape.php';</code></td><td>Cola o rodapé, que fecha o <code>&lt;/body&gt;</code> e o <code>&lt;/html&gt;</code>.</td></tr>
+</table>
+</div>
+
+<p>Repare que <code>cabecalho.php</code> e <code>rodape.php</code> são quase só HTML, com pequenos trechos <code>&lt;?= … ?&gt;</code>. E que o cabeçalho usa <code>htmlspecialchars</code> no título, como manda a aula <a href="escapar-saida.html">Escapar a Saída</a>. Com o <a href="servidor-embutido.html">servidor embutido</a> rodando na pasta (<code>php -S localhost:8000</code>, em outro terminal), a Ana pediu a página de contato com o <code>curl</code>:</p>
+
+<pre class="term">$ curl -s "localhost:8000/index.php?pagina=contato"
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Contato&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="?pagina=inicio"&gt;Início&lt;/a&gt; | &lt;a href="?pagina=contato"&gt;Contato&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;p&gt;Fale com a Ana: (19) 99999-0000&lt;/p&gt;                « a única parte que veio do index.php
+&lt;footer&gt;
+  &lt;p&gt;© 2026 Lojinha da Ana — Campinas/SP&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>O navegador recebe uma página única e completa: ele nem fica sabendo que ela foi montada a partir de três arquivos. Isso acontece no servidor, antes de a resposta sair.</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?pagina=sobre" data-goal="html:Desde 2020,html:Lojinha da Ana">
+<p class="try-task"><strong>Missão:</strong> o site abre na página <code>?pagina=sobre</code>, que ainda não existe (cai no "Início"). No <code>index.php</code>, faça a página <code>sobre</code> mostrar o parágrafo <code>Desde 2020 adoçando Campinas.</code> e ter o título <code>Sobre</code>. Use também a aba <strong>Resultado</strong> para clicar no menu. Bônus: acrescente o link "Sobre" no menu do <code>cabecalho.php</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$pagina = $_GET['pagina'] ?? 'inicio';
+
+$titulo = match ($pagina) {
+    'contato' =&gt; 'Contato',
+    default   =&gt; 'Início',
+};
+
+require __DIR__ . '/cabecalho.php';
+
+if ($pagina === 'contato') {
+    echo "&lt;p&gt;Fale com a Ana: (19) 99999-0000&lt;/p&gt;\n";
+} else {
+    echo "&lt;p&gt;Bolos e doces feitos em casa.&lt;/p&gt;\n";
+}
+
+require __DIR__ . '/rodape.php';
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;&lt;?= htmlspecialchars($titulo) ?&gt;&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="?pagina=inicio"&gt;Início&lt;/a&gt; | &lt;a href="?pagina=contato"&gt;Contato&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+</pre>
+<pre class="script" data-file="rodape.php">&lt;footer&gt;
+  &lt;p&gt;© &lt;?= date('Y') ?&gt; Lojinha da Ana — Campinas/SP&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$pagina = $_GET['pagina'] ?? 'inicio';
+
+$titulo = match ($pagina) {
+    'contato' =&gt; 'Contato',
+    'sobre'   =&gt; 'Sobre',
+    default   =&gt; 'Início',
+};
+
+require __DIR__ . '/cabecalho.php';
+
+if ($pagina === 'contato') {
+    echo "&lt;p&gt;Fale com a Ana: (19) 99999-0000&lt;/p&gt;\n";
+} elseif ($pagina === 'sobre') {
+    echo "&lt;p&gt;Desde 2020 adoçando Campinas.&lt;/p&gt;\n";
+} else {
+    echo "&lt;p&gt;Bolos e doces feitos em casa.&lt;/p&gt;\n";
+}
+
+require __DIR__ . '/rodape.php';
+</pre>
+<pre class="solucao" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;&lt;?= htmlspecialchars($titulo) ?&gt;&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;Lojinha da Ana&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="?pagina=inicio"&gt;Início&lt;/a&gt; | &lt;a href="?pagina=sobre"&gt;Sobre&lt;/a&gt; | &lt;a href="?pagina=contato"&gt;Contato&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+</pre>
+</div>
+
+<div class="warning">
+<strong>Nunca inclua o nome que veio do usuário</strong>
+<p>É tentador escrever <code>include $_GET['pagina'] . '.php';</code> e economizar o <code>match</code>. Não faça isso: quem visita o site controla o endereço, e pode pedir <code>?pagina=../../algum/arquivo</code> para fazer o seu servidor abrir arquivos que não deveria. O jeito seguro é o da Ana: uma <strong>lista fixa</strong> de páginas permitidas (<code>match</code>, <code>if</code> ou um array), e o resto cai no padrão.</p>
+</div>
+
+<hr>
+
+<h2>Caminhos: onde o PHP procura o arquivo</h2>
+<p>Até aqui todos os arquivos estavam na mesma pasta. Mas sites crescem, e a Ana criou uma subpasta <code>paginas/</code> dentro de <code>inc/</code>, com o arquivo <code>sobre.php</code>, que precisa do cabeçalho da pasta de cima:</p>
+
+<pre class="file" data-file="paginas/sobre.php">&lt;?php
+include '../cabecalho.php';          // "suba uma pasta e pegue o cabeçalho"
+echo "Sobre a loja: desde 2020.\n";
+</pre>
+
+<p>Rodando de dentro de <code>paginas/</code>, funciona. Rodando de outra pasta, não:</p>
+
+<pre class="term">$ cd paginas
+$ php sobre.php
+=== Lojinha da Ana ===
+Sobre a loja: desde 2020.
+$ cd ..
+$ php paginas/sobre.php
+
+Warning: include(../cabecalho.php): Failed to open stream: No such file or directory in /home/ana/inc/paginas/sobre.php on line 2
+
+Warning: include(): Failed opening '../cabecalho.php' for inclusion (include_path='.:') in /home/ana/inc/paginas/sobre.php on line 2
+Sobre a loja: desde 2020.</pre>
+
+<p>Por quê? Um caminho que começa com <code>./</code> ou <code>../</code> é calculado a partir da <strong>pasta atual</strong> (a pasta onde o programa foi chamado, a do <code>pwd</code>), e não da pasta onde está o arquivo <code>sobre.php</code>. Quando a Ana estava em <code>inc/</code>, o <code>../</code> apontou para <code>/home/ana</code>, onde não há cabeçalho nenhum. Num servidor web acontece o mesmo: a "pasta atual" depende de qual script foi chamado, e um arquivo incluído por outro herda essa pasta.</p>
+
+<h3>A solução: <code>__DIR__</code></h3>
+<p><code>__DIR__</code> é uma <strong>constante mágica</strong>: o PHP troca essa palavra pela pasta onde está <strong>o arquivo em que ela foi escrita</strong>, sempre como caminho completo. A irmã dela, <code>__FILE__</code>, é o caminho completo do próprio arquivo.</p>
+
+<pre class="file" data-file="paginas/sobre2.php">&lt;?php
+include __DIR__ . '/../cabecalho.php';
+echo "Sobre a loja: desde 2020.\n";
+echo __DIR__, "\n";
+echo __FILE__, "\n";
+</pre>
+
+<pre class="term">$ cd ~
+$ php inc/paginas/sobre2.php
+=== Lojinha da Ana ===                       « funcionou mesmo chamado de /home/ana
+Sobre a loja: desde 2020.
+/home/ana/inc/paginas                        « __DIR__
+/home/ana/inc/paginas/sobre2.php             « __FILE__</pre>
+
+<dl class="anatomy">
+  <dt>__DIR__</dt><dd>Vira <code>'/home/ana/inc/paginas'</code>, não importa de onde o programa foi chamado. Duas sublinhas antes e duas depois.</dd>
+  <dt>.</dt><dd>O operador de <a href="operadores-string.html">concatenação</a>: junta os dois textos.</dd>
+  <dt>'/../cabecalho.php'</dt><dd>O resto do caminho. Comece com <code>/</code>, porque <code>__DIR__</code> não termina com barra. O resultado é <code>/home/ana/inc/paginas/../cabecalho.php</code>, que é o mesmo que <code>/home/ana/inc/cabecalho.php</code>.</dd>
+</dl>
+
+<div class="note">
+<strong>E o <code>include 'cabecalho.php'</code> sem <code>./</code>?</strong>
+<p>Um nome "solto" (sem <code>./</code>, <code>../</code> ou <code>/</code>) é procurado primeiro nas pastas do <code>include_path</code> (a pasta atual, <code>.</code>, e outras configuradas) e, se não achar, na pasta do arquivo que fez o <code>include</code>. Por isso os exemplos do começo funcionaram. Mas essa busca depende de configuração e pode achar um arquivo de mesmo nome em outra pasta. O hábito profissional é sempre escrever <code>__DIR__ . '/arquivo.php'</code>: não há dúvida de qual arquivo será usado.</p>
+</div>
+
+<hr>
+
+<h2>include que devolve um valor: arquivos de configuração</h2>
+<p>Um arquivo incluído pode terminar com <code>return</code>, igual a uma função. O valor devolvido vira o resultado do <code>include</code>/<code>require</code>, e você pode guardá-lo numa variável. Esse é o jeito mais organizado de fazer um arquivo de configuração:</p>
+
+<pre class="file" data-file="config.php">&lt;?php
+return [
+    'loja'   =&gt; 'Lojinha da Ana',
+    'cidade' =&gt; 'Campinas',
+    'frete'  =&gt; 12.5,
+];
+</pre>
+
+<pre class="file" data-file="usa-config.php">&lt;?php
+$config = require 'config.php';
+echo "Loja: {$config['loja']}\n";
+echo "Frete: R$ " . number_format($config['frete'], 2, ',', '.') . "\n";
+var_dump($config);
+</pre>
+
+<pre class="term">$ php usa-config.php
+Loja: Lojinha da Ana
+Frete: R$ 12,50
+array(3) {
+  ["loja"]=&gt;
+  string(14) "Lojinha da Ana"
+  ["cidade"]=&gt;
+  string(8) "Campinas"
+  ["frete"]=&gt;
+  float(12.5)
+}</pre>
+
+<p>A vantagem sobre criar variáveis soltas no <code>config.php</code> (como <code>$loja = '…';</code>): fica claro, na página, <strong>de onde</strong> veio cada valor (<code>$config['frete']</code>), nenhuma variável aparece "do nada" e o arquivo funciona igual dentro de funções.</p>
+
+<h3>O que o include devolve quando não há <code>return</code></h3>
+<pre class="file" data-file="retorno.php">&lt;?php
+$a = include 'rodape.php';
+var_dump($a);
+$b = @include 'naoexiste.php';
+var_dump($b);
+$c = include_once 'rodape.php';
+var_dump($c);
+</pre>
+
+<pre class="term">$ php retorno.php
+--- (c) 2026 Lojinha da Ana ---
+int(1)          « deu certo e o arquivo não tem return: devolve 1
+bool(false)     « o arquivo não existe: devolve false (o @ escondeu os Warnings)
+bool(true)      « include_once de um arquivo já incluído: devolve true e não inclui</pre>
+
+<p>O <code>@</code> na frente do <code>include</code> é o operador que <strong>silencia</strong> os avisos daquela linha. Use com muito cuidado (veja <a href="tipos-erro.html">Tipos de Erro</a>): esconder um aviso não conserta o problema.</p>
+
+<div class="tryphp" data-goal="out:Frete: R$ 15\,00,out:Cidade: Campinas,semerro">
+<p class="try-task"><strong>Missão:</strong> no <code>config.php</code>, mude o frete para <code>15.0</code>. No <code>index.php</code>, mostre também a linha <code>Cidade: Campinas</code> lendo o valor do array <code>$config</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$config = require __DIR__ . '/config.php';
+echo "Loja: {$config['loja']}\n";
+echo "Frete: R$ " . number_format($config['frete'], 2, ',', '.') . "\n";
+</pre>
+<pre class="script" data-file="config.php">&lt;?php
+return [
+    'loja'   =&gt; 'Lojinha da Ana',
+    'cidade' =&gt; 'Campinas',
+    'frete'  =&gt; 12.5,
+];
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$config = require __DIR__ . '/config.php';
+echo "Loja: {$config['loja']}\n";
+echo "Frete: R$ " . number_format($config['frete'], 2, ',', '.') . "\n";
+echo "Cidade: {$config['cidade']}\n";
+</pre>
+<pre class="solucao" data-file="config.php">&lt;?php
+return [
+    'loja'   =&gt; 'Lojinha da Ana',
+    'cidade' =&gt; 'Campinas',
+    'frete'  =&gt; 15.0,
+];
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Failed opening required" com um caminho relativo</strong>
+<p>A Ana trocou o <code>include</code> do <code>paginas/sobre.php</code> por <code>require</code> e rodou de dentro de <code>inc/</code>:</p>
+<pre class="term">$ php paginas/sobre.php
+
+Warning: require(../cabecalho.php): Failed to open stream: No such file or directory in /home/ana/inc/paginas/sobre.php on line 2
+
+Fatal error: Uncaught Error: Failed opening required '../cabecalho.php' (include_path='.:') in /home/ana/inc/paginas/sobre.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/inc/paginas/sobre.php on line 2</pre>
+<p><strong>O que significa:</strong> o arquivo não foi achado a partir da pasta atual. Às vezes funciona num lugar e quebra em outro (no terminal × no servidor).</p>
+<p><strong>Como consertar:</strong> confira o nome (maiúsculas contam no Linux: <code>Cabecalho.php</code> ≠ <code>cabecalho.php</code>) e troque o caminho relativo por <code>__DIR__ . '/../cabecalho.php'</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Cannot redeclare function"</strong>
+<pre class="term">Fatal error: Cannot redeclare function preco_com_desconto() (previously declared in /home/ana/inc/funcoes.php:2) in /home/ana/inc/funcoes.php on line 2</pre>
+<p><strong>O que significa:</strong> o arquivo que define a função foi incluído duas vezes (às vezes por caminhos diferentes: um <code>require</code> na página e outro dentro do cabeçalho).</p>
+<p><strong>Como consertar:</strong> use <code>require_once</code> em arquivos que definem funções e classes.</p>
+</div>
+
+<div class="cenario">
+<strong>O código do arquivo incluído aparece como texto na página</strong>
+<p><strong>O que significa:</strong> o arquivo incluído não começa com <code>&lt;?php</code>. O PHP leu o conteúdo como HTML comum e mandou para a tela.</p>
+<p><strong>Como consertar:</strong> coloque <code>&lt;?php</code> na primeira linha do arquivo incluído. Em arquivos só de PHP, não feche com <code>?&gt;</code> no final (evita espaços em branco "fantasmas" na página; veja <a href="sintaxe.html">Sintaxe</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"Undefined variable" com uma variável do arquivo incluído</strong>
+<pre class="term">Warning: Undefined variable $loja in /home/ana/inc/dentro-func.php on line 8</pre>
+<p><strong>O que significa:</strong> o <code>include</code> foi feito dentro de uma função, e as variáveis dele ficaram presas lá; ou o <code>include</code> veio <strong>depois</strong> da linha que usa a variável.</p>
+<p><strong>Como consertar:</strong> faça o arquivo devolver um valor com <code>return</code> e guarde-o (<code>$config = require …</code>), ou passe os valores como parâmetros de função.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que é</th></tr>
+<tr><td><code>include 'a.php';</code></td><td>Inclui e executa <code>a.php</code>. Se não existir: <code>Warning</code> e continua (devolve <code>false</code>).</td></tr>
+<tr><td><code>require 'a.php';</code></td><td>Igual, mas se não existir: <code>Fatal error</code> (exceção <code>Error</code>) e para.</td></tr>
+<tr><td><code>include_once</code> / <code>require_once</code></td><td>Não inclui de novo um arquivo que já foi incluído (devolve <code>true</code>).</td></tr>
+<tr><td><code>$x = require 'a.php';</code></td><td>Guarda o valor do <code>return</code> de <code>a.php</code> (ou <code>1</code>, se não houver <code>return</code>).</td></tr>
+<tr><td><code>__DIR__</code></td><td>Pasta do arquivo atual, caminho completo, sem barra no fim.</td></tr>
+<tr><td><code>__FILE__</code></td><td>Caminho completo do arquivo atual.</td></tr>
+<tr><td><code>get_included_files()</code></td><td>Devolve um array com todos os arquivos já incluídos (útil para depurar).</td></tr>
+<tr><td><code>include_path</code></td><td>Configuração do <code>php.ini</code> com as pastas onde nomes "soltos" são procurados.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Parar se faltar</h3>
+<p>O arquivo <code>conexao.php</code> é indispensável e define funções. Complete a linha:</p>
+<div class="ex-code"><input data-answer="require_once" aria-label="instrução"> __DIR__ . '/conexao.php';</div>
+</div>
+
+<div class="exercise">
+<h3>2. Caminho seguro</h3>
+<p>Complete para incluir <code>rodape.php</code>, que está na mesma pasta do arquivo atual, sem depender da pasta de onde o programa foi chamado:</p>
+<div class="ex-code">require <input data-answer="__DIR__" aria-label="constante"> . '/rodape.php';</div>
+</div>
+
+<div class="exercise">
+<h3>3. Guardar a configuração</h3>
+<p>O <code>config.php</code> termina com <code>return ['loja' =&gt; 'Lojinha da Ana'];</code>. Complete para guardar o array:</p>
+<div class="ex-code"><input data-answer="$config =|$config=" aria-label="variável"> require 'config.php';</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O arquivo <code>banner.php</code> não existe. O que acontece com <code>include 'banner.php'; echo "fim";</code>?</p>
+<label><input type="radio" name="q4"> Fatal error, e "fim" não aparece.</label>
+<label><input type="radio" name="q4"> Dois Warnings, e depois "fim" aparece.</label>
+<label><input type="radio" name="q4"> Nada aparece, nem aviso.</label>
+<label><input type="radio" name="q4"> O PHP cria o arquivo vazio.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Para que serve o <code>_once</code> em <code>require_once</code>?</p>
+<label><input type="radio" name="q5"> Para incluir o arquivo só se ele existir.</label>
+<label><input type="radio" name="q5"> Para incluir o arquivo mais rápido.</label>
+<label><input type="radio" name="q5"> Para ignorar o pedido se o arquivo já tiver sido incluído antes.</label>
+<label><input type="radio" name="q5"> Para incluir o arquivo uma vez por dia.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Em <code>/home/ana/inc/paginas/sobre.php</code>, o que vale <code>__DIR__</code>?</p>
+<label><input type="radio" name="q6"> <code>/home/ana/inc/paginas</code></label>
+<label><input type="radio" name="q6"> A pasta de onde o comando <code>php</code> foi chamado.</label>
+<label><input type="radio" name="q6"> <code>/home/ana/inc/paginas/sobre.php</code></label>
+<label><input type="radio" name="q6"> <code>paginas</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>include</code> e <code>require</code> "colam" outro arquivo PHP no lugar da linha e o executam, compartilhando as variáveis.</li>
+  <li>Arquivo inexistente: <code>include</code> dá <code>Warning</code> e continua; <code>require</code> dá <code>Fatal error</code> e para. Use <code>require</code> para o que é indispensável.</li>
+  <li><code>_once</code> evita incluir o mesmo arquivo duas vezes (e o erro <code>Cannot redeclare function</code>). Use <code>require_once</code> para arquivos de funções e classes.</li>
+  <li>Cabeçalho e rodapé em arquivos separados: muda num lugar, muda no site inteiro.</li>
+  <li>Caminhos com <code>../</code> dependem da pasta atual; escreva <code>__DIR__ . '/arquivo.php'</code>.</li>
+  <li>Um arquivo pode terminar com <code>return [...]</code>, e <code>$config = require 'config.php';</code> guarda o valor.</li>
+  <li>Nunca inclua um nome vindo do usuário: use uma lista de páginas permitidas.</li>
+</ul>
+
+<p>Próxima aula: <a href="arquivos.html">Ler e Escrever Arquivos</a>, para o PHP guardar e ler os seus próprios dados em arquivos de texto.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
