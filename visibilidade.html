@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Visibilidade — public, protected, private e private(set) | Guia PHP</title>
+<meta name="description" content="Visibilidade em PHP: public, protected e private, o erro Cannot access private property, getters e setters com validação, a visibilidade assimétrica do PHP 8.4 (public private(set)) e a ideia de encapsulamento, com saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Visibilidade</span></h1>
+
+<p class="intro">Até aqui, toda propriedade e todo método começavam com <code>public</code>: qualquer parte do programa podia ler e mudar tudo. Isso abre uma "porta dos fundos": a Ana escreve um método <code>vender</code> que confere o estoque, e alguém simplesmente faz <code>$caneca-&gt;estoque = -50</code>. A <strong>visibilidade</strong> decide <strong>quem</strong> pode mexer em cada parte de um objeto. É o primeiro pilar da POO na prática: o <strong>encapsulamento</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As três visibilidades: <code>public</code>, <code>protected</code> e <code>private</code>.</li>
+  <li>O erro <code>Cannot access private property</code> e o que ele protege.</li>
+  <li>Métodos privados: os "ajudantes internos" de uma classe.</li>
+  <li>Getters e setters: ler e mudar com regras.</li>
+  <li>A <strong>visibilidade assimétrica</strong> do PHP 8.4: <code>public private(set)</code> (todo mundo lê, só a classe muda).</li>
+  <li>O que é encapsulamento e quando usar cada visibilidade.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O problema: a porta dos fundos</h2>
+
+<pre class="file" data-file="problema.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public int $estoque,
+    ) {
+    }
+
+    public function vender(int $quantidade): void
+    {
+        if ($quantidade &gt; $this-&gt;estoque) {
+            echo "Estoque insuficiente!\n";
+            return;
+        }
+        $this-&gt;estoque -= $quantidade;
+    }
+}
+
+$caneca = new Produto("Caneca", 10);
+$caneca-&gt;vender(30);              // o método protege...
+$caneca-&gt;estoque = -50;           // ...mas a porta dos fundos está aberta
+echo "Estoque: {$caneca-&gt;estoque}\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php problema.php
+Estoque insuficiente!     « o método vender recusou a venda de 30
+Estoque: -50              « mas a linha 22 mudou o estoque direto, sem regra nenhuma</pre>
+
+<p>O método <code>vender</code> é a porta da frente, com porteiro: ele confere se há estoque. Mas como <code>$estoque</code> é <code>public</code>, qualquer linha do programa pode entrar pelos fundos e pôr um valor absurdo. Num sistema real, isso vira estoque negativo, preço zero, saldo inventado.</p>
+
+<p>Pense num caixa eletrônico: você não abre o cofre e pega o dinheiro. Você usa os botões <strong>Sacar</strong> e <strong>Depositar</strong>, e a máquina confere o saldo. O cofre é <strong>privado</strong>; os botões são <strong>públicos</strong>.</p>
+
+<hr>
+
+<h2>As três visibilidades</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Palavra</th><th>Tradução</th><th>Quem pode usar</th><th>No dia a dia</th></tr>
+<tr><td><code>public</code></td><td>público</td><td>Qualquer código: dentro da classe, nas classes filhas e fora (<code>$obj-&gt;prop</code>)</td><td>A vitrine da loja</td></tr>
+<tr><td><code>protected</code></td><td>protegido</td><td>A própria classe e as classes <strong>filhas</strong> (veja <a href="heranca.html">Herança</a>)</td><td>A receita da família: passa para os filhos, não para estranhos</td></tr>
+<tr><td><code>private</code></td><td>privado</td><td><strong>Só</strong> o código dentro da própria classe</td><td>O cofre</td></tr>
+</table>
+</div>
+
+<p>A visibilidade vale para propriedades, métodos e constantes, e vem sempre na frente: <code>private int $estoque</code>, <code>private function frete()</code>. No construtor com promoção, também: <code>private int $estoque</code> dentro dos parênteses.</p>
+
+<hr>
+
+<h2><code>private</code>: só a classe mexe</h2>
+<p>A Ana torna o estoque privado. Para os outros poderem <strong>ler</strong> o estoque, ela cria um método público <code>getEstoque()</code>:</p>
+
+<pre class="file" data-file="privado.php">&lt;?php
+class Produto
+{
+    private int $estoque;
+
+    public function __construct(public string $nome, int $estoque)
+    {
+        $this-&gt;estoque = $estoque;
+    }
+
+    public function vender(int $quantidade): void
+    {
+        if ($quantidade &gt; $this-&gt;estoque) {
+            echo "Estoque insuficiente!\n";
+            return;
+        }
+        $this-&gt;estoque -= $quantidade;
+    }
+
+    public function getEstoque(): int
+    {
+        return $this-&gt;estoque;
+    }
+}
+
+$caneca = new Produto("Caneca", 10);
+$caneca-&gt;vender(3);
+echo "Estoque: " . $caneca-&gt;getEstoque() . "\n";
+echo $caneca-&gt;estoque;
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php privado.php
+Estoque: 7
+
+Fatal error: Uncaught Error: Cannot access private property Produto::$estoque in /home/ana/loja/privado.php:29
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/privado.php on line 29</pre>
+
+<p>Dentro da classe, <code>$this-&gt;estoque</code> funciona normalmente (nos métodos <code>vender</code> e <code>getEstoque</code>). Fora dela, a linha 29 tentou ler <code>$caneca-&gt;estoque</code> e o PHP parou: <code>Cannot access private property Produto::$estoque</code> ("não é possível acessar a propriedade privada"). <strong>Mudar</strong> de fora dá o mesmo erro:</p>
+
+<pre class="file" data-file="privado-escrever.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        private int $estoque,
+    ) {
+    }
+}
+
+$caneca = new Produto("Caneca", 10);
+$caneca-&gt;estoque = -50;
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php privado-escrever.php
+
+Fatal error: Uncaught Error: Cannot access private property Produto::$estoque in /home/ana/loja/privado-escrever.php:12
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/privado-escrever.php on line 12</pre>
+
+<p>A porta dos fundos fechou: o único jeito de mudar o estoque agora é pelo método <code>vender</code>, que tem as regras. (Repare também na promoção com <code>private</code>, no construtor.)</p>
+
+<div class="tip">
+<strong>Privado é por classe, não por objeto</strong>
+<p>Um método da classe <code>Produto</code> pode ler o <code>private</code> de <strong>outro</strong> objeto <code>Produto</code>. O "cofre" é da classe, e todo código escrito dentro dela tem a chave:</p>
+<pre class="file" data-file="mesmo-tipo.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        private float $preco,
+    ) {
+    }
+
+    public function maisBaratoQue(Produto $outro): bool
+    {
+        return $this-&gt;preco &lt; $outro-&gt;preco;
+    }
+}
+
+$caneca = new Produto("Caneca", 25.90);
+$camiseta = new Produto("Camiseta", 49.90);
+var_dump($caneca-&gt;maisBaratoQue($camiseta));
+</pre>
+<pre class="term" data-cwd="~/loja">$ php mesmo-tipo.php
+bool(true)</pre>
+</div>
+
+<div class="tryphp" data-goal="out:Estoque: 7,src:private int \$estoque,semerro">
+<p class="try-task"><strong>Missão:</strong> feche a porta dos fundos. Troque <code>public int $estoque</code> por <code>private int $estoque</code>, crie o método <code>getEstoque(): int</code> e mude o <code>echo</code> final para usá-lo. Apague a linha que põe <code>-50</code> (ela vai dar erro, confira antes de apagar!). A saída deve ser <code>Estoque: 7</code>, sem erros.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public int $estoque,
+    ) {
+    }
+
+    public function vender(int $quantidade): void
+    {
+        if ($quantidade &gt; $this-&gt;estoque) {
+            echo "Estoque insuficiente!\n";
+            return;
+        }
+        $this-&gt;estoque -= $quantidade;
+    }
+}
+
+$caneca = new Produto("Caneca", 10);
+$caneca-&gt;vender(3);
+$caneca-&gt;estoque = -50;
+echo "Estoque: {$caneca-&gt;estoque}\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        private int $estoque,
+    ) {
+    }
+
+    public function vender(int $quantidade): void
+    {
+        if ($quantidade &gt; $this-&gt;estoque) {
+            echo "Estoque insuficiente!\n";
+            return;
+        }
+        $this-&gt;estoque -= $quantidade;
+    }
+
+    public function getEstoque(): int
+    {
+        return $this-&gt;estoque;
+    }
+}
+
+$caneca = new Produto("Caneca", 10);
+$caneca-&gt;vender(3);
+echo "Estoque: " . $caneca-&gt;getEstoque() . "\n";
+</pre>
+</div>
+
+<h3>Métodos privados: os ajudantes internos</h3>
+<p>Métodos também podem ser privados. Eles servem para dividir um cálculo em partes sem expor essas partes para fora. Aqui, o pedido calcula subtotal e frete por dentro, e só mostra o total:</p>
+
+<pre class="file" data-file="metodo-privado.php">&lt;?php
+class Pedido
+{
+    private array $itens = [];
+
+    public function adicionar(string $produto, float $preco): void
+    {
+        $this-&gt;itens[] = ["produto" =&gt; $produto, "preco" =&gt; $preco];
+    }
+
+    public function total(): float
+    {
+        return $this-&gt;subtotal() + $this-&gt;frete();
+    }
+
+    private function subtotal(): float
+    {
+        return array_sum(array_column($this-&gt;itens, "preco"));
+    }
+
+    private function frete(): float
+    {
+        return $this-&gt;subtotal() &gt;= 100 ? 0 : 15;
+    }
+}
+
+$pedido = new Pedido();
+$pedido-&gt;adicionar("Caneca", 25.90);
+$pedido-&gt;adicionar("Camiseta", 49.90);
+echo "Total: " . number_format($pedido-&gt;total(), 2, ",", ".") . "\n";
+echo $pedido-&gt;frete();
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php metodo-privado.php
+Total: 90,80              « 25,90 + 49,90 = 75,80, mais 15 de frete (abaixo de 100)
+
+Fatal error: Uncaught Error: Call to private method Pedido::frete() from global scope in /home/ana/loja/metodo-privado.php:31
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/metodo-privado.php on line 31</pre>
+
+<p>"Chamada de método privado <code>Pedido::frete()</code> do escopo global" (escopo global = fora de qualquer classe). A vantagem: amanhã a Ana pode mudar a regra do frete ou separar <code>subtotal</code> em dois métodos, e nenhum código de fora quebra, porque ninguém de fora usava esses métodos.</p>
+
+<h3><code>protected</code>: para a família</h3>
+<p>Fora da classe, <code>protected</code> se comporta igual a <code>private</code>:</p>
+
+<pre class="file" data-file="protegido.php">&lt;?php
+class Produto
+{
+    protected float $preco = 25.90;
+}
+$c = new Produto();
+echo $c-&gt;preco;
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php protegido.php
+
+Fatal error: Uncaught Error: Cannot access protected property Produto::$preco in /home/ana/loja/protegido.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/protegido.php on line 7</pre>
+
+<p>A diferença só aparece com <strong>herança</strong>: uma classe filha (<code>class ProdutoDigital extends Produto</code>) pode usar o que é <code>protected</code> na mãe, mas não o que é <code>private</code>. Você vai ver isso na prática em <a href="heranca.html">Herança</a>.</p>
+
+<h3>O que o <code>var_dump</code> mostra</h3>
+<p>O <code>var_dump</code> e o <code>print_r</code> mostram <strong>tudo</strong>, inclusive o privado, com uma marcação. Eles são ferramentas de depuração; a visibilidade protege o <strong>código</strong>, não esconde dados de quem depura:</p>
+
+<pre class="file" data-file="var-dump.php">&lt;?php
+class Conta
+{
+    public string $titular = "Ana";
+    protected string $agencia = "0001";
+    private float $saldo = 150.0;
+}
+
+var_dump(new Conta());
+print_r(new Conta());
+echo "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php var-dump.php
+object(Conta)#1 (3) {
+  ["titular"]=&gt;
+  string(3) "Ana"
+  ["agencia":protected]=&gt;
+  string(4) "0001"
+  ["saldo":"Conta":private]=&gt;
+  float(150)
+}
+Conta Object
+(
+    [titular] =&gt; Ana
+    [agencia:protected] =&gt; 0001
+    [saldo:Conta:private] =&gt; 150
+)</pre>
+
+<div class="warning">
+<strong><code>private</code> não é segurança de dados</strong>
+<p>Visibilidade é uma regra para <strong>programadores</strong> ("não mexa nisso por fora"), não um cofre contra invasores. Uma senha numa propriedade <code>private</code> continua na memória e aparece num <code>var_dump</code>. Senhas se guardam com <code>password_hash</code> (veja <a href="senhas.html">Senhas</a>).</p>
+</div>
+
+<hr>
+
+<h2>Getters e setters</h2>
+<p>Com as propriedades privadas, como os outros leem e mudam os dados? Por métodos. O costume é chamá-los de <strong>getter</strong> (de <em>get</em>, "pegar": <code>getPreco()</code>) e <strong>setter</strong> (de <em>set</em>, "definir": <code>setPreco()</code>). O setter é onde moram as <strong>regras</strong>:</p>
+
+<pre class="file" data-file="getset.php">&lt;?php
+class Produto
+{
+    private float $preco;
+
+    public function __construct(public string $nome, float $preco)
+    {
+        $this-&gt;setPreco($preco);
+    }
+
+    public function getPreco(): float
+    {
+        return $this-&gt;preco;
+    }
+
+    public function setPreco(float $preco): void
+    {
+        if ($preco &lt;= 0) {
+            throw new InvalidArgumentException("Preço inválido: $preco");
+        }
+        $this-&gt;preco = round($preco, 2);
+    }
+}
+
+$caneca = new Produto("Caneca", 25.9);
+$caneca-&gt;setPreco(19.999);
+echo $caneca-&gt;getPreco() . "\n";
+$caneca-&gt;setPreco(-1);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php getset.php
+20                        « 19.999 arredondado para 2 casas pelo setter
+
+Fatal error: Uncaught InvalidArgumentException: Preço inválido: -1 in /home/ana/loja/getset.php:19
+Stack trace:
+#0 /home/ana/loja/getset.php(28): Produto-&gt;setPreco(-1.0)
+#1 {main}
+  thrown in /home/ana/loja/getset.php on line 19</pre>
+
+<dl class="anatomy">
+  <dt>private float $preco;</dt><dd>O dado fica guardado no "cofre".</dd>
+  <dt>getPreco()</dt><dd>O getter: só devolve o valor.</dd>
+  <dt>setPreco(float $preco)</dt><dd>O setter: confere a regra (preço maior que zero), arredonda e só então guarda.</dd>
+  <dt>$this-&gt;setPreco($preco) no construtor</dt><dd>O construtor usa o próprio setter: a regra fica escrita num lugar só e vale também na criação.</dd>
+</dl>
+
+<div class="tip">
+<strong>Não crie getter e setter para tudo</strong>
+<p>Um getter e um setter "vazios" (que só leem e gravam, sem regra) não protegem nada: é o mesmo que <code>public</code>, com mais código. Crie setter só quando há regra; e, muitas vezes, um método com nome de ação é melhor que um setter (<code>vender(3)</code> diz mais que <code>setEstoque(7)</code>). Para "todo mundo lê, só a classe muda", o PHP 8.4 tem algo mais curto que o getter: a visibilidade assimétrica, logo abaixo. Para regras na própria propriedade, existem os <a href="readonly-hooks.html">property hooks</a>.</p>
+</div>
+
+<hr>
+
+<h2>Visibilidade assimétrica: <code>public private(set)</code> <span class="versao">PHP 8.4+</span></h2>
+<p>O caso mais comum é: "todo mundo pode <strong>ler</strong> o estoque, mas só a classe pode <strong>mudar</strong>". Antes do 8.4, isso exigia uma propriedade <code>private</code> e um getter. No PHP 8.4, a propriedade pode ter <strong>duas</strong> visibilidades: uma para ler e outra para escrever (<em>set</em>). Daí o nome <strong>assimétrica</strong>:</p>
+
+<pre class="file" data-file="assimetrica.php">&lt;?php
+class Produto
+{
+    public private(set) int $estoque = 0;
+
+    public function __construct(public string $nome)
+    {
+    }
+
+    public function repor(int $quantidade): void
+    {
+        $this-&gt;estoque += $quantidade;
+    }
+
+    public function vender(int $quantidade): void
+    {
+        if ($quantidade &gt; $this-&gt;estoque) {
+            throw new RuntimeException("Estoque insuficiente");
+        }
+        $this-&gt;estoque -= $quantidade;
+    }
+}
+
+$caneca = new Produto("Caneca");
+$caneca-&gt;repor(10);
+$caneca-&gt;vender(3);
+echo "{$caneca-&gt;nome}: {$caneca-&gt;estoque} em estoque\n";
+$caneca-&gt;estoque = 1000;
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php assimetrica.php
+Caneca: 7 em estoque      « ler de fora funciona: $caneca-&gt;estoque, sem getter
+
+Fatal error: Uncaught Error: Cannot modify private(set) property Produto::$estoque from global scope in /home/ana/loja/assimetrica.php:28
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/assimetrica.php on line 28</pre>
+
+<dl class="anatomy">
+  <dt>public</dt><dd>A visibilidade de <strong>leitura</strong>: qualquer um lê <code>$caneca-&gt;estoque</code>.</dd>
+  <dt>private(set)</dt><dd>A visibilidade de <strong>escrita</strong>: só o código da classe muda o valor (nos métodos <code>repor</code> e <code>vender</code>).</dd>
+  <dt>int</dt><dd>O tipo é <strong>obrigatório</strong> em propriedades com visibilidade assimétrica.</dd>
+</dl>
+
+<p>A mensagem do erro é clara: "não é possível modificar a propriedade <code>private(set)</code> <code>Produto::$estoque</code> do escopo global".</p>
+
+<h3>As combinações</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Quem lê</th><th>Quem muda</th></tr>
+<tr><td><code>public private(set) int $x</code></td><td>Todos</td><td>Só a classe</td></tr>
+<tr><td><code>private(set) int $x</code></td><td>Todos (o <code>public</code> fica subentendido)</td><td>Só a classe</td></tr>
+<tr><td><code>public protected(set) int $x</code></td><td>Todos</td><td>A classe e as filhas</td></tr>
+<tr><td><code>protected private(set) int $x</code></td><td>A classe e as filhas</td><td>Só a classe</td></tr>
+</table>
+</div>
+
+<p>A escrita nunca pode ser <strong>mais</strong> aberta que a leitura: <code>private public(set)</code> dá <code>Fatal error: Visibility of property Produto::$estoque must not be weaker than set visibility</code>. E funciona com promoção no construtor:</p>
+
+<pre class="file" data-file="assimetrica-promo.php">&lt;?php
+class Conta
+{
+    public function __construct(
+        public private(set) string $titular,
+        private(set) float $saldo = 0,
+    ) {
+    }
+
+    public function depositar(float $valor): void
+    {
+        $this-&gt;saldo += $valor;
+    }
+}
+
+$conta = new Conta("Ana");
+$conta-&gt;depositar(150);
+echo "{$conta-&gt;titular}: R$ {$conta-&gt;saldo}\n";
+var_dump($conta);
+$conta-&gt;titular = "Bruno";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php assimetrica-promo.php
+Ana: R$ 150
+object(Conta)#1 (2) {
+  ["titular"]=&gt;
+  string(3) "Ana"
+  ["saldo"]=&gt;
+  float(150)
+}
+
+Fatal error: Uncaught Error: Cannot modify private(set) property Conta::$titular from global scope in /home/ana/loja/assimetrica-promo.php:20
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/assimetrica-promo.php on line 20</pre>
+
+<p>Repare: o <code>titular</code> recebeu o valor no construtor (que é código da classe, então pode), e o <code>saldo</code> mudou pelo método <code>depositar</code>. De fora, os dois podem ser lidos, mas não mudados.</p>
+
+<hr>
+
+<h2>Encapsulamento: o pilar por trás de tudo isso</h2>
+<p><strong>Encapsular</strong> é pôr numa cápsula: esconder os detalhes internos de um objeto e oferecer só algumas "portas" públicas, com regras. Na prática:</p>
+<ol>
+  <li>Comece com as propriedades <strong>não públicas</strong> para escrita (<code>private</code> ou <code>private(set)</code>), e abra só o que precisar.</li>
+  <li>Ofereça métodos com <strong>nome de ação</strong> (<code>vender</code>, <code>depositar</code>, <code>adicionar</code>) que conferem as regras.</li>
+  <li>Deixe <code>private</code> os métodos que são só "ajudantes" internos.</li>
+</ol>
+<p>O ganho: o objeto <strong>nunca</strong> fica num estado inválido (estoque negativo, preço zero), e você pode mudar o "como" lá dentro sem quebrar quem usa a classe.</p>
+
+<h3>Qual visibilidade usar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Método que os outros devem chamar (<code>vender</code>, <code>total</code>)</td><td><code>public</code></td></tr>
+<tr><td>Método ajudante, só para uso interno</td><td><code>private</code></td></tr>
+<tr><td>Dado que todos leem, mas só a classe muda</td><td><code>public private(set)</code> (8.4+); antes: <code>private</code> + getter</td></tr>
+<tr><td>Dado que nunca muda depois de criado</td><td><code>readonly</code> (veja <a href="readonly-hooks.html">readonly e Property Hooks</a>)</td></tr>
+<tr><td>Dado interno, que ninguém de fora precisa ver</td><td><code>private</code></td></tr>
+<tr><td>Algo que as classes filhas precisam usar ou mudar</td><td><code>protected</code> (com moderação)</td></tr>
+<tr><td>Dado simples, sem regra nenhuma, num objeto de "transporte"</td><td><code>public</code> (tudo bem!)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Cannot access private property / protected property</strong>
+<p>Você viu os dois acima. <strong>O que significa:</strong> código de fora da classe tentou ler ou mudar uma propriedade <code>private</code> (ou <code>protected</code>). <strong>Como consertar:</strong> use o método público que a classe oferece (<code>getEstoque()</code>, <code>vender()</code>). Se não existe nenhum e você precisa mesmo daquele dado, a mudança é na classe: crie um método, ou use <code>private(set)</code> para liberar só a leitura. Não troque para <code>public</code> só para "fazer o erro sumir".</p>
+</div>
+
+<div class="cenario">
+<strong>Call to private method … from global scope</strong>
+<p><strong>O que significa:</strong> um método <code>private</code> foi chamado de fora da classe (exemplo do pedido, acima). <strong>Como consertar:</strong> chame o método público que usa o ajudante (<code>total()</code>), ou, se o método deve mesmo ser usado de fora, troque-o para <code>public</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudar um array <code>private(set)</code> de fora</strong>
+<pre class="file" data-file="assim-array.php">&lt;?php
+class Carrinho
+{
+    public private(set) array $itens = [];
+}
+$c = new Carrinho();
+$c-&gt;itens[] = "Caneca";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php assim-array.php
+
+Fatal error: Uncaught Error: Cannot indirectly modify private(set) property Carrinho::$itens from global scope in /home/ana/loja/assim-array.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/assim-array.php on line 7</pre>
+<p><strong>O que significa:</strong> acrescentar um item no array também é "modificar" a propriedade, só que de forma indireta (<em>indirectly</em>). Com <code>private(set)</code>, nem isso é permitido de fora.</p>
+<p><strong>Como consertar:</strong> crie um método na classe: <code>public function adicionar(string $item): void { $this-&gt;itens[] = $item; }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Property with asymmetric visibility … must have type</strong>
+<pre class="file" data-file="assimetrica-sem-tipo.php">&lt;?php
+class Produto
+{
+    public private(set) $estoque = 0;
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php assimetrica-sem-tipo.php
+
+Fatal error: Property with asymmetric visibility Produto::$estoque must have type in /home/ana/loja/assimetrica-sem-tipo.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> propriedades com visibilidade assimétrica precisam de tipo. <strong>Como consertar:</strong> <code>public private(set) int $estoque = 0;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>public</code></td><td>Todos acessam</td></tr>
+<tr><td><code>protected</code></td><td>A classe e as filhas</td></tr>
+<tr><td><code>private</code></td><td>Só a própria classe</td></tr>
+<tr><td><code>public private(set) tipo $p</code> <span class="versao">PHP 8.4+</span></td><td>Todos leem; só a classe muda</td></tr>
+<tr><td><code>public protected(set) tipo $p</code> <span class="versao">PHP 8.4+</span></td><td>Todos leem; a classe e as filhas mudam</td></tr>
+<tr><td><code>private function x()</code></td><td>Método só para uso interno</td></tr>
+<tr><td><code>getX()</code> / <code>setX($v)</code></td><td>Costume para ler / mudar com regra</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Saque recusado: saldo insuficiente,out:Ana: R$ 120\,00,src:private\(set\),semerro">
+<p class="try-task"><strong>Missão:</strong> complete a classe <code>Conta</code>. O <code>saldo</code> deve ser lido por todos, mas mudado só pela classe: declare-o com <strong>visibilidade assimétrica</strong> (<code>private(set)</code>), começando em 0. Escreva <code>depositar(float $valor): void</code> e <code>sacar(float $valor): void</code>; o <code>sacar</code> lança <code>new RuntimeException("saldo insuficiente")</code> se o valor for maior que o saldo. O código de baixo já está pronto: a saída deve ter <code>Saque recusado: saldo insuficiente</code> e <code>Ana: R$ 120,00</code>.</p>
+<pre class="script">&lt;?php
+class Conta
+{
+    // declare o saldo aqui
+
+    public function __construct(public string $titular)
+    {
+    }
+
+    // escreva depositar e sacar aqui
+}
+
+$conta = new Conta("Ana");
+$conta-&gt;depositar(200);
+$conta-&gt;sacar(80);
+try {
+    $conta-&gt;sacar(500);
+} catch (RuntimeException $e) {
+    echo "Saque recusado: " . $e-&gt;getMessage() . "\n";
+}
+echo "{$conta-&gt;titular}: R$ " . number_format($conta-&gt;saldo, 2, ",", ".") . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Conta
+{
+    public private(set) float $saldo = 0;
+
+    public function __construct(public string $titular)
+    {
+    }
+
+    public function depositar(float $valor): void
+    {
+        $this-&gt;saldo += $valor;
+    }
+
+    public function sacar(float $valor): void
+    {
+        if ($valor &gt; $this-&gt;saldo) {
+            throw new RuntimeException("saldo insuficiente");
+        }
+        $this-&gt;saldo -= $valor;
+    }
+}
+
+$conta = new Conta("Ana");
+$conta-&gt;depositar(200);
+$conta-&gt;sacar(80);
+try {
+    $conta-&gt;sacar(500);
+} catch (RuntimeException $e) {
+    echo "Saque recusado: " . $e-&gt;getMessage() . "\n";
+}
+echo "{$conta-&gt;titular}: R$ " . number_format($conta-&gt;saldo, 2, ",", ".") . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Só a classe</h3>
+<p>Complete para que a propriedade só possa ser usada dentro da própria classe:</p>
+<div class="ex-code"><input data-answer="private" aria-label="visibilidade"> float $custo;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Todos leem, só a classe muda</h3>
+<p>Complete com a visibilidade assimétrica do PHP 8.4:</p>
+<div class="ex-code">public <input data-answer="private(set)" aria-label="visibilidade de escrita"> int $estoque = 0;</div>
+</div>
+
+<div class="exercise">
+<h3>3. O getter</h3>
+<p>Complete o nome do getter da propriedade <code>$preco</code>, seguindo o costume:</p>
+<div class="ex-code">public function <input data-answer="getPreco" aria-label="nome do método">(): float</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Quem pode acessar uma propriedade <code>protected</code>?</p>
+<label><input type="radio" name="q4"> Qualquer código</label>
+<label><input type="radio" name="q4"> Só a própria classe</label>
+<label><input type="radio" name="q4"> A própria classe e as classes filhas</label>
+<label><input type="radio" name="q4"> Só código fora da classe</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. A propriedade é <code>public private(set) int $estoque</code>. O que acontece com <code>echo $caneca-&gt;estoque;</code> fora da classe?</p>
+<label><input type="radio" name="q5"> Mostra o estoque normalmente</label>
+<label><input type="radio" name="q5"> <code>Cannot access private property</code></label>
+<label><input type="radio" name="q5"> <code>Cannot modify private(set) property</code></label>
+<label><input type="radio" name="q5"> Precisa de um getter</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que deixar um método <code>private</code>?</p>
+<label><input type="radio" name="q6"> Para ele rodar mais rápido</label>
+<label><input type="radio" name="q6"> Para esconder dados de invasores</label>
+<label><input type="radio" name="q6"> Porque métodos privados não aparecem no <code>var_dump</code></label>
+<label><input type="radio" name="q6"> Porque ele é um ajudante interno, e assim pode mudar sem quebrar quem usa a classe</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">7. Qual declaração dá erro?</p>
+<label><input type="radio" name="q7"> <code>private(set) int $x = 0;</code></label>
+<label><input type="radio" name="q7"> <code>private public(set) int $x = 0;</code></label>
+<label><input type="radio" name="q7"> <code>public protected(set) int $x = 0;</code></label>
+<label><input type="radio" name="q7"> <code>protected int $x = 0;</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>public</code> = todos; <code>protected</code> = a classe e as filhas; <code>private</code> = só a classe.</li>
+  <li>Acessar de fora o que não é público dá <code>Error: Cannot access private property …</code> (ou <code>Call to private method …</code>).</li>
+  <li>Métodos privados são ajudantes internos; métodos públicos são as "portas" com regras.</li>
+  <li>Getters leem; setters mudam com regra. Não crie setters vazios: prefira métodos com nome de ação.</li>
+  <li><strong>Visibilidade assimétrica</strong> (8.4+): <code>public private(set)</code> deixa todos lerem e só a classe mudar. Exige tipo.</li>
+  <li><strong>Encapsulamento</strong>: esconda o "como", mostre o "o quê", e o objeto nunca fica num estado inválido.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
