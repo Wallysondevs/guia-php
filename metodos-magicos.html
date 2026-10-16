@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Métodos Mágicos — __toString, __get, __set, __call, __invoke e __clone | Guia PHP</title>
+<meta name="description" content="Os métodos mágicos do PHP explicados do zero: __toString, __get e __set (com __isset e __unset), __call e __callStatic, __invoke, __clone e __debugInfo. Quando o PHP chama cada um, erros reais do PHP 8.5 e quando é melhor evitá-los.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Métodos Mágicos</span></h1>
+
+<p class="intro">Você já conhece um método especial: o <code>__construct</code>, que o PHP chama sozinho quando você escreve <code>new</code>. Ele não é o único. O PHP tem uma família de métodos com nomes que começam com <strong>dois sublinhados</strong> (<code>__</code>) e que <strong>ninguém chama diretamente</strong>: o próprio PHP os chama quando certa coisa acontece com o objeto. Eles se chamam <strong>métodos mágicos</strong>. Nesta aula você vai conhecer os mais usados, ver cada um funcionando e, tão importante quanto, aprender quando <strong>não</strong> usá-los.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um método mágico e quando o PHP o chama.</li>
+  <li><code>__toString</code>: o objeto vira texto num <code>echo</code>.</li>
+  <li><code>__get</code>, <code>__set</code>, <code>__isset</code> e <code>__unset</code>: propriedades que não existem (ou não são visíveis).</li>
+  <li><code>__call</code> e <code>__callStatic</code>: métodos que não existem.</li>
+  <li><code>__invoke</code>: usar o objeto como se fosse uma função.</li>
+  <li><code>__clone</code>: consertar a cópia feita pelo <code>clone</code>.</li>
+  <li>Os erros reais de cada um e quando é melhor escolher outro caminho.</li>
+</ul>
+</div>
+
+<p>Pré-requisitos: <a href="classes-objetos.html">classes e objetos</a>, <a href="construtores.html">construtores</a> (inclusive a promoção de propriedades no construtor) e <a href="visibilidade.html">visibilidade</a> (<code>public</code> e <code>private</code>). Os exemplos rodam na máquina fictícia da Ana, na pasta <code>~/poo</code>, com o PHP 8.5.</p>
+
+<hr>
+
+<h2>A ideia antes do código: o porteiro automático</h2>
+<p>Pense na portaria de um prédio. Você não chama o porteiro para cada coisa: ele <strong>reage sozinho</strong> a certos acontecimentos. Tocou o interfone? Ele atende. Chegou uma encomenda para alguém que não mora ali? Ele decide o que fazer. Alguém pediu uma cópia da chave? Ele faz a cópia do jeito certo.</p>
+<p>Os métodos mágicos são esse porteiro. Você escreve o método uma vez dentro da classe e o PHP o chama na hora certa:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quando acontece isto…</th><th>…o PHP chama</th></tr>
+<tr><td><code>new Produto(…)</code></td><td><code>__construct</code> (você já conhece)</td></tr>
+<tr><td>o objeto é usado como texto (<code>echo $p</code>)</td><td><code>__toString</code></td></tr>
+<tr><td>alguém lê uma propriedade que não existe ou é <code>private</code></td><td><code>__get</code></td></tr>
+<tr><td>alguém grava numa propriedade que não existe ou é <code>private</code></td><td><code>__set</code></td></tr>
+<tr><td>alguém chama um método que não existe</td><td><code>__call</code></td></tr>
+<tr><td>alguém chama o objeto como função (<code>$obj(10)</code>)</td><td><code>__invoke</code></td></tr>
+<tr><td>alguém faz <code>clone $obj</code></td><td><code>__clone</code> (na cópia)</td></tr>
+<tr><td>o objeto deixa de ser usado</td><td><code>__destruct</code></td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Os nomes com <code>__</code> são reservados</strong>
+<p>Todo método cujo nome começa com dois sublinhados é reservado para o PHP. Não invente os seus (<code>__calcular</code>, <code>__salvar</code>): se uma versão futura do PHP criar um método mágico com esse nome, o seu código passa a se comportar de outro jeito.</p>
+</div>
+
+<hr>
+
+<h2>1. <code>__toString</code>: o objeto vira texto</h2>
+<p>O que acontece se a Ana tentar dar <code>echo</code> num objeto? Um número ou um texto o PHP sabe mostrar, mas um objeto pode ter várias propriedades: qual delas mostrar?</p>
+
+<pre class="file" data-file="produto.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {}
+}
+
+$p = new Produto("Caderno", 12.5);
+echo $p;
+echo "fim\n";
+</pre>
+
+<pre class="term" data-cwd="~/poo">$ php produto.php
+
+Fatal error: Uncaught Error: Object of class Produto could not be converted to string in /home/ana/poo/produto.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/produto.php on line 11</pre>
+
+<p>"O objeto da classe Produto não pôde ser convertido para string". O PHP não adivinha: ele para o programa (o <code>fim</code> nem aparece). O método <code>__toString</code> ("para string") é a resposta: nele você diz <strong>como</strong> o objeto vira texto.</p>
+
+<pre class="file" data-file="tostring.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {}
+
+    public function __toString(): string
+    {
+        return $this-&gt;nome . " (R$ " . number_format($this-&gt;preco, 2, ",", ".") . ")";
+    }
+}
+
+$p = new Produto("Caderno", 12.5);
+echo $p, "\n";
+echo "Você comprou: $p\n";
+$texto = "Item: " . $p;
+echo $texto, "\n";
+echo strlen($p), "\n";
+var_dump($p instanceof Stringable);
+echo (string) $p, "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>public function __toString(): string</dt><dd>O nome é fixo (<code>__toString</code>), o método precisa ser <code>public</code>, não recebe parâmetros e <strong>devolve uma string</strong>.</dd>
+  <dt>return $this-&gt;nome . …</dt><dd>Você monta o texto como quiser. Aqui: nome e preço formatado (veja <a href="number-format.html">Formatar Números</a>).</dd>
+  <dt>echo $p</dt><dd>O PHP percebe que precisa de texto e chama <code>$p-&gt;__toString()</code> por você.</dd>
+  <dt>"Você comprou: $p"</dt><dd>Dentro de aspas duplas também (<a href="interpolacao.html">interpolação</a>).</dd>
+  <dt>"Item: " . $p</dt><dd>No operador de concatenação <code>.</code>, em <code>strlen()</code> e em qualquer função que espera texto.</dd>
+  <dt>$p instanceof Stringable</dt><dd>Toda classe com <code>__toString</code> passa a implementar, automaticamente, a interface <code>Stringable</code> ("que pode virar string"). Veja <a href="interfaces.html">Interfaces</a>.</dd>
+  <dt>(string) $p</dt><dd>A conversão explícita (veja <a href="conversao-tipos.html">Conversão de Tipos</a>) também chama o método.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/poo">$ php tostring.php
+Caderno (R$ 12,50)
+Você comprou: Caderno (R$ 12,50)
+Item: Caderno (R$ 12,50)
+18                          « strlen contou os bytes do texto (o "R$ " e o resto)
+bool(true)
+Caderno (R$ 12,50)</pre>
+
+<p>Repare que <strong>nenhuma linha</strong> chama <code>__toString()</code> pelo nome. É isso que faz dele "mágico". Funciona até em funções que recebem vários objetos, como <code>implode</code>:</p>
+
+<pre class="file" data-file="tags.php">&lt;?php
+class Tag
+{
+    public function __construct(private string $nome) {}
+    public function __toString(): string
+    {
+        return "#" . $this-&gt;nome;
+    }
+}
+$tags = [new Tag("php"), new Tag("poo")];
+echo implode(" ", $tags), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php tags.php
+#php #poo</pre>
+
+<div class="tip">
+<strong>Para que serve no dia a dia</strong>
+<p>Para objetos que têm uma representação "natural" em texto: um preço (<code>R$ 12,50</code>), um nome completo, uma data, um endereço de e-mail, um link. Se você precisaria pensar muito para decidir qual texto mostrar, prefira um método com nome claro, como <code>descricao()</code> ou <code>resumo()</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Ana tirou 9.5,out:Boletim: Ana tirou 9.5,src:function __toString,semerro">
+<p class="try-task"><strong>Missão:</strong> rode o código e veja o erro. Depois escreva o método <code>__toString</code> na classe <code>Aluno</code> para que o objeto vire o texto <code>Ana tirou 9.5</code> (nome, a palavra "tirou" e a nota).</p>
+<pre class="script">&lt;?php
+class Aluno
+{
+    public function __construct(
+        public string $nome,
+        public float $nota,
+    ) {}
+
+    // escreva o __toString aqui
+}
+
+$ana = new Aluno("Ana", 9.5);
+echo $ana . "\n";
+echo "Boletim: $ana\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Aluno
+{
+    public function __construct(
+        public string $nome,
+        public float $nota,
+    ) {}
+
+    public function __toString(): string
+    {
+        return "$this-&gt;nome tirou $this-&gt;nota";
+    }
+}
+
+$ana = new Aluno("Ana", 9.5);
+echo $ana . "\n";
+echo "Boletim: $ana\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>2. <code>__get</code> e <code>__set</code>: propriedades que não existem</h2>
+<p>Primeiro, relembre o que o PHP faz sozinho quando você lê ou grava uma propriedade que a classe não declarou:</p>
+
+<pre class="file" data-file="dinamica.php">&lt;?php
+class Aluno
+{
+    public string $nome = "Ana";
+}
+
+$a = new Aluno();
+echo $a-&gt;idade, "\n";
+$a-&gt;idade = 29;
+echo $a-&gt;idade, "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php dinamica.php
+
+Warning: Undefined property: Aluno::$idade in /home/ana/poo/dinamica.php on line 8
+
+
+Deprecated: Creation of dynamic property Aluno::$idade is deprecated in /home/ana/poo/dinamica.php on line 9
+29</pre>
+
+<p>Na leitura, um aviso de "propriedade indefinida". Na gravação, o PHP cria uma <strong>propriedade dinâmica</strong> na hora, mas avisa que isso está <code>Deprecated</code> (condenado: desde o PHP 8.2, vai deixar de funcionar no futuro). Os métodos <code>__get</code> ("pegar") e <code>__set</code> ("definir") deixam <strong>você</strong> decidir o que acontece nesses casos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>O PHP chama quando…</th><th>Recebe</th><th>Devolve</th></tr>
+<tr><td><code>__get($nome)</code></td><td>alguém <strong>lê</strong> <code>$obj-&gt;nome</code></td><td>o nome da propriedade</td><td>o valor a entregar</td></tr>
+<tr><td><code>__set($nome, $valor)</code></td><td>alguém <strong>grava</strong> <code>$obj-&gt;nome = valor</code></td><td>o nome e o valor</td><td>nada (<code>void</code>)</td></tr>
+<tr><td><code>__isset($nome)</code></td><td>alguém usa <code>isset($obj-&gt;nome)</code> ou <code>empty()</code></td><td>o nome</td><td><code>true</code> ou <code>false</code></td></tr>
+<tr><td><code>__unset($nome)</code></td><td>alguém usa <code>unset($obj-&gt;nome)</code></td><td>o nome</td><td>nada</td></tr>
+</table>
+</div>
+
+<p>Eles só entram em ação quando a propriedade <strong>não existe</strong> ou <strong>não é visível</strong> de onde o código está (uma <code>private</code> acessada de fora). Se a propriedade existe e é <code>public</code>, o PHP usa a propriedade direto e nenhum método mágico é chamado.</p>
+
+<p>Um exemplo: uma "ficha" que aceita qualquer campo e guarda tudo num array. Os <code>echo</code> entre colchetes estão ali só para você <strong>ver</strong> quando o PHP chama cada método:</p>
+
+<pre class="file" data-file="getset.php">&lt;?php
+class Ficha
+{
+    private array $dados = [];
+
+    public function __get(string $nome): mixed
+    {
+        echo "[__get chamado para '$nome']\n";
+        return $this-&gt;dados[$nome] ?? null;
+    }
+
+    public function __set(string $nome, mixed $valor): void
+    {
+        echo "[__set chamado: '$nome' = '$valor']\n";
+        $this-&gt;dados[$nome] = $valor;
+    }
+
+    public function __isset(string $nome): bool
+    {
+        return isset($this-&gt;dados[$nome]);
+    }
+
+    public function __unset(string $nome): void
+    {
+        unset($this-&gt;dados[$nome]);
+    }
+}
+
+$f = new Ficha();
+$f-&gt;nome = "Ana";
+$f-&gt;cidade = "Recife";
+echo $f-&gt;nome . " mora em " . $f-&gt;cidade . "\n";
+var_dump(isset($f-&gt;cidade));
+unset($f-&gt;cidade);
+var_dump(isset($f-&gt;cidade));
+var_dump($f-&gt;telefone);
+</pre>
+
+<pre class="term" data-cwd="~/poo">$ php getset.php
+[__set chamado: 'nome' = 'Ana']          « $f-&gt;nome = "Ana" não existe: foi para o __set
+[__set chamado: 'cidade' = 'Recife']
+[__get chamado para 'nome']              « o PHP monta a frase inteira antes do echo
+[__get chamado para 'cidade']
+Ana mora em Recife
+bool(true)                               « __isset respondeu
+bool(false)                              « depois do unset (via __unset)
+[__get chamado para 'telefone']
+NULL                                     « o ?? null do __get</pre>
+
+<dl class="anatomy">
+  <dt>private array $dados = [];</dt><dd>O lugar onde os valores ficam de verdade. Ninguém de fora enxerga.</dd>
+  <dt>__get(string $nome): mixed</dt><dd>Recebe o <strong>nome</strong> da propriedade pedida, como texto. <code>mixed</code> quer dizer "pode devolver qualquer tipo".</dd>
+  <dt>$this-&gt;dados[$nome] ?? null</dt><dd>Devolve o valor guardado ou <code>null</code> se não existir (veja <a href="null-coalescing.html">??</a>).</dd>
+  <dt>__set(string $nome, mixed $valor): void</dt><dd>Recebe o nome e o valor. Aqui ele guarda no array, mas poderia validar, recusar, converter…</dd>
+</dl>
+
+<h3>Um uso de verdade: só leitura de fora</h3>
+<p>Com <code>__get</code> e sem <code>__set</code>, dá para deixar uma propriedade <code>private</code> legível de fora, mas não gravável. E dá para dar uma mensagem melhor quando alguém erra o nome:</p>
+
+<pre class="file" data-file="conta.php">&lt;?php
+class Conta
+{
+    private float $saldo = 100.0;
+
+    public function __get(string $nome): mixed
+    {
+        if ($nome === "saldo") {
+            return $this-&gt;saldo;
+        }
+        throw new Error("A propriedade '$nome' não existe em Conta");
+    }
+}
+
+$c = new Conta();
+echo $c-&gt;saldo, "\n";
+$c-&gt;saldo = 1000000;
+</pre>
+<pre class="term" data-cwd="~/poo">$ php conta.php
+100                « leitura: o __get entregou o saldo
+
+Fatal error: Uncaught Error: Cannot access private property Conta::$saldo in /home/ana/poo/conta.php:17
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/conta.php on line 17</pre>
+<p>A leitura funcionou pelo <code>__get</code>. A gravação não tem <code>__set</code>, então o PHP fez o normal: recusou mexer numa propriedade <code>private</code> ("Não é possível acessar a propriedade privada"). A Ana não ganha um milhão.</p>
+
+<div class="tip">
+<strong>No PHP moderno existe um jeito melhor</strong>
+<p>Esse "lê de fora, só grava por dentro" hoje se escreve sem mágica nenhuma: com <code>public private(set)</code> ou <code>readonly</code>, e regras de leitura e gravação com <strong>property hooks</strong> <span class="versao">PHP 8.4+</span>. O editor e as ferramentas enxergam essas propriedades; já as do <code>__get</code> são invisíveis para eles. Veja <a href="readonly-hooks.html">readonly e Property Hooks</a>.</p>
+</div>
+
+<hr>
+
+<h2>3. <code>__call</code> e <code>__callStatic</code>: métodos que não existem</h2>
+<p>Chamar um método que a classe não tem é um erro fatal:</p>
+
+<pre class="file" data-file="call-sem.php">&lt;?php
+class Loja
+{
+}
+$loja = new Loja();
+$loja-&gt;precoCaderno();
+</pre>
+<pre class="term" data-cwd="~/poo">$ php call-sem.php
+
+Fatal error: Uncaught Error: Call to undefined method Loja::precoCaderno() in /home/ana/poo/call-sem.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/call-sem.php on line 6</pre>
+
+<p>"Chamada a um método indefinido". Se a classe tiver <code>__call</code> ("chamar"), o PHP, em vez de parar, chama o <code>__call</code> com o <strong>nome</strong> do método e um <strong>array com os argumentos</strong>. O irmão <code>__callStatic</code> faz o mesmo para chamadas estáticas (<code>Loja::algo()</code>, veja <a href="static.html">static</a>).</p>
+
+<pre class="file" data-file="call.php">&lt;?php
+class Loja
+{
+    private array $precos = ["caderno" =&gt; 12.5, "caneta" =&gt; 3.0];
+
+    public function __call(string $metodo, array $argumentos): mixed
+    {
+        echo "[__call: $metodo(" . implode(", ", $argumentos) . ")]\n";
+        if (str_starts_with($metodo, "preco")) {
+            $item = strtolower(substr($metodo, 5));
+            return $this-&gt;precos[$item] ?? 0.0;
+        }
+        throw new BadMethodCallException("Método Loja::$metodo() não existe");
+    }
+
+    public static function __callStatic(string $metodo, array $argumentos): string
+    {
+        return "estático: $metodo";
+    }
+}
+
+$loja = new Loja();
+echo $loja-&gt;precoCaderno(), "\n";
+echo $loja-&gt;precoCaneta(), "\n";
+echo $loja-&gt;precoBorracha(), "\n";
+echo Loja::abrir(), "\n";
+echo $loja-&gt;vender("caderno", 2), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/poo">$ php call.php
+[__call: precoCaderno()]
+12.5
+[__call: precoCaneta()]
+3
+[__call: precoBorracha()]
+0                              « não está no array: o ?? 0.0
+estático: abrir                « Loja::abrir() foi para o __callStatic
+[__call: vender(caderno, 2)]   « os argumentos chegam no array
+
+Fatal error: Uncaught BadMethodCallException: Método Loja::vender() não existe in /home/ana/poo/call.php:13
+Stack trace:
+#0 /home/ana/poo/call.php(27): Loja-&gt;__call('vender', Array)
+#1 {main}
+  thrown in /home/ana/poo/call.php on line 13</pre>
+
+<dl class="anatomy">
+  <dt>__call(string $metodo, array $argumentos)</dt><dd><code>$metodo</code> é o nome que foi chamado (<code>"precoCaderno"</code>); <code>$argumentos</code> é um array com o que veio nos parênteses (<code>["caderno", 2]</code>).</dd>
+  <dt>str_starts_with($metodo, "preco")</dt><dd>"O nome começa com <code>preco</code>?" Se sim, o resto do nome (<code>substr($metodo, 5)</code>, a partir da 6ª letra) vira o item procurado.</dd>
+  <dt>throw new BadMethodCallException(…)</dt><dd>Para qualquer outro nome, o <code>__call</code> <strong>lança uma exceção</strong>. Sem isso, um erro de digitação (<code>$loja-&gt;precoCadreno()</code>) passaria em silêncio. Veja <a href="excecoes.html">Exceções</a>.</dd>
+</dl>
+
+<div class="warning">
+<strong>Sempre trate o "nome desconhecido" no <code>__call</code> e no <code>__get</code></strong>
+<p>Um <code>__call</code> que aceita qualquer nome transforma todo erro de digitação num bug silencioso. Termine sempre com um <code>throw</code> para os nomes que você não espera. O mesmo vale para o <code>__get</code>.</p>
+</div>
+
+<hr>
+
+<h2>4. <code>__invoke</code>: o objeto vira uma função</h2>
+<p>Quando uma classe tem <code>__invoke</code> ("invocar"), você pode colocar parênteses depois do objeto, como se ele fosse uma função. É útil quando uma "função" precisa guardar uma configuração. Exemplo: a lojinha da Ana tem descontos de 10%, 15%…</p>
+
+<pre class="file" data-file="invoke.php">&lt;?php
+class Desconto
+{
+    public function __construct(private float $porcentagem) {}
+
+    public function __invoke(float $preco): float
+    {
+        return $preco - $preco * $this-&gt;porcentagem / 100;
+    }
+}
+
+$dezPorCento = new Desconto(10);
+echo $dezPorCento(50), "\n";
+echo $dezPorCento(200), "\n";
+
+$precos = [50, 120, 9.9];
+print_r(array_map($dezPorCento, $precos));
+var_dump(is_callable($dezPorCento));
+</pre>
+
+<pre class="term" data-cwd="~/poo">$ php invoke.php
+45
+180
+Array
+(
+    [0] =&gt; 45
+    [1] =&gt; 108
+    [2] =&gt; 8.91
+)
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>new Desconto(10)</dt><dd>Cria o objeto e guarda a configuração (10%).</dd>
+  <dt>$dezPorCento(50)</dt><dd>Parênteses depois do objeto: o PHP chama <code>$dezPorCento-&gt;__invoke(50)</code>.</dd>
+  <dt>array_map($dezPorCento, $precos)</dt><dd>Como o objeto é "chamável" (<em>callable</em>), ele pode ir para qualquer função que espera uma função, como <code>array_map</code> (veja <a href="funcoes-array.html">Funções de Array</a>).</dd>
+  <dt>is_callable($dezPorCento)</dt><dd>"Pode ser chamado?" <code>true</code>.</dd>
+</dl>
+
+<p>Sem o <code>__invoke</code>, o PHP recusa: <code>Fatal error: Uncaught Error: Object of type Desconto is not callable</code> ("objeto do tipo Desconto não é chamável").</p>
+<p>Para coisas pequenas, uma <a href="closures.html">função anônima</a> resolve o mesmo problema (<code>fn($preco) =&gt; $preco * 0.9</code>). Prefira a classe com <code>__invoke</code> quando a "função" tem nome, configuração e merece ser testada sozinha.</p>
+
+<hr>
+
+<h2>5. <code>__clone</code>: consertar a cópia</h2>
+<p>Lembre: atribuir um objeto a outra variável <strong>não copia</strong> o objeto; as duas variáveis apontam para o mesmo. Para ter uma cópia, use <code>clone</code>. Só que o <code>clone</code> faz uma cópia <strong>rasa</strong>: as propriedades que guardam <em>outros objetos</em> continuam apontando para os mesmos objetos de antes.</p>
+
+<pre class="file" data-file="clone-raso.php">&lt;?php
+class Endereco
+{
+    public function __construct(public string $cidade) {}
+}
+
+class Cliente
+{
+    public function __construct(
+        public string $nome,
+        public Endereco $endereco,
+    ) {}
+}
+
+$ana = new Cliente("Ana", new Endereco("Recife"));
+$bia = clone $ana;
+$bia-&gt;nome = "Bia";
+$bia-&gt;endereco-&gt;cidade = "Natal";
+
+echo $ana-&gt;nome, " mora em ", $ana-&gt;endereco-&gt;cidade, "\n";
+echo $bia-&gt;nome, " mora em ", $bia-&gt;endereco-&gt;cidade, "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php clone-raso.php
+Ana mora em Natal      « a Ana "se mudou" sem querer!
+Bia mora em Natal</pre>
+
+<p>O nome foi copiado (é uma string), mas o <code>Endereco</code> é <strong>o mesmo objeto</strong> nas duas fichas. Mudar a cidade da Bia mudou a da Ana. O <code>__clone</code> resolve: o PHP o chama <strong>na cópia</strong>, logo depois de copiar, e ali você clona também os objetos de dentro (uma cópia <strong>profunda</strong>).</p>
+
+<div class="tryphp" data-goal="out:Ana mora em Recife,out:Bia mora em Natal,src:__clone">
+<p class="try-task"><strong>Missão:</strong> rode e veja a Ana "se mudar" para Natal. Depois acrescente à classe <code>Cliente</code> um método <code>public function __clone(): void</code> que faça <code>$this-&gt;endereco = clone $this-&gt;endereco;</code>. A Ana deve continuar em Recife.</p>
+<pre class="script">&lt;?php
+class Endereco
+{
+    public function __construct(public string $cidade) {}
+}
+
+class Cliente
+{
+    public function __construct(
+        public string $nome,
+        public Endereco $endereco,
+    ) {}
+}
+
+$ana = new Cliente("Ana", new Endereco("Recife"));
+$bia = clone $ana;
+$bia-&gt;nome = "Bia";
+$bia-&gt;endereco-&gt;cidade = "Natal";
+
+echo $ana-&gt;nome, " mora em ", $ana-&gt;endereco-&gt;cidade, "\n";
+echo $bia-&gt;nome, " mora em ", $bia-&gt;endereco-&gt;cidade, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Endereco
+{
+    public function __construct(public string $cidade) {}
+}
+
+class Cliente
+{
+    public function __construct(
+        public string $nome,
+        public Endereco $endereco,
+    ) {}
+
+    public function __clone(): void
+    {
+        $this-&gt;endereco = clone $this-&gt;endereco;
+    }
+}
+
+$ana = new Cliente("Ana", new Endereco("Recife"));
+$bia = clone $ana;
+$bia-&gt;nome = "Bia";
+$bia-&gt;endereco-&gt;cidade = "Natal";
+
+echo $ana-&gt;nome, " mora em ", $ana-&gt;endereco-&gt;cidade, "\n";
+echo $bia-&gt;nome, " mora em ", $bia-&gt;endereco-&gt;cidade, "\n";
+</pre>
+</div>
+
+<p>Com o <code>__clone</code>, a saída fica:</p>
+<pre class="term" data-cwd="~/poo">$ php clone-fundo.php
+Ana mora em Recife
+Bia mora em Natal</pre>
+
+<dl class="anatomy">
+  <dt>public function __clone(): void</dt><dd>Roda <strong>na cópia</strong> (o <code>$this</code> aqui é a Bia, não a Ana), depois que o PHP copiou as propriedades.</dd>
+  <dt>$this-&gt;endereco = clone $this-&gt;endereco;</dt><dd>Troca o endereço compartilhado por uma cópia só da Bia.</dd>
+</dl>
+<p>O <code>clone</code> tem novidades no PHP 8.5 (<code>clone</code> com novos valores) e cuidados especiais com propriedades <code>readonly</code>: veja <a href="readonly-hooks.html">readonly e Property Hooks</a>.</p>
+
+<hr>
+
+<h2>Outros métodos mágicos</h2>
+<p>Você vai encontrar estes com menos frequência. Dois merecem um exemplo rápido.</p>
+
+<h3><code>__destruct</code>: o objeto vai embora</h3>
+<p>O contrário do construtor: o PHP chama quando o objeto deixa de ser usado (um <code>unset</code>, a variável sai de escopo ou o programa termina). Serve para "fechar" algo que o objeto abriu.</p>
+<pre class="file" data-file="destruct.php">&lt;?php
+class Arquivo
+{
+    public function __construct(private string $nome)
+    {
+        echo "Abrindo $this-&gt;nome\n";
+    }
+
+    public function __destruct()
+    {
+        echo "Fechando $this-&gt;nome\n";
+    }
+}
+
+$a = new Arquivo("notas.txt");
+echo "Trabalhando...\n";
+unset($a);
+echo "Fim do programa\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php destruct.php
+Abrindo notas.txt
+Trabalhando...
+Fechando notas.txt     « no unset, antes do "Fim"
+Fim do programa</pre>
+
+<h3><code>__debugInfo</code>: o que o <code>var_dump</code> mostra</h3>
+<p>Por padrão, o <a href="var-dump.html">var_dump</a> mostra <strong>tudo</strong>, inclusive o que é <code>private</code>. Num objeto com senha, isso é perigoso num log:</p>
+<pre class="term" data-cwd="~/poo">$ php debug-sem.php
+object(Usuario)#1 (2) {
+  ["email"]=&gt;
+  string(15) "ana@exemplo.com"
+  ["senha":"Usuario":private]=&gt;
+  string(10) "segredo123"
+}</pre>
+<p>Com <code>__debugInfo</code>, você devolve um array com o que deve aparecer:</p>
+<pre class="file" data-file="debuginfo.php">&lt;?php
+class Usuario
+{
+    public function __construct(
+        public string $email,
+        private string $senha,
+    ) {}
+
+    public function __debugInfo(): array
+    {
+        return ["email" =&gt; $this-&gt;email, "senha" =&gt; "***"];
+    }
+}
+var_dump(new Usuario("ana@exemplo.com", "segredo123"));
+</pre>
+<pre class="term" data-cwd="~/poo">$ php debuginfo.php
+object(Usuario)#1 (2) {
+  ["email"]=&gt;
+  string(15) "ana@exemplo.com"
+  ["senha"]=&gt;
+  string(3) "***"
+}</pre>
+
+<p>E ainda: <code>__serialize</code>/<code>__unserialize</code> (o que o <code>serialize()</code> guarda do objeto), <code>__set_state</code> (usado por <code>var_export</code>) e os antigos <code>__sleep</code>/<code>__wakeup</code>, substituídos pelo par <code>__serialize</code>/<code>__unserialize</code> em código novo.</p>
+
+<hr>
+
+<h2>Quando usar e quando evitar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Bom uso</th><th>Cuidado</th></tr>
+<tr><td><code>__toString</code></td><td>Objetos com um texto "natural" (preço, nome, data, link)</td><td>Não coloque lógica pesada nem nada que possa falhar</td></tr>
+<tr><td><code>__invoke</code></td><td>Uma "função com configuração" que vai para <code>array_map</code>, <code>usort</code>…</td><td>Para algo pequeno, uma <a href="closures.html">arrow function</a> basta</td></tr>
+<tr><td><code>__clone</code></td><td>Cópia profunda de objetos com objetos dentro</td><td>Lembre que roda na cópia</td></tr>
+<tr><td><code>__get</code>/<code>__set</code></td><td>Objetos de dados realmente flexíveis (uma ficha, uma configuração)</td><td>Invisíveis para o editor, sem autocompletar, erros de digitação passam; prefira <a href="readonly-hooks.html">property hooks</a> e <code>private(set)</code></td></tr>
+<tr><td><code>__call</code></td><td>"Repassar" chamadas para outro objeto, bibliotecas</td><td>Mesmo problema: o editor não sabe que o método existe; trate nomes desconhecidos com <code>throw</code></td></tr>
+</table>
+</div>
+<p>A regra geral: <strong>use mágica quando ela deixa o código mais claro para quem usa a classe</strong>. Se quem lê precisa abrir a classe para descobrir que <code>$loja-&gt;precoCaderno()</code> "existe", um método normal <code>$loja-&gt;preco("caderno")</code> é melhor. Métodos mágicos também são um pouco mais lentos que métodos e propriedades comuns.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>__toString</code> devolvendo um número</strong>
+<pre class="file" data-file="nota.php">&lt;?php
+declare(strict_types=1);
+class Nota
+{
+    public function __construct(public int $valor) {}
+
+    public function __toString(): string
+    {
+        return $this-&gt;valor;
+    }
+}
+echo new Nota(9), "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php nota.php
+
+Fatal error: Uncaught TypeError: Nota::__toString(): Return value must be of type string, int returned in /home/ana/poo/nota.php:9
+Stack trace:
+#0 /home/ana/poo/nota.php(12): Nota-&gt;__toString()
+#1 {main}
+  thrown in /home/ana/poo/nota.php on line 9</pre>
+<p><strong>O que significa:</strong> "o valor de retorno precisa ser do tipo string, foi devolvido um int". Com <code>declare(strict_types=1)</code> (veja <a href="tipos-retorno.html">Tipos e Retorno</a>), o PHP não converte o número sozinho. Sem o <code>declare</code>, ele converteria e mostraria <code>9</code>.</p>
+<p><strong>Como consertar:</strong> devolva texto de verdade: <code>return (string) $this-&gt;valor;</code> ou <code>return "Nota: $this-&gt;valor";</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Método mágico que não é <code>public</code></strong>
+<pre class="file" data-file="caixa.php">&lt;?php
+class Caixa
+{
+    private function __get(string $nome): mixed
+    {
+        return 42;
+    }
+}
+echo (new Caixa())-&gt;x, "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php caixa.php
+
+Warning: The magic method Caixa::__get() must have public visibility in /home/ana/poo/caixa.php on line 4
+42</pre>
+<p><strong>O que significa:</strong> "o método mágico precisa ter visibilidade pública". O PHP avisa e usa o método mesmo assim, mas o aviso aparece em toda execução.</p>
+<p><strong>Como consertar:</strong> declare os métodos mágicos sempre como <code>public</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudar um array devolvido pelo <code>__get</code> não muda nada</strong>
+<pre class="file" data-file="carrinho.php">&lt;?php
+class Carrinho
+{
+    private array $dados = ["itens" =&gt; []];
+
+    public function __get(string $nome): mixed
+    {
+        return $this-&gt;dados[$nome];
+    }
+
+    public function __set(string $nome, mixed $valor): void
+    {
+        $this-&gt;dados[$nome] = $valor;
+    }
+}
+
+$c = new Carrinho();
+$c-&gt;itens[] = "caderno";
+print_r($c-&gt;itens);
+</pre>
+<pre class="term" data-cwd="~/poo">$ php carrinho.php
+
+Notice: Indirect modification of overloaded property Carrinho::$itens has no effect in /home/ana/poo/carrinho.php on line 18
+Array
+(
+)</pre>
+<p><strong>O que significa:</strong> "a modificação indireta de uma propriedade sobrecarregada não tem efeito". O <code>__get</code> devolveu uma <strong>cópia</strong> do array; o <code>[] = "caderno"</code> entrou na cópia, que foi jogada fora. O carrinho continua vazio.</p>
+<p><strong>Como consertar:</strong> crie um método com nome claro, como <code>public function adicionar(string $item): void { $this-&gt;dados["itens"][] = $item; }</code>. É mais um motivo para preferir métodos e propriedades declaradas à mágica.</p>
+</div>
+
+<div class="cenario">
+<strong>Erro de digitação "engolido"</strong>
+<p>Se o <code>__get</code> da classe <code>Ficha</code> lá de cima recebe <code>$f-&gt;cidde</code> (faltou um "a"), ele devolve <code>null</code> e o programa segue sem nenhum aviso, mostrando um texto vazio. Por isso a <code>Conta</code> lança uma exceção para nomes desconhecidos:</p>
+<pre class="term" data-cwd="~/poo">$ php conta-erro.php
+
+Fatal error: Uncaught Error: A propriedade 'sado' não existe em Conta in /home/ana/poo/conta-erro.php:11
+Stack trace:
+#0 /home/ana/poo/conta-erro.php(16): Conta-&gt;__get('sado')
+#1 {main}
+  thrown in /home/ana/poo/conta-erro.php on line 11</pre>
+<p>Agora o erro aparece, com a linha (16) e o nome errado (<code>'sado'</code>). Um erro barulhento é muito melhor que um silencioso.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Assinatura</th><th>Chamado quando</th></tr>
+<tr><td><code>__construct</code></td><td><code>__construct(…)</code></td><td><code>new Classe(…)</code></td></tr>
+<tr><td><code>__destruct</code></td><td><code>__destruct()</code></td><td>o objeto deixa de existir</td></tr>
+<tr><td><code>__toString</code></td><td><code>__toString(): string</code></td><td>o objeto é usado como texto</td></tr>
+<tr><td><code>__get</code></td><td><code>__get(string $nome): mixed</code></td><td>leitura de propriedade inexistente ou invisível</td></tr>
+<tr><td><code>__set</code></td><td><code>__set(string $nome, mixed $valor): void</code></td><td>gravação de propriedade inexistente ou invisível</td></tr>
+<tr><td><code>__isset</code></td><td><code>__isset(string $nome): bool</code></td><td><code>isset()</code> / <code>empty()</code> nela</td></tr>
+<tr><td><code>__unset</code></td><td><code>__unset(string $nome): void</code></td><td><code>unset()</code> nela</td></tr>
+<tr><td><code>__call</code></td><td><code>__call(string $metodo, array $args): mixed</code></td><td>método inexistente ou invisível no objeto</td></tr>
+<tr><td><code>__callStatic</code></td><td><code>static __callStatic(string $metodo, array $args): mixed</code></td><td>o mesmo, em <code>Classe::metodo()</code></td></tr>
+<tr><td><code>__invoke</code></td><td><code>__invoke(…)</code></td><td><code>$obj(…)</code></td></tr>
+<tr><td><code>__clone</code></td><td><code>__clone(): void</code></td><td>na cópia, depois de <code>clone $obj</code></td></tr>
+<tr><td><code>__debugInfo</code></td><td><code>__debugInfo(): array</code></td><td><code>var_dump($obj)</code></td></tr>
+<tr><td><code>__serialize</code> / <code>__unserialize</code></td><td><code>__serialize(): array</code></td><td><code>serialize()</code> / <code>unserialize()</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Olá\, Ana!,out:Olá\, Bia!,out:Olá\, Duda!,src:function __invoke,semerro">
+<p class="try-task"><strong>Missão:</strong> a classe <code>Saudacao</code> guarda um cumprimento (<code>"Olá"</code>). Escreva o método <code>__invoke(string $nome): string</code> para que <code>$ola("Ana")</code> devolva <code>Olá, Ana!</code>. O mesmo objeto deve funcionar no <code>array_map</code>, cumprimentando a turma inteira.</p>
+<pre class="script">&lt;?php
+class Saudacao
+{
+    public function __construct(private string $cumprimento) {}
+
+    // escreva o __invoke aqui
+}
+
+$ola = new Saudacao("Olá");
+echo $ola("Ana"), "\n";
+
+$turma = ["Bia", "Caio", "Duda"];
+foreach (array_map($ola, $turma) as $frase) {
+    echo $frase, "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+class Saudacao
+{
+    public function __construct(private string $cumprimento) {}
+
+    public function __invoke(string $nome): string
+    {
+        return "$this-&gt;cumprimento, $nome!";
+    }
+}
+
+$ola = new Saudacao("Olá");
+echo $ola("Ana"), "\n";
+
+$turma = ["Bia", "Caio", "Duda"];
+foreach (array_map($ola, $turma) as $frase) {
+    echo $frase, "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O nome do método</h3>
+<p>Complete com o método mágico que o PHP chama quando o objeto aparece num <code>echo</code>:</p>
+<div class="ex-code">public function <input data-answer="__toString" aria-label="nome do método">(): string</div>
+</div>
+
+<div class="exercise">
+<h3>2. Objeto chamável</h3>
+<p>Complete para que <code>$dobro(5)</code> funcione e devolva <code>10</code>:</p>
+<div class="ex-code">public function <input data-answer="__invoke" aria-label="nome do método">(int $n): int { return $n * 2; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Cópia profunda</h3>
+<p>Dentro do <code>__clone</code>, complete a linha que copia também o objeto guardado em <code>$this-&gt;endereco</code>:</p>
+<div class="ex-code">$this-&gt;endereco = <input data-answer="clone $this-&gt;endereco|clone($this-&gt;endereco)" aria-label="expressão">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A classe <code>Ficha</code> tem <code>public string $nome</code> e também um método <code>__get</code>. O que acontece em <code>echo $f-&gt;nome;</code>?</p>
+<label><input type="radio" name="q4"> O PHP chama o <code>__get</code> com <code>"nome"</code>.</label>
+<label><input type="radio" name="q4"> O PHP lê a propriedade direto; o <code>__get</code> não é chamado.</label>
+<label><input type="radio" name="q4"> Dá erro, porque a propriedade e o método têm o mesmo nome.</label>
+<label><input type="radio" name="q4"> O PHP chama o <code>__get</code> e depois lê a propriedade.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Quais são os dois parâmetros que o <code>__call</code> recebe?</p>
+<label><input type="radio" name="q5"> O objeto e o nome do método.</label>
+<label><input type="radio" name="q5"> O nome da classe e o nome do método.</label>
+<label><input type="radio" name="q5"> O nome do método chamado e um array com os argumentos.</label>
+<label><input type="radio" name="q5"> Os argumentos, um por parâmetro, e o valor de retorno.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Depois de <code>$bia = clone $ana;</code>, o <code>__clone</code> roda em qual objeto?</p>
+<label><input type="radio" name="q6"> Na cópia (<code>$bia</code>).</label>
+<label><input type="radio" name="q6"> No original (<code>$ana</code>).</label>
+<label><input type="radio" name="q6"> Nos dois.</label>
+<label><input type="radio" name="q6"> Em nenhum: ele só roda com <code>new</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Por que é bom terminar o <code>__call</code> com um <code>throw</code> para nomes desconhecidos?</p>
+<label><input type="radio" name="q7"> Porque o PHP exige; sem ele, dá erro fatal.</label>
+<label><input type="radio" name="q7"> Porque deixa o programa mais rápido.</label>
+<label><input type="radio" name="q7"> Porque o <code>__call</code> precisa devolver uma exceção.</label>
+<label><input type="radio" name="q7"> Para que um erro de digitação no nome do método apareça, em vez de passar em silêncio.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Métodos mágicos começam com <code>__</code>, são <code>public</code> e o <strong>PHP</strong> os chama quando algo acontece com o objeto.</li>
+  <li><code>__toString</code>: como o objeto vira texto (<code>echo</code>, interpolação, <code>.</code>). Sem ele, <code>Object of class … could not be converted to string</code>.</li>
+  <li><code>__get</code>/<code>__set</code>/<code>__isset</code>/<code>__unset</code>: propriedades inexistentes ou invisíveis. Hoje, prefira propriedades declaradas, <code>private(set)</code> e property hooks.</li>
+  <li><code>__call</code>/<code>__callStatic</code>: métodos inexistentes. Sem eles, <code>Call to undefined method</code>.</li>
+  <li><code>__invoke</code>: <code>$obj(…)</code>, e o objeto passa a valer como função.</li>
+  <li><code>__clone</code>: roda na cópia; use para clonar os objetos de dentro (cópia profunda).</li>
+  <li>Mágica boa deixa a classe mais fácil de usar. Mágica ruim esconde o que existe e engole erros de digitação.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
