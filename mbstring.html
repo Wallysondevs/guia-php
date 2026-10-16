@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Acentos e mbstring — por que "maçã" tem 6 letras e como resolver | Guia PHP</title>
+<meta name="description" content="Por que strlen, strtoupper, substr e strrev erram com acentos no PHP, o que é UTF-8 (a ideia dos bytes) e as funções mb_ que resolvem: mb_strlen, mb_strtoupper, mb_substr, mb_str_split, mb_str_pad (8.3), mb_trim e mb_ucfirst (8.4). Saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Acentos e mbstring</span></h1>
+
+<p class="intro">Na aula de <a href="funcoes-string.html">Funções de String</a>, algumas respostas pareceram estranhas: <code>strlen("maçã")</code> deu <code>6</code>, e <code>strtoupper("joão")</code> deu <code>JOãO</code>. Não é defeito do seu computador: as funções clássicas do PHP contam <strong>bytes</strong>, não letras. Para quem escreve em português, essa aula é obrigatória.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os quatro sintomas: tamanho errado, maiúscula pela metade, corte no meio da letra e texto invertido virando lixo.</li>
+  <li>A ideia do <strong>UTF-8</strong>: por que uma letra pode ocupar 1, 2, 3 ou 4 bytes.</li>
+  <li>As funções <code>mb_</code>: <code>mb_strlen</code>, <code>mb_strtoupper</code>, <code>mb_strtolower</code>, <code>mb_substr</code>, <code>mb_str_split</code>, <code>mb_strpos</code>, <code>mb_convert_case</code>.</li>
+  <li>As novas: <code>mb_str_pad</code> (PHP 8.3), <code>mb_trim</code>, <code>mb_ucfirst</code> e <code>mb_lcfirst</code> (PHP 8.4).</li>
+  <li>A regra prática: <strong>com texto em português, use <code>mb_</code></strong>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O problema, ao vivo</h2>
+<p>A Ana tem uma lojinha de frutas e começou a usar as funções de string nos nomes dos produtos:</p>
+
+<pre class="file" data-file="problema.php">&lt;?php
+$fruta = "maçã";
+echo strlen($fruta), "\n";
+echo strtoupper("Olá"), "\n";
+echo substr($fruta, 0, 3), "\n";
+echo strrev($fruta), "\n";
+</pre>
+
+<pre class="term">$ php problema.php
+6           « "maçã" tem 4 letras, não 6
+OLá         « o "á" ficou minúsculo
+ma�         « pediu 3 letras e veio "ma" + um símbolo estranho
+�ç�am       « invertido, virou lixo</pre>
+
+<p>Quatro respostas erradas, e <strong>nenhuma mensagem de erro</strong>. O PHP fez exatamente o que essas funções prometem; o problema é que elas foram feitas para o inglês, que não tem acentos. Para entender, precisamos olhar como o texto fica guardado.</p>
+
+<hr>
+
+<h2>A ideia: letras viram bytes (UTF-8)</h2>
+<p>O computador só guarda números. Cada número pequeno, de 0 a 255, é um <strong>byte</strong>. Para guardar texto, existe uma tabela que diz qual número representa cada letra. A tabela usada hoje em quase todo lugar (sites, Linux, PHP) se chama <strong>UTF-8</strong>.</p>
+
+<p>Pense numa caixa de correio com escaninhos. As letras simples do inglês (<code>a</code>–<code>z</code>, números, pontuação) cabem num escaninho só. Letras acentuadas são "encomendas maiores" e ocupam <strong>dois</strong> escaninhos. Símbolos como <code>€</code> ocupam três, e emojis, quatro.</p>
+
+<pre class="file" data-file="bytes.php">&lt;?php
+echo bin2hex("maçã"), "\n";
+echo strlen("a"), " ", strlen("ç"), " ", strlen("€"), " ", strlen("😀"), "\n";
+</pre>
+
+<pre class="term">$ php bytes.php
+6d61c3a7c3a3      « os bytes de "maçã", em hexadecimal (2 dígitos = 1 byte)
+1 2 3 4           « a = 1 byte, ç = 2, € = 3, 😀 = 4</pre>
+
+<p><code>bin2hex</code> mostra os bytes "crus" de um texto. Separando de dois em dois dígitos:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Letra</th><td><code>m</code></td><td><code>a</code></td><td colspan="2"><code>ç</code></td><td colspan="2"><code>ã</code></td></tr>
+<tr><th>Bytes</th><td><code>6d</code></td><td><code>61</code></td><td><code>c3</code></td><td><code>a7</code></td><td><code>c3</code></td><td><code>a3</code></td></tr>
+<tr><th>Posição do byte</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td></tr>
+</table>
+</div>
+
+<p>Agora os quatro sintomas fazem sentido:</p>
+<ul>
+  <li><strong><code>strlen</code> deu 6</strong> porque contou os 6 bytes.</li>
+  <li><strong><code>substr($fruta, 0, 3)</code></strong> pegou os bytes 0, 1 e 2: <code>m</code>, <code>a</code> e <strong>só a primeira metade</strong> do <code>ç</code> (<code>c3</code>). Meia letra não é nada; o terminal (ou o navegador) mostra no lugar o símbolo de "caractere inválido", <code>�</code>.</li>
+  <li><strong><code>strrev</code></strong> inverteu os bytes um a um, separando as metades de cada letra. Por sorte, <code>c3 a7</code> ficou junto de novo no meio (o <code>ç</code> que aparece), mas o resto virou <code>�</code>.</li>
+  <li><strong><code>strtoupper</code></strong> só conhece as 26 letras sem acento. Os dois bytes do <code>á</code> não são nenhuma delas, então ficaram como estavam.</li>
+</ul>
+
+<div class="note">
+<strong>Você não precisa decorar bytes</strong>
+<p>Basta lembrar da ideia: <strong>no UTF-8, letras acentuadas ocupam mais de um byte</strong>, e as funções antigas do PHP contam bytes. O PHP não tem um "tipo texto com acentos": uma string é só uma sequência de bytes. Quem decide se conta bytes ou letras é a função que você escolhe.</p>
+</div>
+
+<hr>
+
+<h2>A solução: as funções <code>mb_</code></h2>
+<p>O PHP tem uma extensão chamada <strong>mbstring</strong> (de <em>multibyte string</em>, "texto de vários bytes"). Ela traz versões das funções de string que entendem UTF-8 e contam <strong>letras</strong> (o nome técnico é "caracteres"). Quase todas têm o mesmo nome da original com <code>mb_</code> na frente e recebem os mesmos argumentos.</p>
+
+<pre class="file" data-file="solucao.php">&lt;?php
+$fruta = "maçã";
+echo mb_strlen($fruta), "\n";
+echo mb_strtoupper("Olá, João"), "\n";
+echo mb_strtolower("ÁRVORE"), "\n";
+echo mb_substr($fruta, 0, 3), "\n";
+echo mb_substr("Conceição", -4), "\n";
+</pre>
+
+<pre class="term">$ php solucao.php
+4             « 4 letras
+OLÁ, JOÃO     « agora o Á e o Ã também
+árvore
+maç           « 3 letras inteiras
+ição          « negativos contam do fim, como no substr</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sem <code>mb_</code> (bytes)</th><th>Resultado</th><th>Com <code>mb_</code> (letras)</th><th>Resultado</th></tr>
+<tr><td><code>strlen("maçã")</code></td><td><code>6</code></td><td><code>mb_strlen("maçã")</code></td><td><code>4</code></td></tr>
+<tr><td><code>strtoupper("Olá")</code></td><td><code>OLá</code></td><td><code>mb_strtoupper("Olá")</code></td><td><code>OLÁ</code></td></tr>
+<tr><td><code>strtolower("ÁRVORE")</code></td><td><code>Árvore</code></td><td><code>mb_strtolower("ÁRVORE")</code></td><td><code>árvore</code></td></tr>
+<tr><td><code>substr("maçã", 0, 3)</code></td><td><code>ma�</code></td><td><code>mb_substr("maçã", 0, 3)</code></td><td><code>maç</code></td></tr>
+</table>
+</div>
+
+<p>Um exemplo do dia a dia: o cadastro da escola da Ana aceita nomes de até 10 letras. Com <code>strlen</code>, a aluna Conceição seria recusada:</p>
+
+<pre class="file" data-file="limite.php">&lt;?php
+$nome = "Conceição";
+echo strlen($nome), "\n";
+echo mb_strlen($nome), "\n";
+</pre>
+<pre class="term">$ php limite.php
+11       « strlen: 11 bytes, "passou do limite"
+9        « mb_strlen: 9 letras, a resposta certa</pre>
+
+<div class="tryphp" data-goal="out:9 letras,src:mb_strlen">
+<p class="try-task"><strong>Missão:</strong> o programa abaixo diz que "Conceição" tem 11 letras. Rode, veja o erro e corrija para mostrar <code>9 letras</code>.</p>
+<pre class="script">&lt;?php
+$nome = "Conceição";
+echo strlen($nome), " letras\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Conceição";
+echo mb_strlen($nome), " letras\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Letra por letra: <code>mb_str_split</code></h2>
+<p><code>str_split</code> quebra um texto em pedaços de 1 <strong>byte</strong>, o que parte as letras acentuadas. <code>mb_str_split</code> quebra em <strong>letras</strong>:</p>
+
+<pre class="file" data-file="letras.php">&lt;?php
+print_r(str_split("pé"));
+print_r(mb_str_split("maçã"));
+echo implode("", array_reverse(mb_str_split("maçã"))), "\n";
+</pre>
+
+<pre class="term">$ php letras.php
+Array
+(
+    [0] =&gt; p
+    [1] =&gt; �        « metade do é
+    [2] =&gt; �        « a outra metade
+)
+Array
+(
+    [0] =&gt; m
+    [1] =&gt; a
+    [2] =&gt; ç
+    [3] =&gt; ã
+)
+ãçam               « maçã ao contrário, do jeito certo</pre>
+
+<p>Não existe <code>mb_strrev</code>. A última linha mostra como inverter com acentos: <code>mb_str_split</code> separa as letras, <code>array_reverse</code> inverte a lista (veja <a href="funcoes-array.html">Funções de Array</a>) e <code>implode("", …)</code> junta tudo de novo, sem nada entre as letras. Leia de dentro para fora.</p>
+
+<hr>
+
+<h2>Maiúsculas no começo: <code>mb_convert_case</code>, <code>mb_ucfirst</code> e <code>mb_lcfirst</code></h2>
+
+<pre class="file" data-file="capitalizar.php">&lt;?php
+echo ucwords("joão da silva"), "\n";
+echo mb_convert_case("JOÃO DA SILVA", MB_CASE_TITLE), "\n";
+echo ucfirst("érica"), "\n";
+echo mb_ucfirst("érica"), "\n";
+echo mb_lcfirst("Érica"), "\n";
+</pre>
+
+<pre class="term">$ php capitalizar.php
+João Da Silva       « ucwords funcionou porque o j não tem acento
+João Da Silva       « mb_convert_case: minúsculas e depois a 1ª de cada palavra
+érica               « ucfirst não sabe fazer É
+Érica               « mb_ucfirst sabe
+érica</pre>
+
+<dl class="anatomy">
+  <dt>mb_convert_case(texto, modo)</dt><dd>"Converter maiúsculas/minúsculas". O modo é uma constante: <code>MB_CASE_UPPER</code> (tudo maiúsculo), <code>MB_CASE_LOWER</code> (tudo minúsculo) ou <code>MB_CASE_TITLE</code> ("de título": primeira de cada palavra maiúscula, o resto minúsculo).</dd>
+  <dt>mb_ucfirst / mb_lcfirst <span class="versao">PHP 8.4+</span></dt><dd>Primeira letra maiúscula / minúscula, com acento. Antes do 8.4: <code>mb_strtoupper(mb_substr($s, 0, 1)) . mb_substr($s, 1)</code>.</dd>
+</dl>
+
+<p>O <code>MB_CASE_TITLE</code> também resolve a ordem: ele já passa o resto da palavra para minúsculas, então <code>"JOÃO"</code> vira <code>"João"</code> sem precisar de um <code>mb_strtolower</code> antes.</p>
+
+<hr>
+
+<h2>Alinhar colunas: <code>mb_str_pad</code> <span class="versao">PHP 8.3+</span></h2>
+<p>A Ana quer imprimir a lista de clientes e frutas favoritas em colunas. Com <code>str_pad</code>, que conta bytes, as linhas com acento ficam tortas:</p>
+
+<pre class="file" data-file="colunas.php">&lt;?php
+echo str_pad("Ana", 10), str_pad("maçã", 8), "|\n";
+echo str_pad("Bruno", 10), str_pad("uva", 8), "|\n";
+echo str_pad("Conceição", 10), str_pad("limão", 8), "|\n";
+echo "--- com mb_str_pad ---\n";
+echo mb_str_pad("Ana", 10), mb_str_pad("maçã", 8), "|\n";
+echo mb_str_pad("Bruno", 10), mb_str_pad("uva", 8), "|\n";
+echo mb_str_pad("Conceição", 10), mb_str_pad("limão", 8), "|\n";
+</pre>
+
+<pre class="term">$ php colunas.php
+Ana       maçã  |
+Bruno     uva     |
+Conceiçãolimão  |       « "Conceição" já tem 11 bytes: nenhum espaço foi posto
+--- com mb_str_pad ---
+Ana       maçã    |
+Bruno     uva     |
+Conceição limão   |     « tudo alinhado</pre>
+
+<p><code>str_pad</code> achou que "maçã" (6 bytes) só precisava de 2 espaços para chegar a 8, e que "Conceição" (11 bytes) já passava de 10. <code>mb_str_pad</code> conta letras e alinha certo. Os argumentos são os mesmos do <code>str_pad</code>: texto, tamanho, com o que completar e o lado (<code>STR_PAD_LEFT</code>, <code>STR_PAD_RIGHT</code>, <code>STR_PAD_BOTH</code>).</p>
+
+<div class="note">
+<strong>Antes do PHP 8.3</strong>
+<p><code>mb_str_pad</code> não existe (dá <code>Call to undefined function mb_str_pad()</code>). A alternativa é somar a diferença de bytes: <code>str_pad($s, 10 + strlen($s) - mb_strlen($s))</code>.</p>
+</div>
+
+<hr>
+
+<h2>Limpar espaços "especiais": <code>mb_trim</code> <span class="versao">PHP 8.4+</span></h2>
+<p>O <code>trim</code> remove espaços, tabs e quebras de linha comuns. Mas existem espaços "especiais" do UTF-8. O mais comum é o <strong>espaço não separável</strong> (código U+00A0), que aparece quando você copia texto de um site, do Word ou de um PDF. Ele parece um espaço, mas o <code>trim</code> não o reconhece:</p>
+
+<pre class="file" data-file="aparar.php">&lt;?php
+$colado = "\u{00A0}Ana Souza\u{00A0}";
+echo "[", trim($colado), "]\n";
+echo "[", mb_trim($colado), "]\n";
+</pre>
+
+<pre class="term">$ php aparar.php
+[ Ana Souza ]       « os espaços especiais ficaram
+[Ana Souza]</pre>
+
+<p>O <code>"\u{00A0}"</code> é a forma de escrever um caractere pelo seu código dentro de aspas duplas (veja <a href="strings.html">Strings</a>). Também existem <code>mb_ltrim</code> e <code>mb_rtrim</code> <span class="versao">PHP 8.4+</span>. Antes do 8.4, use uma expressão regular: <code>preg_replace('/^\s+|\s+$/u', '', $s)</code>.</p>
+
+<hr>
+
+<h2>Procurar: <code>mb_strpos</code> e companhia</h2>
+<p>As funções de busca também têm versão <code>mb_</code>. A diferença está no número devolvido: posição em letras ou em bytes.</p>
+
+<pre class="file" data-file="posicao.php">&lt;?php
+echo strpos("maçã verde", "verde"), "\n";
+echo mb_strpos("maçã verde", "verde"), "\n";
+</pre>
+<pre class="term">$ php posicao.php
+7          « em bytes
+5          « em letras: m-a-ç-ã-espaço, e o "verde" começa na 5ª posição</pre>
+
+<p>Se você vai usar a posição com <code>substr</code>, use a mesma "família": <code>strpos</code> com <code>substr</code>, ou <code>mb_strpos</code> com <code>mb_substr</code>. Misturar as duas é um bug comum. Para só saber se contém, <code>str_contains</code> funciona bem com acentos (ele compara os bytes e não precisa contar nada).</p>
+
+<hr>
+
+<h2>Quais funções precisam do <code>mb_</code>?</h2>
+<p>A regra: precisa quando a função <strong>conta, corta ou muda letras</strong>. Quando ela só procura ou troca um texto inteiro por outro, a versão comum funciona.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função comum</th><th>Com acentos</th><th>Use</th></tr>
+<tr><td><code>strlen</code></td><td>conta bytes</td><td><code>mb_strlen</code></td></tr>
+<tr><td><code>strtoupper</code> / <code>strtolower</code></td><td>ignora acentos</td><td><code>mb_strtoupper</code> / <code>mb_strtolower</code></td></tr>
+<tr><td><code>ucfirst</code> / <code>lcfirst</code></td><td>ignora acentos</td><td><code>mb_ucfirst</code> / <code>mb_lcfirst</code> <span class="versao">8.4+</span></td></tr>
+<tr><td><code>ucwords</code></td><td>ignora acentos</td><td><code>mb_convert_case($s, MB_CASE_TITLE)</code></td></tr>
+<tr><td><code>substr</code></td><td>corta no meio da letra</td><td><code>mb_substr</code></td></tr>
+<tr><td><code>strpos</code> / <code>stripos</code> / <code>strrpos</code></td><td>posição em bytes</td><td><code>mb_strpos</code> / <code>mb_stripos</code> / <code>mb_strrpos</code></td></tr>
+<tr><td><code>str_split</code></td><td>parte as letras</td><td><code>mb_str_split</code></td></tr>
+<tr><td><code>strrev</code></td><td>vira lixo</td><td><code>implode("", array_reverse(mb_str_split($s)))</code></td></tr>
+<tr><td><code>str_pad</code></td><td>alinha errado</td><td><code>mb_str_pad</code> <span class="versao">8.3+</span></td></tr>
+<tr><td><code>trim</code></td><td>não vê espaços especiais</td><td><code>mb_trim</code> <span class="versao">8.4+</span></td></tr>
+<tr><td><code>substr_count</code></td><td>funciona</td><td>(ou <code>mb_substr_count</code>)</td></tr>
+<tr><td><code>str_replace</code>, <code>str_contains</code>, <code>str_starts_with</code>, <code>str_ends_with</code>, <code>explode</code>, <code>implode</code></td><td><strong>funcionam</strong></td><td>a versão comum</td></tr>
+<tr><td><code>wordwrap</code></td><td>conta bytes; com corte, parte letras</td><td>não há <code>mb_wordwrap</code>; cuidado</td></tr>
+<tr><td><code>str_word_count</code></td><td>trata acentos como separador</td><td><code>count(explode(" ", $s))</code></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>A regra desta aula</strong>
+<p>Com texto em português (nomes, endereços, produtos, qualquer coisa que um usuário digita), <strong>use <code>mb_</code></strong> para contar, cortar e mudar maiúsculas. Não custa nada, e o programa nunca vai quebrar com a "Conceição" ou o "João".</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Aparece <code>�</code> no meio do texto</strong>
+<pre class="file" data-file="iniciais.php">&lt;?php
+$nome = "Érica";
+$sobrenome = "Souza";
+echo substr($nome, 0, 1) . substr($sobrenome, 0, 1), "\n";
+echo mb_substr($nome, 0, 1) . mb_substr($sobrenome, 0, 1), "\n";
+</pre>
+<pre class="term">$ php iniciais.php
+�S       « substr pegou só o 1º byte do É
+ÉS</pre>
+<p><strong>O que significa:</strong> o <code>�</code> é como o terminal e o navegador mostram um byte que sozinho não forma letra nenhuma. Alguma função de bytes (<code>substr</code>, <code>str_split</code>, <code>strrev</code>, <code>wordwrap</code> com corte) partiu uma letra ao meio.</p>
+<p><strong>Como consertar:</strong> troque pela versão <code>mb_</code> (<code>mb_substr</code>, <code>mb_str_split</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Aparece <code>OlÃ¡</code> em vez de <code>Olá</code></strong>
+<pre class="term">$ php -r 'echo mb_convert_encoding("Olá, João", "UTF-8", "ISO-8859-1"), "\n";'
+OlÃ¡, JoÃ£o</pre>
+<p><strong>O que significa:</strong> esse "embaralhado" (chamado <em>mojibake</em>) acontece quando um texto em UTF-8 é lido como se estivesse em outra tabela, a antiga <strong>ISO-8859-1</strong> (Latin-1). Cada byte do <code>á</code> (<code>c3 a1</code>) virou uma letra separada: <code>Ã</code> e <code>¡</code>. O comando acima provoca o problema de propósito, para você reconhecê-lo.</p>
+<p><strong>Como consertar:</strong> use UTF-8 em todo lugar: salve os arquivos <code>.php</code> em UTF-8 no editor (veja <a href="editores.html">Editores e IDEs</a>), coloque <code>&lt;meta charset="utf-8"&gt;</code> no HTML e, no banco de dados, use <code>utf8mb4</code> (veja <a href="mysql.html">MySQL e MariaDB</a>). O PHP 8 já usa UTF-8 como padrão.</p>
+</div>
+
+<div class="cenario">
+<strong>must be a valid encoding</strong>
+<pre class="file" data-file="enc.php">&lt;?php
+echo mb_strlen("maçã", "utf-9"), "\n";
+</pre>
+<pre class="term">$ php enc.php
+
+Fatal error: Uncaught ValueError: mb_strlen(): Argument #2 ($encoding) must be a valid encoding, "utf-9" given in /home/ana/php/enc.php:2
+Stack trace:
+#0 /home/ana/php/enc.php(2): mb_strlen('ma\xC3\xA7\xC3\xA3', 'utf-9')
+#1 {main}
+  thrown in /home/ana/php/enc.php on line 2</pre>
+<p><strong>O que significa:</strong> as funções <code>mb_</code> aceitam um último argumento opcional com o nome da codificação. "utf-9" não existe. Repare na linha <code>#0</code>: o PHP mostra os argumentos, e o <code>"maçã"</code> aparece como <code>'ma\xC3\xA7\xC3\xA3'</code>, os mesmos bytes que você viu no começo da aula.</p>
+<p><strong>Como consertar:</strong> não passe a codificação (o padrão já é UTF-8) ou escreva <code>"UTF-8"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Call to undefined function mb_strlen()</strong>
+<p><strong>O que significa:</strong> a extensão mbstring não está instalada. No laboratório e no editor do guia ela está, mas em algumas instalações do Linux ela vem num pacote separado. A mensagem é a mesma de qualquer função inexistente: <code>Fatal error: Uncaught Error: Call to undefined function mb_strlen()</code>.</p>
+<p><strong>Como consertar:</strong> no Ubuntu/Debian, <code>sudo apt install php-mbstring</code> (veja <a href="instalar-linux.html">Instalar no Linux</a>). Confira com <code>php -m</code>, que lista as extensões: <code>mbstring</code> deve aparecer. Se a mensagem for sobre <code>mb_str_pad</code>, <code>mb_trim</code> ou <code>mb_ucfirst</code>, o problema é a versão do PHP (8.3/8.4+), não a extensão.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>mb_strlen($s)</code></td><td>Número de letras</td><td><code>mb_strlen("maçã")</code> → <code>4</code></td></tr>
+<tr><td><code>mb_strtoupper($s)</code></td><td>Tudo maiúsculo</td><td><code>mb_strtoupper("ação")</code> → <code>AÇÃO</code></td></tr>
+<tr><td><code>mb_strtolower($s)</code></td><td>Tudo minúsculo</td><td><code>mb_strtolower("ÁRVORE")</code> → <code>árvore</code></td></tr>
+<tr><td><code>mb_convert_case($s, MB_CASE_TITLE)</code></td><td>1ª de cada palavra</td><td><code>"JOÃO DA SILVA"</code> → <code>João Da Silva</code></td></tr>
+<tr><td><code>mb_ucfirst</code> / <code>mb_lcfirst</code> <span class="versao">8.4+</span></td><td>1ª letra maiúscula / minúscula</td><td><code>mb_ucfirst("érica")</code> → <code>Érica</code></td></tr>
+<tr><td><code>mb_substr($s, $ini, $qtd)</code></td><td>Recorta letras</td><td><code>mb_substr("maçã", 0, 3)</code> → <code>maç</code></td></tr>
+<tr><td><code>mb_strpos($s, $p)</code></td><td>Posição em letras, ou <code>false</code></td><td><code>mb_strpos("maçã verde", "verde")</code> → <code>5</code></td></tr>
+<tr><td><code>mb_str_split($s)</code></td><td>Lista de letras</td><td><code>mb_str_split("pé")</code> → <code>["p", "é"]</code></td></tr>
+<tr><td><code>mb_str_pad($s, $tam, $com, $lado)</code> <span class="versao">8.3+</span></td><td>Completa contando letras</td><td><code>mb_str_pad("maçã", 6, ".")</code> → <code>maçã..</code></td></tr>
+<tr><td><code>mb_trim</code> / <code>mb_ltrim</code> / <code>mb_rtrim</code> <span class="versao">8.4+</span></td><td>Tira espaços (inclusive os especiais)</td><td><code>mb_trim("\u{00A0}Ana")</code> → <code>Ana</code></td></tr>
+<tr><td><code>mb_substr_count($s, $p)</code></td><td>Quantas vezes aparece</td><td><code>mb_substr_count("maçã com maçã", "maçã")</code> → <code>2</code></td></tr>
+<tr><td><code>mb_strimwidth($s, 0, $larg, "...")</code></td><td>Encurta com reticências</td><td><code>mb_strimwidth("Amanhã não haverá aula", 0, 12, "...")</code> → <code>Amanhã nã...</code></td></tr>
+<tr><td><code>bin2hex($s)</code></td><td>Mostra os bytes (para investigar)</td><td><code>bin2hex("ç")</code> → <code>c3a7</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Contar letras</h3>
+<p>Complete para mostrar <code>4</code>:</p>
+<div class="ex-code">echo <input data-answer="mb_strlen" aria-label="função">("maçã");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Gritar em português</h3>
+<p>Complete para mostrar <code>CORAÇÃO</code>:</p>
+<div class="ex-code">echo <input data-answer="mb_strtoupper" aria-label="função">("coração");</div>
+</div>
+
+<div class="exercise">
+<h3>3. A primeira letra</h3>
+<p>Complete para pegar só a primeira letra de <code>$nome</code> (que pode ser "Érica"):</p>
+<div class="ex-code">$inicial = mb_substr($nome, <input data-answer="0, 1|0,1" aria-label="argumentos">);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quanto vale <code>strlen("pão")</code>?</p>
+<label><input type="radio" name="q4"> <code>3</code></label>
+<label><input type="radio" name="q4"> <code>4</code></label>
+<label><input type="radio" name="q4"> <code>6</code></label>
+<label><input type="radio" name="q4"> Dá erro</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas funções <strong>não</strong> precisa da versão <code>mb_</code> para funcionar com acentos?</p>
+<label><input type="radio" name="q5"> <code>strtoupper</code></label>
+<label><input type="radio" name="q5"> <code>substr</code></label>
+<label><input type="radio" name="q5"> <code>str_replace</code></label>
+<label><input type="radio" name="q5"> <code>strlen</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Um nome apareceu na tela como <code>Jo�o</code>. Qual a causa mais provável?</p>
+<label><input type="radio" name="q6"> Uma função de bytes (como <code>substr</code>) partiu o <code>ã</code> ao meio.</label>
+<label><input type="radio" name="q6"> Faltou <code>htmlspecialchars</code>.</label>
+<label><input type="radio" name="q6"> O nome foi digitado em maiúsculas.</label>
+<label><input type="radio" name="q6"> O PHP não aceita acentos.</label>
+</div>
+
+<div class="tryphp" data-goal="out:JOÃO DA CONCEIÇÃO,out:17 letras,src:mb_">
+<p class="try-task"><strong>Missão final:</strong> o formulário da escola mandou o nome <code>"  joão da conceição  "</code>, com espaços sobrando. Faça o programa mostrar o nome sem os espaços das pontas, todo em maiúsculas e, na linha de baixo, quantas letras ele tem:<br><code>JOÃO DA CONCEIÇÃO</code><br><code>17 letras</code><br>Rode primeiro para ver os erros do código atual.</p>
+<pre class="script">&lt;?php
+$digitado = "  joão da conceição  ";
+echo strtoupper($digitado), "\n";
+echo strlen($digitado), " letras\n";
+</pre>
+<pre class="solucao">&lt;?php
+$digitado = "  joão da conceição  ";
+$nome = trim($digitado);
+echo mb_strtoupper($nome), "\n";
+echo mb_strlen($nome), " letras\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>No UTF-8, letras sem acento ocupam 1 byte; acentuadas, 2; símbolos como <code>€</code>, 3; emojis, 4.</li>
+  <li>As funções clássicas (<code>strlen</code>, <code>substr</code>, <code>strtoupper</code>, <code>strrev</code>, <code>str_pad</code>…) trabalham com <strong>bytes</strong>: com acentos, contam errado, cortam letras ao meio (<code>�</code>) e não mudam maiúsculas.</li>
+  <li>As funções <code>mb_</code> (extensão mbstring) trabalham com <strong>letras</strong>: <code>mb_strlen</code>, <code>mb_strtoupper</code>, <code>mb_strtolower</code>, <code>mb_substr</code>, <code>mb_strpos</code>, <code>mb_str_split</code>, <code>mb_convert_case</code>.</li>
+  <li>Novidades: <code>mb_str_pad</code> (8.3), <code>mb_trim</code>, <code>mb_ucfirst</code>, <code>mb_lcfirst</code> (8.4).</li>
+  <li><code>str_replace</code>, <code>str_contains</code>, <code>explode</code> e <code>implode</code> funcionam normalmente com acentos.</li>
+  <li>Regra: <strong>texto em português → <code>mb_</code></strong>. E UTF-8 em todo lugar (arquivos, HTML, banco).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
