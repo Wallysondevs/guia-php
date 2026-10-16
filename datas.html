@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Datas e Horas — date, strtotime, DateTime e fuso horário | Guia PHP</title>
+<meta name="description" content="Datas e horas no PHP: date() e a tabela de formatos, time() e o timestamp, mktime e strtotime ('next monday', '+1 week'), DateTime e DateTimeImmutable, format('d/m/Y'), diff para calcular a idade, fuso America/Sao_Paulo, nomes dos meses em português e checkdate.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Datas e Horas</span></h1>
+
+<p class="intro">Quase todo sistema lida com datas: a data do pedido, o prazo de entrega, a idade do cliente, quantos dias faltam para o Natal. O PHP tem dois jeitos de trabalhar com elas: as funções clássicas (<code>date</code>, <code>time</code>, <code>strtotime</code>), curtas e diretas, e os objetos <code>DateTime</code>, mais completos para cálculos. E tem uma pegadinha que pega todo brasileiro no primeiro dia: o <strong>fuso horário</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Mostrar a data e a hora com <code>date()</code>, e as letras de formato (<code>d/m/Y H:i</code>…).</li>
+  <li>Acertar o fuso: <code>date_default_timezone_set('America/Sao_Paulo')</code>, e por que a hora sai 3 horas adiantada sem ele.</li>
+  <li>O que é o <em>timestamp</em> (<code>time()</code>), e como criar datas com <code>mktime</code> e <code>strtotime</code> (<code>'+1 week'</code>, <code>'next monday'</code>).</li>
+  <li>Usar <code>DateTime</code> e <code>DateTimeImmutable</code>, e por que preferir o segundo.</li>
+  <li>Ler datas no formato brasileiro (<code>25/12/2026</code>) sem cair em armadilhas.</li>
+  <li>Calcular diferenças com <code>diff</code> (a idade de alguém, dias até uma data).</li>
+  <li>Escrever os nomes dos meses e dias em português, e validar datas com <code>checkdate</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A primeira data: <code>date()</code></h2>
+<p><code>date</code> ("data") devolve a data e a hora de agora, formatadas do jeito que você pedir. O formato é um texto em que <strong>cada letra</strong> vira um pedaço da data:</p>
+
+<pre class="file" data-file="agora.php">&lt;?php
+echo date('d/m/Y H:i:s'), "\n";
+echo date_default_timezone_get(), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>d</dt><dd>Dia com dois dígitos (<code>16</code>, <code>07</code>).</dd>
+  <dt>/</dt><dd>Não é letra de formato: sai como está.</dd>
+  <dt>m</dt><dd>Mês com dois dígitos (<code>10</code>).</dd>
+  <dt>Y</dt><dd>Ano com quatro dígitos (<code>2026</code>). Maiúscula! O <code>y</code> minúsculo dá só <code>26</code>.</dd>
+  <dt>H:i:s</dt><dd>Hora (0 a 23), minutos e segundos, com dois dígitos. Atenção: minuto é <code>i</code>, e não <code>m</code> (que é o mês).</dd>
+</dl>
+
+<p>A Ana rodou o programa às 20h56 de uma sexta-feira, em Campinas, e comparou com o relógio do sistema (o comando <code>date</code> do terminal):</p>
+
+<pre class="term">$ cd datas
+$ date
+sex 16 out 2026 20:56:29 -03
+$ php agora.php
+16/10/2026 23:56:29          « 3 horas a mais!
+UTC</pre>
+
+<h3>O fuso horário</h3>
+<p>O PHP não sabe onde você está. Se ninguém disser, ele usa o fuso <strong>UTC</strong> (o "horário universal", de Londres no inverno), que está 3 horas à frente do horário de Brasília. Note que ele <strong>não avisa</strong> nada: só mostra a hora errada. (Versões muito antigas, até o PHP 5, mostravam um aviso; hoje, silêncio.) Há duas formas de consertar:</p>
+
+<ol>
+  <li><strong>No código</strong>, no começo do programa:
+<pre class="file" data-file="fuso.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+echo date('d/m/Y H:i:s'), "\n";
+echo date_default_timezone_get(), "\n";
+</pre>
+<pre class="term">$ php fuso.php
+16/10/2026 20:56:29          « agora bate com o relógio
+America/Sao_Paulo</pre>
+  </li>
+  <li><strong>No <code>php.ini</code></strong> (a configuração do PHP, veja <a href="tipos-erro.html">Tipos de Erro</a>), valendo para todos os programas: <code>date.timezone = America/Sao_Paulo</code>.</li>
+</ol>
+
+<p>O nome do fuso segue o padrão "Continente/Cidade" (o banco de dados de fusos da IANA). Para o Brasil, os mais usados são <code>America/Sao_Paulo</code> (Brasília, Sul, Sudeste, parte do Nordeste), <code>America/Manaus</code>, <code>America/Cuiaba</code>, <code>America/Rio_Branco</code>, <code>America/Fortaleza</code>, <code>America/Recife</code>, <code>America/Belem</code> e <code>America/Noronha</code>. Escreva exatamente assim, com sublinhado no lugar do espaço. Um nome errado dá aviso e o fuso não muda:</p>
+
+<pre class="term">$ php fuso-errado.php      « date_default_timezone_set('America/Sao Paulo');
+
+Notice: date_default_timezone_set(): Timezone ID 'America/Sao Paulo' is invalid in /home/ana/datas/fuso-errado.php on line 2
+bool(false)
+UTC
+$ php -d date.timezone=Brasil agora.php      « um valor inválido no php.ini
+
+Warning: PHP Startup: Invalid date.timezone value 'Brasil', using 'UTC' instead in Unknown on line 0
+16/10/2026 23:56:30
+UTC</pre>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e compare as duas linhas com o relógio do seu computador. A primeira usa o fuso padrão do PHP; a segunda, o de Brasília. Troque o fuso por <code>America/Manaus</code> ou <code>Europe/Lisbon</code> e veja a hora mudar.</p>
+<pre class="script">&lt;?php
+echo "Padrão (" . date_default_timezone_get() . "): " . date('d/m/Y H:i') . "\n";
+date_default_timezone_set('America/Sao_Paulo');
+echo "Brasília: " . date('d/m/Y H:i') . "\n";
+</pre>
+</div>
+
+<h3>As letras de formato</h3>
+<p>Para a tabela abaixo, a Ana usou sempre a mesma data, <strong>sábado, 7 de março de 2026, 14:05:09</strong>, passando um segundo argumento ao <code>date</code> (você vai entender esse número na próxima seção). Saídas reais:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Letra</th><th>Significa</th><th>Saída</th></tr>
+<tr><td><code>d</code></td><td>Dia, 2 dígitos</td><td><code>07</code></td></tr>
+<tr><td><code>j</code></td><td>Dia, sem zero</td><td><code>7</code></td></tr>
+<tr><td><code>D</code></td><td>Dia da semana, abreviado (inglês)</td><td><code>Sat</code></td></tr>
+<tr><td><code>l</code> (L minúsculo)</td><td>Dia da semana, completo (inglês)</td><td><code>Saturday</code></td></tr>
+<tr><td><code>w</code></td><td>Dia da semana, número (0 = domingo … 6 = sábado)</td><td><code>6</code></td></tr>
+<tr><td><code>N</code></td><td>Dia da semana, ISO (1 = segunda … 7 = domingo)</td><td><code>6</code></td></tr>
+<tr><td><code>z</code></td><td>Dia do ano (começa em 0)</td><td><code>65</code></td></tr>
+<tr><td><code>W</code></td><td>Semana do ano (ISO)</td><td><code>10</code></td></tr>
+<tr><td><code>m</code></td><td>Mês, 2 dígitos</td><td><code>03</code></td></tr>
+<tr><td><code>n</code></td><td>Mês, sem zero</td><td><code>3</code></td></tr>
+<tr><td><code>M</code> / <code>F</code></td><td>Mês, abreviado / completo (inglês)</td><td><code>Mar</code> / <code>March</code></td></tr>
+<tr><td><code>t</code></td><td>Quantos dias o mês tem</td><td><code>31</code></td></tr>
+<tr><td><code>L</code></td><td>Ano bissexto? (1 ou 0)</td><td><code>0</code></td></tr>
+<tr><td><code>Y</code> / <code>y</code></td><td>Ano, 4 / 2 dígitos</td><td><code>2026</code> / <code>26</code></td></tr>
+<tr><td><code>H</code> / <code>G</code></td><td>Hora 00–23 / 0–23</td><td><code>14</code> / <code>14</code></td></tr>
+<tr><td><code>h</code> / <code>g</code></td><td>Hora 01–12 / 1–12</td><td><code>02</code> / <code>2</code></td></tr>
+<tr><td><code>a</code> / <code>A</code></td><td>am/pm</td><td><code>pm</code> / <code>PM</code></td></tr>
+<tr><td><code>i</code></td><td>Minutos</td><td><code>05</code></td></tr>
+<tr><td><code>s</code></td><td>Segundos</td><td><code>09</code></td></tr>
+<tr><td><code>e</code></td><td>Nome do fuso</td><td><code>America/Sao_Paulo</code></td></tr>
+<tr><td><code>T</code> / <code>P</code></td><td>Abreviação / diferença para o UTC</td><td><code>-03</code> / <code>-03:00</code></td></tr>
+<tr><td><code>U</code></td><td>Timestamp</td><td><code>1772903109</code></td></tr>
+<tr><td><code>c</code></td><td>Data completa ISO 8601</td><td><code>2026-03-07T14:05:09-03:00</code></td></tr>
+<tr><td><code>r</code></td><td>Data no formato de e-mail (RFC 2822)</td><td><code>Sat, 07 Mar 2026 14:05:09 -0300</code></td></tr>
+</table>
+</div>
+
+<p>Para escrever uma letra <strong>sem</strong> que ela vire formato, ponha uma barra invertida antes (<code>\h</code>, <code>\d\e</code>):</p>
+
+<pre class="term">$ php formatos.php       « (final do programa)
+…
+07/03/2026 às 14h05                       « date('d/m/Y \à\s H\hi', $ts)
+Saturday, 07 de March de 2026             « date('l, d \d\e F \d\e Y', $ts): nomes em inglês!</pre>
+
+<p>Os nomes de dias e meses do <code>date</code> saem sempre em inglês. A solução em português está mais adiante, em <a href="#portugues">Meses e dias em português</a>.</p>
+
+<hr>
+
+<h2>O timestamp: <code>time()</code> e <code>mktime()</code></h2>
+<p>Por dentro, o PHP (e quase todo sistema) guarda um momento como um <strong>número inteiro</strong>: quantos segundos se passaram desde a meia-noite de 1º de janeiro de 1970, no fuso UTC. Esse número se chama <strong>timestamp</strong> ("carimbo de tempo") ou "tempo Unix". A função <code>time()</code> devolve o timestamp de agora, e <code>date</code> aceita um timestamp como segundo argumento:</p>
+
+<pre class="file" data-file="time.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+var_dump(time());
+echo date('d/m/Y H:i', 0), "\n";
+echo date('d/m/Y H:i', 1000000000), "\n";
+$natal = mktime(0, 0, 0, 12, 25, 2026);
+echo $natal, "\n";
+echo date('d/m/Y', mktime(0, 0, 0, 13, 1, 2026)), "\n";
+echo date('d/m/Y', mktime(0, 0, 0, 3, 0, 2026)), "\n";
+</pre>
+
+<pre class="term">$ php time.php
+int(1792194990)            « segundos desde 1970 (no momento em que a Ana rodou)
+31/12/1969 21:00           « o timestamp 0, no horário de Brasília
+08/09/2001 22:46           « o timestamp 1 bilhão
+1798167600                 « o Natal de 2026, meia-noite
+01/01/2027                 « "mês 13 de 2026" = janeiro de 2027
+28/02/2026                 « "dia 0 de março" = último dia de fevereiro</pre>
+
+<dl class="anatomy">
+  <dt>mktime(hora, minuto, segundo, mês, dia, ano)</dt><dd><em>make time</em>, "fabricar o tempo": monta o timestamp de uma data. Cuidado com a ordem estranha: <strong>mês antes do dia</strong> (herança do formato americano).</dd>
+  <dt>valores "fora do lugar"</dt><dd>O <code>mktime</code> não reclama de mês 13 ou dia 0: ele "transborda" para o mês seguinte ou anterior. Isso é útil (o dia 0 de março dá o último dia de fevereiro) e perigoso (uma data errada vira outra data sem aviso).</dd>
+</dl>
+
+<p>Com timestamps, comparar datas e fazer contas é fácil, porque são só números: o maior é o mais recente, e um dia tem 86 400 segundos. Mas contas "na mão" erram em horário de verão e meses de tamanhos diferentes. Para somar dias, semanas e meses, use <code>strtotime</code> ou <code>DateTime</code>.</p>
+
+<hr>
+
+<h2><code>strtotime</code>: datas escritas em inglês</h2>
+<p><code>strtotime</code> ("texto para tempo") lê uma data escrita em texto, inclusive expressões relativas em inglês, e devolve o timestamp (ou <code>false</code> se não entender). O segundo argumento é o "ponto de partida"; sem ele, é agora. A Ana usou como base a sexta-feira 16/10/2026 às 10:00:</p>
+
+<pre class="file" data-file="strtotime.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$base = mktime(10, 0, 0, 10, 16, 2026);   // sexta, 16/10/2026 10:00
+foreach (['tomorrow', '+1 day', '+1 week', '+2 weeks 3 days', 'next monday', 'last friday', 'first day of next month', 'last day of this month', '2026-12-25', '2026-12-25 18:30', '12/25/2026', '05/12/2026', '25/12/2026', 'amanhã'] as $t) {
+    $r = strtotime($t, $base);
+    echo str_pad("'$t'", 28), ' =&gt; ', $r === false ? 'false' : date('D d/m/Y H:i', $r), "\n";
+}
+</pre>
+
+<pre class="term">$ php strtotime.php
+'tomorrow'                   =&gt; Sat 17/10/2026 00:00     « amanhã, meia-noite
+'+1 day'                     =&gt; Sat 17/10/2026 10:00     « 24 horas depois, mesma hora
+'+1 week'                    =&gt; Fri 23/10/2026 10:00
+'+2 weeks 3 days'            =&gt; Mon 02/11/2026 10:00
+'next monday'                =&gt; Mon 19/10/2026 00:00     « a próxima segunda
+'last friday'                =&gt; Fri 09/10/2026 00:00     « a sexta anterior (não hoje)
+'first day of next month'    =&gt; Sun 01/11/2026 10:00
+'last day of this month'     =&gt; Sat 31/10/2026 10:00
+'2026-12-25'                 =&gt; Fri 25/12/2026 00:00     « formato ISO: o mais seguro
+'2026-12-25 18:30'           =&gt; Fri 25/12/2026 18:30
+'12/25/2026'                 =&gt; Fri 25/12/2026 00:00     « com barras = mês/dia/ano (americano)
+'05/12/2026'                 =&gt; Tue 12/05/2026 00:00     « PERIGO: virou 12 de MAIO
+'25/12/2026'                 =&gt; false                    « não existe mês 25
+'amanhã'                    =&gt; false                    « só entende inglês</pre>
+
+<div class="warning">
+<strong>Nunca passe uma data brasileira com barras para <code>strtotime</code></strong>
+<p>Com barras, o PHP entende <strong>mês/dia/ano</strong>. <code>25/12/2026</code> falha (ainda bem, você percebe), mas <code>05/12/2026</code> vira 12 de maio, sem erro nenhum, e o bolo é entregue sete meses depois. Para ler datas no formato <code>dd/mm/aaaa</code>, use <code>DateTimeImmutable::createFromFormat('d/m/Y', …)</code>, que você vai ver daqui a pouco. Para guardar datas (em arquivos e bancos), use o formato ISO <code>2026-12-25</code>.</p>
+</div>
+
+<hr>
+
+<h2>Objetos de data: <code>DateTime</code> e <code>DateTimeImmutable</code></h2>
+<p>As funções acima trabalham com números soltos. Os objetos <code>DateTime</code> guardam a data <strong>e</strong> o fuso juntos, e têm métodos para formatar, somar, comparar e calcular diferenças. (Objetos e métodos são assunto do <a href="classes-objetos.html">Nível 3</a>; aqui basta a receita: <code>new</code> cria, <code>-&gt;</code> chama um método.)</p>
+
+<pre class="file" data-file="datetime.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$d = new DateTime('2026-10-16 14:30');
+echo $d-&gt;format('d/m/Y H:i'), "\n";
+$d-&gt;modify('+1 day');
+echo $d-&gt;format('d/m/Y H:i'), "\n";
+$e = $d;
+$e-&gt;modify('+1 month');
+echo $d-&gt;format('d/m/Y'), " e ", $e-&gt;format('d/m/Y'), "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>new DateTime('2026-10-16 14:30')</code></td><td>Cria a data. Aceita os mesmos textos do <code>strtotime</code> (<code>'now'</code>, <code>'tomorrow'</code>, <code>'+1 week'</code>…). Sem argumento, é agora.</td></tr>
+<tr><td><code>-&gt;format('d/m/Y H:i')</code></td><td>Formata com as mesmas letras do <code>date</code>.</td></tr>
+<tr><td><code>-&gt;modify('+1 day')</code></td><td>Muda a data <strong>do próprio objeto</strong>.</td></tr>
+<tr><td><code>$e = $d;</code></td><td>Não copia a data: <code>$e</code> e <code>$d</code> passam a ser <strong>o mesmo objeto</strong>.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php datetime.php
+16/10/2026 14:30
+17/10/2026 14:30
+17/11/2026 e 17/11/2026      « mexer em $e mudou $d também!</pre>
+
+<p>Esse último resultado é a fonte de muitos bugs: você calcula o prazo de entrega a partir da data do pedido e, sem querer, muda a data do pedido. Por isso existe o <code>DateTimeImmutable</code> ("imutável"): os métodos dele <strong>nunca</strong> mudam o objeto; eles devolvem uma data nova.</p>
+
+<pre class="file" data-file="immutable.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$pedido = new DateTimeImmutable('2026-10-16');
+$entrega = $pedido-&gt;modify('+3 days');
+echo "Pedido:  ", $pedido-&gt;format('d/m/Y'), "\n";
+echo "Entrega: ", $entrega-&gt;format('d/m/Y'), "\n";
+$prazo = $pedido-&gt;add(new DateInterval('P1M'));
+echo "Prazo:   ", $prazo-&gt;format('d/m/Y'), "\n";
+var_dump($entrega &gt; $pedido);
+</pre>
+
+<pre class="term">$ php immutable.php
+Pedido:  16/10/2026          « intacto
+Entrega: 19/10/2026
+Prazo:   16/11/2026
+bool(true)                   « datas se comparam com &lt; &gt; == direto</pre>
+
+<dl class="anatomy">
+  <dt>$entrega = $pedido-&gt;modify('+3 days');</dt><dd>Com o imutável, <strong>guarde o resultado</strong>: <code>$pedido-&gt;modify(…)</code> sozinho, sem atribuir, não faz nada.</dd>
+  <dt>new DateInterval('P1M')</dt><dd>Um "intervalo": <code>P</code> (período) + <code>1M</code> (1 mês). Outros: <code>P3D</code> (3 dias), <code>P1Y2M</code> (1 ano e 2 meses), <code>PT2H</code> (2 horas; o <code>T</code> separa as horas).</dd>
+  <dt>-&gt;add(…) / -&gt;sub(…)</dt><dd>Somam ou subtraem um intervalo.</dd>
+</dl>
+
+<div class="tip">
+<strong>Qual usar?</strong>
+<p>Em código novo, prefira <strong><code>DateTimeImmutable</code></strong>. Ele faz tudo o que o <code>DateTime</code> faz, sem o risco de mudar uma data sem querer. Para só mostrar "agora" numa página, <code>date('d/m/Y')</code> continua ótimo.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Pedido: 16/10/2026,out:Entrega: 19/10/2026,semerro">
+<p class="try-task"><strong>Missão:</strong> o prazo de entrega da lojinha é de 3 dias. O programa abaixo mostra a data do pedido errada (ela mudou junto com a entrega). Troque <code>DateTime</code> por <code>DateTimeImmutable</code> e guarde o resultado do <code>modify</code> em <code>$entrega</code>, para mostrar <code>Pedido: 16/10/2026</code> e <code>Entrega: 19/10/2026</code>.</p>
+<pre class="script">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$pedido = new DateTime('2026-10-16');
+$entrega = $pedido;
+$entrega-&gt;modify('+3 days');
+echo "Pedido: " . $pedido-&gt;format('d/m/Y') . "\n";
+echo "Entrega: " . $entrega-&gt;format('d/m/Y') . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$pedido = new DateTimeImmutable('2026-10-16');
+$entrega = $pedido-&gt;modify('+3 days');
+echo "Pedido: " . $pedido-&gt;format('d/m/Y') . "\n";
+echo "Entrega: " . $entrega-&gt;format('d/m/Y') . "\n";
+</pre>
+</div>
+
+<h3>Ler uma data brasileira: <code>createFromFormat</code></h3>
+<p>Quando a data vem de um formulário como <code>25/12/2026</code>, diga ao PHP qual é o formato:</p>
+
+<pre class="file" data-file="fromformat.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$d = DateTimeImmutable::createFromFormat('d/m/Y', '25/12/2026');
+echo $d-&gt;format('Y-m-d'), "\n";
+$x = DateTimeImmutable::createFromFormat('d/m/Y', '31/02/2026');
+echo $x-&gt;format('d/m/Y'), "\n";
+print_r(DateTimeImmutable::getLastErrors());
+$y = DateTimeImmutable::createFromFormat('d/m/Y', 'ontem');
+var_dump($y);
+</pre>
+
+<pre class="term">$ php fromformat.php
+2026-12-25                    « entendeu dia/mês/ano
+03/03/2026                    « 31 de fevereiro "transbordou" para 3 de março!
+Array
+(
+    [warning_count] =&gt; 1
+    [warnings] =&gt; Array
+        (
+            [10] =&gt; The parsed date was invalid      « mas ficou um aviso guardado
+        )
+
+    [error_count] =&gt; 0
+    [errors] =&gt; Array
+        (
+        )
+
+)
+bool(false)                   « texto que não segue o formato: false</pre>
+
+<p>Os dois pontos de atenção: <code>createFromFormat</code> devolve <code>false</code> quando o texto não tem o formato pedido, e aceita datas impossíveis como <code>31/02</code>, "transbordando" para março. Para recusar datas impossíveis, confira com <code>checkdate</code> (no fim da aula) ou com <code>getLastErrors()</code>. E o <code>::</code> em <code>DateTimeImmutable::createFromFormat</code> chama um método da classe, sem objeto (um método <a href="static.html">estático</a>).</p>
+
+<p>Já o <code>new DateTime('25/12/2026')</code> não tenta adivinhar: lança uma exceção:</p>
+
+<pre class="term">$ php malformed.php      « $d = new DateTime('25/12/2026');
+
+Fatal error: Uncaught DateMalformedStringException: Failed to parse time string (25/12/2026) at position 0 (2): Unexpected character in /home/ana/datas/malformed.php:2
+Stack trace:
+#0 /home/ana/datas/malformed.php(2): DateTime-&gt;__construct('25/12/2026')
+#1 {main}
+  thrown in /home/ana/datas/malformed.php on line 2</pre>
+
+<p>"<em>Falha ao interpretar o texto de data</em>". A exceção <code>DateMalformedStringException</code> existe desde o <span class="versao">PHP 8.3+</span> (antes era uma <code>Exception</code> comum, com a mesma mensagem).</p>
+
+<hr>
+
+<h2>Diferença entre datas: <code>diff</code> (e a idade)</h2>
+<p><code>$a-&gt;diff($b)</code> calcula o intervalo entre duas datas, em anos, meses e dias de calendário (levando em conta meses de 28, 30 ou 31 dias e anos bissextos). É o jeito certo de calcular uma idade:</p>
+
+<pre class="file" data-file="idade.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$nascimento = new DateTimeImmutable('1997-03-15');
+$hoje = new DateTimeImmutable('2026-10-16');
+$diff = $nascimento-&gt;diff($hoje);
+echo "Idade: {$diff-&gt;y} anos\n";
+echo $diff-&gt;format('%y anos, %m meses e %d dias'), "\n";
+echo "Dias vividos: {$diff-&gt;days}\n";
+echo $diff-&gt;format('%a dias'), "\n";
+$natal = new DateTimeImmutable('2026-12-25');
+echo "Faltam ", $hoje-&gt;diff($natal)-&gt;days, " dias para o Natal\n";
+var_dump($natal-&gt;diff($hoje)-&gt;invert);
+</pre>
+
+<pre class="term">$ php idade.php
+Idade: 29 anos
+29 anos, 7 meses e 1 dias        « o format não sabe fazer plural: "1 dias"
+Dias vividos: 10807
+10807 dias
+Faltam 70 dias para o Natal
+int(1)                           « 1 = o intervalo é "para trás" (a 2ª data é anterior)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No intervalo</th><th>O que é</th><th>No <code>format</code></th></tr>
+<tr><td><code>-&gt;y</code>, <code>-&gt;m</code>, <code>-&gt;d</code></td><td>Anos, meses e dias "de calendário"</td><td><code>%y</code>, <code>%m</code>, <code>%d</code></td></tr>
+<tr><td><code>-&gt;h</code>, <code>-&gt;i</code>, <code>-&gt;s</code></td><td>Horas, minutos, segundos</td><td><code>%h</code>, <code>%i</code>, <code>%s</code></td></tr>
+<tr><td><code>-&gt;days</code></td><td>Total de dias entre as datas</td><td><code>%a</code></td></tr>
+<tr><td><code>-&gt;invert</code></td><td><code>1</code> se a segunda data é anterior à primeira</td><td><code>%R</code> mostra <code>+</code> ou <code>-</code></td></tr>
+</table>
+</div>
+
+<p>Num programa de verdade, <code>$hoje</code> seria <code>new DateTimeImmutable('today')</code>. Aqui a Ana fixou a data para o resultado não mudar a cada dia.</p>
+
+<hr>
+
+<h2 id="portugues">Meses e dias em português</h2>
+<p>O <code>date</code> e o <code>format</code> só escrevem em inglês. O jeito mais simples (e que funciona em qualquer PHP) é ter os nomes num array e usar os números que o <code>format</code> dá: <code>n</code> (mês de 1 a 12) e <code>w</code> (dia da semana de 0 a 6, começando no domingo).</p>
+
+<pre class="file" data-file="meses.php">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$meses = [1 =&gt; 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+          'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+$dias = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira',
+         'quinta-feira', 'sexta-feira', 'sábado'];
+$d = new DateTimeImmutable('2026-10-16');
+echo $dias[$d-&gt;format('w')] . ', ' . $d-&gt;format('j') . ' de '
+   . $meses[$d-&gt;format('n')] . ' de ' . $d-&gt;format('Y') . "\n";
+</pre>
+
+<pre class="term">$ php meses.php
+sexta-feira, 16 de outubro de 2026</pre>
+
+<dl class="anatomy">
+  <dt>[1 =&gt; 'janeiro', 'fevereiro', …]</dt><dd>O <code>1 =&gt;</code> faz o array começar na chave 1; os próximos ganham 2, 3… Assim <code>$meses[10]</code> é <code>'outubro'</code>, sem precisar subtrair 1.</dd>
+  <dt>$dias</dt><dd>Começa em 0 (domingo), igual ao <code>w</code>.</dd>
+</dl>
+
+<div class="note">
+<strong>E a extensão intl?</strong>
+<p>O PHP tem uma extensão de internacionalização, a <code>intl</code>, com a classe <code>IntlDateFormatter</code>, que escreve datas em qualquer idioma. Ela não vem em toda instalação: no Ubuntu/Debian é o pacote <code>php-intl</code>. O PHP do laboratório da Ana (e o do editor do guia) <strong>não</strong> tem:</p>
+<pre class="term">$ php intl.php      « var_dump(extension_loaded('intl')); new IntlDateFormatter(…);
+bool(false)
+
+Fatal error: Uncaught Error: Class "IntlDateFormatter" not found in /home/ana/datas/intl.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/datas/intl.php on line 3</pre>
+<p>Onde ela existir, o uso é assim (ilustrativo):</p>
+<pre class="file" data-file="intl.php">if (extension_loaded('intl')) {
+    $fmt = new IntlDateFormatter('pt_BR', IntlDateFormatter::FULL, IntlDateFormatter::NONE,
+                                 'America/Sao_Paulo');
+    echo $fmt-&gt;format(new DateTimeImmutable('2026-10-16'));
+    // sexta-feira, 16 de outubro de 2026
+}
+</pre>
+<p>Confira sempre com <code>extension_loaded('intl')</code> antes, ou fique com o array, que funciona em qualquer lugar.</p>
+</div>
+
+<hr>
+
+<h2>Validar: <code>checkdate</code> e conversão de fusos</h2>
+<p><code>checkdate(mês, dia, ano)</code> responde se a data existe de verdade (de novo, mês antes do dia):</p>
+
+<pre class="file" data-file="checkdate.php">&lt;?php
+var_dump(checkdate(2, 29, 2026));
+var_dump(checkdate(2, 29, 2028));
+var_dump(checkdate(4, 31, 2026));
+var_dump(checkdate(12, 25, 2026));
+</pre>
+
+<pre class="term">$ php checkdate.php
+bool(false)     « 2026 não é bissexto
+bool(true)      « 2028 é
+bool(false)     « abril tem 30 dias
+bool(true)</pre>
+
+<p>E para mostrar o mesmo momento em outro fuso (o cliente de Manaus, a fornecedora em Lisboa), use <code>setTimezone</code>:</p>
+
+<pre class="file" data-file="zonas.php">&lt;?php
+$sp = new DateTimeImmutable('2026-10-16 14:30', new DateTimeZone('America/Sao_Paulo'));
+echo $sp-&gt;format('d/m/Y H:i T P'), "\n";
+echo $sp-&gt;setTimezone(new DateTimeZone('Europe/Lisbon'))-&gt;format('d/m/Y H:i T P'), "\n";
+echo $sp-&gt;setTimezone(new DateTimeZone('America/Manaus'))-&gt;format('d/m/Y H:i T P'), "\n";
+echo $sp-&gt;setTimezone(new DateTimeZone('UTC'))-&gt;format('d/m/Y H:i T P'), "\n";
+</pre>
+
+<pre class="term">$ php zonas.php
+16/10/2026 14:30 -03 -03:00
+16/10/2026 18:30 WEST +01:00     « horário de verão de Portugal (outubro)
+16/10/2026 13:30 -04 -04:00
+16/10/2026 17:30 UTC +00:00</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A hora sai 3 horas adiantada</strong>
+<p><strong>O que significa:</strong> o PHP está usando o fuso UTC (o padrão, sem aviso).</p>
+<p><strong>Como consertar:</strong> <code>date_default_timezone_set('America/Sao_Paulo');</code> no começo do programa (ou num arquivo de configuração incluído por todas as páginas), ou <code>date.timezone = America/Sao_Paulo</code> no <code>php.ini</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Timezone ID 'America/Sao Paulo' is invalid"</strong>
+<pre class="term">Notice: date_default_timezone_set(): Timezone ID 'America/Sao Paulo' is invalid in /home/ana/datas/fuso-errado.php on line 2</pre>
+<p><strong>Como consertar:</strong> o nome tem sublinhado: <code>America/Sao_Paulo</code>. Com <code>new DateTimeZone('Brasil/Campinas')</code> o erro é uma exceção: <code>Fatal error: Uncaught DateInvalidTimeZoneException: DateTimeZone::__construct(): Unknown or bad timezone (Brasil/Campinas)</code>. A lista completa sai de <code>DateTimeZone::listIdentifiers()</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Dia e mês trocados (05/12 virou 12 de maio)</strong>
+<p><strong>O que significa:</strong> <code>strtotime</code> ou <code>new DateTime</code> receberam uma data com barras, que eles leem como mês/dia/ano.</p>
+<p><strong>Como consertar:</strong> <code>DateTimeImmutable::createFromFormat('d/m/Y', $texto)</code>, conferindo se o resultado não é <code>false</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Failed to parse time string"</strong>
+<pre class="term">Fatal error: Uncaught DateMalformedStringException: Failed to parse time string (25/12/2026) at position 0 (2): Unexpected character in /home/ana/datas/malformed.php:2</pre>
+<p><strong>O que significa:</strong> o texto passado a <code>new DateTime(…)</code> não é uma data que o PHP entenda ("posição 0, caractere 2: inesperado").</p>
+<p><strong>Como consertar:</strong> use o formato ISO (<code>2026-12-25</code>) ou <code>createFromFormat</code>; se o texto vem do usuário, trate a exceção com <code>try</code>/<code>catch</code> (veja <a href="excecoes.html">Exceções</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que faz</th></tr>
+<tr><td><code>date($formato, $ts)</code></td><td>Formata o timestamp (padrão: agora).</td></tr>
+<tr><td><code>time()</code></td><td>Timestamp de agora (segundos desde 1970).</td></tr>
+<tr><td><code>mktime(h, i, s, mês, dia, ano)</code></td><td>Monta um timestamp.</td></tr>
+<tr><td><code>strtotime($texto, $base)</code></td><td>Texto (em inglês) → timestamp, ou <code>false</code>.</td></tr>
+<tr><td><code>checkdate(mês, dia, ano)</code></td><td>A data existe?</td></tr>
+<tr><td><code>date_default_timezone_set($fuso)</code> / <code>_get()</code></td><td>Define / mostra o fuso padrão.</td></tr>
+<tr><td><code>new DateTimeImmutable($texto, $fuso)</code></td><td>Cria uma data imutável.</td></tr>
+<tr><td><code>DateTimeImmutable::createFromFormat('d/m/Y', $t)</code></td><td>Lê uma data num formato conhecido.</td></tr>
+<tr><td><code>-&gt;format($f)</code></td><td>Formata (mesmas letras do <code>date</code>).</td></tr>
+<tr><td><code>-&gt;modify('+1 week')</code>, <code>-&gt;add(new DateInterval('P3D'))</code>, <code>-&gt;sub(…)</code></td><td>Somam/subtraem (no imutável, devolvem uma data nova).</td></tr>
+<tr><td><code>$a-&gt;diff($b)</code></td><td>Intervalo: <code>-&gt;y</code>, <code>-&gt;m</code>, <code>-&gt;d</code>, <code>-&gt;days</code>, <code>-&gt;invert</code>.</td></tr>
+<tr><td><code>-&gt;setTimezone(new DateTimeZone('…'))</code></td><td>O mesmo momento em outro fuso.</td></tr>
+<tr><td><code>-&gt;getTimestamp()</code></td><td>O timestamp do objeto.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Formato brasileiro</h3>
+<p>Complete para mostrar algo como <code>16/10/2026</code>:</p>
+<div class="ex-code">echo date('<input data-answer="d/m/Y" aria-label="formato" size="8">');</div>
+</div>
+
+<div class="exercise">
+<h3>2. O fuso de Brasília</h3>
+<p>Complete:</p>
+<div class="ex-code">date_default_timezone_set('<input data-answer="America/Sao_Paulo" aria-label="fuso">');</div>
+</div>
+
+<div class="exercise">
+<h3>3. Uma semana depois</h3>
+<p>Complete para calcular a data uma semana depois de <code>$pedido</code> (um <code>DateTimeImmutable</code>):</p>
+<div class="ex-code">$retorno = $pedido-&gt;modify('<input data-answer="+1 week|+7 days|+1 weeks" aria-label="texto" size="10">');</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. No <code>date</code>, qual letra mostra os <strong>minutos</strong>?</p>
+<label><input type="radio" name="q4"> <code>m</code></label>
+<label><input type="radio" name="q4"> <code>i</code></label>
+<label><input type="radio" name="q4"> <code>M</code></label>
+<label><input type="radio" name="q4"> <code>n</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que <code>strtotime('05/12/2026')</code> devolve?</p>
+<label><input type="radio" name="q5"> 5 de dezembro de 2026.</label>
+<label><input type="radio" name="q5"> <code>false</code>.</label>
+<label><input type="radio" name="q5"> 12 de maio de 2026 (lê como mês/dia/ano).</label>
+<label><input type="radio" name="q5"> Um erro fatal.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Com <code>$a = new DateTimeImmutable('2026-10-16'); $a-&gt;modify('+1 day'); echo $a-&gt;format('d');</code>, o que aparece?</p>
+<label><input type="radio" name="q6"> <code>16</code>: o imutável não muda; o resultado do <code>modify</code> foi jogado fora.</label>
+<label><input type="radio" name="q6"> <code>17</code></label>
+<label><input type="radio" name="q6"> Um erro: imutáveis não têm <code>modify</code>.</label>
+<label><input type="radio" name="q6"> <code>16/10/2026</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Bia tem 29 anos,out:Aniversário: segunda-feira\, 15 de março de 2027,out:Faltam 150 dias,out:Data inválida: 31/02/2026,semerro">
+<p class="try-task"><strong>Missão final:</strong> complete a função <code>ficha</code>. Ela recebe o nome e a data de nascimento no formato brasileiro e, considerando que hoje é 16/10/2026: (1) se a data não existir, mostra <code>Data inválida: 31/02/2026</code>; (2) senão, mostra a idade (<code>Bia tem 29 anos</code>), o próximo aniversário por extenso em português (<code>Aniversário: segunda-feira, 15 de março de 2027</code>) e quantos dias faltam (<code>Faltam 150 dias</code>). Dica: <code>explode('/', $texto)</code> separa dia, mês e ano para o <code>checkdate</code>; o próximo aniversário é a data de nascimento com o ano de hoje, ou do ano seguinte se já passou.</p>
+<pre class="script">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$meses = [1 =&gt; 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+          'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+$dias = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira',
+         'quinta-feira', 'sexta-feira', 'sábado'];
+$hoje = new DateTimeImmutable('2026-10-16');
+
+function ficha(string $nome, string $nascimento): void
+{
+    global $meses, $dias, $hoje;
+    // seu código aqui
+}
+
+ficha('Bia', '15/03/1997');
+ficha('Caio', '31/02/2026');
+</pre>
+<pre class="solucao">&lt;?php
+date_default_timezone_set('America/Sao_Paulo');
+$meses = [1 =&gt; 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+          'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+$dias = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira',
+         'quinta-feira', 'sexta-feira', 'sábado'];
+$hoje = new DateTimeImmutable('2026-10-16');
+
+function ficha(string $nome, string $nascimento): void
+{
+    global $meses, $dias, $hoje;
+    [$d, $m, $a] = array_map('intval', explode('/', $nascimento));
+    if (!checkdate($m, $d, $a)) {
+        echo "Data inválida: $nascimento\n";
+        return;
+    }
+    $nasc = DateTimeImmutable::createFromFormat('!d/m/Y', $nascimento);
+    echo "$nome tem {$nasc-&gt;diff($hoje)-&gt;y} anos\n";
+
+    $aniv = $nasc-&gt;setDate((int) $hoje-&gt;format('Y'), $m, $d);
+    if ($aniv &lt; $hoje) {
+        $aniv = $aniv-&gt;modify('+1 year');
+    }
+    echo "Aniversário: " . $dias[$aniv-&gt;format('w')] . ', ' . $aniv-&gt;format('j')
+       . ' de ' . $meses[$aniv-&gt;format('n')] . ' de ' . $aniv-&gt;format('Y') . "\n";
+    echo "Faltam {$hoje-&gt;diff($aniv)-&gt;days} dias\n";
+}
+
+ficha('Bia', '15/03/1997');
+ficha('Caio', '31/02/2026');
+</pre>
+</div>
+
+<p>Na solução aparecem dois detalhes novos: o <code>!</code> no começo do formato (<code>'!d/m/Y'</code>) zera a hora: sem ele, a data recebe a hora do momento em que o programa roda (quando a Ana testou, <code>createFromFormat('d/m/Y', '15/03/2027')</code> deu <code>15/03/2027 20:59:04</code>), e uma comparação como <code>$aniv &lt; $hoje</code> no próprio dia do aniversário daria o resultado errado, e <code>setDate(ano, mês, dia)</code> troca a data mantendo o resto. O <code>global</code> deixa a função usar as variáveis de fora (veja <a href="escopo.html">Escopo</a>); num programa maior, você passaria esses valores como parâmetros.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>date('d/m/Y H:i')</code> mostra data e hora; cada letra é um pedaço (minuto é <code>i</code>; ano com 4 dígitos é <code>Y</code>).</li>
+  <li>Sem fuso definido, o PHP usa UTC (3 horas à frente de Brasília) e não avisa: use <code>date_default_timezone_set('America/Sao_Paulo')</code> ou o <code>php.ini</code>.</li>
+  <li>Timestamp = segundos desde 1970: <code>time()</code>, <code>mktime()</code> (mês antes do dia!).</li>
+  <li><code>strtotime</code> entende inglês (<code>'+1 week'</code>, <code>'next monday'</code>), mas lê <code>05/12/2026</code> como 12 de maio.</li>
+  <li>Prefira <code>DateTimeImmutable</code>: <code>format</code>, <code>modify</code>, <code>add</code>, <code>diff</code>, e guarde sempre o resultado.</li>
+  <li>Datas brasileiras: <code>createFromFormat('d/m/Y', …)</code> + <code>checkdate</code>.</li>
+  <li>Nomes em português: um array de meses e dias (ou <code>IntlDateFormatter</code>, se a extensão <code>intl</code> existir).</li>
+</ul>
+
+<p>Próxima aula: <a href="tipos-erro.html">Tipos de Erro</a>, para entender os <code>Warning</code>, <code>Notice</code> e <code>Fatal error</code> que apareceram até aqui.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
