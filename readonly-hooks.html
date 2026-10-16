@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP readonly e Property Hooks — propriedades protegidas, get, set e clone with | Guia PHP</title>
+<meta name="description" content="Propriedades readonly (PHP 8.1), classes readonly (8.2), como &quot;mudar&quot; um objeto readonly com clone e o clone com novos valores do PHP 8.5, e property hooks get e set (8.4), com os erros reais do PHP 8.5 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">readonly e Property Hooks</span></h1>
+
+<p class="intro">Uma propriedade <code>public</code> aceita qualquer coisa, a qualquer momento, de qualquer lugar: o número de um pedido pode ser trocado por engano, um preço pode virar negativo. O PHP moderno tem duas ferramentas para <strong>controlar uma propriedade</strong> sem precisar escrever métodos <code>getAlgo()</code>/<code>setAlgo()</code>: o <code>readonly</code> ("somente leitura": o valor é gravado uma vez e nunca mais muda) e os <strong>property hooks</strong> ("ganchos de propriedade": um código seu roda toda vez que alguém lê ou grava a propriedade).</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Propriedades <code>readonly</code> <span class="versao">PHP 8.1+</span>: as regras e os erros reais.</li>
+  <li>Classes <code>readonly</code> <span class="versao">PHP 8.2+</span>: todas as propriedades de uma vez.</li>
+  <li>Como "mudar" um objeto readonly: criar uma cópia com <code>clone</code> e o <code>clone</code> com novos valores <span class="versao">PHP 8.5+</span>, e por que de fora da classe ele dá erro.</li>
+  <li>Property hooks <code>get</code> e <code>set</code> <span class="versao">PHP 8.4+</span>: validar, limpar e calcular valores.</li>
+  <li>Qual ferramenta usar em cada caso.</li>
+</ul>
+</div>
+
+<p>Pré-requisitos: <a href="construtores.html">construtores</a> (com promoção de propriedades), <a href="visibilidade.html">visibilidade</a> e <a href="excecoes.html">exceções</a>. O <code>clone</code> e o <code>__clone</code> aparecem em <a href="metodos-magicos.html">Métodos Mágicos</a>, mas vamos relembrar aqui. Os exemplos rodam na máquina fictícia da Ana, na pasta <code>~/poo</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: a nota fiscal e o porteiro</h2>
+<p>Uma <strong>nota fiscal</strong>, depois de emitida, não se rasura. Se o valor estava errado, emite-se <strong>outra</strong> nota. Isso é o <code>readonly</code>: o objeto nasce com os valores certos e eles não mudam mais; para ter valores diferentes, cria-se outro objeto.</p>
+<p>Já um <strong>porteiro</strong> fica na entrada e confere quem entra ("tem crachá?") e às vezes ajusta ("assine aqui"). Isso é o <strong>hook</strong> <code>set</code>: todo valor que entra na propriedade passa por ele. E o hook <code>get</code> é como uma placa que é calculada na hora em que alguém olha.</p>
+
+<hr>
+
+<h2>1. Propriedades <code>readonly</code> <span class="versao">PHP 8.1+</span></h2>
+<p>Escreva <code>readonly</code> antes do tipo. O jeito mais comum é junto com a promoção no construtor:</p>
+
+<pre class="file" data-file="pedido.php">&lt;?php
+class Pedido
+{
+    public function __construct(
+        public readonly int $numero,
+        public readonly string $cliente,
+    ) {}
+}
+
+$p = new Pedido(1001, "Ana");
+echo "Pedido $p-&gt;numero de $p-&gt;cliente\n";
+$p-&gt;numero = 2002;
+echo "fim\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>public readonly int $numero</dt><dd><code>public</code>: todo mundo pode <strong>ler</strong>. <code>readonly</code>: só pode ser gravada <strong>uma vez</strong>. <code>int</code>: o tipo, que é obrigatório.</dd>
+  <dt>new Pedido(1001, "Ana")</dt><dd>O construtor grava os valores: essa é a "uma vez".</dd>
+  <dt>echo "… $p-&gt;numero …"</dt><dd>Ler funciona normalmente, de qualquer lugar.</dd>
+  <dt>$p-&gt;numero = 2002;</dt><dd>Tentar gravar de novo: erro.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/poo">$ php pedido.php
+Pedido 1001 de Ana
+
+Fatal error: Uncaught Error: Cannot modify readonly property Pedido::$numero in /home/ana/poo/pedido.php:12
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/pedido.php on line 12</pre>
+
+<p>"Não é possível modificar a propriedade somente leitura <code>Pedido::$numero</code>". O <code>fim</code> não aparece: é um <code>Error</code> que para o programa (a não ser que você o capture com <a href="excecoes.html">try/catch</a>).</p>
+
+<h3>Nem a própria classe pode mudar depois</h3>
+<p>O <code>readonly</code> não é só "de fora". Depois de gravada, nem um método da classe muda a propriedade:</p>
+
+<pre class="file" data-file="renumerar.php">&lt;?php
+class Pedido
+{
+    public function __construct(
+        public readonly int $numero,
+    ) {}
+
+    public function renumerar(int $novo): void
+    {
+        $this-&gt;numero = $novo;
+    }
+}
+
+$p = new Pedido(1001);
+$p-&gt;renumerar(2002);
+</pre>
+<pre class="term" data-cwd="~/poo">$ php renumerar.php
+
+Fatal error: Uncaught Error: Cannot modify readonly property Pedido::$numero in /home/ana/poo/renumerar.php:10
+Stack trace:
+#0 /home/ana/poo/renumerar.php(15): Pedido-&gt;renumerar(2002)
+#1 {main}
+  thrown in /home/ana/poo/renumerar.php on line 10</pre>
+
+<h3>As regras do <code>readonly</code></h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Se desobedecer</th></tr>
+<tr><td>Precisa ter <strong>tipo</strong> (<code>int</code>, <code>string</code>, <code>array</code>…)</td><td><code>Fatal error: Readonly property Pedido::$numero must have type</code></td></tr>
+<tr><td><strong>Não</strong> pode ter valor padrão (<code>= 1</code>)</td><td><code>Fatal error: Readonly property Pedido::$numero cannot have default value</code></td></tr>
+<tr><td>É gravada <strong>uma vez só</strong></td><td><code>Cannot modify readonly property Pedido::$numero</code></td></tr>
+<tr><td>Só é gravada <strong>de dentro</strong> da classe (normalmente no construtor)</td><td><code>Cannot modify protected(set) readonly property Pedido::$numero from global scope</code></td></tr>
+<tr><td>Precisa ser gravada antes de ser lida</td><td><code>Typed property Pedido::$numero must not be accessed before initialization</code></td></tr>
+</table>
+</div>
+
+<p>A penúltima linha merece atenção. Desde o PHP 8.4, <code>readonly</code> significa também <code>protected(set)</code>: "só a própria classe (e as classes filhas) podem <strong>gravar</strong>". Veja o que acontece se a Ana deixa o construtor de lado e tenta preencher de fora:</p>
+
+<pre class="file" data-file="de-fora.php">&lt;?php
+class Pedido
+{
+    public readonly int $numero;
+}
+$p = new Pedido();
+$p-&gt;numero = 5;
+</pre>
+<pre class="term" data-cwd="~/poo">$ php de-fora.php
+
+Fatal error: Uncaught Error: Cannot modify protected(set) readonly property Pedido::$numero from global scope in /home/ana/poo/de-fora.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/de-fora.php on line 7</pre>
+<p>"Não é possível modificar a propriedade readonly protected(set) a partir do escopo global" (o "escopo global" é o código fora de qualquer classe). Guarde essa mensagem: ela vai voltar quando falarmos de <code>clone</code>.</p>
+
+<div class="tryphp" data-goal="src:readonly int \$numero,erro:Cannot modify readonly property Pedido::$numero">
+<p class="try-task"><strong>Missão:</strong> o número do pedido nunca deveria mudar, mas o código troca para <code>9999</code> sem reclamar. Rode e veja. Depois coloque <code>readonly</code> na propriedade <code>$numero</code> (deixe o <code>$status</code> como está, porque ele muda de verdade) e rode de novo: o PHP deve recusar a troca com <code>Cannot modify readonly property</code>.</p>
+<pre class="script">&lt;?php
+class Pedido
+{
+    public function __construct(
+        public int $numero,
+        public string $status,
+    ) {}
+}
+
+$p = new Pedido(1001, "Pendente");
+$p-&gt;status = "Pago";
+echo "Pedido $p-&gt;numero: $p-&gt;status\n";
+$p-&gt;numero = 9999;
+echo "Pedido $p-&gt;numero: $p-&gt;status\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Pedido
+{
+    public function __construct(
+        public readonly int $numero,
+        public string $status,
+    ) {}
+}
+
+$p = new Pedido(1001, "Pendente");
+$p-&gt;status = "Pago";
+echo "Pedido $p-&gt;numero: $p-&gt;status\n";
+$p-&gt;numero = 9999;
+echo "Pedido $p-&gt;numero: $p-&gt;status\n";
+</pre>
+</div>
+
+<h3>Cuidado: readonly não "congela" o que está dentro</h3>
+<p>Uma propriedade readonly que guarda um <strong>objeto</strong> não deixa você trocar o objeto, mas o objeto em si continua mudando. Já um <strong>array</strong> readonly fica realmente travado:</p>
+
+<pre class="file" data-file="dentro.php">&lt;?php
+class Cliente
+{
+    public function __construct(public string $cidade) {}
+}
+
+class Pedido
+{
+    public function __construct(
+        public readonly Cliente $cliente,
+        public readonly array $itens,
+    ) {}
+}
+
+$p = new Pedido(new Cliente("Recife"), ["caderno"]);
+$p-&gt;cliente-&gt;cidade = "Natal";
+echo $p-&gt;cliente-&gt;cidade, "\n";
+$p-&gt;itens[] = "caneta";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php dentro.php
+Natal               « o Cliente de dentro mudou: ele não é readonly
+
+Fatal error: Uncaught Error: Cannot indirectly modify readonly property Pedido::$itens in /home/ana/poo/dentro.php:18
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/dentro.php on line 18</pre>
+<p>O <code>readonly</code> protege <strong>a propriedade</strong>, não o objeto guardado nela. Se você quer que nada mude, o <code>Cliente</code> também precisa ter propriedades readonly.</p>
+
+<hr>
+
+<h2>2. Classes <code>readonly</code> <span class="versao">PHP 8.2+</span></h2>
+<p>Quando <strong>todas</strong> as propriedades devem ser readonly, escreva <code>readonly</code> uma vez, antes de <code>class</code>. É o caso típico de objetos que são só "um valor": um ponto, um preço, uma data, um endereço.</p>
+
+<pre class="file" data-file="ponto.php">&lt;?php
+readonly class Ponto
+{
+    public function __construct(
+        public int $x,
+        public int $y,
+    ) {}
+}
+$p = new Ponto(3, 4);
+echo "($p-&gt;x, $p-&gt;y)\n";
+$p-&gt;cor = "azul";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php ponto.php
+(3, 4)
+
+Fatal error: Uncaught Error: Cannot create dynamic property Ponto::$cor in /home/ana/poo/ponto.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/ponto.php on line 11</pre>
+
+<dl class="anatomy">
+  <dt>readonly class Ponto</dt><dd>Todas as propriedades declaradas viram readonly (e valem as mesmas regras: tipo obrigatório, sem valor padrão).</dd>
+  <dt>$p-&gt;cor = "azul"</dt><dd>Numa classe comum, criar uma propriedade que não existe dá só um aviso <code>Deprecated</code>. Numa classe readonly é erro: "não é possível criar a propriedade dinâmica".</dd>
+</dl>
+<p>Sem o <code>readonly</code> na classe, você escreveria <code>public readonly int $x, public readonly int $y</code>. Use a classe readonly quando o objeto inteiro é imutável; use a propriedade readonly quando só algumas partes são fixas (como o <code>Pedido</code> com <code>numero</code> fixo e <code>status</code> que muda).</p>
+
+<hr>
+
+<h2>3. "Mudar" um objeto readonly: criar uma cópia</h2>
+<p>A Ana tem o preço do caderno, <code>R$ 12,50</code>, num objeto readonly. Vai ter promoção. Ela não muda o preço: ela cria <strong>outro</strong> objeto <code>Preco</code> com o valor novo (como a nota fiscal nova). O lugar certo para isso é um método da própria classe, que por costume se chama <code>comAlgo()</code> (em inglês, <code>withAlgo()</code>).</p>
+
+<h3>O <code>clone</code> com novos valores <span class="versao">PHP 8.5+</span></h3>
+<p>No PHP 8.5, o <code>clone</code> pode ser escrito como uma função que recebe o objeto e um <strong>array com os valores que mudam</strong>: <code>clone($objeto, ["propriedade" =&gt; novoValor])</code>. Ele copia o objeto e já grava os valores novos na cópia. É o que se chama de "clone with".</p>
+
+<pre class="file" data-file="preco.php">&lt;?php
+readonly class Preco
+{
+    public function __construct(
+        public float $valor,
+        public string $moeda,
+    ) {}
+
+    public function comValor(float $valor): static
+    {
+        return clone($this, ["valor" =&gt; $valor]);
+    }
+}
+$a = new Preco(10.0, "BRL");
+$b = $a-&gt;comValor(12.5);
+echo "$a-&gt;valor $a-&gt;moeda\n";
+echo "$b-&gt;valor $b-&gt;moeda\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php preco.php
+10 BRL          « o original não mudou
+12.5 BRL        « a cópia tem o valor novo e a mesma moeda</pre>
+
+<dl class="anatomy">
+  <dt>public function comValor(float $valor): static</dt><dd>Um método que devolve um objeto do mesmo tipo (<code>static</code> = "a mesma classe deste objeto").</dd>
+  <dt>clone($this, …)</dt><dd>Copia o objeto atual…</dd>
+  <dt>["valor" =&gt; $valor]</dt><dd>…e na cópia grava <code>valor</code> com o número novo. As outras propriedades (a <code>moeda</code>) vêm iguais.</dd>
+</dl>
+
+<h3>De fora da classe, dá erro (e isso é bom)</h3>
+<p>Por que não fazer o <code>clone</code> direto, no código principal, sem o método <code>comValor</code>?</p>
+<pre class="file" data-file="clone-fora.php">&lt;?php
+readonly class Preco
+{
+    public function __construct(
+        public float $valor,
+        public string $moeda,
+    ) {}
+}
+$a = new Preco(10.0, "BRL");
+$b = clone($a, ["valor" =&gt; 12.5]);
+var_dump($b);
+</pre>
+<pre class="term" data-cwd="~/poo">$ php clone-fora.php
+
+Fatal error: Uncaught Error: Cannot modify protected(set) readonly property Preco::$valor from global scope in /home/ana/poo/clone-fora.php:10
+Stack trace:
+#0 /home/ana/poo/clone-fora.php(10): clone(Object(Preco), Array)
+#1 {main}
+  thrown in /home/ana/poo/clone-fora.php on line 10</pre>
+<p>É a mesma mensagem da seção 1. O <code>clone</code> com valores grava as propriedades <strong>obedecendo às mesmas regras</strong> de uma gravação comum. Como readonly é <code>protected(set)</code>, só código <strong>de dentro</strong> da classe pode gravar. Por isso o caminho certo é o método <code>comValor()</code>: a classe decide o que pode ser trocado (e pode validar o valor novo antes).</p>
+
+<div class="tip">
+<strong>Se você quer mesmo permitir de fora</strong>
+<p>Dá para declarar a propriedade como <code>public public(set) float $valor</code> ("leitura e gravação públicas, mas readonly"). Aí <code>clone($a, ["valor" =&gt; 12.5])</code> funciona fora da classe, e o objeto continua sem poder ser alterado depois de criado. Na maioria dos casos, o método <code>comValor()</code> é mais claro.</p>
+</div>
+
+<h3>Antes do PHP 8.5</h3>
+<p>Antes do <code>clone</code> com valores, o jeito mais simples era criar um objeto novo pelo construtor: <code>return new static($valor, $this-&gt;moeda);</code>. O que <strong>não</strong> funciona é clonar e depois gravar:</p>
+<pre class="file" data-file="clone-antigo.php">&lt;?php
+final class Preco
+{
+    public function __construct(
+        public readonly float $valor,
+    ) {}
+
+    public function comValor(float $valor): static
+    {
+        $novo = clone $this;
+        $novo-&gt;valor = $valor;
+        return $novo;
+    }
+}
+$b = (new Preco(10.0))-&gt;comValor(12.5);
+echo $b-&gt;valor, "\n";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php clone-antigo.php
+
+Fatal error: Uncaught Error: Cannot modify readonly property Preco::$valor in /home/ana/poo/clone-antigo.php:11
+Stack trace:
+#0 /home/ana/poo/clone-antigo.php(15): Preco-&gt;comValor(12.5)
+#1 {main}
+  thrown in /home/ana/poo/clone-antigo.php on line 11</pre>
+<p>A cópia já nasce com o <code>valor</code> gravado (copiado do original), então gravar de novo é "modificar". A única exceção é dentro do método <a href="metodos-magicos.html"><code>__clone</code></a>: desde o PHP 8.3, ali as propriedades readonly da cópia ainda podem ser regravadas (útil para clonar um objeto de dentro, a "cópia profunda").</p>
+
+<div class="tryphp" data-goal="out:Antes: 12.5 BRL,out:Promoção: 9.9 BRL,src:clone\(\$this,semerro">
+<p class="try-task"><strong>Missão:</strong> complete o método <code>comValor</code> para devolver uma cópia do preço com o valor novo, usando <code>clone($this, [...])</code>. O preço original deve continuar <code>12.5</code>.</p>
+<pre class="script">&lt;?php
+readonly class Preco
+{
+    public function __construct(
+        public float $valor,
+        public string $moeda,
+    ) {}
+
+    public function comValor(float $valor): static
+    {
+        // devolva uma cópia de $this com o novo valor
+    }
+}
+
+$caderno = new Preco(12.5, "BRL");
+$promocao = $caderno-&gt;comValor(9.9);
+echo "Antes: $caderno-&gt;valor $caderno-&gt;moeda\n";
+echo "Promoção: $promocao-&gt;valor $promocao-&gt;moeda\n";
+</pre>
+<pre class="solucao">&lt;?php
+readonly class Preco
+{
+    public function __construct(
+        public float $valor,
+        public string $moeda,
+    ) {}
+
+    public function comValor(float $valor): static
+    {
+        return clone($this, ["valor" =&gt; $valor]);
+    }
+}
+
+$caderno = new Preco(12.5, "BRL");
+$promocao = $caderno-&gt;comValor(9.9);
+echo "Antes: $caderno-&gt;valor $caderno-&gt;moeda\n";
+echo "Promoção: $promocao-&gt;valor $promocao-&gt;moeda\n";
+</pre>
+</div>
+<p>Se você rodar o código sem completar, o PHP reclama que o método não devolveu nada: <code>Preco::comValor(): Return value must be of type Preco, none returned</code>.</p>
+
+<hr>
+
+<h2>4. Property hooks <span class="versao">PHP 8.4+</span></h2>
+<p>O <code>readonly</code> resolve "nunca muda". Mas e o preço da Ana, que muda, mas <strong>nunca pode ser negativo</strong>? Ou o nome do produto, que deveria chegar sem espaços sobrando? Antes do PHP 8.4, a saída era deixar a propriedade <code>private</code> e criar métodos <code>getPreco()</code> e <code>setPreco()</code>. Com os <strong>hooks</strong>, a regra fica <strong>na própria propriedade</strong>, e quem usa a classe continua escrevendo <code>$p-&gt;preco = 15</code>.</p>
+
+<pre class="file" data-file="hooks.php">&lt;?php
+class Produto
+{
+    public string $nome {
+        set(string $valor) {
+            $valor = trim($valor);
+            if ($valor === "") {
+                throw new ValueError("O nome não pode ficar vazio");
+            }
+            $this-&gt;nome = $valor;
+        }
+    }
+
+    public float $preco {
+        set(float $valor) {
+            if ($valor &lt; 0) {
+                throw new ValueError("Preço negativo: $valor");
+            }
+            $this-&gt;preco = $valor;
+        }
+    }
+
+    public string $etiqueta {
+        get =&gt; $this-&gt;nome . " - R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+}
+
+$p = new Produto();
+$p-&gt;nome = "  Caderno  ";
+$p-&gt;preco = 12.5;
+echo "[$p-&gt;nome]\n";
+echo $p-&gt;etiqueta, "\n";
+$p-&gt;preco = 15;
+echo $p-&gt;etiqueta, "\n";
+$p-&gt;preco = -3;
+</pre>
+
+<pre class="term" data-cwd="~/poo">$ php hooks.php
+[Caderno]                « o set tirou os espaços
+Caderno - R$ 12,50       « o get montou a etiqueta na hora
+Caderno - R$ 15,00       « e de novo, com o preço novo
+
+Fatal error: Uncaught ValueError: Preço negativo: -3 in /home/ana/poo/hooks.php:17
+Stack trace:
+#0 /home/ana/poo/hooks.php(35): Produto-&gt;$preco::set(-3.0)
+#1 {main}
+  thrown in /home/ana/poo/hooks.php on line 17</pre>
+
+<dl class="anatomy">
+  <dt>public string $nome { … }</dt><dd>Em vez de <code>;</code> no fim, a propriedade ganha um bloco <code>{ }</code> com os hooks.</dd>
+  <dt>set(string $valor) { … }</dt><dd>O hook <code>set</code> roda <strong>toda vez</strong> que alguém grava <code>$p-&gt;nome = …</code>. <code>$valor</code> é o que está chegando.</dd>
+  <dt>$this-&gt;nome = $valor;</dt><dd>Dentro do próprio hook, gravar <code>$this-&gt;nome</code> guarda o valor <strong>de verdade</strong> (não chama o hook de novo). Se você não gravar, nada é guardado.</dd>
+  <dt>throw new ValueError(…)</dt><dd>Recusa o valor. <code>ValueError</code> é a exceção do PHP para "o tipo está certo, mas o valor não serve".</dd>
+  <dt>get =&gt; …;</dt><dd>O hook <code>get</code> roda toda vez que alguém <strong>lê</strong> a propriedade. A forma curta <code>=&gt;</code> devolve o resultado da expressão.</dd>
+  <dt>$etiqueta</dt><dd>Só tem <code>get</code> e não usa <code>$this-&gt;etiqueta</code>: é uma propriedade <strong>virtual</strong>, que não guarda nada; é calculada a cada leitura.</dd>
+</dl>
+
+<p>Na linha <code>#0</code> do erro, repare em <code>Produto-&gt;$preco::set(-3.0)</code>: o PHP mostra que o erro aconteceu <strong>dentro do hook <code>set</code></strong> da propriedade <code>$preco</code>.</p>
+
+<h3>A forma curta do <code>set</code> e o <code>$value</code></h3>
+<p>Quando o <code>set</code> só transforma o valor, há uma forma curta: <code>set =&gt; expressão;</code>. O valor que chega se chama automaticamente <code>$value</code> (em inglês, como o PHP define), e o resultado da expressão é o que fica guardado:</p>
+
+<pre class="file" data-file="email.php">&lt;?php
+class Usuario
+{
+    public string $email {
+        set =&gt; strtolower(trim($value));
+    }
+
+    public function __construct(string $email)
+    {
+        $this-&gt;email = $email;
+    }
+}
+$u = new Usuario("  Ana@Exemplo.COM ");
+var_dump($u-&gt;email);
+$u-&gt;email = "BIA@exemplo.com";
+var_dump($u-&gt;email);
+</pre>
+<pre class="term" data-cwd="~/poo">$ php email.php
+string(15) "ana@exemplo.com"      « o construtor também passa pelo hook
+string(15) "bia@exemplo.com"</pre>
+
+<p>Hooks também funcionam na promoção do construtor: <code>public string $nome { set =&gt; trim($value); },</code> dentro dos parênteses do <code>__construct</code>.</p>
+
+<h3><code>get</code> e <code>set</code> juntos: uma propriedade calculada</h3>
+<pre class="file" data-file="temperatura.php">&lt;?php
+class Temperatura
+{
+    public float $celsius = 0.0;
+
+    public float $fahrenheit {
+        get =&gt; $this-&gt;celsius * 9 / 5 + 32;
+        set(float $valor) {
+            $this-&gt;celsius = ($valor - 32) * 5 / 9;
+        }
+    }
+}
+$t = new Temperatura();
+$t-&gt;celsius = 25;
+echo $t-&gt;fahrenheit, "\n";
+$t-&gt;fahrenheit = 212;
+echo $t-&gt;celsius, "\n";
+var_dump($t);
+</pre>
+<pre class="term" data-cwd="~/poo">$ php temperatura.php
+77
+100                     « gravar em fahrenheit mudou o celsius
+object(Temperatura)#1 (1) {
+  ["celsius"]=&gt;
+  float(100)            « só o celsius existe de verdade
+}</pre>
+<p>O <code>$fahrenheit</code> é virtual: lê e grava, mas o único valor guardado é o <code>$celsius</code>. O <code>var_dump</code> confirma.</p>
+
+<h3>Visibilidade assimétrica: só "ler de fora" <span class="versao">PHP 8.4+</span></h3>
+<p>Às vezes você não precisa de regra nenhuma: só quer que de fora se possa <strong>ler</strong>, e só a classe possa <strong>gravar</strong>, mais de uma vez. Para isso existe <code>public private(set)</code>:</p>
+<pre class="file" data-file="conta.php">&lt;?php
+class Conta
+{
+    public private(set) float $saldo = 0.0;
+
+    public function depositar(float $valor): void
+    {
+        $this-&gt;saldo += $valor;
+    }
+}
+$c = new Conta();
+$c-&gt;depositar(50);
+echo $c-&gt;saldo, "\n";
+$c-&gt;saldo = 1000000;
+</pre>
+<pre class="term" data-cwd="~/poo">$ php conta.php
+50
+
+Fatal error: Uncaught Error: Cannot modify private(set) property Conta::$saldo from global scope in /home/ana/poo/conta.php:14
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/conta.php on line 14</pre>
+<p>Diferente do <code>readonly</code>, o método <code>depositar</code> pode mudar o saldo quantas vezes quiser. Mais sobre isso em <a href="visibilidade.html">Visibilidade</a>.</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Um valor que nunca muda depois de criado</td><td><code>readonly</code></td><td>número do pedido, CPF, data de criação</td></tr>
+<tr><td>Um objeto inteiro que nunca muda</td><td><code>readonly class</code></td><td><code>Preco</code>, <code>Ponto</code>, <code>Endereco</code></td></tr>
+<tr><td>Uma "versão alterada" de um objeto readonly</td><td>método <code>comAlgo()</code> com <code>clone($this, [...])</code></td><td><code>$preco-&gt;comValor(9.9)</code></td></tr>
+<tr><td>Ler de fora, mudar só por dentro (várias vezes)</td><td><code>public private(set)</code></td><td>saldo, estoque, contador</td></tr>
+<tr><td>Validar ou limpar todo valor gravado</td><td>hook <code>set</code></td><td>preço não negativo, e-mail minúsculo</td></tr>
+<tr><td>Um valor calculado a partir de outros</td><td>hook <code>get</code> (virtual)</td><td>etiqueta, nome completo, total</td></tr>
+</table>
+</div>
+<p>Em PHP anterior ao 8.4 (sem hooks), o equivalente é uma propriedade <code>private</code> com métodos <code>getPreco()</code> e <code>setPreco()</code>, ou os mágicos <a href="metodos-magicos.html"><code>__get</code>/<code>__set</code></a>. Em código novo, prefira os hooks: o editor enxerga a propriedade e quem usa a classe não precisa decorar nomes de métodos.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Readonly sem tipo ou com valor padrão</strong>
+<pre class="file" data-file="sem-tipo.php">&lt;?php
+class Pedido
+{
+    public readonly $numero;
+}
+</pre>
+<pre class="term" data-cwd="~/poo">$ php sem-tipo.php
+
+Fatal error: Readonly property Pedido::$numero must have type in /home/ana/poo/sem-tipo.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "a propriedade readonly precisa ter tipo". Com <code>public readonly int $numero = 1;</code> o erro seria <code>Readonly property Pedido::$numero cannot have default value</code> ("não pode ter valor padrão"): um valor fixo para sempre é uma <a href="constantes.html">constante</a>, não uma propriedade.</p>
+<p><strong>Como consertar:</strong> declare o tipo e grave o valor no construtor.</p>
+</div>
+
+<div class="cenario">
+<strong>Ler antes de gravar</strong>
+<pre class="file" data-file="antes.php">&lt;?php
+class Pedido
+{
+    public readonly int $numero;
+}
+$p = new Pedido();
+echo $p-&gt;numero;
+</pre>
+<pre class="term" data-cwd="~/poo">$ php antes.php
+
+Fatal error: Uncaught Error: Typed property Pedido::$numero must not be accessed before initialization in /home/ana/poo/antes.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/antes.php on line 7</pre>
+<p><strong>O que significa:</strong> "a propriedade tipada não pode ser acessada antes de ser inicializada". A classe não tem construtor, então <code>$numero</code> nunca recebeu valor, e uma readonly não tem valor padrão.</p>
+<p><strong>Como consertar:</strong> grave toda propriedade readonly no construtor (a promoção <code>public readonly int $numero</code> dentro do <code>__construct</code> já faz isso).</p>
+</div>
+
+<div class="cenario">
+<strong>Gravar numa propriedade só com <code>get</code></strong>
+<pre class="file" data-file="so-get.php">&lt;?php
+class Produto
+{
+    public string $etiqueta {
+        get =&gt; "x";
+    }
+}
+$p = new Produto();
+$p-&gt;etiqueta = "y";
+</pre>
+<pre class="term" data-cwd="~/poo">$ php so-get.php
+
+Fatal error: Uncaught Error: Property Produto::$etiqueta is read-only in /home/ana/poo/so-get.php:9
+Stack trace:
+#0 {main}
+  thrown in /home/ana/poo/so-get.php on line 9</pre>
+<p><strong>O que significa:</strong> uma propriedade virtual com só <code>get</code> é "somente leitura": não há onde guardar o valor.</p>
+<p><strong>Como consertar:</strong> grave nas propriedades de onde ela é calculada (aqui, <code>nome</code> e <code>preco</code>) ou acrescente um <code>set</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Hook com readonly</strong>
+<pre class="file" data-file="hook-readonly.php">&lt;?php
+class Produto
+{
+    public readonly string $nome {
+        get =&gt; "a";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/poo">$ php hook-readonly.php
+
+Fatal error: Hooked properties cannot be readonly in /home/ana/poo/hook-readonly.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "propriedades com hooks não podem ser readonly". As duas ideias não se misturam (e por isso uma <code>readonly class</code> também não aceita hooks).</p>
+<p><strong>Como consertar:</strong> escolha uma. Para "valida uma vez e nunca muda", use readonly e valide no construtor. Para "valida sempre e pode mudar", use o hook.</p>
+</div>
+
+<div class="cenario">
+<strong><code>clone … with</code> não existe</strong>
+<p>O recurso é conhecido como "clone with", mas a sintaxe é a de uma função: <code>clone($obj, [...])</code>. Escrever <code>clone $a with ["valor" =&gt; 1]</code> dá <code>Parse error: syntax error, unexpected identifier "with"</code>. E o <code>clone</code> com valores existe só no PHP 8.5; em versões anteriores, use <code>new static(...)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th><th>Versão</th></tr>
+<tr><td><code>public readonly int $x</code></td><td>Gravada uma vez, de dentro da classe; lida de qualquer lugar</td><td>8.1</td></tr>
+<tr><td><code>readonly class Nome</code></td><td>Todas as propriedades são readonly; sem propriedades dinâmicas</td><td>8.2</td></tr>
+<tr><td><code>clone($obj, ["x" =&gt; 1])</code></td><td>Copia e grava novos valores (respeitando a visibilidade)</td><td>8.5</td></tr>
+<tr><td><code>__clone()</code> regravando readonly</td><td>Permitido só dentro do <code>__clone</code></td><td>8.3</td></tr>
+<tr><td><code>public private(set) float $x</code></td><td>Lê de fora, grava só por dentro</td><td>8.4</td></tr>
+<tr><td><code>set(tipo $v) { … $this-&gt;x = $v; }</code></td><td>Roda a cada gravação</td><td>8.4</td></tr>
+<tr><td><code>set =&gt; expr($value);</code></td><td>Forma curta: guarda o resultado</td><td>8.4</td></tr>
+<tr><td><code>get =&gt; expr;</code></td><td>Roda a cada leitura</td><td>8.4</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Ana: 9.5,out:Nota inválida: 11,src:throw,semerro">
+<p class="try-task"><strong>Missão:</strong> o hook <code>set</code> da nota aceita qualquer número, e a Ana ficou com nota 11. Complete o hook para lançar <code>new ValueError("Nota inválida: $valor")</code> quando a nota for menor que 0 ou maior que 10. A saída deve mostrar a mensagem e a nota da Ana deve continuar <code>9.5</code>.</p>
+<pre class="script">&lt;?php
+class Aluno
+{
+    public float $nota {
+        set(float $valor) {
+            // recuse notas menores que 0 ou maiores que 10
+            $this-&gt;nota = $valor;
+        }
+    }
+
+    public function __construct(public string $nome, float $nota)
+    {
+        $this-&gt;nota = $nota;
+    }
+}
+
+$ana = new Aluno("Ana", 9.5);
+echo "$ana-&gt;nome: $ana-&gt;nota\n";
+
+try {
+    $ana-&gt;nota = 11;
+} catch (ValueError $e) {
+    echo $e-&gt;getMessage(), "\n";
+}
+echo "$ana-&gt;nome: $ana-&gt;nota\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Aluno
+{
+    public float $nota {
+        set(float $valor) {
+            if ($valor &lt; 0 || $valor &gt; 10) {
+                throw new ValueError("Nota inválida: $valor");
+            }
+            $this-&gt;nota = $valor;
+        }
+    }
+
+    public function __construct(public string $nome, float $nota)
+    {
+        $this-&gt;nota = $nota;
+    }
+}
+
+$ana = new Aluno("Ana", 9.5);
+echo "$ana-&gt;nome: $ana-&gt;nota\n";
+
+try {
+    $ana-&gt;nota = 11;
+} catch (ValueError $e) {
+    echo $e-&gt;getMessage(), "\n";
+}
+echo "$ana-&gt;nome: $ana-&gt;nota\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Somente leitura</h3>
+<p>Complete para que o CPF possa ser lido, mas nunca alterado depois de criado:</p>
+<div class="ex-code">public <input data-answer="readonly" aria-label="palavra-chave"> string $cpf</div>
+</div>
+
+<div class="exercise">
+<h3>2. Classe inteira</h3>
+<p>Complete para que todas as propriedades da classe <code>Endereco</code> sejam readonly:</p>
+<div class="ex-code"><input data-answer="readonly" aria-label="palavra-chave"> class Endereco</div>
+</div>
+
+<div class="exercise">
+<h3>3. Cópia com valor novo (PHP 8.5)</h3>
+<p>Dentro do método <code>comMoeda(string $moeda)</code>, complete para devolver uma cópia com a moeda nova:</p>
+<div class="ex-code">return <input data-answer="clone($this, [&quot;moeda&quot; =&gt; $moeda])|clone($this, ['moeda' =&gt; $moeda])" aria-label="expressão">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A classe <code>Preco</code> é <code>readonly</code>. No código principal (fora da classe), a Ana escreve <code>$b = clone($a, ["valor" =&gt; 9.9]);</code>. O que acontece?</p>
+<label><input type="radio" name="q4"> Funciona: o <code>clone</code> sempre pode mudar qualquer propriedade.</label>
+<label><input type="radio" name="q4"> Muda o valor do <code>$a</code> também.</label>
+<label><input type="radio" name="q4"> Erro <code>Cannot modify protected(set) readonly property</code>, porque só a classe pode gravar.</label>
+<label><input type="radio" name="q4"> <code>Parse error</code>: essa sintaxe não existe.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Num hook <code>set =&gt; …;</code> (forma curta), como se chama a variável com o valor que está chegando?</p>
+<label><input type="radio" name="q5"> <code>$valor</code></label>
+<label><input type="radio" name="q5"> <code>$value</code></label>
+<label><input type="radio" name="q5"> <code>$this-&gt;value</code></label>
+<label><input type="radio" name="q5"> <code>$novo</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Uma propriedade só com <code>get =&gt; $this-&gt;nome . " " . $this-&gt;sobrenome;</code> é:</p>
+<label><input type="radio" name="q6"> Virtual: calculada a cada leitura, não guarda nada e não aceita gravação.</label>
+<label><input type="radio" name="q6"> Readonly: gravada uma vez no construtor.</label>
+<label><input type="radio" name="q6"> Uma constante da classe.</label>
+<label><input type="radio" name="q6"> Um erro: todo hook precisa de <code>get</code> e <code>set</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. O saldo deve ser lido de fora e alterado várias vezes, mas só pelos métodos da classe. Qual declaração usar?</p>
+<label><input type="radio" name="q7"> <code>public readonly float $saldo</code></label>
+<label><input type="radio" name="q7"> <code>private float $saldo</code></label>
+<label><input type="radio" name="q7"> <code>readonly class Conta</code></label>
+<label><input type="radio" name="q7"> <code>public private(set) float $saldo</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>readonly</code> (8.1): gravada uma vez, de dentro da classe; precisa de tipo, não tem valor padrão. Mudar dá <code>Cannot modify readonly property</code>.</li>
+  <li>Desde o 8.4, readonly também é <code>protected(set)</code>: gravar de fora dá <code>Cannot modify protected(set) readonly property … from global scope</code>.</li>
+  <li>Readonly protege a propriedade, não o objeto guardado dentro dela.</li>
+  <li><code>readonly class</code> (8.2): todas as propriedades readonly e nada de propriedades dinâmicas.</li>
+  <li>Para "mudar" um objeto readonly, crie outro: um método <code>comAlgo()</code> com <code>clone($this, ["prop" =&gt; $novo])</code> (8.5) ou <code>new static(...)</code>. De fora da classe, o <code>clone</code> com valores esbarra no <code>protected(set)</code>.</li>
+  <li>Hooks (8.4): <code>set</code> valida ou limpa cada gravação; <code>get</code> calcula na leitura; só <code>get</code> = propriedade virtual. Hooks não combinam com readonly.</li>
+  <li><code>public private(set)</code>: lê de fora, grava só por dentro, quantas vezes quiser.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
