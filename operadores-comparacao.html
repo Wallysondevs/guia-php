@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Comparação — == e ===, !=, &lt;, &gt; e &lt;=&gt; | Guia PHP</title>
+<meta name="description" content="Os operadores de comparação do PHP: a diferença entre == (igual) e === (idêntico), a tabela de surpresas reais (0 == &quot;a&quot;, &quot;1&quot; == &quot;01&quot;, &quot;10&quot; == &quot;1e1&quot;, null == false, senhas 0e…), !=, !==, &lt;&gt;, maior e menor com textos e acentos e o operador nave espacial &lt;=&gt;. Regra: use ===.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Comparação (== e ===)</span></h1>
+
+<p class="intro">Comparar é fazer uma pergunta de "sim ou não": a nota é maior que 7? A senha digitada é a certa? O estoque acabou? Os <strong>operadores de comparação</strong> fazem essas perguntas e respondem <code>true</code> ou <code>false</code>. O PHP tem <strong>dois</strong> jeitos de perguntar "é igual?": o <code>==</code> e o <code>===</code>. Entender a diferença entre eles é uma das lições mais importantes do PHP, porque o <code>==</code> tem surpresas que já causaram falhas de segurança de verdade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <code>==</code> ("igual", converte os tipos) e <code>===</code> ("idêntico", compara também o tipo).</li>
+  <li>As surpresas reais do <code>==</code>: <code>"1" == "01"</code>, <code>"10" == "1e1"</code>, <code>null == false</code>, senhas que começam com <code>0e</code>… e o que mudou do PHP 7 para o PHP 8.</li>
+  <li>Os operadores de diferença: <code>!=</code>, <code>&lt;&gt;</code> e <code>!==</code>.</li>
+  <li>Maior e menor (<code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>), inclusive com textos e acentos.</li>
+  <li>O operador nave espacial <code>&lt;=&gt;</code>.</li>
+  <li>A regra que evita as surpresas: <strong>use <code>===</code></strong>.</li>
+</ul>
+</div>
+
+<p>Antes, é bom ter visto <a href="tipos-dados.html">Tipos de Dados</a> e <a href="booleanos.html">Booleanos</a>. Os resultados aparecem com o <a href="var-dump.html"><code>var_dump</code></a>, que mostra <code>bool(true)</code> ou <code>bool(false)</code>.</p>
+
+<hr>
+
+<h2>A ideia: "parecido" × "idêntico"</h2>
+<p>Pense em <strong>R$ 10 em dinheiro</strong> e <strong>R$ 10 no Pix</strong>. Têm o mesmo <strong>valor</strong>? Sim. São a <strong>mesma coisa</strong>? Não: um é papel na carteira, o outro é um número no banco. Depende da pergunta: "dá para pagar um lanche de R$ 10?" (sim, com os dois) ou "é uma nota de papel?" (só um deles).</p>
+
+<p>O PHP tem as duas perguntas:</p>
+<ul>
+  <li><code>==</code> (dois iguais) pergunta "têm o mesmo <strong>valor</strong>?". Se os tipos forem diferentes, ele <strong>converte</strong> um deles antes de comparar. Chama-se <strong>igualdade</strong> (ou comparação "frouxa").</li>
+  <li><code>===</code> (três iguais) pergunta "têm o mesmo valor <strong>e</strong> o mesmo <strong>tipo</strong>?". Não converte nada. Chama-se <strong>identidade</strong> (ou comparação "estrita").</li>
+</ul>
+
+<div class="warning">
+<strong>Um <code>=</code>, dois <code>==</code>, três <code>===</code></strong>
+<p>O <code>=</code> sozinho <strong>não compara</strong>: ele <strong>guarda</strong> um valor numa variável (veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>). Trocar <code>==</code> por <code>=</code> é um dos erros mais comuns de quem começa; ele aparece na seção <a href="#errado">Quando dá errado</a>.</p>
+</div>
+
+<hr>
+
+<h2><code>==</code> e <code>===</code> na prática</h2>
+
+<pre class="file" data-file="igual.php">&lt;?php
+$idade = 29;
+var_dump($idade == 29);
+var_dump($idade == 30);
+var_dump($idade == "29");
+var_dump($idade === "29");
+var_dump($idade === 29);
+</pre>
+
+<pre class="term">$ php igual.php
+bool(true)
+bool(false)
+bool(true)
+bool(false)
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>$idade == 29</dt><dd>O número 29 é igual ao número 29: <code>true</code>.</dd>
+  <dt>$idade == 30</dt><dd>Valores diferentes: <code>false</code>.</dd>
+  <dt>$idade == "29"</dt><dd>De um lado o <strong>número</strong> 29 (<code>int</code>), do outro o <strong>texto</strong> <code>"29"</code> (<code>string</code>). O <code>==</code> converte o texto em número e compara: <code>true</code>.</dd>
+  <dt>$idade === "29"</dt><dd>O <code>===</code> vê tipos diferentes (<code>int</code> × <code>string</code>) e responde <code>false</code> na hora, sem converter.</dd>
+  <dt>$idade === 29</dt><dd>Mesmo tipo e mesmo valor: <code>true</code>.</dd>
+</dl>
+
+<p>Até aqui, o <code>==</code> parece até mais "esperto": ele entendeu que <code>29</code> e <code>"29"</code> são o mesmo número. O problema é que essa conversão automática às vezes faz coisas que ninguém espera.</p>
+
+<hr>
+
+<h2>As surpresas do <code>==</code></h2>
+<p>Quando os dois lados são textos <strong>que parecem números</strong>, o <code>==</code> compara como números. Quando um lado é número e o outro é texto, ou um lado é <code>null</code> ou booleano, ele também converte. Veja o PHP 8.5 respondendo:</p>
+
+<pre class="file" data-file="surpresas.php">&lt;?php
+var_dump(0 == "a");
+var_dump("1" == "01");
+var_dump("10" == "1e1");
+var_dump(100 == "1e2");
+var_dump(null == false);
+var_dump(0 == "");
+var_dump("abc" == 0);
+var_dump(null == 0);
+var_dump("0" == false);
+var_dump("" == null);
+var_dump([] == false);
+var_dump("1" == " 1");
+var_dump("1" == "1 ");
+var_dump(1 == "1 ");
+var_dump(1.0 == 1);
+var_dump(1.0 === 1);
+var_dump("abc" == "ABC");
+</pre>
+
+<pre class="term">$ php surpresas.php
+bool(false)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(false)
+bool(false)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
+bool(false)
+bool(false)</pre>
+
+<p>A tabela abaixo explica as principais. A coluna "PHP 7" mostra como era antes do PHP 8.0, que mudou as regras de comparação entre números e textos (essa coluna vem da documentação oficial; o laboratório deste guia roda só o PHP 8.5).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comparação</th><th><code>==</code> no PHP 8.5</th><th>No PHP 7</th><th><code>===</code></th><th>Por quê</th></tr>
+<tr><td><code>0 == "a"</code></td><td><code>false</code></td><td><strong><code>true</code></strong></td><td><code>false</code></td><td>No PHP 7, o texto <code>"a"</code> virava o número 0. Desde o PHP 8.0, se o texto não é numérico, o número é que vira texto: <code>"0" == "a"</code>, falso.</td></tr>
+<tr><td><code>"abc" == 0</code></td><td><code>false</code></td><td><strong><code>true</code></strong></td><td><code>false</code></td><td>A mesma mudança.</td></tr>
+<tr><td><code>0 == ""</code></td><td><code>false</code></td><td><strong><code>true</code></strong></td><td><code>false</code></td><td>A mesma mudança: texto vazio não é numérico.</td></tr>
+<tr><td><code>"1" == "01"</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>Os dois textos parecem números, então são comparados como números: 1 = 1.</td></tr>
+<tr><td><code>"10" == "1e1"</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td><code>"1e1"</code> é notação científica: 1 × 10¹ = 10.</td></tr>
+<tr><td><code>100 == "1e2"</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td><code>"1e2"</code> = 1 × 10² = 100.</td></tr>
+<tr><td><code>null == false</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>O <code>null</code> é convertido para booleano: vale <code>false</code>.</td></tr>
+<tr><td><code>null == 0</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>Os dois "valem falso".</td></tr>
+<tr><td><code>"0" == false</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>O texto <code>"0"</code> vale <code>false</code> (veja <a href="booleanos.html">Booleanos</a>).</td></tr>
+<tr><td><code>"" == null</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>Texto vazio e "nada" são considerados iguais.</td></tr>
+<tr><td><code>[] == false</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>Array vazio vale <code>false</code>.</td></tr>
+<tr><td><code>1.0 == 1</code></td><td><code>true</code></td><td><code>true</code></td><td><code>false</code></td><td>Mesmo valor, tipos diferentes (<code>float</code> × <code>int</code>).</td></tr>
+<tr><td><code>"abc" == "ABC"</code></td><td><code>false</code></td><td><code>false</code></td><td><code>false</code></td><td>Maiúsculas e minúsculas são letras diferentes.</td></tr>
+</table>
+</div>
+
+<p>O PHP 8 consertou as piores surpresas (<code>0 == "a"</code> ser verdadeiro causava falhas graves). Mas as outras continuam valendo, e elas aparecem em situações bem reais.</p>
+
+<h3>Surpresa na lojinha: códigos com zero à esquerda</h3>
+<p>Os produtos da lojinha da Ana têm códigos de texto. O código do caderno é <code>"7"</code>, mas o cliente digitou <code>"007"</code>:</p>
+
+<pre class="file" data-file="codigo.php">&lt;?php
+$codigoProduto = "7";
+$codigoDigitado = "007";
+
+$mesmoProduto = $codigoDigitado == $codigoProduto;
+var_dump($mesmoProduto);
+</pre>
+
+<pre class="term">$ php codigo.php
+bool(true)</pre>
+
+<p>Os dois são textos, mas como "parecem números", o <code>==</code> comparou 7 com 7. Para códigos, CEPs, telefones e CPFs, o zero à esquerda <strong>faz diferença</strong>: <code>"007"</code> e <code>"7"</code> são códigos diferentes.</p>
+
+<div class="tryphp" data-goal="out:bool(false),src:===">
+<p class="try-task"><strong>Missão:</strong> troque a comparação para que <code>"007"</code> e <code>"7"</code> sejam considerados códigos <strong>diferentes</strong>. O resultado deve ser <code>bool(false)</code>. Depois, troque <code>"007"</code> por <code>"7"</code> e confira que dá <code>true</code>.</p>
+<pre class="script">&lt;?php
+$codigoProduto = "7";
+$codigoDigitado = "007";
+
+$mesmoProduto = $codigoDigitado == $codigoProduto;
+var_dump($mesmoProduto);
+</pre>
+<pre class="solucao">&lt;?php
+$codigoProduto = "7";
+$codigoDigitado = "007";
+
+$mesmoProduto = $codigoDigitado === $codigoProduto;
+var_dump($mesmoProduto);
+</pre>
+</div>
+
+<h3>Surpresa na segurança: senhas que começam com <code>0e</code></h3>
+<p>Um texto como <code>"0e1234"</code> parece um número em notação científica: 0 × 10<sup>1234</sup>, que é <strong>zero</strong>. Qualquer outro <code>"0e…"</code> só com algarismos depois também vale zero. Então:</p>
+
+<pre class="file" data-file="senha.php">&lt;?php
+$senhaCerta = "0e5678";
+$senhaDigitada = "0e1234";
+var_dump($senhaDigitada == $senhaCerta);
+var_dump($senhaDigitada === $senhaCerta);
+</pre>
+
+<pre class="term">$ php senha.php
+bool(true)
+bool(false)</pre>
+
+<p>Com <code>==</code>, a senha <strong>errada</strong> foi aceita! Isso não é teoria: sistemas reais compararam códigos de senha (os "hashes", veja <a href="senhas.html">Senhas</a>) com <code>==</code> e foram invadidos assim. Com <code>===</code>, os textos são comparados letra por letra, e a senha errada é recusada.</p>
+
+<h3>Surpresa com funções: o zero que não é "falso"</h3>
+<p>Algumas funções do PHP devolvem um número <strong>ou</strong> <code>false</code>. A <code>strpos</code> ("posição no texto", da aula <a href="funcoes-string.html">Funções de String</a>) diz em que posição um pedaço aparece, contando do <strong>zero</strong>, e devolve <code>false</code> se não encontrar:</p>
+
+<pre class="file" data-file="strpos.php">&lt;?php
+$nome = "Ana Souza";
+var_dump(strpos($nome, "A"));
+var_dump(strpos($nome, "A") == false);
+var_dump(strpos($nome, "A") === false);
+var_dump(strpos($nome, "Z"));
+</pre>
+
+<pre class="term">$ php strpos.php
+int(0)
+bool(true)
+bool(false)
+bool(false)</pre>
+
+<p>O <code>"A"</code> está na posição 0 (a primeira). Mas <code>0 == false</code> é verdadeiro, então a pergunta "não encontrou?" com <code>==</code> respondeu <strong>sim</strong>, errado. Com <code>===</code>, só o <code>false</code> de verdade conta como "não encontrou". (O último <code>bool(false)</code> é a <code>strpos</code> dizendo que não há <code>"Z"</code> maiúsculo no nome.)</p>
+
+<hr>
+
+<h2>A regra: use <code>===</code></h2>
+<p>O <code>===</code> não tem nenhuma das surpresas acima: ele só diz <code>true</code> quando os dois lados são <strong>exatamente</strong> a mesma coisa, do mesmo tipo. Por isso a recomendação de quase todo guia de estilo de PHP é:</p>
+
+<div class="tip">
+<strong>Regra de ouro</strong>
+<p>Compare com <code>===</code> e <code>!==</code>. Use <code>==</code> só quando você <strong>quer</strong> a conversão e sabe exatamente o que ela faz.</p>
+</div>
+
+<p>O preço do <code>===</code> é que você precisa cuidar dos tipos. O exemplo clássico são os dados de formulário: tudo o que vem do navegador chega como <strong>texto</strong> (veja <a href="get-post.html">$_GET e $_POST</a>). Converta antes de comparar (veja <a href="conversao-tipos.html">Conversão de Tipos</a>):</p>
+
+<pre class="file" data-file="form.php">&lt;?php
+$idadeDigitada = "29";
+var_dump($idadeDigitada === 29);
+var_dump((int) $idadeDigitada === 29);
+</pre>
+
+<pre class="term">$ php form.php
+bool(false)
+bool(true)</pre>
+
+<p>O <code>(int)</code> transforma o texto <code>"29"</code> no número <code>29</code>; depois disso, o <code>===</code> compara número com número. Assim a conversão fica <strong>visível</strong> no código, e não escondida dentro do <code>==</code>.</p>
+
+<div class="note">
+<strong>E os números com vírgula?</strong>
+<p>Nem <code>==</code> nem <code>===</code> resolvem um problema dos <code>float</code>: <code>0.1 + 0.2 == 0.3</code> dá <code>false</code>, porque o computador guarda <code>0.1</code> e <code>0.2</code> com um errinho minúsculo. A aula <a href="numeros.html">int e float</a> explica e mostra como comparar dinheiro.</p>
+</div>
+
+<hr>
+
+<h2>Diferente: <code>!=</code>, <code>&lt;&gt;</code> e <code>!==</code></h2>
+<p>Cada pergunta de igualdade tem a sua pergunta oposta:</p>
+<ul>
+  <li><code>!=</code> é o contrário de <code>==</code>: "têm valores diferentes?" (com conversão). O <code>&lt;&gt;</code> é outra forma de escrever exatamente o mesmo.</li>
+  <li><code>!==</code> é o contrário de <code>===</code>: "não são idênticos?" (diferentes no valor <strong>ou</strong> no tipo).</li>
+</ul>
+
+<pre class="file" data-file="diferente.php">&lt;?php
+$senha = "1234";
+var_dump($senha != "1234");
+var_dump($senha &lt;&gt; "1234");
+var_dump($senha != 1234);
+var_dump($senha !== 1234);
+var_dump($senha !== "1234");
+</pre>
+
+<pre class="term">$ php diferente.php
+bool(false)
+bool(false)
+bool(false)
+bool(true)
+bool(false)</pre>
+
+<dl class="anatomy">
+  <dt>$senha != "1234"</dt><dd>Os valores são iguais, então "diferente?" é <code>false</code>.</dd>
+  <dt>$senha &lt;&gt; "1234"</dt><dd>Igual ao <code>!=</code>. Existe por tradição (outras linguagens e o SQL usam <code>&lt;&gt;</code>); no PHP, prefira <code>!=</code> ou, melhor, <code>!==</code>.</dd>
+  <dt>$senha != 1234</dt><dd>Texto × número: o <code>!=</code> converte, acha "iguais" e responde <code>false</code>.</dd>
+  <dt>$senha !== 1234</dt><dd>Tipos diferentes, então não são idênticos: <code>true</code>.</dd>
+  <dt>$senha !== "1234"</dt><dd>Mesmo tipo e mesmo valor: são idênticos, então "não idênticos?" é <code>false</code>.</dd>
+</dl>
+
+<hr>
+
+<h2>Maior e menor: <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code></h2>
+
+<pre class="file" data-file="maior.php">&lt;?php
+$nota = 7;
+var_dump($nota &gt; 7);
+var_dump($nota &gt;= 7);
+var_dump($nota &lt; 5);
+var_dump($nota &lt;= 10);
+var_dump("10" &lt; "9");
+var_dump(10 &lt; 9);
+var_dump("abacaxi" &lt; "banana");
+var_dump("Banana" &lt; "abacaxi");
+var_dump("maçã" &lt; "mamão");
+var_dump("10" &lt; "9a");
+</pre>
+
+<pre class="term">$ php maior.php
+bool(false)
+bool(true)
+bool(false)
+bool(true)
+bool(false)
+bool(false)
+bool(true)
+bool(true)
+bool(false)
+bool(true)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comparação</th><th>Resultado</th><th>Por quê</th></tr>
+<tr><td><code>$nota &gt; 7</code></td><td><code>false</code></td><td>7 não é <strong>maior</strong> que 7.</td></tr>
+<tr><td><code>$nota &gt;= 7</code></td><td><code>true</code></td><td>"Maior <strong>ou igual</strong>": 7 conta. Escreve-se <code>&gt;=</code>, nunca <code>=&gt;</code> (que é outra coisa, usada em <a href="arrays-associativos.html">arrays</a>).</td></tr>
+<tr><td><code>"10" &lt; "9"</code></td><td><code>false</code></td><td>Os dois textos parecem números, então o PHP compara 10 com 9.</td></tr>
+<tr><td><code>"abacaxi" &lt; "banana"</code></td><td><code>true</code></td><td>Textos comuns são comparados letra por letra, como no dicionário: <code>a</code> vem antes de <code>b</code>.</td></tr>
+<tr><td><code>"Banana" &lt; "abacaxi"</code></td><td><code>true</code></td><td>Para o computador, <strong>todas as maiúsculas vêm antes das minúsculas</strong>. O <code>B</code> maiúsculo "ganha" do <code>a</code> minúsculo.</td></tr>
+<tr><td><code>"maçã" &lt; "mamão"</code></td><td><code>false</code></td><td>Letras acentuadas vêm <strong>depois</strong> de todas as letras sem acento. No dicionário, "maçã" vem antes de "mamão"; para o PHP, o <code>ç</code> vem depois do <code>m</code>.</td></tr>
+<tr><td><code>"10" &lt; "9a"</code></td><td><code>true</code></td><td><code>"9a"</code> não é número, então a comparação é de texto: o caractere <code>1</code> vem antes do <code>9</code>.</td></tr>
+</table>
+</div>
+
+<p>Para comparar números, <code>&lt;</code> e <code>&gt;</code> funcionam como na escola. Para colocar <strong>palavras</strong> em ordem alfabética do jeito que um brasileiro espera (maiúsculas junto com minúsculas, acentos no lugar certo), há funções próprias, que aparecem em <a href="ordenar-arrays.html">Ordenar Arrays</a>.</p>
+
+<hr>
+
+<h2>A nave espacial <code>&lt;=&gt;</code> <span class="versao">PHP 7.0+</span></h2>
+<p>O operador <code>&lt;=&gt;</code> tem esse apelido porque lembra uma navezinha. Em vez de <code>true</code>/<code>false</code>, ele responde com um <strong>número</strong>, dizendo de que lado está o maior:</p>
+
+<pre class="file" data-file="nave.php">&lt;?php
+var_dump(1 &lt;=&gt; 2);
+var_dump(2 &lt;=&gt; 2);
+var_dump(3 &lt;=&gt; 2);
+var_dump("Ana" &lt;=&gt; "Bia");
+var_dump(7.5 &lt;=&gt; 7);
+</pre>
+
+<pre class="term">$ php nave.php
+int(-1)
+int(0)
+int(1)
+int(-1)
+int(1)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th><code>$a &lt;=&gt; $b</code> devolve</th><th>Quando</th></tr>
+<tr><td><code>-1</code></td><td><code>$a</code> é <strong>menor</strong> que <code>$b</code></td></tr>
+<tr><td><code>0</code></td><td>são <strong>iguais</strong> (no sentido do <code>==</code>)</td></tr>
+<tr><td><code>1</code></td><td><code>$a</code> é <strong>maior</strong> que <code>$b</code></td></tr>
+</table>
+</div>
+
+<p>Para que serve uma resposta com três valores? Para <strong>ordenar</strong>: as funções de ordenação perguntam "este vem antes, depois, ou tanto faz?", e o <code>&lt;=&gt;</code> responde exatamente isso numa conta só. Você vai usá-lo em <a href="ordenar-arrays.html">Ordenar Arrays</a>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Laboratório livre:</strong> teste as suas próprias comparações. Antes de rodar, escreva num papel o que você acha que cada linha vai mostrar. Experimente <code>"1e3" == "1000"</code>, <code>"0.0" == "0"</code>, <code>"Ana" &lt;=&gt; "ana"</code>…</p>
+<pre class="script">&lt;?php
+var_dump("1e3" == "1000");
+var_dump("1e3" === "1000");
+var_dump("0.0" == "0");
+var_dump(null == "");
+var_dump(null === "");
+var_dump("Ana" &lt;=&gt; "ana");
+var_dump(10 &gt;= 10.0);
+</pre>
+</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A comparação mudou a variável (um <code>=</code> só)</strong>
+<pre class="file" data-file="atribuir.php">&lt;?php
+$nota = 7;
+var_dump($nota = 10);
+var_dump($nota);
+</pre>
+<pre class="term">$ php atribuir.php
+int(10)
+int(10)</pre>
+<p><strong>O que aconteceu:</strong> a ideia era perguntar "a nota é 10?", mas com <strong>um</strong> <code>=</code> o PHP <strong>guardou</strong> 10 na variável. Não há erro nem aviso: é uma atribuição válida. A nota da Ana virou 10 sem ninguém perceber.</p>
+<p><strong>Como resolver:</strong> para comparar, <code>===</code> (ou <code>==</code>). Leia em voz alta: <code>=</code> é "recebe", <code>===</code> é "é idêntico a".</p>
+</div>
+
+<div class="cenario">
+<strong>Parse error: syntax error, unexpected token "=="</strong>
+<pre class="term">$ php tresiguais.php
+
+Parse error: syntax error, unexpected token "==" in /home/ana/site/tresiguais.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> a linha era <code>var_dump($a = == 1);</code>, com um espaço no meio do <code>===</code>. Os iguais precisam estar <strong>colados</strong>: <code>===</code>, <code>!==</code>, <code>&lt;=</code>, <code>&gt;=</code>, <code>&lt;=&gt;</code>. O mesmo erro (<code>unexpected token</code>) aparece se você encadear comparações, como <code>1 &lt; $x &lt; 10</code> (veja <a href="precedencia.html">Precedência</a>).</p>
+<p><strong>Como resolver:</strong> junte os sinais: <code>var_dump($a === 1);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Duas coisas diferentes foram consideradas iguais</strong>
+<pre class="term">$ php senha.php
+bool(true)
+bool(false)</pre>
+<p><strong>O que aconteceu:</strong> o <code>==</code> converteu os valores antes de comparar (códigos com zero à esquerda, <code>"0e…"</code>, <code>"1e2"</code>, <code>null</code> × <code>0</code> × <code>false</code> × <code>""</code>).</p>
+<p><strong>Como resolver:</strong> troque por <code>===</code>. Se os tipos forem diferentes de propósito (texto de formulário × número), converta antes, de forma visível: <code>(int) $idadeDigitada === 29</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Encontrou na posição 0, mas o programa disse "não encontrou"</strong>
+<pre class="term">$ php strpos.php
+int(0)
+bool(true)
+bool(false)
+bool(false)</pre>
+<p><strong>O que aconteceu:</strong> a função devolveu <code>0</code> (a primeira posição), e <code>0 == false</code> é verdadeiro.</p>
+<p><strong>Como resolver:</strong> compare com <code>=== false</code> ou <code>!== false</code>. Sempre que a documentação de uma função disser "devolve <code>false</code> se falhar", use comparação estrita.</p>
+</div>
+
+<div class="cenario">
+<strong>A ordem alfabética saiu estranha</strong>
+<pre class="term">$ php maior.php
+bool(false)
+bool(true)
+bool(false)
+bool(true)
+bool(false)
+bool(false)
+bool(true)
+bool(true)                « "Banana" &lt; "abacaxi"
+bool(false)               « "maçã" &lt; "mamão"
+bool(true)</pre>
+<p><strong>O que aconteceu:</strong> <code>&lt;</code> e <code>&gt;</code> comparam textos pelo código de cada caractere: maiúsculas antes de minúsculas, acentuadas depois de todas.</p>
+<p><strong>Como resolver:</strong> para comparar sem ligar para maiúsculas, converta os dois lados com <code>mb_strtolower</code> (veja <a href="mbstring.html">Acentos e mbstring</a>). Para ordenar listas de palavras em português, veja <a href="ordenar-arrays.html">Ordenar Arrays</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Nome</th><th>Dá <code>true</code> quando…</th><th>Converte os tipos?</th></tr>
+<tr><td><code>$a == $b</code></td><td>Igual</td><td>os valores são iguais depois da conversão</td><td>sim</td></tr>
+<tr><td><code>$a === $b</code></td><td>Idêntico</td><td>mesmo valor e mesmo tipo</td><td>não</td></tr>
+<tr><td><code>$a != $b</code></td><td>Diferente</td><td>os valores são diferentes depois da conversão</td><td>sim</td></tr>
+<tr><td><code>$a &lt;&gt; $b</code></td><td>Diferente</td><td>igual ao <code>!=</code></td><td>sim</td></tr>
+<tr><td><code>$a !== $b</code></td><td>Não idêntico</td><td>valor <strong>ou</strong> tipo diferente</td><td>não</td></tr>
+<tr><td><code>$a &lt; $b</code></td><td>Menor</td><td><code>$a</code> é menor que <code>$b</code></td><td>sim</td></tr>
+<tr><td><code>$a &gt; $b</code></td><td>Maior</td><td><code>$a</code> é maior que <code>$b</code></td><td>sim</td></tr>
+<tr><td><code>$a &lt;= $b</code></td><td>Menor ou igual</td><td><code>$a</code> é menor ou igual a <code>$b</code></td><td>sim</td></tr>
+<tr><td><code>$a &gt;= $b</code></td><td>Maior ou igual</td><td><code>$a</code> é maior ou igual a <code>$b</code></td><td>sim</td></tr>
+<tr><td><code>$a &lt;=&gt; $b</code></td><td>Nave espacial</td><td>(devolve <code>-1</code>, <code>0</code> ou <code>1</code>)</td><td>sim</td></tr>
+</table>
+</div>
+
+<p>Não existe <code>&lt;==</code> nem <code>&gt;==</code>: para "maior/menor" sem conversão, garanta antes que os dois lados têm o mesmo tipo.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Idêntico</h3>
+<p>Complete para comparar valor <strong>e</strong> tipo:</p>
+<div class="ex-code">var_dump($codigo <input data-answer="===" aria-label="operador"> "007");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Não encontrou</h3>
+<p>Complete para perguntar, sem cair na armadilha do zero, se a <code>strpos</code> <strong>não</strong> encontrou o texto:</p>
+<div class="ex-code">var_dump(strpos($nome, "A") <input data-answer="=== false" aria-label="comparação">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Aprovada</h3>
+<p>Complete para dar <code>true</code> se a nota for 7 <strong>ou mais</strong>:</p>
+<div class="ex-code">var_dump($nota <input data-answer="&gt;= 7|&gt;=7" aria-label="comparação">);</div>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. No PHP 8.5, o que <code>var_dump("1" == "01");</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>bool(true)</code>, porque os dois textos parecem números</label>
+<label><input type="radio" name="q4"> <code>bool(false)</code>, porque os textos são diferentes</label>
+<label><input type="radio" name="q4"> <code>int(1)</code></label>
+<label><input type="radio" name="q4"> Um <code>Warning</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual comparação mudou de resultado do PHP 7 para o PHP 8?</p>
+<label><input type="radio" name="q5"> <code>"10" == "1e1"</code></label>
+<label><input type="radio" name="q5"> <code>null == false</code></label>
+<label><input type="radio" name="q5"> <code>0 == "a"</code></label>
+<label><input type="radio" name="q5"> <code>1.0 == 1</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Quanto vale <code>5 &lt;=&gt; 9</code>?</p>
+<label><input type="radio" name="q6"> <code>false</code></label>
+<label><input type="radio" name="q6"> <code>-1</code></label>
+<label><input type="radio" name="q6"> <code>1</code></label>
+<label><input type="radio" name="q6"> <code>-4</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Depois de <code>$nota = 7; var_dump($nota = 10);</code>, quanto vale <code>$nota</code>?</p>
+<label><input type="radio" name="q7"> <code>7</code>, porque foi só uma comparação</label>
+<label><input type="radio" name="q7"> <code>false</code></label>
+<label><input type="radio" name="q7"> Dá <code>Parse error</code></label>
+<label><input type="radio" name="q7"> <code>10</code>, porque um <code>=</code> só guarda o valor</label>
+</div>
+
+<h3>Missão final: três comparações perigosas</h3>
+<div class="tryphp" data-goal="outre:bool\(false\)\s+bool\(false\)\s+bool\(false\),semerro,src:===">
+<p class="try-task"><strong>Missão:</strong> as três respostas abaixo estão erradas: todas mostram <code>true</code>, e todas deveriam ser <code>false</code> (a senha está errada, o código é outro e o estoque é zero, não <code>null</code>). Conserte as comparações para o programa mostrar <code>bool(false)</code> três vezes.</p>
+<pre class="script">&lt;?php
+// 1. A senha digitada é igual à senha certa?
+$senhaCerta = "0e5678";
+$senhaDigitada = "0e1234";
+var_dump($senhaDigitada == $senhaCerta);
+
+// 2. O código digitado é o mesmo do produto?
+$codigoProduto = "100";
+$codigoDigitado = "1e2";
+var_dump($codigoDigitado == $codigoProduto);
+
+// 3. O estoque está sem valor (null)?
+$estoque = 0;
+var_dump($estoque == null);
+</pre>
+<pre class="solucao">&lt;?php
+// 1. A senha digitada é igual à senha certa?
+$senhaCerta = "0e5678";
+$senhaDigitada = "0e1234";
+var_dump($senhaDigitada === $senhaCerta);
+
+// 2. O código digitado é o mesmo do produto?
+$codigoProduto = "100";
+$codigoDigitado = "1e2";
+var_dump($codigoDigitado === $codigoProduto);
+
+// 3. O estoque está sem valor (null)?
+$estoque = 0;
+var_dump($estoque === null);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>==</code> compara valores <strong>convertendo</strong> os tipos; <code>===</code> compara valor <strong>e</strong> tipo, sem converter.</li>
+  <li>O <code>==</code> acha iguais <code>"1"</code> e <code>"01"</code>, <code>"10"</code> e <code>"1e1"</code>, <code>"0e1234"</code> e <code>"0e5678"</code>, <code>null</code> e <code>false</code>, <code>0</code> e <code>null</code>.</li>
+  <li>O PHP 8 consertou <code>0 == "a"</code> (era <code>true</code> no PHP 7), mas as outras surpresas continuam.</li>
+  <li>Regra: use <code>===</code> e <code>!==</code>. Converta dados de formulário antes: <code>(int) $idade === 29</code>.</li>
+  <li><code>!=</code> e <code>&lt;&gt;</code> são o contrário de <code>==</code>; <code>!==</code> é o contrário de <code>===</code>.</li>
+  <li><code>&lt;</code> e <code>&gt;</code> com textos: maiúsculas antes de minúsculas, acentos depois de tudo.</li>
+  <li><code>$a &lt;=&gt; $b</code> devolve <code>-1</code>, <code>0</code> ou <code>1</code>; serve para ordenar.</li>
+  <li>Um <code>=</code> só <strong>guarda</strong>, não compara.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
