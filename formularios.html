@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Formulários HTML — form, input, select, GET e POST | Guia PHP</title>
+<meta name="description" content="Como um formulário HTML conversa com o PHP: a tag form, action e method, os campos input, select, textarea, checkbox, radio e button, o que o navegador envia (nome=valor), a diferença entre GET e POST e a página que mostra e processa o próprio formulário.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Formulários HTML</span></h1>
+
+<p class="intro">Até aqui, os seus programas PHP só falavam: mostravam texto, contas, listas. Com um <strong>formulário</strong>, o visitante também fala. Ele digita o nome, escolhe um sabor, marca uma opção, clica em <em>Enviar</em>, e o PHP recebe tudo isso para trabalhar. Esta aula é sobre o lado do <strong>HTML</strong>: como montar o formulário e o que exatamente o navegador manda para o PHP. Na próxima, você vê o lado do PHP em detalhe.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um formulário e como ele leva dados do navegador até o PHP.</li>
+  <li>A tag <code>&lt;form&gt;</code> e os atributos <code>action</code> (para onde) e <code>method</code> (como).</li>
+  <li>Os campos: <code>&lt;input&gt;</code> (texto, e-mail, número, senha), <code>&lt;select&gt;</code>, <code>&lt;textarea&gt;</code>, checkbox, radio e <code>&lt;button&gt;</code>.</li>
+  <li>Por que o atributo <code>name</code> é o mais importante de todos.</li>
+  <li>O que viaja pela rede: pares <code>nome=valor</code>.</li>
+  <li>A diferença entre <strong>GET</strong> e <strong>POST</strong>, e quando usar cada um.</li>
+  <li>Como fazer uma página só que mostra o formulário <strong>e</strong> processa o envio.</li>
+</ul>
+</div>
+
+<p>Os exemplos do terminal acontecem na máquina fictícia da Ana (<strong>notebook</strong>), com o servidor embutido do PHP (<code>php -S</code>, visto em <a href="servidor-embutido.html">O Servidor Embutido</a>). As caixas <em>Experimente</em> rodam o PHP de verdade no seu navegador, como uma página web: a aba <strong>Resultado</strong> mostra a página pronta, e os formulários dela funcionam.</p>
+
+<hr>
+
+<h2>A ideia: uma ficha de papel</h2>
+<p>Pense na ficha que a padaria da Ana usa para anotar encomendas de bolo:</p>
+
+<pre class="file" data-file="ficha de papel">Nome do cliente: ____Bia______________
+Sabor:     ( ) cenoura  (x) chocolate  ( ) limão
+Entrega?   [x] sim
+Observação: __sem açúcar no topo______</pre>
+
+<p>Cada linha tem duas partes: um <strong>rótulo</strong> impresso ("Nome do cliente") e um <strong>espaço</strong> que o cliente preenche ("Bia"). Quando a ficha chega na cozinha, a confeiteira não lê a ficha inteira como um texto corrido: ela procura o campo "Sabor" e vê o que está marcado.</p>
+
+<p>Um formulário HTML é essa ficha. O navegador desenha os espaços para preencher; quando o visitante clica em <em>Enviar</em>, o navegador junta tudo no formato <strong>nome do campo = o que foi preenchido</strong> e entrega para um programa PHP (a "cozinha"). O PHP então procura cada campo pelo nome.</p>
+
+<figure>
+<pre class="file" data-file="o caminho de um formulário">  NAVEGADOR (a Ana)                         SERVIDOR (o PHP)
+ ┌───────────────────────┐   1. pedido     ┌──────────────────────┐
+ │ Nome: [Bia       ]    │ ──────────────▶ │ ola.php              │
+ │        [ Enviar ]     │   nome=Bia      │  lê o campo "nome"   │
+ └───────────────────────┘                 │  monta uma resposta  │
+ ┌───────────────────────┐   2. resposta   │                      │
+ │ Olá, Bia!             │ ◀────────────── │ "Olá, Bia!"          │
+ └───────────────────────┘   (HTML)        └──────────────────────┘</pre>
+<figcaption>O formulário fica no navegador; quem processa é o PHP, no servidor. Cada envio é um pedido novo, e o PHP responde com uma página nova.</figcaption>
+</figure>
+
+<hr>
+
+<h2>O primeiro formulário</h2>
+<p>Este é o menor formulário útil: um campo e um botão. Ele é HTML puro, sem nenhuma linha de PHP:</p>
+
+<pre class="file" data-file="form.html">&lt;form action="ola.php" method="get"&gt;
+  &lt;label&gt;Seu nome: &lt;input type="text" name="nome"&gt;&lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>&lt;form&gt; … &lt;/form&gt;</dt><dd>A "ficha". Tudo o que estiver entre a abertura e o fechamento é enviado junto. Campo fora do <code>&lt;form&gt;</code> não vai.</dd>
+  <dt>action="ola.php"</dt><dd><em>Action</em> = ação. É o <strong>endereço do programa</strong> que vai receber os dados (a "cozinha"). Aqui, o arquivo <code>ola.php</code> na mesma pasta.</dd>
+  <dt>method="get"</dt><dd><em>Method</em> = método, a <strong>forma de entrega</strong>: <code>get</code> (os dados vão no endereço) ou <code>post</code> (os dados vão escondidos no corpo do pedido). Você vê a diferença daqui a pouco.</dd>
+  <dt>&lt;label&gt;</dt><dd>O rótulo impresso ("Seu nome:"). Envolver o campo com o <code>&lt;label&gt;</code> faz o clique no texto também colocar o cursor no campo, e ajuda leitores de tela. Não é enviado.</dd>
+  <dt>&lt;input type="text"&gt;</dt><dd>O espaço para digitar (<em>input</em> = entrada). <code>type="text"</code> é uma linha de texto.</dd>
+  <dt>name="nome"</dt><dd>O <strong>nome do campo</strong>. É por esse nome que o PHP vai encontrar o que foi digitado. Sem <code>name</code>, o campo <strong>não é enviado</strong>.</dd>
+  <dt>&lt;button&gt;Enviar&lt;/button&gt;</dt><dd>O botão. Dentro de um formulário, um <code>&lt;button&gt;</code> envia o formulário quando é clicado (apertar <kbd>Enter</kbd> num campo de texto também envia).</dd>
+</dl>
+
+<p>Do outro lado, o <code>ola.php</code> só precisa olhar o que chegou. Por enquanto, vamos apenas <strong>espiar</strong> com <code>print_r</code> (de <a href="var-dump.html">var_dump e print_r</a>) o array <code>$_GET</code>, onde o PHP guarda o que veio pelo método GET. A próxima aula, <a href="get-post.html">$_GET e $_POST</a>, explica esse array com calma.</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+print_r($_GET);
+</pre>
+
+<p>A Ana abriu o servidor na pasta e, no navegador, digitou <code>Ana Maria</code> e clicou em <em>Enviar</em>. O navegador foi para este endereço:</p>
+
+<pre class="file" data-file="barra de endereço do navegador">http://localhost:8000/ola.php?nome=Ana+Maria</pre>
+
+<p>E a página mostrou:</p>
+
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=Ana+Maria"
+Array
+(
+    [nome] =&gt; Ana Maria
+)</pre>
+
+<p>(O <code>curl</code> pede a mesma página que o navegador pediu, e mostra a resposta no terminal. Vamos usá-lo a aula inteira para ver exatamente o que o PHP recebe e devolve.)</p>
+
+<p>Repare na última parte do endereço: <code>?nome=Ana+Maria</code>. É o formulário inteiro, "dobrado" dentro da URL. O PHP desdobrou e montou o array com a chave <code>nome</code> e o valor <code>Ana Maria</code>.</p>
+
+<hr>
+
+<h2>O que o navegador envia: pares <code>nome=valor</code></h2>
+<p>Quando você clica em <em>Enviar</em>, o navegador percorre os campos do formulário, na ordem, e para cada um que tem <code>name</code> escreve <code>nome=valor</code>. Os pares são ligados por <code>&amp;</code> ("e"):</p>
+
+<pre class="file" data-file="o que viaja">cliente=Ana&amp;sabor=chocolate&amp;tamanho=M&amp;entrega=on</pre>
+
+<p>Alguns caracteres não podem viajar como estão, porque já têm significado nesse formato (<code>&amp;</code> separa pares, <code>=</code> separa nome e valor, o espaço quebraria o endereço). O navegador os <strong>codifica</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você digita</th><th>Viaja como</th><th>Por quê</th></tr>
+<tr><td>espaço</td><td><code>+</code></td><td>Endereços não podem ter espaços.</td></tr>
+<tr><td><code>ã</code>, <code>é</code>, <code>ç</code></td><td><code>%C3%A3</code>, <code>%C3%A9</code>, <code>%C3%A7</code></td><td>Letras acentuadas viram os bytes do UTF-8, cada um como <code>%</code> + dois dígitos hexadecimais.</td></tr>
+<tr><td><code>&amp;</code></td><td><code>%26</code></td><td>Senão, pareceria o começo de outro par.</td></tr>
+<tr><td><code>=</code></td><td><code>%3D</code></td><td>Senão, pareceria a separação entre nome e valor.</td></tr>
+</table>
+</div>
+
+<p>Você não precisa fazer nada disso à mão: o navegador codifica na ida e o PHP decodifica na chegada. Mas é bom reconhecer quando vê um endereço cheio de <code>%</code>. O próprio PHP sabe montar esse texto com a função <code>http_build_query</code> (que você usa em <a href="get-post.html">$_GET e $_POST</a>):</p>
+
+<pre class="file" data-file="codifica.php">&lt;?php
+echo http_build_query(['nome' =&gt; 'Ana Maria', 'cidade' =&gt; 'São Paulo', 'obs' =&gt; 'café &amp; pão']), "\n";
+</pre>
+
+<pre class="term">$ php codifica.php
+nome=Ana+Maria&amp;cidade=S%C3%A3o+Paulo&amp;obs=caf%C3%A9+%26+p%C3%A3o</pre>
+
+<p>Mesmo com o endereço codificado, o PHP entrega os valores já "limpos":</p>
+
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=Ana+Maria&amp;cidade=S%C3%A3o+Paulo"
+Array
+(
+    [nome] =&gt; Ana Maria
+    [cidade] =&gt; São Paulo
+)</pre>
+
+<div class="tip"><strong>Regra para guardar:</strong> o que viaja é sempre <strong>texto</strong>. Mesmo que o campo seja de número, o PHP recebe <code>"29"</code> (uma string), não <code>29</code>. Converter e conferir é trabalho seu, na aula <a href="validacao.html">Validar Dados</a>.</div>
+
+<hr>
+
+<h2>Os campos, um de cada vez</h2>
+<p>Agora vamos montar a ficha de encomenda da padaria, campo por campo. Para cada tipo, o que importa é: <strong>como aparece</strong> na tela e <strong>o que é enviado</strong>.</p>
+
+<h3>1. <code>&lt;input&gt;</code>: uma linha</h3>
+<p>O <code>&lt;input&gt;</code> é o campo mais comum. O atributo <code>type</code> muda a aparência e o teclado (no celular), mas o que chega no PHP é sempre o texto digitado:</p>
+
+<pre class="file" data-file="inputs.html">&lt;input type="text"     name="cliente" value="Ana"&gt;
+&lt;input type="email"    name="email"   placeholder="voce@exemplo.com"&gt;
+&lt;input type="number"   name="qtd"     min="1" max="10"&gt;
+&lt;input type="password" name="senha"&gt;
+&lt;input type="hidden"   name="loja"    value="centro"&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atributo / tipo</th><th>O que faz</th></tr>
+<tr><td><code>type="text"</code></td><td>Texto livre, uma linha. É o padrão: <code>&lt;input name="x"&gt;</code> já é texto.</td></tr>
+<tr><td><code>type="email"</code></td><td>O navegador confere se tem cara de e-mail antes de enviar.</td></tr>
+<tr><td><code>type="number"</code></td><td>Mostra setinhas; <code>min</code> e <code>max</code> limitam a faixa. Chega no PHP como texto (<code>"3"</code>).</td></tr>
+<tr><td><code>type="password"</code></td><td>Mostra bolinhas no lugar das letras. Só esconde <strong>da tela</strong>: o valor viaja normalmente.</td></tr>
+<tr><td><code>type="hidden"</code></td><td>Campo invisível: o visitante não vê, mas ele é enviado. Serve para mandar junto uma informação fixa.</td></tr>
+<tr><td><code>value="Ana"</code></td><td>O texto que já vem preenchido (o visitante pode apagar e trocar).</td></tr>
+<tr><td><code>placeholder="…"</code></td><td>Um texto de exemplo, cinza, que some quando a pessoa digita. <strong>Não é enviado.</strong></td></tr>
+<tr><td><code>required</code></td><td>O navegador não deixa enviar com o campo vazio.</td></tr>
+</table>
+</div>
+
+<div class="warning"><strong>Cuidado:</strong> <code>required</code>, <code>type="email"</code>, <code>min</code> e <code>max</code> são conferidos pelo <strong>navegador</strong>, como gentileza para o visitante. Quem quiser burlar consegue (o <code>curl</code> manda o que quiser, sem formulário nenhum). O campo <code>hidden</code> também pode ser trocado. O PHP precisa conferir tudo de novo: veja <a href="validacao.html">Validar Dados</a>.</div>
+
+<h3>2. <code>&lt;select&gt;</code>: uma lista para escolher</h3>
+<pre class="file" data-file="select.html">&lt;select name="sabor"&gt;
+  &lt;option value="cenoura"&gt;Cenoura com cobertura&lt;/option&gt;
+  &lt;option value="chocolate" selected&gt;Chocolate&lt;/option&gt;
+  &lt;option value="limao"&gt;Limão&lt;/option&gt;
+&lt;/select&gt;
+</pre>
+<dl class="anatomy">
+  <dt>&lt;select name="sabor"&gt;</dt><dd>A caixinha de escolha. O <code>name</code> fica no <code>&lt;select&gt;</code>, não em cada opção.</dd>
+  <dt>&lt;option value="cenoura"&gt;</dt><dd>Cada opção. O <code>value</code> é o que é <strong>enviado</strong>; o texto entre as tags é o que o visitante <strong>vê</strong>. Escolher "Cenoura com cobertura" envia <code>sabor=cenoura</code>.</dd>
+  <dt>selected</dt><dd>A opção que já vem escolhida. Sem nenhum <code>selected</code>, vale a primeira.</dd>
+</dl>
+<p>Se a <code>&lt;option&gt;</code> não tiver <code>value</code>, o navegador envia o texto visível. Prefira sempre colocar <code>value</code>: um texto curto, sem acentos e sem espaços, é mais fácil de conferir no PHP.</p>
+
+<h3>3. <code>&lt;textarea&gt;</code>: várias linhas</h3>
+<pre class="file" data-file="textarea.html">&lt;textarea name="obs" rows="3" cols="40"&gt;&lt;/textarea&gt;
+</pre>
+<p>Uma caixa de texto grande, para observações, comentários, mensagens. <code>rows</code> e <code>cols</code> são só o tamanho na tela (linhas e colunas). Diferente do <code>&lt;input&gt;</code>, o texto inicial vai <strong>entre as tags</strong>, não num <code>value</code>. As quebras de linha que o visitante digitar chegam no PHP.</p>
+
+<h3>4. Radio: escolher um entre vários</h3>
+<pre class="file" data-file="radio.html">&lt;label&gt;&lt;input type="radio" name="tamanho" value="P"&gt; Pequeno&lt;/label&gt;
+&lt;label&gt;&lt;input type="radio" name="tamanho" value="M" checked&gt; Médio&lt;/label&gt;
+&lt;label&gt;&lt;input type="radio" name="tamanho" value="G"&gt; Grande&lt;/label&gt;
+</pre>
+<p>Os botões <em>radio</em> (as bolinhas) com o <strong>mesmo <code>name</code></strong> formam um grupo: marcar um desmarca os outros, como os botões de estação de um rádio antigo (daí o nome). Só o marcado é enviado: <code>tamanho=M</code>. <code>checked</code> deixa um marcado de início. Se nenhum estiver marcado, o grupo <strong>não envia nada</strong>.</p>
+
+<h3>5. Checkbox: sim ou não</h3>
+<pre class="file" data-file="checkbox.html">&lt;label&gt;&lt;input type="checkbox" name="entrega"&gt; Quero entrega&lt;/label&gt;
+</pre>
+<p>A caixinha de marcar (<em>checkbox</em>). Esta é a parte que mais confunde quem começa:</p>
+<ul>
+  <li><strong>Marcada:</strong> envia <code>entrega=on</code>. O <code>on</code> é o valor padrão; com <code>value="sim"</code>, envia <code>entrega=sim</code>.</li>
+  <li><strong>Desmarcada:</strong> não envia <strong>nada</strong>. Nem <code>entrega=</code>, nem <code>entrega=off</code>. O campo simplesmente não existe no pedido.</li>
+</ul>
+<p>Por isso, no PHP, a pergunta certa não é "qual o valor de <code>entrega</code>?", e sim "<code>entrega</code> chegou?". Você vê como perguntar isso na próxima aula. Para várias caixinhas com o mesmo assunto (as frutas de uma salada, por exemplo), existe o truque do <code>name="frutas[]"</code>, também em <a href="get-post.html">$_GET e $_POST</a>.</p>
+
+<h3>6. <code>&lt;button&gt;</code>: enviar</h3>
+<pre class="file" data-file="botoes.html">&lt;button&gt;Enviar&lt;/button&gt;
+&lt;button type="submit"&gt;Enviar&lt;/button&gt;    &lt;!-- o mesmo, escrito por extenso --&gt;
+&lt;button type="reset"&gt;Limpar&lt;/button&gt;     &lt;!-- volta os campos ao início, não envia --&gt;
+&lt;button type="button"&gt;Nada&lt;/button&gt;      &lt;!-- não faz nada sozinho (usado com JavaScript) --&gt;
+</pre>
+<p>Você também vai ver <code>&lt;input type="submit" value="Enviar"&gt;</code> em códigos mais antigos: faz o mesmo que o <code>&lt;button&gt;</code>. Um botão com <code>name</code> e <code>value</code> também é enviado, mas só o que foi clicado; isso permite dois botões no mesmo formulário (<code>acao=salvar</code> e <code>acao=apagar</code>).</p>
+
+<h3>Tudo junto: a ficha de encomenda</h3>
+<pre class="file" data-file="encomenda.html">&lt;form action="pedido.php" method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input type="text" name="cliente" required&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Sabor:
+    &lt;select name="sabor"&gt;
+      &lt;option value="cenoura"&gt;Cenoura com cobertura&lt;/option&gt;
+      &lt;option value="chocolate"&gt;Chocolate&lt;/option&gt;
+      &lt;option value="limao"&gt;Limão&lt;/option&gt;
+    &lt;/select&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;Tamanho:
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="P"&gt; P&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="M" checked&gt; M&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="G"&gt; G&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;&lt;input type="checkbox" name="entrega"&gt; Quero entrega&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Observação:&lt;br&gt;&lt;textarea name="obs" rows="3" cols="40"&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+
+<p>E um <code>pedido.php</code> que só mostra o que chegou (com <code>method="post"</code>, os dados ficam em <code>$_POST</code>, e não em <code>$_GET</code>):</p>
+
+<pre class="file" data-file="pedido.php">&lt;?php
+echo "&lt;pre&gt;";
+print_r($_POST);
+echo "&lt;/pre&gt;";
+</pre>
+
+<p>A Bia encomendou um bolo de chocolate médio, com entrega e uma observação. O navegador enviou o pedido abaixo (o <code>curl -d</code> envia exatamente os mesmos dados, por POST):</p>
+
+<pre class="term">$ curl -s localhost:8000/pedido.php -d "cliente=Bia&amp;sabor=chocolate&amp;tamanho=M&amp;entrega=on&amp;obs=Sem+a%C3%A7%C3%BAcar+no+topo%2C+por+favor."
+&lt;pre&gt;Array
+(
+    [cliente] =&gt; Bia
+    [sabor] =&gt; chocolate
+    [tamanho] =&gt; M
+    [entrega] =&gt; on
+    [obs] =&gt; Sem açúcar no topo, por favor.
+)
+&lt;/pre&gt;</pre>
+
+<p>Agora a mesma encomenda, sem marcar a entrega e sem escrever observação:</p>
+
+<pre class="term">$ curl -s localhost:8000/pedido.php -d "cliente=Bia&amp;sabor=chocolate&amp;tamanho=M&amp;obs="
+&lt;pre&gt;Array
+(
+    [cliente] =&gt; Bia
+    [sabor] =&gt; chocolate
+    [tamanho] =&gt; M
+    [obs] =&gt;          « a textarea vazia chega, com texto vazio
+)
+&lt;/pre&gt;                « e "entrega" nem aparece: checkbox desmarcada não é enviada</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Campo</th><th>Preenchido</th><th>Vazio / desmarcado</th></tr>
+<tr><td><code>&lt;input type="text"&gt;</code>, <code>&lt;textarea&gt;</code></td><td><code>nome=texto</code></td><td><code>nome=</code> (chega, vazio)</td></tr>
+<tr><td><code>&lt;select&gt;</code></td><td><code>nome=value da opção</code></td><td>sempre tem uma opção escolhida</td></tr>
+<tr><td>radio</td><td><code>nome=value do marcado</code></td><td><strong>não é enviado</strong></td></tr>
+<tr><td>checkbox</td><td><code>nome=on</code> (ou o <code>value</code>)</td><td><strong>não é enviado</strong></td></tr>
+<tr><td>campo sem <code>name</code></td><td colspan="2"><strong>nunca é enviado</strong></td></tr>
+<tr><td>campo com <code>disabled</code></td><td colspan="2"><strong>nunca é enviado</strong> (use <code>readonly</code> se quiser só impedir a edição)</td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task">Este é o formulário de encomenda, com <code>action</code> apontando para a própria página. Preencha na aba <strong>Resultado</strong>, clique em <em>Encomendar</em> e veja o que o PHP recebeu. Depois, desmarque a entrega e envie de novo; tire o <code>name</code> de um campo e veja ele sumir.</p>
+<pre class="script">&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input type="text" name="cliente"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Sabor:
+    &lt;select name="sabor"&gt;
+      &lt;option value="cenoura"&gt;Cenoura com cobertura&lt;/option&gt;
+      &lt;option value="chocolate"&gt;Chocolate&lt;/option&gt;
+      &lt;option value="limao"&gt;Limão&lt;/option&gt;
+    &lt;/select&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;Tamanho:
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="P"&gt; P&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="M" checked&gt; M&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="G"&gt; G&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;&lt;input type="checkbox" name="entrega"&gt; Quero entrega&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Observação:&lt;br&gt;&lt;textarea name="obs" rows="3" cols="40"&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;h3&gt;O que o PHP recebeu&lt;/h3&gt;
+&lt;pre&gt;&lt;?php print_r($_POST); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>GET ou POST?</h2>
+<p>Os dois métodos levam os mesmos pares <code>nome=valor</code>. A diferença é <strong>onde</strong> eles vão.</p>
+
+<p><strong>GET</strong> (<em>pegar</em>): os dados vão <strong>no endereço</strong>, depois do <code>?</code>. É como escrever o pedido no lado de fora do envelope: qualquer um que olhe vê.</p>
+<pre class="file" data-file="pedido GET">GET /ola.php?nome=Ana HTTP/1.1
+Host: localhost:8000</pre>
+
+<p><strong>POST</strong> (<em>postar</em>, como no correio): o endereço fica limpo e os dados vão no <strong>corpo</strong> do pedido, dentro do envelope. O <code>curl -v</code> mostra o pedido que sai (linhas com <code>&gt;</code>); repare no <code>Content-Type</code> e no <code>Content-Length: 25</code>, o tamanho do corpo:</p>
+
+<pre class="term">$ curl -sv -d "nome=Ana&amp;senha=segredo123" localhost:8000/ola.php -o /dev/null 2&gt;&amp;1 | grep '^[&gt;}]'
+&gt; POST /ola.php HTTP/1.1
+&gt; Host: localhost:8000
+&gt; User-Agent: curl/8.18.0
+&gt; Accept: */*
+&gt; Content-Length: 25
+&gt; Content-Type: application/x-www-form-urlencoded
+&gt;
+} [25 bytes data]          « o corpo: nome=Ana&amp;senha=segredo123 (25 letras)</pre>
+
+<p>O <code>application/x-www-form-urlencoded</code> é o nome oficial do formato <code>nome=valor&amp;nome=valor</code> codificado. É o que todo formulário usa, a não ser que envie arquivos (veja <a href="upload.html">Upload de Arquivos</a>).</p>
+
+<p>Uma diferença que pouca gente nota: o servidor anota cada endereço pedido no registro dele (o <em>log</em>). Veja o que o <code>php -S</code> da Ana escreveu quando recebeu um login por GET e outro por POST:</p>
+
+<pre class="term">[Fri Oct 16 20:46:40 2026] 127.0.0.1:59658 [200]: GET /ola.php?usuario=ana&amp;senha=segredo123
+[Fri Oct 16 20:46:40 2026] 127.0.0.1:59670 [200]: POST /ola.php</pre>
+
+<p>A senha enviada por GET ficou gravada no log, em texto puro. A do POST, não. O mesmo vale para o histórico do navegador e para os favoritos: eles guardam o endereço inteiro.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>GET</th><th>POST</th></tr>
+<tr><td>Onde vão os dados</td><td>No endereço: <code>ola.php?nome=Ana</code></td><td>No corpo do pedido; o endereço fica <code>ola.php</code></td></tr>
+<tr><td>Aparece na barra de endereço</td><td>Sim</td><td>Não</td></tr>
+<tr><td>Tamanho</td><td>Limitado: endereços muito longos são recusados (fique abaixo de uns 2 mil caracteres)</td><td>Grande (o PHP aceita até <code>post_max_size</code>, 8 MB por padrão)</td></tr>
+<tr><td>Favoritos e links</td><td>Dá para salvar e compartilhar o resultado (<code>busca.php?q=bolo</code>)</td><td>Não dá: o favorito guarda só o endereço, sem os dados</td></tr>
+<tr><td>Histórico e logs do servidor</td><td>Guardam os dados junto com o endereço</td><td>Guardam só o endereço</td></tr>
+<tr><td>Senhas e dados pessoais</td><td><strong>Nunca</strong></td><td>Sim (com HTTPS)</td></tr>
+<tr><td>Apertar <kbd>F5</kbd> no resultado</td><td>Pede de novo, sem perguntar</td><td>O navegador pergunta se quer <strong>reenviar</strong> o formulário</td></tr>
+<tr><td>Arquivos (upload)</td><td>Não</td><td>Sim</td></tr>
+<tr><td>Use para</td><td><strong>Consultar</strong>: buscas, filtros, páginas de uma lista</td><td><strong>Mudar algo</strong>: cadastrar, comprar, enviar mensagem, login</td></tr>
+</table>
+</div>
+
+<div class="note"><strong>A regra prática:</strong> se enviar duas vezes não faz mal nenhum (buscar "bolo" de novo), use GET. Se enviar duas vezes cria problema (duas encomendas, duas cobranças), use POST. O problema do <kbd>F5</kbd> reenviando um POST tem solução própria, o padrão Post/Redirect/Get, em <a href="redirecionar.html">header e Redirecionamento</a>.</div>
+
+<p>Se o <code>method</code> faltar (ou estiver escrito errado), o navegador usa <strong>GET</strong>. Se o <code>action</code> faltar, o formulário é enviado para <strong>a mesma página</strong> em que está. Esses dois "padrões" são usados o tempo todo, como você vê agora.</p>
+
+<hr>
+
+<h2>A mesma página mostra e processa</h2>
+<p>Ter dois arquivos (<code>form.html</code> e <code>ola.php</code>) funciona, mas é comum fazer tudo num arquivo só: a página mostra o formulário e, quando ele volta preenchido, mostra também a resposta. Para isso, deixe o <code>action</code> de fora (ou vazio) e pergunte ao PHP se o campo chegou, com <code>isset</code> ("está definido?", de <a href="null.html">null</a>):</p>
+
+<pre class="file" data-file="index.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;body&gt;
+&lt;h1&gt;Boas-vindas&lt;/h1&gt;
+&lt;?php if (isset($_GET['nome'])): ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars($_GET['nome']) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="get"&gt;
+  &lt;label&gt;Seu nome: &lt;input type="text" name="nome"&gt;&lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>&lt;?php if (isset($_GET['nome'])): ?&gt;</code></td><td>"Chegou um campo <code>nome</code>?" Na primeira visita, não chegou nada, e o parágrafo é pulado.</td></tr>
+<tr><td><code>&lt;?= htmlspecialchars($_GET['nome']) ?&gt;</code></td><td>Escreve o nome recebido. O <code>htmlspecialchars</code> é uma proteção obrigatória sempre que você mostra algo que veio do visitante; o motivo está em <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</td></tr>
+<tr><td><code>&lt;?php endif; ?&gt;</code></td><td>Fim do <code>if</code> (a forma com <code>:</code> e <code>endif</code>, de <a href="php-e-html.html">PHP Dentro do HTML</a>).</td></tr>
+<tr><td><code>&lt;form method="get"&gt;</code></td><td>Sem <code>action</code>: envia para o próprio <code>index.php</code>.</td></tr>
+</table>
+</div>
+
+<p>Primeira visita (sem nada no endereço) e depois do envio:</p>
+
+<pre class="term">$ curl -s localhost:8000/
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;body&gt;
+&lt;h1&gt;Boas-vindas&lt;/h1&gt;
+&lt;form method="get"&gt;
+  &lt;label&gt;Seu nome: &lt;input type="text" name="nome"&gt;&lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+$ curl -s "localhost:8000/?nome=Ana"
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;body&gt;
+&lt;h1&gt;Boas-vindas&lt;/h1&gt;
+  &lt;p&gt;Olá, Ana!&lt;/p&gt;          « só aparece quando "nome" chegou
+&lt;form method="get"&gt;
+  &lt;label&gt;Seu nome: &lt;input type="text" name="nome"&gt;&lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>O mesmo arquivo produziu duas páginas diferentes. Esse é o padrão que você vai usar em quase todo formulário deste guia. Com POST, a pergunta "foi enviado?" é um pouco diferente (<code>$_SERVER['REQUEST_METHOD'] === 'POST'</code>), e é a próxima aula que mostra.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O campo foi preenchido, mas não chegou no PHP</strong>
+<pre class="file" data-file="form.html">&lt;input type="text" id="nome"&gt;</pre>
+<pre class="term">$ curl -s "localhost:8000/ola.php?"
+Array
+(
+)</pre>
+<p><strong>O que aconteceu:</strong> o campo não tem <code>name</code>. O <code>id</code> serve para CSS e JavaScript, mas o navegador só envia campos com <code>name</code>. O mesmo acontece com campos fora do <code>&lt;form&gt;</code> e com campos <code>disabled</code>.</p>
+<p><strong>Como resolver:</strong> <code>&lt;input type="text" name="nome" id="nome"&gt;</code>. Pode ter os dois; o PHP só olha o <code>name</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Not Found" depois de clicar em Enviar</strong>
+<pre class="term">$ curl -si "localhost:8000/olaa.php?nome=Ana"
+HTTP/1.1 404 Not Found
+…
+&lt;h1&gt;Not Found&lt;/h1&gt;&lt;p&gt;The requested resource &lt;code class="url"&gt;/olaa.php?nome=Ana&lt;/code&gt; was not found on this server.&lt;/p&gt;</pre>
+<p>E no terminal do <code>php -S</code>:</p>
+<pre class="term">[Fri Oct 16 20:43:42 2026] 127.0.0.1:51122 [404]: GET /olaa.php?nome=Ana - No such file or directory</pre>
+<p><strong>O que aconteceu:</strong> o <code>action</code> aponta para um arquivo que não existe (aqui, <code>olaa.php</code>, digitado errado). O formulário funcionou; quem não foi achado é o "destinatário".</p>
+<p><strong>Como resolver:</strong> confira o nome no <code>action</code> (maiúsculas contam no Linux) e se o arquivo está na pasta em que o <code>php -S</code> foi aberto.</p>
+</div>
+
+<div class="cenario">
+<strong>Dois campos com o mesmo nome: só o último chegou</strong>
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=Ana&amp;nome=Bia"
+Array
+(
+    [nome] =&gt; Bia
+)</pre>
+<p><strong>O que aconteceu:</strong> dois campos com <code>name="nome"</code> (comum quando se copia e cola um campo e esquece de trocar o nome). O PHP guarda cada nome uma vez só, e o segundo valor apagou o primeiro.</p>
+<p><strong>Como resolver:</strong> dê nomes diferentes (<code>nome</code>, <code>sobrenome</code>). Se você <strong>quer</strong> vários valores (várias frutas marcadas), use colchetes no nome: <code>name="frutas[]"</code>, assunto de <a href="get-post.html">$_GET e $_POST</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Clico no botão e nada acontece</strong>
+<p><strong>O que aconteceu:</strong> o botão está fora do <code>&lt;form&gt;</code> (ou o <code>&lt;/form&gt;</code> fecha antes dele), ou o botão é <code>type="button"</code>. Um botão fora do formulário não sabe o que enviar.</p>
+<p><strong>Como resolver:</strong> coloque todos os campos e o botão entre <code>&lt;form&gt;</code> e <code>&lt;/form&gt;</code>, e use <code>&lt;button&gt;</code> sem <code>type</code> ou com <code>type="submit"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O formulário é POST, mas o PHP procura em <code>$_GET</code></strong>
+<pre class="file" data-file="index.php">&lt;?php
+$nome = $_GET['nome'];
+echo "Olá, $nome";
+</pre>
+<pre class="term">$ curl -s localhost:8000/ -d "nome=Ana"
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "nome" in &lt;b&gt;/home/ana/site/index.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+Olá, </pre>
+<p><strong>O que aconteceu:</strong> com <code>method="post"</code>, os dados vão para <code>$_POST</code>; o <code>$_GET</code> fica vazio, e o PHP avisa que a chave <code>"nome"</code> não existe ("Undefined array key" = chave de array não definida). No servidor, o aviso vem com as tags <code>&lt;br /&gt;</code> e <code>&lt;b&gt;</code>, para aparecer formatado no navegador.</p>
+<p><strong>Como resolver:</strong> leia do array que combina com o método: <code>method="post"</code> → <code>$_POST</code>; <code>method="get"</code> (ou sem <code>method</code>) → <code>$_GET</code>. A próxima aula mostra como evitar esse aviso de vez.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>HTML</th><th>Para quê</th><th>Envia</th></tr>
+<tr><td><code>&lt;form action="x.php" method="post"&gt;</code></td><td>A ficha: para onde e como enviar</td><td>—</td></tr>
+<tr><td><code>action</code> ausente ou vazio</td><td>Envia para a própria página</td><td>—</td></tr>
+<tr><td><code>method</code> ausente</td><td>Usa GET</td><td>—</td></tr>
+<tr><td><code>&lt;input name="n"&gt;</code></td><td>Texto de uma linha</td><td><code>n=texto</code></td></tr>
+<tr><td><code>type="email|number|password|hidden"</code></td><td>Variações do input</td><td><code>n=texto</code></td></tr>
+<tr><td><code>&lt;select name="n"&gt;&lt;option value="v"&gt;</code></td><td>Lista de opções</td><td><code>n=v</code></td></tr>
+<tr><td><code>&lt;textarea name="n"&gt;</code></td><td>Texto de várias linhas</td><td><code>n=texto</code></td></tr>
+<tr><td><code>&lt;input type="radio" name="n" value="v"&gt;</code></td><td>Um entre vários (mesmo <code>name</code>)</td><td><code>n=v</code> do marcado, ou nada</td></tr>
+<tr><td><code>&lt;input type="checkbox" name="n"&gt;</code></td><td>Sim / não</td><td><code>n=on</code> se marcado, ou nada</td></tr>
+<tr><td><code>&lt;button&gt;</code></td><td>Envia o formulário</td><td><code>name=value</code> do botão clicado, se tiver</td></tr>
+<tr><td><code>&lt;label&gt;</code></td><td>Rótulo clicável do campo</td><td>nada</td></tr>
+<tr><td><code>value</code>, <code>selected</code>, <code>checked</code></td><td>Valor inicial</td><td>—</td></tr>
+<tr><td><code>placeholder</code>, <code>required</code>, <code>min</code>, <code>max</code></td><td>Ajuda e conferência no navegador (não substituem o PHP)</td><td>—</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O atributo que manda o campo</h3>
+<p>Complete para o campo chegar no PHP como <code>email</code>:</p>
+<div class="ex-code">&lt;input type="email" <input data-answer="name=&quot;email&quot;|name='email'|name=email" aria-label="atributo">&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Método para senha</h3>
+<p>Complete o formulário de login com o método certo:</p>
+<div class="ex-code">&lt;form action="entrar.php" method="<input data-answer="post|POST" aria-label="método">"&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Para onde vai?</h3>
+<p>Um formulário sem <code>action</code>, dentro de <code>contato.php</code>, é enviado para qual arquivo?</p>
+<div class="ex-code"><input data-answer="contato.php" aria-label="arquivo"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A checkbox <code>&lt;input type="checkbox" name="aceito"&gt;</code> ficou desmarcada. O que o PHP recebe?</p>
+<label><input type="radio" name="q4"> <code>aceito=off</code></label>
+<label><input type="radio" name="q4"> <code>aceito=</code> (vazio)</label>
+<label><input type="radio" name="q4"> Nada: o campo <code>aceito</code> não é enviado.</label>
+<label><input type="radio" name="q4"> <code>aceito=false</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual uso combina com GET?</p>
+<label><input type="radio" name="q5"> Formulário de login com senha.</label>
+<label><input type="radio" name="q5"> Busca de produtos que a pessoa quer salvar nos favoritos.</label>
+<label><input type="radio" name="q5"> Finalizar uma compra.</label>
+<label><input type="radio" name="q5"> Enviar uma foto.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Na opção <code>&lt;option value="limao"&gt;Limão siciliano&lt;/option&gt;</code>, o que o PHP recebe quando ela é escolhida?</p>
+<label><input type="radio" name="q6"> <code>limao</code></label>
+<label><input type="radio" name="q6"> <code>Limão siciliano</code></label>
+<label><input type="radio" name="q6"> <code>option</code></label>
+<label><input type="radio" name="q6"> Os dois textos juntos.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="out:name=&quot;cidade&quot;,html:Olá\, Ana" data-url="/index.php?nome=Ana">
+<p class="try-task"><strong>Missão:</strong> a página já cumprimenta pelo nome. Acrescente ao formulário um campo de texto chamado <code>cidade</code> (com o rótulo "Cidade:"), antes do botão. Rode, preencha os dois campos na aba <strong>Resultado</strong> e envie: o <code>print_r</code> deve mostrar <code>nome</code> e <code>cidade</code>.</p>
+<pre class="script">&lt;?php if (isset($_GET['nome'])): ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars($_GET['nome']) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="get"&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input type="text" name="nome"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;pre&gt;&lt;?php print_r($_GET); ?&gt;&lt;/pre&gt;
+</pre>
+<pre class="solucao">&lt;?php if (isset($_GET['nome'])): ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars($_GET['nome']) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="get"&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input type="text" name="nome"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Cidade: &lt;input type="text" name="cidade"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;pre&gt;&lt;?php print_r($_GET); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="out:name=&quot;tamanho&quot;,outre:type=&quot;radio&quot;[^&gt;]*value=&quot;G&quot;,src:method=&quot;post&quot;">
+<p class="try-task"><strong>Missão:</strong> transforme o formulário de busca em uma encomenda: troque o método para <code>post</code> e acrescente três botões radio chamados <code>tamanho</code>, com os valores <code>P</code>, <code>M</code> e <code>G</code>. Envie pela aba <strong>Resultado</strong> e confira: o endereço não muda e os dados aparecem em <code>$_POST</code>.</p>
+<pre class="script">&lt;form method="get"&gt;
+  &lt;p&gt;&lt;label&gt;Sabor: &lt;input type="text" name="sabor"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;pre&gt;&lt;?php print_r($_POST); ?&gt;&lt;/pre&gt;
+</pre>
+<pre class="solucao">&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Sabor: &lt;input type="text" name="sabor"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;Tamanho:
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="P"&gt; P&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="M"&gt; M&lt;/label&gt;
+    &lt;label&gt;&lt;input type="radio" name="tamanho" value="G"&gt; G&lt;/label&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;pre&gt;&lt;?php print_r($_POST); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um formulário é a "ficha" que o visitante preenche; o PHP é quem lê. Tudo entre <code>&lt;form&gt;</code> e <code>&lt;/form&gt;</code> vai junto.</li>
+  <li><code>action</code> = para onde enviar (sem ele, a própria página). <code>method</code> = como (sem ele, GET).</li>
+  <li>Só campos com <code>name</code> são enviados, no formato <code>nome=valor&amp;nome=valor</code>, sempre como texto.</li>
+  <li>Radio e checkbox desmarcados <strong>não são enviados</strong>. Checkbox marcada envia <code>on</code> (ou o seu <code>value</code>).</li>
+  <li>GET põe os dados no endereço (buscas, filtros, links); POST põe no corpo (senhas, cadastros, compras, arquivos).</li>
+  <li><code>required</code>, <code>type="email"</code>, <code>min</code>/<code>max</code> ajudam o visitante, mas não protegem nada: o PHP confere de novo.</li>
+  <li>Uma página só pode mostrar o formulário e processar o envio: <code>action</code> vazio + um <code>if</code> que pergunta se os dados chegaram.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
