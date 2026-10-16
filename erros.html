@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Erros — como ler as mensagens do PHP | Guia PHP</title>
+<meta name="description" content="Aprenda a ler as mensagens de erro do PHP: Parse error, Fatal error, Warning, Deprecated e Notice; o arquivo e a linha; display_errors e error_reporting no terminal e no navegador; e os 10 erros mais comuns de quem começa, com a mensagem real e a correção.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Lendo Erros</span></h1>
+
+<p class="intro">Todo mundo que programa vê mensagens de erro, todos os dias, inclusive quem programa há vinte anos. A diferença é que quem tem experiência <strong>lê</strong> a mensagem e quem está começando costuma se assustar e fechar a janela. Nesta aula você vai aprender a ler o que o PHP diz quando algo dá errado: que tipo de problema é, o que aconteceu e em que linha. Quase sempre a resposta está escrita ali.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As quatro partes de toda mensagem do PHP: a gravidade, o que aconteceu, o arquivo e a linha.</li>
+  <li>A diferença entre <code>Parse error</code>, <code>Fatal error</code>, <code>Warning</code>, <code>Deprecated</code> e <code>Notice</code>, e quais deles param o programa.</li>
+  <li>Por que a linha indicada às vezes não é a linha do erro (e onde procurar).</li>
+  <li>Como conferir a sintaxe sem rodar o programa (<code>php -l</code>).</li>
+  <li>O que mudam <code>display_errors</code> e <code>error_reporting</code>, no terminal e no navegador.</li>
+  <li>Os 10 erros mais comuns de quem começa, com a mensagem real e a correção.</li>
+</ul>
+</div>
+
+<p>Todas as mensagens desta página foram produzidas pelo PHP 8.5 de verdade, no computador da Ana (usuária <code>ana</code>, pasta <code>/home/ana/erros</code>). Elas vêm em inglês, sempre: o PHP não traduz as mensagens. Por isso cada uma ganha tradução aqui.</p>
+
+<hr>
+
+<h2>A ideia: o erro é um bilhete, não uma bronca</h2>
+<p>Pense na professora que devolve a prova com um bilhete na margem: <em>"Questão 3, linha 2: faltou o sinal de menos"</em>. O bilhete diz <strong>quão grave</strong> é (errou a questão inteira ou só perdeu meio ponto?), <strong>o que</strong> está errado e <strong>onde</strong>. Você não precisa adivinhar nada: é só ir até lá e consertar.</p>
+<p>A mensagem do PHP é esse bilhete. Veja um programa com um pequeno engano: a variável foi criada como <code>$nome</code> (com <code>n</code> minúsculo), mas foi usada como <code>$Nome</code> (com <code>N</code> maiúsculo). Para o PHP, são duas variáveis diferentes (veja <a href="variaveis.html">Variáveis</a>).</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = "Ana";
+echo "Olá, $Nome!\n";
+</pre>
+
+<pre class="term">$ php ola.php
+
+Warning: Undefined variable $Nome in /home/ana/erros/ola.php on line 3
+Olá, !</pre>
+
+<h3>Anatomia da mensagem</h3>
+<dl class="anatomy">
+  <dt>Warning:</dt><dd>A <strong>gravidade</strong>. <em>Warning</em> = "aviso": algo estranho aconteceu, mas o programa continuou. Por isso o <code>Olá, !</code> apareceu depois.</dd>
+  <dt>Undefined variable $Nome</dt><dd><strong>O que aconteceu</strong>: "variável não definida: <code>$Nome</code>". Você usou uma variável que nunca recebeu valor.</dd>
+  <dt>in /home/ana/erros/ola.php</dt><dd><strong>Em qual arquivo</strong> (<em>in</em> = "em"). Num projeto com muitos arquivos, isso importa.</dd>
+  <dt>on line 3</dt><dd><strong>Em qual linha</strong> (<em>on line</em> = "na linha"). Conte as linhas do arquivo: a 1 é o <code>&lt;?php</code>, a 3 é o <code>echo</code>.</dd>
+</dl>
+
+<p>Repare também na <strong>linha em branco</strong> antes do <code>Warning:</code>: o PHP sempre pula uma linha antes da mensagem, para ela não grudar no que já estava na tela. E repare no resultado: como <code>$Nome</code> não existe, ela valeu "nada", e a frase saiu <code>Olá, !</code>.</p>
+
+<p>Todas as mensagens do PHP seguem esse formato: <strong>gravidade: o que aconteceu in arquivo on line N</strong>. Quando você souber ler essas quatro partes, já saberá ler 90% dos erros.</p>
+
+<hr>
+
+<h2>Os tipos de mensagem: do mais grave ao mais leve</h2>
+<p>A primeira palavra da mensagem diz quão sério é o problema e, principalmente, <strong>se o programa parou</strong>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Começa com</th><th>Tradução</th><th>O programa…</th><th>Quando acontece</th></tr>
+<tr><td><code>Parse error</code></td><td>erro de análise (de escrita)</td><td><strong>nem começa</strong>: nenhuma linha roda</td><td>O código está escrito de um jeito que o PHP não entende: falta <code>;</code>, aspas, chaves…</td></tr>
+<tr><td><code>Fatal error</code></td><td>erro fatal</td><td><strong>para</strong> naquela linha; o que vinha antes já rodou</td><td>O código está bem escrito, mas pede algo impossível: uma função que não existe, dividir por zero…</td></tr>
+<tr><td><code>Warning</code></td><td>aviso</td><td>continua</td><td>Algo provavelmente errado: variável que não existe, posição de array que não existe.</td></tr>
+<tr><td><code>Deprecated</code></td><td>obsoleto</td><td>continua</td><td>Funciona hoje, mas vai deixar de funcionar numa versão futura do PHP.</td></tr>
+<tr><td><code>Notice</code></td><td>observação</td><td>continua</td><td>Um detalhe que talvez seja engano. No PHP 8 sobraram poucos.</td></tr>
+</table>
+</div>
+
+<p>Vamos ver cada um com um exemplo real.</p>
+
+<h3><code>Parse error</code>: o PHP não conseguiu ler o seu código</h3>
+<p>Antes de executar qualquer coisa, o PHP lê o arquivo inteiro e confere se ele está escrito de acordo com as regras da linguagem (a <a href="sintaxe.html">sintaxe</a>). Esse trabalho se chama <em>parse</em> ("análise"). Se algo não se encaixa, ele desiste e mostra um <code>Parse error</code>. Nenhuma linha roda, nem as que estavam certas:</p>
+
+<pre class="file" data-file="linhas.php">&lt;?php
+echo "Linha 1\n";
+echo "Linha 2\n";
+echo "Linha 3\n"
+echo "Linha 4\n";
+</pre>
+
+<pre class="term">$ php linhas.php
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in /home/ana/erros/linhas.php on line 5</pre>
+
+<p>Nem a <code>Linha 1</code> apareceu. A mensagem, traduzida:</p>
+<dl class="anatomy">
+  <dt>Parse error: syntax error</dt><dd>"Erro de análise: erro de sintaxe." O código está mal escrito.</dd>
+  <dt>unexpected token "echo"</dt><dd>"Encontrei um <code>echo</code> que eu não esperava." <em>Unexpected</em> = inesperado; <em>token</em> = "pedaço" do código (uma palavra, um sinal).</dd>
+  <dt>expecting "," or ";"</dt><dd>"Eu esperava uma vírgula ou um ponto e vírgula." Essa é a dica de ouro: diz exatamente o que faltou.</dd>
+  <dt>on line 5</dt><dd>O PHP percebeu o problema na linha 5, quando chegou ao <code>echo</code>. Mas quem esqueceu o <code>;</code> foi a linha <strong>4</strong>.</dd>
+</dl>
+
+<p>O PHP não sabe onde você <em>queria</em> colocar o <code>;</code>. Ele só sabe onde percebeu que algo estava errado: no primeiro pedaço que não fazia sentido. Por isso, num <code>Parse error</code>, <strong>olhe a linha indicada e a de cima</strong>. Nas próximas seções você vai ver os "pedaços inesperados" mais comuns.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O PHP diz <code>unexpected…</code></th><th>Quer dizer que achou…</th></tr>
+<tr><td><code>token "echo"</code>, <code>token "="</code>, <code>token "{"</code></td><td>uma palavra da linguagem ou um sinal</td></tr>
+<tr><td><code>identifier "Tchau"</code></td><td>uma palavra solta, sem <code>$</code> nem aspas (<em>identifier</em> = nome)</td></tr>
+<tr><td><code>variable "$total"</code></td><td>uma variável</td></tr>
+<tr><td><code>end of file</code></td><td>o <strong>fim do arquivo</strong>: algo ficou aberto (aspas, parênteses, chaves) até o final</td></tr>
+</table>
+</div>
+
+<h3><code>Fatal error</code>: o programa parou no meio</h3>
+<p>Aqui o código está bem escrito, então o PHP começa a rodar. Tudo vai bem até uma linha que pede algo impossível. Nesse ponto ele para, e o resto não roda:</p>
+
+<pre class="file" data-file="parou.php">&lt;?php
+echo "Antes\n";
+echo $x;
+echo "Depois\n";
+echo naoExiste();
+echo "Nunca aparece\n";
+</pre>
+
+<pre class="term">$ php parou.php
+Antes
+
+Warning: Undefined variable $x in /home/ana/erros/parou.php on line 3
+Depois
+
+Fatal error: Uncaught Error: Call to undefined function naoExiste() in /home/ana/erros/parou.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/parou.php on line 5
+$ echo $?
+255</pre>
+
+<p>Leia a saída de cima para baixo e você vê a história do programa: <code>Antes</code> saiu; a linha 3 deu um <strong>aviso</strong> e o programa <strong>continuou</strong> (<code>Depois</code> saiu); a linha 5 deu um <strong>erro fatal</strong> e o programa <strong>parou</strong> (<code>Nunca aparece</code> nunca apareceu). O <code>echo $?</code> mostra o <a href="linha-comando.html">código de saída</a>: <code>255</code> é o jeito de o PHP avisar ao terminal "terminei com erro fatal"; um programa que termina bem sai com <code>0</code>.</p>
+
+<p>A mensagem do erro fatal é maior. Parte por parte:</p>
+<dl class="anatomy">
+  <dt>Fatal error:</dt><dd>Erro fatal: o programa parou.</dd>
+  <dt>Uncaught Error:</dt><dd>"Erro não capturado." No PHP 8, a maioria dos erros fatais é um <strong>objeto de erro</strong> que o PHP "lança" (<em>throw</em>). Se ninguém o "captura" (<em>catch</em>), o programa para. Você vai aprender a capturar em <a href="excecoes.html">Exceções (try e catch)</a>; por enquanto, leia <em>Uncaught</em> como "e ninguém tratou".</dd>
+  <dt>Call to undefined function naoExiste()</dt><dd>O que aconteceu: "chamada a uma função não definida: <code>naoExiste()</code>".</dd>
+  <dt>in /home/ana/erros/parou.php:5</dt><dd>Arquivo e linha, num formato curto: <code>arquivo:linha</code>.</dd>
+  <dt>Stack trace:</dt><dd>"Rastro da pilha": o caminho de funções que levou até o erro, do mais recente (<code>#0</code>) ao mais antigo. Aqui o erro aconteceu direto no programa principal (<code>{main}</code>), então o rastro é curto. Ele fica útil quando você tiver <a href="funcoes.html">funções</a> chamando funções.</dd>
+  <dt>thrown in … on line 5</dt><dd>"Lançado em … na linha 5": repete o lugar, no formato de sempre.</dd>
+</dl>
+
+<h3><code>Warning</code>: um aviso, e o programa segue</h3>
+<p>O aviso é o tipo mais traiçoeiro, justamente porque o programa <strong>não para</strong>. Ele continua com um valor errado (no exemplo da Ana, a variável inexistente virou "nada") e o resultado sai estranho: <code>Olá, !</code>. Nunca ignore um <code>Warning</code>: ele quase sempre é um engano seu que vai virar um bug.</p>
+
+<h3><code>Deprecated</code>: funciona, mas está com os dias contados</h3>
+<p><em>Deprecated</em> quer dizer "desaprovado, obsoleto". É o PHP avisando: "isso ainda funciona, mas uma versão futura vai remover; troque". Acontece muito com códigos antigos copiados da internet. Um exemplo novo do PHP 8.5: os nomes compridos de conversão de tipo, como <code>(integer)</code>, viraram obsoletos.</p>
+
+<pre class="file" data-file="idade.php">&lt;?php
+$idade = (integer) "29";
+echo $idade, "\n";
+</pre>
+
+<pre class="term">$ php idade.php
+
+Deprecated: Non-canonical cast (integer) is deprecated, use the (int) cast instead in /home/ana/erros/idade.php on line 2
+29</pre>
+
+<p>Tradução: "A conversão não padrão <code>(integer)</code> está obsoleta; use a conversão <code>(int)</code> no lugar." O programa funcionou (<code>29</code> saiu), e a própria mensagem diz como consertar: trocar <code>(integer)</code> por <code>(int)</code>. Mensagens <code>Deprecated</code> costumam ser assim, educadas e com a solução. Conversões de tipo são assunto de <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+
+<h3><code>Notice</code>: uma observação</h3>
+<p>Antigamente o PHP tinha muitos <em>notices</em>; no PHP 8, quase todos viraram <code>Warning</code>. Os que sobraram são raros, por exemplo:</p>
+<pre class="term">$ php final.php
+
+Notice: Only variables should be passed by reference in /home/ana/erros/final.php on line 2
+c</pre>
+<p>Você não precisa entender este agora ("só variáveis deveriam ser passadas por referência"). Guarde só que <code>Notice</code> é o mais leve de todos e que o programa continua. A lista completa de tipos fica em <a href="tipos-erro.html">Tipos de Erro</a>.</p>
+
+<div class="tryphp" data-goal="out:Antes,out:Depois,out:FIM,semerro">
+<p class="try-task"><strong>Missão:</strong> clique em <strong>Rodar</strong> e leia a saída: um aviso e um erro fatal. Depois conserte o programa: a linha 3 deve mostrar o valor de <code>$x</code> (crie a variável antes, com o valor que quiser) e a linha 5 deve chamar a função que existe de verdade, <code>strtoupper</code> ("texto em maiúsculas"). O objetivo é ver <code>Antes</code>, <code>Depois</code> e <code>FIM</code>, sem nenhuma mensagem do PHP.</p>
+<pre class="script">&lt;?php
+echo "Antes\n";
+echo $x, "\n";
+echo "Depois\n";
+echo strtoupperr("fim"), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Antes\n";
+$x = 10;
+echo $x, "\n";
+echo "Depois\n";
+echo strtoupper("fim"), "\n";
+</pre>
+</div>
+
+
+<hr>
+
+<h2>A linha nem sempre é a do erro</h2>
+<p>O PHP indica a linha onde <strong>percebeu</strong> o problema, que nem sempre é a linha onde ele <strong>está</strong>. Isso acontece quase só com <code>Parse error</code>. Veja este arquivo, com duas linhas em branco depois do <code>echo</code> sem ponto e vírgula:</p>
+
+<pre class="file" data-file="longe.php">&lt;?php
+echo "Olá"
+
+
+$x = 1;
+</pre>
+
+<pre class="term">$ php longe.php
+
+Parse error: syntax error, unexpected variable "$x", expecting "," or ";" in /home/ana/erros/longe.php on line 5</pre>
+
+<p>O <code>;</code> faltou na linha 2, mas o PHP aponta a 5. Para ele, linhas em branco não contam: depois de <code>echo "Olá"</code> veio direto <code>$x</code>, e só ali ele percebeu que faltava algo. A regra prática:</p>
+
+<ol class="passo">
+  <li>Vá até a linha indicada.</li>
+  <li>Se ela parece certa, suba: olhe a <strong>última linha com código</strong> antes dela.</li>
+  <li>Se a mensagem fala em <code>end of file</code> (fim do arquivo), procure algo <strong>aberto</strong> e não fechado: aspas, <code>(</code>, <code>{</code>. Aí o problema pode estar bem longe, lá em cima.</li>
+</ol>
+
+<div class="tip">
+<strong>Ligue os números de linha no editor</strong>
+<p>Todo editor de código mostra o número de cada linha na margem esquerda (veja <a href="editores.html">Editores e IDEs</a>). O VS Code também pula direto para uma linha com <kbd>Ctrl</kbd>+<kbd>G</kbd>. No <code>nano</code>, é <kbd>Ctrl</kbd>+<kbd>_</kbd> (ou <kbd>Alt</kbd>+<kbd>G</kbd>). Com isso, ir até a "line 37" leva dois segundos.</p>
+</div>
+
+<h3>Conferir a escrita sem rodar: <code>php -l</code></h3>
+<p>A opção <code>-l</code> (de <em>lint</em>, "fiapo": catar pequenos defeitos) faz o PHP só <strong>ler</strong> o arquivo e dizer se a sintaxe está certa, sem executar nada. Ela encontra os <code>Parse error</code>, não os outros (para achar um <code>Warning</code>, o programa precisa rodar).</p>
+
+<pre class="term">$ php -l linhas.php
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in linhas.php on line 5
+Errors parsing linhas.php
+$ echo $?
+255
+$ php -l ola.php
+No syntax errors detected in ola.php</pre>
+
+<p><code>No syntax errors detected</code> = "nenhum erro de sintaxe encontrado". <code>Errors parsing</code> = "erros ao analisar". É útil antes de enviar um arquivo para o servidor: um <code>Parse error</code> no ar derruba a página inteira.</p>
+
+<hr>
+
+<h2>Onde a mensagem aparece: terminal × navegador</h2>
+<p>Até aqui você rodou tudo no terminal (o modo <strong>CLI</strong>, de <em>command line interface</em>). Quando o mesmo PHP gera uma página web, a mensagem aparece de outro jeito. E, num site de verdade, muitas vezes ela nem aparece. Quem decide isso são duas configurações: <code>display_errors</code> e <code>error_reporting</code>.</p>
+
+<h3><code>display_errors</code>: mostrar ou esconder</h3>
+<p><code>display_errors</code> ("exibir os erros") decide se as mensagens vão para a <strong>saída</strong> do programa: a tela do terminal ou a página que o navegador recebe. Ligado (<code>1</code> ou <code>On</code>), você vê as mensagens. Desligado (<code>0</code> ou <code>Off</code>), elas somem, mas o erro continua acontecendo. Você pode mudar só para uma execução com <code>-d</code> ("definir"):</p>
+
+<pre class="term">$ php ola.php
+
+Warning: Undefined variable $Nome in /home/ana/erros/ola.php on line 3
+Olá, !
+$ php -d display_errors=0 ola.php
+Olá, !                               « o aviso sumiu, mas o problema continua</pre>
+
+<p>Com um erro fatal e <code>display_errors</code> desligado, o resultado é o pior de todos: <strong>nada</strong>. Nenhuma saída, nenhuma explicação. Só o código de saída denuncia:</p>
+
+<pre class="term">$ php -d display_errors=0 parou.php
+Antes
+Depois
+$ echo $?
+255                                  « parou com erro fatal, em silêncio</pre>
+
+<h3>No navegador: as mesmas mensagens, em HTML</h3>
+<p>Esta página tem os mesmos dois enganos (a variável <code>$Nome</code> e uma função que não existe):</p>
+
+<pre class="file" data-file="pagina.php">&lt;?php
+$nome = "Ana";
+echo "&lt;p&gt;Olá, $Nome!&lt;/p&gt;\n";
+echo "&lt;p&gt;Total: " . contar() . "&lt;/p&gt;\n";
+</pre>
+
+<p>Abrindo pelo <a href="servidor-embutido.html">servidor embutido</a> (<code>php -S localhost:8000</code>), o navegador recebe este HTML:</p>
+
+<pre class="term">$ curl -s localhost:8000/pagina.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined variable $Nome in &lt;b&gt;/home/ana/erros/pagina.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+&lt;p&gt;Olá, !&lt;/p&gt;
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught Error: Call to undefined function contar() in /home/ana/erros/pagina.php:4
+Stack trace:
+#0 {main}
+  thrown in &lt;b&gt;/home/ana/erros/pagina.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;</pre>
+
+<p>A mensagem é a mesma, só que com etiquetas HTML: <code>&lt;b&gt;</code> (negrito) na gravidade, no arquivo e na linha, e <code>&lt;br /&gt;</code> (quebra de linha) no lugar das linhas em branco. No navegador, você vê o texto em negrito, misturado com a sua página. Isso é a configuração <code>html_errors</code>, que vem ligada no modo web e desligada no terminal.</p>
+
+<p>Agora o mesmo servidor, com <code>display_errors</code> desligado (<code>php -d display_errors=0 -S localhost:8000</code>), numa página em que o erro fatal acontece <strong>antes</strong> de qualquer saída:</p>
+
+<pre class="file" data-file="pagina2.php">&lt;?php
+$total = contar();
+echo "&lt;p&gt;Total: $total&lt;/p&gt;";
+</pre>
+
+<pre class="term">$ curl -si localhost:8000/pagina2.php
+HTTP/1.0 500 Internal Server Error
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:44:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+                                     « e mais nada: a página veio vazia</pre>
+
+<p>Esta é a famosa <strong>"tela branca"</strong>: o navegador recebe o código <code>500 Internal Server Error</code> ("erro interno do servidor") e uma página vazia (ou a página padrão de erro do navegador). Nenhuma pista. A pista está no <strong>registro</strong> (<em>log</em>) do servidor. No servidor embutido, o registro é o próprio terminal onde ele está rodando:</p>
+
+<pre class="term">[Fri Oct 16 20:44:32 2026] 127.0.0.1:54500 [200]: GET /pagina.php - Uncaught Error: Call to undefined function contar() in /home/ana/erros/pagina.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/pagina.php on line 4</pre>
+
+<h3>Ligado no seu computador, desligado no site no ar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde</th><th><code>display_errors</code></th><th>Por quê</th></tr>
+<tr><td>Seu computador (desenvolvimento)</td><td><strong>ligado</strong></td><td>Você quer ver cada erro na hora, para consertar.</td></tr>
+<tr><td>Site no ar (produção)</td><td><strong>desligado</strong>, com <code>log_errors</code> ligado</td><td>A mensagem mostra caminhos de pastas e nomes de arquivos do servidor, informação útil para um invasor. Os erros vão para o registro, que só você lê.</td></tr>
+</table>
+</div>
+
+<p>Essas configurações moram no arquivo <code>php.ini</code>. O comando <code>php --ini</code> mostra qual arquivo está sendo usado, e <code>php -i</code> mostra os valores atuais. No computador da Ana, o PHP não tem <code>php.ini</code>, então vale o padrão de fábrica do terminal: mostrar tudo.</p>
+
+<pre class="term">$ php -i | grep -E "^(display_errors|error_reporting|log_errors|html_errors)"
+display_errors =&gt; STDOUT =&gt; STDOUT
+error_reporting =&gt; no value =&gt; no value
+html_errors =&gt; Off =&gt; Off
+log_errors =&gt; Off =&gt; Off</pre>
+
+<p><code>STDOUT</code> quer dizer "ligado, na saída normal". <code>error_reporting</code> sem valor quer dizer "o padrão", que no PHP 8 é <strong>todos os tipos</strong>. No Debian e no Ubuntu, o PHP instalado pelo <code>apt</code> tem um <code>php.ini</code> para o terminal e outro para o servidor web, em <code>/etc/php/8.x/</code> (veja <a href="instalar-linux.html">Instalar no Linux</a>); a versão do servidor web costuma vir com <code>display_errors</code> desligado.</p>
+
+<div class="note">
+<strong>Por que às vezes a mensagem aparece duas vezes?</strong>
+<p>Se <code>display_errors</code> e <code>log_errors</code> estiverem ligados ao mesmo tempo no terminal, o PHP mostra a mensagem na saída <strong>e</strong> escreve no registro. Sem um arquivo de registro configurado, o registro vai para a saída de erros do terminal, com o prefixo <code>PHP</code>:</p>
+<pre class="term">$ php -d log_errors=1 ola.php
+PHP Warning:  Undefined variable $Nome in /home/ana/erros/ola.php on line 3
+
+Warning: Undefined variable $Nome in /home/ana/erros/ola.php on line 3
+Olá, !</pre>
+<p>É o mesmo aviso, uma vez só. Se você vir <code>PHP Warning:</code> no seu computador, é essa configuração.</p>
+</div>
+
+<h3><code>error_reporting</code>: quais tipos contam</h3>
+<p><code>error_reporting</code> ("relatar erros") escolhe <strong>quais tipos</strong> de mensagem o PHP leva em conta. Cada tipo tem uma constante com o nome dele:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Constante</th><th>Tipo</th></tr>
+<tr><td><code>E_ALL</code></td><td>Todos (o padrão do PHP 8; é o que você quer enquanto aprende)</td></tr>
+<tr><td><code>E_WARNING</code></td><td>Os <code>Warning</code></td></tr>
+<tr><td><code>E_NOTICE</code></td><td>Os <code>Notice</code></td></tr>
+<tr><td><code>E_DEPRECATED</code></td><td>Os <code>Deprecated</code></td></tr>
+<tr><td><code>E_ALL &amp; ~E_DEPRECATED</code></td><td>Todos, menos os <code>Deprecated</code> (o <code>~</code> quer dizer "menos")</td></tr>
+</table>
+</div>
+
+<p>Você pode mudar as duas configurações <strong>dentro do programa</strong>, nas primeiras linhas. É comum ver isto no topo de arquivos de quem está desenvolvendo:</p>
+
+<pre class="file" data-file="config.php">&lt;?php
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+echo "Olá, $Nome!\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>error_reporting(E_ALL);</dt><dd>"Leve em conta todos os tipos de mensagem."</dd>
+  <dt>ini_set('display_errors', '1');</dt><dd>Muda uma configuração do <code>php.ini</code> só para este programa (<code>ini_set</code> = "definir no ini"): "mostre as mensagens".</dd>
+</dl>
+
+<pre class="term">$ php -d display_errors=0 config.php
+
+Warning: Undefined variable $Nome in /home/ana/erros/config.php on line 5
+Olá, !                               « o ini_set venceu o -d</pre>
+
+<div class="warning">
+<strong>O <code>ini_set</code> não mostra <code>Parse error</code></strong>
+<p>Se o arquivo tem um erro de sintaxe, o PHP desiste <strong>antes</strong> de rodar qualquer linha, inclusive o <code>ini_set</code>. Com <code>display_errors</code> desligado no <code>php.ini</code>, o resultado é a tela vazia:</p>
+<pre class="term">$ php -d display_errors=0 config2.php
+$ echo $?
+255</pre>
+<p>Para ver erros de sintaxe, use <code>php -l arquivo.php</code> ou ligue <code>display_errors</code> no <code>php.ini</code> do seu computador.</p>
+</div>
+
+<p>E não esconda avisos para "consertar" o programa. Desligar os <code>Warning</code> com <code>error_reporting(E_ALL &amp; ~E_WARNING)</code> só tira o bilhete da sua frente; o engano continua lá e o resultado continua errado (<code>Olá, !</code>). Erros são tratados de verdade em <a href="excecoes.html">Exceções</a> e <a href="depuracao.html">Depurar</a>.</p>
+
+<hr>
+
+<h2>Os 10 erros mais comuns de quem começa</h2>
+<p>Cada caso abaixo foi rodado no PHP 8.5. Guarde esta seção: quando aparecer um erro que você não entende, procure aqui pela mensagem. Para a lista completa, veja <a href="ref-erros.html">Mensagens de Erro</a>.</p>
+
+<div class="cenario">
+<strong>1. Esqueceu o ponto e vírgula</strong>
+<pre class="file" data-file="e1.php">&lt;?php
+$nome = "Ana"
+echo "Olá, $nome!\n";
+</pre>
+<pre class="term">$ php e1.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/erros/e1.php on line 3</pre>
+<p><strong>O que significa:</strong> "encontrei um <code>echo</code> inesperado na linha 3". Toda instrução do PHP termina com <code>;</code>. Sem ele, o PHP achou que a linha 2 continuava, e o <code>echo</code> não fazia sentido ali.</p>
+<p><strong>Como consertar:</strong> coloque o <code>;</code> no fim da linha <strong>de cima</strong> (a 2): <code>$nome = "Ana";</code>. Se o <code>;</code> faltar na última linha do arquivo, a mensagem vira <code>unexpected end of file, expecting "," or ";"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>2. Aspas abertas e não fechadas</strong>
+<pre class="file" data-file="e2.php">&lt;?php
+echo "Olá, mundo!\n;
+echo "Tchau!\n";
+</pre>
+<pre class="term">$ php e2.php
+
+Parse error: syntax error, unexpected identifier "Tchau", expecting "," or ";" in /home/ana/erros/e2.php on line 3</pre>
+<p><strong>O que significa:</strong> a aspa que deveria fechar o texto da linha 2 ficou <strong>dentro</strong> dele (<code>\n;</code> em vez de <code>\n";</code>). Então o texto continuou até a primeira aspa da linha 3, e o <code>Tchau</code> ficou "solto", fora de qualquer aspas. Repare na dica: o editor do guia e os editores de código pintam o texto entre aspas de outra cor; quando a cor "vaza" para as linhas seguintes, é aspa faltando.</p>
+<p><strong>Como consertar:</strong> feche as aspas: <code>echo "Olá, mundo!\n";</code>. Se a aspa nunca fecha, a mensagem é <code>unexpected end of file</code>. O mesmo acontece com uma aspa dentro do texto: <code>echo "Ela disse "oi"";</code> dá <code>unexpected identifier "oi"</code>; use <code>'Ela disse "oi"'</code> ou <code>"Ela disse \"oi\""</code> (veja <a href="strings.html">Strings</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>3. Chave aberta e não fechada</strong>
+<pre class="file" data-file="e3.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7) {
+    echo "Aprovada!\n";
+
+echo "Fim\n";
+</pre>
+<pre class="term">$ php e3.php
+
+Parse error: Unclosed '{' on line 3 in /home/ana/erros/e3.php on line 7</pre>
+<p><strong>O que significa:</strong> "chave <code>{</code> da linha 3 não foi fechada". O PHP chegou ao fim do arquivo (linha 7) ainda esperando a <code>}</code>. Esta mensagem é das boas: diz onde a chave foi <strong>aberta</strong>.</p>
+<p><strong>Como consertar:</strong> feche o bloco onde ele deve acabar, com <code>}</code> depois do <code>echo "Aprovada!\n";</code>. Manter o código <strong>indentado</strong> (com recuo dentro das chaves) ajuda a ver qual chave ficou sem par. O <code>if</code> é assunto de <a href="if-else.html">if, elseif, else</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>4. Parêntese faltando</strong>
+<pre class="file" data-file="f1.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7 {
+    echo "Aprovada!\n";
+}
+</pre>
+<pre class="term">$ php f1.php
+
+Parse error: syntax error, unexpected token "{" in /home/ana/erros/f1.php on line 3</pre>
+<p><strong>O que significa:</strong> o PHP esperava fechar o parêntese da condição e encontrou uma <code>{</code>.</p>
+<p><strong>Como consertar:</strong> <code>if ($nota &gt;= 7) {</code>. Conte: cada <code>(</code> precisa de um <code>)</code>. Os editores de código destacam o par quando você põe o cursor num parêntese.</p>
+</div>
+
+<div class="cenario">
+<strong>5. Variável com nome diferente (maiúscula, erro de digitação)</strong>
+<pre class="file" data-file="e4.php">&lt;?php
+$nome = "Ana";
+echo "Olá, $Nome!\n";
+</pre>
+<pre class="term">$ php e4.php
+
+Warning: Undefined variable $Nome in /home/ana/erros/e4.php on line 3
+Olá, !</pre>
+<p><strong>O que significa:</strong> "variável não definida: <code>$Nome</code>". No PHP, maiúsculas e minúsculas fazem diferença nos nomes de variáveis: <code>$nome</code>, <code>$Nome</code> e <code>$NOME</code> são três variáveis. O mesmo aviso aparece se você usar a variável antes de criá-la, ou se errar uma letra (<code>$nmoe</code>).</p>
+<p><strong>Como consertar:</strong> copie o nome exatamente como foi criado: <code>$nome</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>6. Esqueceu o <code>$</code> da variável</strong>
+<pre class="file" data-file="e6.php">&lt;?php
+$nome = "Ana";
+echo nome;
+</pre>
+<pre class="term">$ php e6.php
+
+Fatal error: Uncaught Error: Undefined constant "nome" in /home/ana/erros/e6.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/e6.php on line 3</pre>
+<p><strong>O que significa:</strong> sem <code>$</code> e sem aspas, uma palavra solta é, para o PHP, o nome de uma <a href="constantes.html">constante</a>. Não existe constante chamada <code>nome</code>, e o programa para. Se o <code>$</code> faltar na criação (<code>nome = "Ana";</code>), o erro é outro, de sintaxe: <code>Parse error: syntax error, unexpected token "="</code>.</p>
+<p><strong>Como consertar:</strong> <code>echo $nome;</code>. O mesmo erro aparece com a chave de um array sem aspas: <code>$aluna[nome]</code> dá <code>Undefined constant "nome"</code>; o certo é <code>$aluna["nome"]</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>7. Nome de função errado</strong>
+<pre class="file" data-file="e7.php">&lt;?php
+$texto = "banana";
+echo strlenn($texto);
+</pre>
+<pre class="term">$ php e7.php
+
+Fatal error: Uncaught Error: Call to undefined function strlenn() in /home/ana/erros/e7.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/e7.php on line 3</pre>
+<p><strong>O que significa:</strong> "chamada a uma função não definida: <code>strlenn()</code>". A função certa é <code>strlen</code> ("tamanho do texto"), com um <code>n</code> só. O PHP não sugere o nome certo; quem tem que perceber é você.</p>
+<p><strong>Como consertar:</strong> corrija o nome. Na dúvida, procure a função no manual (<code>php.net/strlen</code>) ou em <a href="ref-string.html">Funções de String</a>. Se a função é sua, confira se ela foi criada (ou incluída, com <a href="include-require.html">require</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>8. Posição de array que não existe</strong>
+<pre class="file" data-file="e8.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "nota" =&gt; 9];
+echo $aluna["idade"];
+echo "\n";
+$frutas = ["maçã", "pera"];
+echo $frutas[2];
+</pre>
+<pre class="term">$ php e8.php
+
+Warning: Undefined array key "idade" in /home/ana/erros/e8.php on line 3
+
+
+Warning: Undefined array key 2 in /home/ana/erros/e8.php on line 6</pre>
+<p><strong>O que significa:</strong> "chave de array não definida". O array <code>$aluna</code> não tem <code>"idade"</code>; o <code>$frutas</code> tem as posições <code>0</code> e <code>1</code> (a contagem começa no zero), não a <code>2</code>.</p>
+<p><strong>Como consertar:</strong> use uma chave que existe, ou confira antes, com <code>isset($aluna["idade"])</code> ou com o operador <code>??</code>: <code>echo $aluna["idade"] ?? "sem idade";</code> (veja <a href="arrays.html">Arrays Indexados</a> e <a href="null-coalescing.html">?? e ?-&gt;</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>9. Juntar textos com <code>+</code> em vez de <code>.</code></strong>
+<pre class="file" data-file="e10.php">&lt;?php
+$nome = "Ana";
+echo "Olá, " + $nome;
+</pre>
+<pre class="term">$ php e10.php
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + string in /home/ana/erros/e10.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/e10.php on line 3</pre>
+<p><strong>O que significa:</strong> "tipos de operando não suportados: texto + texto". Quem vem de JavaScript ou Python escreve <code>+</code> para juntar textos, mas no PHP o <code>+</code> é só para <strong>somar números</strong>. <code>TypeError</code> é o erro de "tipo errado".</p>
+<p><strong>Como consertar:</strong> use o ponto, que é o operador de juntar textos: <code>echo "Olá, " . $nome;</code> (veja <a href="operadores-string.html">Operadores de String</a>). Parecido: <code>echo "Frutas: " . $frutas;</code> com um array dá <code>Warning: Array to string conversion</code> e mostra a palavra <code>Array</code>; para ver um array, use <code>print_r</code> (veja <a href="var-dump.html">var_dump e print_r</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>10. Divisão por zero</strong>
+<pre class="file" data-file="e9.php">&lt;?php
+$total = 100;
+$pessoas = 0;
+echo $total / $pessoas;
+</pre>
+<pre class="term">$ php e9.php
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/erros/e9.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/e9.php on line 4</pre>
+<p><strong>O que significa:</strong> "erro de divisão por zero". Dividir por zero não tem resposta na matemática, e o PHP 8 para o programa (no PHP 7 era só um aviso).</p>
+<p><strong>Como consertar:</strong> confira o divisor antes: <code>if ($pessoas &gt; 0) { echo $total / $pessoas; }</code>. O problema quase nunca é o <code>/</code>: é o valor que chegou zero sem você esperar (um formulário vazio, uma lista sem itens).</p>
+</div>
+
+<div class="cenario">
+<strong>Bônus: o código apareceu na tela, em vez de rodar</strong>
+<pre class="file" data-file="f4.php">echo "Olá, mundo!\n";
+</pre>
+<pre class="term">$ php f4.php
+echo "Olá, mundo!\n";</pre>
+<p><strong>O que significa:</strong> não há mensagem de erro, porque o PHP não viu código nenhum. Sem o <code>&lt;?php</code> no começo, tudo é texto comum, e o PHP o devolve como está (veja <a href="php-e-html.html">PHP Dentro do HTML</a>).</p>
+<p><strong>Como consertar:</strong> comece o arquivo com <code>&lt;?php</code>, na primeira linha, sem nada antes.</p>
+</div>
+
+<div class="tryphp" data-goal="erro:Undefined constant">
+<p class="try-task"><strong>Missão:</strong> provoque um erro de propósito. Apague o <code>$</code> do <code>$cidade</code> na linha 3, clique em <strong>Rodar</strong> e leia a mensagem: qual é a gravidade, o que aconteceu e em que linha?</p>
+<pre class="script">&lt;?php
+$cidade = "Recife";
+echo $cidade, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$cidade = "Recife";
+echo cidade, "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Roteiro para qualquer erro</h2>
+<p>Quando uma mensagem aparecer, siga sempre a mesma ordem:</p>
+<ol class="passo">
+  <li><strong>Leia a primeira palavra.</strong> <code>Parse error</code>? O problema é de escrita (pontuação, aspas, chaves). <code>Fatal error</code>? O código está bem escrito, mas pediu algo impossível. <code>Warning</code>? O programa seguiu com um valor errado.</li>
+  <li><strong>Leia o "o que aconteceu"</strong>, traduzindo palavra por palavra. <em>Undefined</em> = não definido; <em>unexpected</em> = inesperado; <em>expecting</em> = esperava; <em>unclosed</em> = não fechado; <em>call to</em> = chamada a.</li>
+  <li><strong>Vá até o arquivo e a linha.</strong> Num <code>Parse error</code>, olhe também a linha de cima.</li>
+  <li><strong>Conserte só o primeiro erro e rode de novo.</strong> Um erro no começo pode causar outros mais para baixo; muitas vezes eles somem juntos.</li>
+  <li><strong>Ainda não entendeu?</strong> Copie a parte fixa da mensagem (sem o seu caminho e o número da linha), como <code>Undefined array key</code>, e procure em <a href="ref-erros.html">Mensagens de Erro</a> ou num buscador.</li>
+</ol>
+
+<div class="tryphp" data-goal="out:Produto: Caderno,out:Total: R$ 37.5,semerro">
+<p class="try-task"><strong>Missão final:</strong> o programa da lojinha da Ana tem <strong>três</strong> erros, um de cada tipo desta aula. Rode, leia a mensagem, conserte, rode de novo, até aparecer <code>Produto: Caderno</code> e <code>Total: R$ 37.5</code> sem nenhuma mensagem do PHP. Repare que cada conserto revela o erro seguinte.</p>
+<pre class="script">&lt;?php
+$produto = "Caderno";
+$preco = 12.5;
+$qtd = 3
+
+$total = $preco * $qtd;
+echo "Produto: " . $Produto . "\n";
+echo "Total: R$ " + $total . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$produto = "Caderno";
+$preco = 12.5;
+$qtd = 3;
+
+$total = $preco * $qtd;
+echo "Produto: " . $produto . "\n";
+echo "Total: R$ " . $total . "\n";
+</pre>
+</div>
+
+<p>No PHP real, a sequência de mensagens foi esta. Primeiro, o <code>Parse error</code> (o <code>;</code> que falta na linha 4 só é notado na linha 6, por causa da linha em branco):</p>
+<pre class="term">$ php loja.php
+
+Parse error: syntax error, unexpected variable "$total" in /home/ana/erros/loja.php on line 6</pre>
+<p>Depois de colocar o <code>;</code>, o programa roda até a linha 8:</p>
+<pre class="term">$ php loja.php
+
+Warning: Undefined variable $Produto in /home/ana/erros/loja.php on line 7
+Produto:
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + float in /home/ana/erros/loja.php:8
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/loja.php on line 8</pre>
+<p>Com <code>$produto</code> minúsculo e o <code>.</code> no lugar do <code>+</code>:</p>
+<pre class="term">$ php loja.php
+Produto: Caderno
+Total: R$ 37.5</pre>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem (parte fixa)</th><th>Tradução</th><th>Causa mais comum</th></tr>
+<tr><td><code>Parse error: syntax error, unexpected …</code></td><td>erro de sintaxe, … inesperado</td><td>Falta <code>;</code>, aspas, <code>)</code> ou <code>}</code> na linha indicada ou na de cima</td></tr>
+<tr><td><code>… expecting "," or ";"</code></td><td>esperava <code>,</code> ou <code>;</code></td><td>Falta o <code>;</code> na instrução anterior</td></tr>
+<tr><td><code>unexpected end of file</code></td><td>fim do arquivo inesperado</td><td>Algo aberto e nunca fechado (aspas, parênteses)</td></tr>
+<tr><td><code>Unclosed '{' on line N</code></td><td>chave aberta na linha N não fechada</td><td>Falta uma <code>}</code></td></tr>
+<tr><td><code>Warning: Undefined variable $x</code></td><td>variável não definida</td><td>Nome diferente (maiúscula, letra trocada) ou usada antes de criar</td></tr>
+<tr><td><code>Warning: Undefined array key</code></td><td>chave de array não definida</td><td>Chave que não existe; posição além do fim</td></tr>
+<tr><td><code>Warning: Array to string conversion</code></td><td>conversão de array em texto</td><td><code>echo</code> de um array inteiro</td></tr>
+<tr><td><code>Error: Undefined constant "x"</code></td><td>constante não definida</td><td>Faltou o <code>$</code> ou as aspas</td></tr>
+<tr><td><code>Error: Call to undefined function f()</code></td><td>função não definida</td><td>Nome errado ou arquivo da função não incluído</td></tr>
+<tr><td><code>TypeError: Unsupported operand types</code></td><td>tipos de operando não suportados</td><td><code>+</code> com textos (use <code>.</code>)</td></tr>
+<tr><td><code>DivisionByZeroError: Division by zero</code></td><td>divisão por zero</td><td>Divisor que chegou zero</td></tr>
+<tr><td><code>ArgumentCountError: f() expects exactly 1 argument, 0 given</code></td><td>esperava 1 argumento, recebeu 0</td><td>Faltou passar algo para a função</td></tr>
+<tr><td><code>Deprecated: …</code></td><td>obsoleto</td><td>Código antigo; a mensagem diz o substituto</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>O que faz</th></tr>
+<tr><td><code>php -l arquivo.php</code></td><td>Confere a sintaxe sem rodar</td></tr>
+<tr><td><code>php -d display_errors=0 arquivo.php</code></td><td>Roda uma vez com uma configuração diferente</td></tr>
+<tr><td><code>php --ini</code> / <code>php -i</code></td><td>Mostra qual <code>php.ini</code> é usado / os valores atuais</td></tr>
+<tr><td><code>error_reporting(E_ALL);</code></td><td>Dentro do programa: levar em conta todos os tipos</td></tr>
+<tr><td><code>ini_set('display_errors', '1');</code></td><td>Dentro do programa: mostrar as mensagens (não vale para <code>Parse error</code>)</td></tr>
+<tr><td><code>echo $?</code></td><td>No terminal, logo depois: <code>255</code> = terminou com erro fatal ou de sintaxe</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Traduza a gravidade</h3>
+<p>Qual palavra começa a mensagem de um erro que impede o PHP de rodar <strong>qualquer</strong> linha do arquivo?</p>
+<div class="ex-code"><input data-answer="Parse error|Parse|Parse error:" aria-label="gravidade"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Conferir sem rodar</h3>
+<p>Complete o comando que confere a sintaxe de <code>loja.php</code> sem executá-lo:</p>
+<div class="ex-code">php <input data-answer="-l loja.php|-l" aria-label="opção e arquivo"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Qual linha?</h3>
+<p>O PHP mostrou <code>Parse error: syntax error, unexpected token "echo", expecting "," or ";" in /home/ana/site/index.php on line 12</code>, e a linha 12 começa com <code>echo</code> e parece certa. Em qual linha está, provavelmente, o <code>;</code> que falta (supondo que não há linhas em branco)?</p>
+<div class="ex-code">linha <input data-answer="11" aria-label="número da linha"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O programa mostrou <code>Warning: Undefined variable $total</code> na linha 4. O que aconteceu com as linhas 5, 6 e 7?</p>
+<label><input type="radio" name="q4"> Não rodaram: o programa parou na linha 4.</label>
+<label><input type="radio" name="q4"> Rodaram normalmente, mas usando <code>$total</code> como se fosse "nada".</label>
+<label><input type="radio" name="q4"> Nenhuma linha do programa rodou.</label>
+<label><input type="radio" name="q4"> O PHP criou <code>$total</code> com o valor certo.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas mensagens aparece quando você esquece o <code>$</code> em <code>echo nome;</code>?</p>
+<label><input type="radio" name="q5"> <code>Warning: Undefined variable $nome</code></label>
+<label><input type="radio" name="q5"> <code>Parse error: syntax error, unexpected token "echo"</code></label>
+<label><input type="radio" name="q5"> <code>Fatal error: Uncaught Error: Undefined constant "nome"</code></label>
+<label><input type="radio" name="q5"> <code>Fatal error: Uncaught Error: Call to undefined function nome()</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O site da Ana, no ar, mostra uma página em branco. Por que a mensagem de erro não aparece no navegador?</p>
+<label><input type="radio" name="q6"> Porque o PHP não tem mensagens de erro no modo web.</label>
+<label><input type="radio" name="q6"> Porque o erro é um <code>Deprecated</code>.</label>
+<label><input type="radio" name="q6"> Porque o navegador bloqueia mensagens em inglês.</label>
+<label><input type="radio" name="q6"> Porque, em produção, <code>display_errors</code> fica desligado; a mensagem vai para o registro (log) do servidor.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. O que acontece com <code>echo "Total: " + 10;</code>?</p>
+<label><input type="radio" name="q7"> <code>Fatal error: Uncaught TypeError: Unsupported operand types: string + int</code>; o conserto é trocar o <code>+</code> pelo <code>.</code>.</label>
+<label><input type="radio" name="q7"> Não dá erro; o PHP junta os dois.</label>
+<label><input type="radio" name="q7"> Dá <code>Parse error</code>; falta o <code>;</code>.</label>
+<label><input type="radio" name="q7"> Dá <code>Deprecated</code>; basta ignorar.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Toda mensagem do PHP tem quatro partes: <strong>gravidade</strong>, <strong>o que aconteceu</strong>, <strong>arquivo</strong> (<em>in</em>) e <strong>linha</strong> (<em>on line</em>).</li>
+  <li><code>Parse error</code>: o código está mal escrito; nenhuma linha roda. <code>Fatal error</code>: o programa para naquela linha. <code>Warning</code>, <code>Deprecated</code> e <code>Notice</code>: o programa continua, possivelmente com valores errados.</li>
+  <li>Num <code>Parse error</code>, o problema costuma estar na linha indicada <strong>ou antes</strong>; <code>end of file</code> = algo ficou aberto.</li>
+  <li><code>php -l</code> confere a sintaxe sem rodar. <code>echo $?</code> igual a <code>255</code> = terminou com erro.</li>
+  <li><code>display_errors</code> mostra ou esconde as mensagens; <code>error_reporting</code> escolhe os tipos. Ligados no seu computador, <code>display_errors</code> desligado no site no ar (os erros vão para o log).</li>
+  <li>No navegador, a mensagem vem em HTML (<code>&lt;b&gt;Warning&lt;/b&gt;</code>); com <code>display_errors</code> desligado, um erro fatal vira tela branca e <code>500</code>.</li>
+  <li>Conserte o <strong>primeiro</strong> erro e rode de novo. Nunca esconda avisos: conserte a causa.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
