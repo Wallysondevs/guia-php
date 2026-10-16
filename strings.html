@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Strings — aspas simples, duplas, strlen e caracteres | Guia PHP</title>
+<meta name="description" content="Strings (textos) em PHP para quem nunca programou: aspas simples e duplas, interpolação, sequências de escape como \n e \t, strlen e o problema dos acentos, concatenação com ponto e acesso a cada caractere com $s[0], com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Strings</span></h1>
+
+<p class="intro">Nome de cliente, endereço, mensagem de boas-vindas, o HTML inteiro de uma página: quase tudo o que um programa PHP mostra é <strong>texto</strong>. Em programação, texto se chama <strong>string</strong>. Nesta aula você aprende a escrever strings com aspas simples e duplas (e a diferença entre elas, que confunde muita gente), a colocar quebras de linha e aspas dentro do texto, a medir o tamanho de uma string e por que o PHP diz que <code>"maçã"</code> tem 6 caracteres.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma string e como escrevê-la com <code>'aspas simples'</code> e <code>"aspas duplas"</code>.</li>
+  <li>O que só as aspas duplas fazem: trocar variáveis pelo valor e entender <code>\n</code>, <code>\t</code>, <code>\"</code>…</li>
+  <li>Como colocar uma aspa dentro de uma string.</li>
+  <li>Como medir uma string com <code>strlen</code>, e o "problema" dos acentos.</li>
+  <li>Como juntar strings com o ponto (<code>.</code>).</li>
+  <li>Como pegar um caractere com <code>$s[0]</code>, e por que isso quebra letras acentuadas.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. As funções que transformam texto (maiúsculas, procurar, trocar, cortar) estão em <a href="funcoes-string.html">Funções de String</a>; aqui é a base.</p>
+
+<hr>
+
+<h2>A ideia: um colar de contas</h2>
+<p>A palavra inglesa <em>string</em> quer dizer "cordão". Pense num colar: cada conta é um caractere (uma letra, um número, um espaço, um ponto), e o cordão mantém as contas em ordem. <code>"Ana"</code> é um colar de 3 contas: <code>A</code>, <code>n</code>, <code>a</code>. <code>"Olá, mundo!"</code> é um colar mais comprido, com o espaço e a pontuação também contando como contas.</p>
+
+<p>Para o PHP saber onde o texto começa e termina, você o coloca <strong>entre aspas</strong>. As aspas não fazem parte do texto: são o "fecho" do colar.</p>
+
+<hr>
+
+<h2>1. Criar uma string</h2>
+<p>Existem duas formas principais: aspas simples (<code>'</code>) e aspas duplas (<code>"</code>). Para um texto simples, as duas dão o mesmo resultado:</p>
+
+<pre class="file" data-file="criar.php">&lt;?php
+$a = 'Ana';
+$b = "Ana";
+$vazia = "";
+$texto = "Linha 1
+Linha 2";
+var_dump($a, $b, $vazia);
+echo $texto, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php criar.php
+string(3) "Ana"         « com aspas simples
+string(3) "Ana"         « com aspas duplas: igualzinho
+string(0) ""            « a string vazia: zero caracteres
+Linha 1                 « a quebra de linha digitada no código faz parte do texto
+Linha 2</pre>
+
+<dl class="anatomy">
+  <dt>string(3)</dt><dd>O <code>var_dump</code> diz o tipo (<code>string</code>) e o tamanho (3).</dd>
+  <dt>"Ana"</dt><dd>O conteúdo. O <code>var_dump</code> sempre mostra com aspas duplas, não importa como você escreveu.</dd>
+  <dt>""</dt><dd>A <strong>string vazia</strong>: existe, é do tipo <code>string</code>, mas não tem nenhum caractere. Útil como "ainda não preenchido".</dd>
+</dl>
+
+<p>Uma string pode ocupar várias linhas: o PHP guarda as quebras de linha que você digitou entre as aspas. Para textos longos, existe uma forma mais confortável, o <a href="heredoc.html">heredoc</a>.</p>
+
+<hr>
+
+<h2>2. Aspas simples: o texto é exatamente o que você escreveu</h2>
+<p>Entre aspas simples, o PHP <strong>não interpreta nada</strong>: <code>$nome</code> fica <code>$nome</code>, <code>\n</code> fica <code>\n</code> (uma barra e a letra n). Só existem duas exceções: <code>\'</code> (para escrever uma aspa simples) e <code>\\</code> (para escrever uma barra).</p>
+
+<pre class="file" data-file="simples.php">&lt;?php
+$nome = "Ana";
+echo 'Olá, $nome\n';
+echo "\n";
+echo 'It\'s ok', "\n";
+echo 'Barra: \\ e \n e \t', "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php simples.php
+Olá, $nome\n            « nada foi trocado: nem a variável, nem o \n
+It's ok                 « \' virou uma aspa simples
+Barra: \ e \n e \t      « \\ virou uma barra; \n e \t ficaram como estão</pre>
+
+<p>Repare na linha 4 do programa: como <code>'Olá, $nome\n'</code> não pulou linha, foi preciso um <code>echo "\n";</code> separado (com aspas <strong>duplas</strong>) para a próxima frase não grudar.</p>
+
+<hr>
+
+<h2>3. Aspas duplas: variáveis e sequências de escape</h2>
+<p>Entre aspas duplas, o PHP faz duas coisas a mais:</p>
+
+<ol>
+  <li><strong>Troca as variáveis pelo valor.</strong> <code>"Olá, $nome"</code> vira <code>Olá, Ana</code>. Isso se chama <strong>interpolação</strong> e tem aula própria: <a href="interpolacao.html">Interpolação</a> (lá você vê <code>{$...}</code>, arrays e objetos dentro do texto).</li>
+  <li><strong>Entende as sequências de escape</strong>: combinações que começam com barra invertida e representam um caractere especial, como a quebra de linha.</li>
+</ol>
+
+<pre class="file" data-file="duplas.php">&lt;?php
+$nome = "Ana";
+echo "Olá, $nome\n";
+echo "Tab:\t[fim]\n";
+echo "Ele disse \"oi\"\n";
+echo "Custa \$5\n";
+echo "Barra: \\ \n";
+echo "Emoji: \u{1F600}\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php duplas.php
+Olá, Ana                « $nome trocado, \n pulou a linha
+Tab:	[fim]           « \t virou uma tabulação
+Ele disse "oi"          « \" virou uma aspa dupla
+Custa $5                « \$ virou um cifrão comum (sem procurar variável)
+Barra: \                « \\ virou uma barra
+Emoji: 😀               « \u{1F600} é o código Unicode do emoji</pre>
+
+<h3>As sequências de escape mais usadas</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escreva</th><th>Para obter</th><th>Funciona em <code>'…'</code>?</th></tr>
+<tr><td><code>\n</code></td><td>Quebra de linha (<em>new line</em>)</td><td>Não</td></tr>
+<tr><td><code>\t</code></td><td>Tabulação (<em>tab</em>)</td><td>Não</td></tr>
+<tr><td><code>\"</code></td><td>Aspa dupla</td><td>Não (e nem precisa: <code>'"'</code> já funciona)</td></tr>
+<tr><td><code>\'</code></td><td>Aspa simples</td><td><strong>Sim</strong> (dentro de <code>"…"</code> não precisa: <code>"'"</code>)</td></tr>
+<tr><td><code>\\</code></td><td>Uma barra invertida</td><td><strong>Sim</strong></td></tr>
+<tr><td><code>\$</code></td><td>Um cifrão (sem virar variável)</td><td>Não (e nem precisa)</td></tr>
+<tr><td><code>\u{codigo}</code></td><td>Um caractere Unicode pelo código</td><td>Não</td></tr>
+<tr><td><code>\r</code></td><td>"Retorno de carro" (usado no fim de linha do Windows: <code>\r\n</code>)</td><td>Não</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>A barra antes de uma letra qualquer</strong>
+<p>Se a combinação não é uma sequência conhecida, a barra fica no texto. Mas cuidado com caminhos do Windows entre aspas duplas:</p>
+<pre class="file" data-file="caminho.php">&lt;?php
+echo "C:\pasta\nova\n";
+echo 'C:\pasta\nova', "\n";
+</pre>
+<pre class="term" data-cwd="~/site">$ php caminho.php
+C:\pasta                « o \p não é especial e ficou; o \n de "\nova" pulou a linha!
+ova
+C:\pasta\nova           « com aspas simples, nada é especial</pre>
+</div>
+
+<div class="tryphp" data-goal="out:A Ana disse &quot;oi&quot; e pagou $5,semerro,src:\$nome">
+<p class="try-task"><strong>Missão:</strong> usando a variável <code>$nome</code> (sem digitar "Ana" no texto), mostre exatamente <code>A Ana disse "oi" e pagou $5</code>. Você vai precisar de duas sequências de escape. Dica: rode primeiro como está e leia o erro.</p>
+<pre class="script">&lt;?php
+$nome = "Ana";
+echo "A $nome disse "oi" e pagou $5\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Ana";
+echo "A $nome disse \"oi\" e pagou \$5\n";
+</pre>
+</div>
+
+<h3>Simples ou duplas: qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>'aspas simples'</code></th><th><code>"aspas duplas"</code></th></tr>
+<tr><td>Troca <code>$variavel</code> pelo valor</td><td>Não</td><td>Sim</td></tr>
+<tr><td><code>\n</code>, <code>\t</code>, <code>\u{…}</code></td><td>Não (ficam como texto)</td><td>Sim</td></tr>
+<tr><td>Escapes que funcionam</td><td>só <code>\'</code> e <code>\\</code></td><td>todos da tabela acima</td></tr>
+<tr><td>Bom para</td><td>Texto fixo; textos com <code>$</code> ou <code>\</code> que devem aparecer como estão; HTML com aspas duplas dentro</td><td>Textos com variáveis ou com quebras de linha</td></tr>
+</table>
+</div>
+
+<p>Não existe diferença de velocidade que importe. Uma regra prática que muitos programadores PHP seguem: <strong>aspas simples por padrão; aspas duplas quando precisar de variável ou de <code>\n</code></strong>. O importante é saber o que cada uma faz.</p>
+
+<hr>
+
+<h2>4. Uma aspa dentro da outra</h2>
+<p>A aspa que abriu a string também a fecha. Se o seu texto tem uma aspa do mesmo tipo, o PHP acha que o texto acabou ali:</p>
+
+<pre class="term" data-cwd="~/site">$ cat erro-aspa.php
+&lt;?php
+echo 'It's ok';
+$ php erro-aspa.php
+
+Parse error: syntax error, unexpected identifier "s", expecting "," or ";" in /home/ana/site/erro-aspa.php on line 2</pre>
+
+<p>O PHP leu <code>'It'</code> como a string inteira e depois encontrou um <code>s</code> solto, que não faz sentido ali ("esperava <code>,</code> ou <code>;</code>"). Há três saídas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Saída</th></tr>
+<tr><td>Usar o outro tipo de aspas por fora</td><td><code>"It's ok"</code>, <code>'Ele disse "oi"'</code></td><td><code>It's ok</code>, <code>Ele disse "oi"</code></td></tr>
+<tr><td>Escapar a aspa com <code>\</code></td><td><code>'It\'s ok'</code>, <code>"Ele disse \"oi\""</code></td><td>as mesmas</td></tr>
+<tr><td>Heredoc, para textos grandes com muitas aspas</td><td>veja <a href="heredoc.html">Heredoc e Nowdoc</a></td><td></td></tr>
+</table>
+</div>
+
+<p>A primeira é a mais legível. É por isso que, ao escrever HTML dentro do PHP, muita gente usa aspas simples por fora: <code>echo '&lt;a href="contato.php"&gt;Contato&lt;/a&gt;';</code>.</p>
+
+<hr>
+
+<h2>5. O tamanho de uma string: <code>strlen</code></h2>
+<p>A função <code>strlen</code> (de <em>string length</em>, "comprimento da string") conta quantos caracteres… quer dizer, quantos <strong>bytes</strong> a string tem. Veja:</p>
+
+<pre class="file" data-file="tamanho.php">&lt;?php
+var_dump(strlen("Ana"));
+var_dump(strlen("Olá, mundo!"));
+var_dump(strlen(""));
+var_dump(strlen("maçã"));
+var_dump(mb_strlen("maçã"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php tamanho.php
+int(3)
+int(12)                 « 11 caracteres na tela, mas 12 bytes: o "á" vale 2
+int(0)
+int(6)                  « "maçã" tem 4 letras, mas 6 bytes!
+int(4)                  « mb_strlen conta letras de verdade</pre>
+
+<h3>Por que <code>"maçã"</code> tem 6?</h3>
+<p>O computador guarda tudo como números de 0 a 255, os <strong>bytes</strong>. As letras sem acento (<code>a</code>–<code>z</code>, <code>A</code>–<code>Z</code>), os números e a pontuação comum cabem em <strong>1 byte</strong> cada. Já <code>ç</code>, <code>ã</code>, <code>é</code>, os emojis e as letras de outros alfabetos não cabem: no padrão <strong>UTF-8</strong> (o usado em praticamente toda página e arquivo hoje), eles ocupam de 2 a 4 bytes.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Letra</th><th>m</th><th>a</th><th>ç</th><th>ã</th><th>Total</th></tr>
+<tr><td>Bytes</td><td>1</td><td>1</td><td>2</td><td>2</td><td><strong>6</strong></td></tr>
+</table>
+</div>
+
+<p>As funções clássicas de string do PHP (<code>strlen</code>, <code>substr</code>, <code>strtoupper</code>, <code>strrev</code>…) são antigas: trabalham com <strong>bytes</strong> e não sabem que dois bytes juntos formam um "ç". Para o português, isso dá resultados estranhos:</p>
+
+<pre class="file" data-file="acentos.php">&lt;?php
+echo strtoupper("maçã"), "\n";
+echo mb_strtoupper("maçã"), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php acentos.php
+MAçã                    « strtoupper não conhece ç e ã: deixou como estavam
+MAÇÃ                    « a versão mb_ acerta</pre>
+
+<p>A solução é a família de funções <code>mb_</code> (de <em>multibyte</em>, "vários bytes"): <code>mb_strlen</code>, <code>mb_substr</code>, <code>mb_strtoupper</code>… Elas contam e cortam <strong>letras</strong>, não bytes. Toda a história está em <a href="mbstring.html">Acentos e mbstring</a>. Por enquanto, a regra: <strong>texto que pode ter acento → funções <code>mb_</code></strong>.</p>
+
+<div class="tip">
+<strong>Quando <code>strlen</code> é o certo</strong>
+<p>Às vezes você quer mesmo os bytes: para saber o tamanho de um arquivo, de uma senha que vai para o banco de dados, ou de um campo com limite em bytes. Aí <code>strlen</code> é exato.</p>
+</div>
+
+<hr>
+
+<h2>6. Juntar strings: o ponto (<code>.</code>)</h2>
+<p>Em PHP, o sinal para "colar" duas strings é o <strong>ponto</strong>, e não o <code>+</code> (que é só para números). Juntar strings se chama <strong>concatenar</strong>:</p>
+
+<pre class="file" data-file="juntar.php">&lt;?php
+$nome = "Ana";
+$sobrenome = "Souza";
+$completo = $nome . " " . $sobrenome;
+echo $completo, "\n";
+echo "Tamanho: " . strlen($completo) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php juntar.php
+Ana Souza
+Tamanho: 9</pre>
+
+<p>Repare no <code>" "</code> no meio: o ponto cola sem espaço, então o espaço entre nome e sobrenome precisa ser colado também. O operador <code>.</code>, o atalho <code>.=</code> e quando preferir ponto ou interpolação estão em <a href="operadores-string.html">Operadores de String</a>.</p>
+
+<hr>
+
+<h2>7. Cada caractere: <code>$s[0]</code></h2>
+<p>Uma string funciona como uma fileira de caixinhas numeradas, uma por byte, <strong>começando do zero</strong>. Você pega uma caixinha escrevendo o número entre colchetes. Números negativos contam do fim: <code>-1</code> é o último.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Posição</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td></tr>
+<tr><th>Caractere</th><td><code>b</code></td><td><code>a</code></td><td><code>n</code></td><td><code>a</code></td><td><code>n</code></td><td><code>a</code></td></tr>
+<tr><th>Do fim</th><td>-6</td><td>-5</td><td>-4</td><td>-3</td><td>-2</td><td>-1</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="posicao.php">&lt;?php
+$s = "banana";
+echo $s[0], " ", $s[1], " ", $s[-1], "\n";
+$s[0] = "B";
+echo $s, "\n";
+echo $s[10];
+echo "fim\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php posicao.php
+b a a                   « posição 0, posição 1 e a última
+Banana                  « dá para trocar um caractere
+
+Warning: Uninitialized string offset 10 in /home/ana/site/posicao.php on line 6
+fim</pre>
+
+<p><em>Uninitialized string offset 10</em> = "posição 10 da string não existe": <code>"banana"</code> só vai de 0 a 5. É um Warning: o programa continua, e o <code>echo</code> não mostra nada.</p>
+
+<h3>Por que "array de bytes" importa</h3>
+<p>Como cada caixinha é um <strong>byte</strong>, uma letra acentuada ocupa duas caixinhas. Pegar só uma delas dá meio caractere, que a tela não sabe desenhar:</p>
+
+<pre class="file" data-file="meio.php">&lt;?php
+$f = "maçã";
+var_dump($f[2]);
+var_dump($f[0] . $f[1] . $f[2]);
+echo strrev("maçã"), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php meio.php
+string(1) "�"           « o primeiro byte do "ç", sozinho: lixo
+string(3) "ma�"         « "ma" + meio "ç"
+�ç�am                   « strrev inverteu os bytes e embaralhou os acentos</pre>
+
+<p>O <code>�</code> é o "caractere de substituição": o terminal (ou o navegador) mostra isso quando recebe um pedaço de letra que não forma nada. Para pegar a terceira <strong>letra</strong> de uma palavra acentuada, use <code>mb_substr($f, 2, 1)</code> (veja <a href="mbstring.html">Acentos e mbstring</a>).</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque a palavra por outras (<code>"PHP"</code>, <code>"pão"</code>, <code>"café"</code>) e compare <code>strlen</code> com <code>mb_strlen</code>. Qual é a primeira e a última letra de cada uma?</p>
+<pre class="script">&lt;?php
+$palavra = "abacaxi";
+echo "Bytes: ", strlen($palavra), "\n";
+echo "Letras: ", mb_strlen($palavra), "\n";
+echo "Primeira: ", $palavra[0], "\n";
+echo "Última: ", $palavra[-1], "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected identifier "s", expecting "," or ";"</code></strong>
+<p><strong>O que significa:</strong> uma aspa dentro do texto fechou a string antes da hora (<code>'It's ok'</code>), e o resto virou código sem sentido. O nome citado (<code>"s"</code>) é a primeira coisa depois da aspa.</p>
+<p><strong>Como consertar:</strong> use o outro tipo de aspas por fora (<code>"It's ok"</code>) ou escape a aspa (<code>'It\'s ok'</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected end of file</code></strong>
+<pre class="term" data-cwd="~/site">$ cat sem-fechar.php
+&lt;?php
+$nome = "Ana;
+echo $nome;
+$ php sem-fechar.php
+
+Parse error: syntax error, unexpected end of file in /home/ana/site/sem-fechar.php on line 4</pre>
+<p><strong>O que significa:</strong> uma aspa abriu e nunca fechou. O PHP engoliu o resto do arquivo como texto e chegou ao fim (<em>end of file</em>) procurando a aspa. A linha da mensagem é a última do arquivo, não a do erro.</p>
+<p><strong>Como consertar:</strong> procure a aspa sem par. Num editor com cores (<a href="editores.html">Editores e IDEs</a>), o trecho depois dela inteiro fica com a cor de "texto", o que entrega o lugar.</p>
+</div>
+
+<div class="cenario">
+<strong>Aparece <code>\n</code> ou <code>$nome</code> literalmente na tela</strong>
+<p><strong>O que significa:</strong> a string está entre aspas simples.</p>
+<p><strong>Como consertar:</strong> troque para aspas duplas: <code>"Olá, $nome\n"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Aparecem <code>�</code> ou <code>Ã§</code> no lugar dos acentos</strong>
+<p><strong>O que significa:</strong> o <code>�</code> aparece quando um pedaço de letra foi cortado (por <code>$s[2]</code>, <code>substr</code>, <code>strrev</code>…). Já o <code>Ã§</code> no lugar de <code>ç</code> é outro problema: a página foi lida com a codificação errada.</p>
+<p><strong>Como consertar:</strong> para textos com acento, use as funções <code>mb_</code>. Para páginas, salve os arquivos em UTF-8 e declare <code>&lt;meta charset="utf-8"&gt;</code>. Tudo em <a href="mbstring.html">Acentos e mbstring</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Uninitialized string offset</code></strong>
+<p><strong>O que significa:</strong> você pediu uma posição além do fim da string (lembre: a última posição é o tamanho menos 1).</p>
+<p><strong>Como consertar:</strong> confira o tamanho com <code>strlen</code> antes, ou use <code>$s[-1]</code> para o último.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>'texto'</code></td><td>String literal (só <code>\'</code> e <code>\\</code> são especiais)</td><td><code>'Oi $x'</code> → <code>Oi $x</code></td></tr>
+<tr><td><code>"texto"</code></td><td>String com variáveis e escapes</td><td><code>"Oi $x\n"</code> → <code>Oi Ana</code> + quebra de linha</td></tr>
+<tr><td><code>""</code></td><td>String vazia</td><td><code>string(0) ""</code></td></tr>
+<tr><td><code>strlen($s)</code></td><td>Tamanho em bytes</td><td><code>strlen("maçã")</code> → <code>6</code></td></tr>
+<tr><td><code>mb_strlen($s)</code></td><td>Tamanho em letras</td><td><code>mb_strlen("maçã")</code> → <code>4</code></td></tr>
+<tr><td><code>$a . $b</code></td><td>Junta (concatena)</td><td><code>"Ana" . "!"</code> → <code>Ana!</code></td></tr>
+<tr><td><code>$s[0]</code>, <code>$s[-1]</code></td><td>Primeiro e último byte</td><td><code>"banana"[-1]</code> → <code>a</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Pular linha</h3>
+<p>Complete para o texto pular a linha no fim:</p>
+<div class="ex-code">echo "Bom dia!<input data-answer="\n" aria-label="escape">";</div>
+</div>
+
+<div class="exercise">
+<h3>2. O primeiro caractere</h3>
+<p>Complete para mostrar a primeira letra de <code>$nome</code>:</p>
+<div class="ex-code">echo $nome[<input data-answer="0" aria-label="posição">];</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>$nome = "Ana";</code>, o que <code>echo 'Oi, $nome';</code> mostra?</p>
+<label><input type="radio" name="q3"> <code>Oi, Ana</code></label>
+<label><input type="radio" name="q3"> <code>Oi, $nome</code></label>
+<label><input type="radio" name="q3"> Um Warning</label>
+<label><input type="radio" name="q3"> <code>Oi, </code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Quanto vale <code>strlen("pão")</code>?</p>
+<label><input type="radio" name="q4"> 3</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 5</label>
+<label><input type="radio" name="q4"> 4</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas linhas mostra <code>Ele disse "sim"</code> sem erro?</p>
+<label><input type="radio" name="q5"> <code>echo "Ele disse "sim"";</code></label>
+<label><input type="radio" name="q5"> <code>echo 'Ele disse \"sim\"';</code></label>
+<label><input type="radio" name="q5"> <code>echo 'Ele disse "sim"';</code></label>
+<label><input type="radio" name="q5"> <code>echo "Ele disse 'sim'";</code></label>
+</div>
+
+<h3>Missão final: a etiqueta do produto</h3>
+
+<div class="tryphp" data-goal="out:Produto: pão de queijo (14 bytes\, 13 letras),out:Inicial: p,semerro,src:strlen\(\$produto\),src:mb_strlen\(\$produto\)">
+<p class="try-task"><strong>Missão:</strong> a Ana quer uma etiqueta para o produto da variável <code>$produto</code>. Mostre as duas linhas abaixo calculando os números com <code>strlen($produto)</code> e <code>mb_strlen($produto)</code> e a inicial com <code>$produto[0]</code> (não digite os números à mão):</p>
+<pre class="out">Produto: pão de queijo (14 bytes, 13 letras)
+Inicial: p</pre>
+<pre class="script">&lt;?php
+$produto = "pão de queijo";
+</pre>
+<pre class="solucao">&lt;?php
+$produto = "pão de queijo";
+echo "Produto: $produto (" . strlen($produto) . " bytes, " . mb_strlen($produto) . " letras)\n";
+echo "Inicial: " . $produto[0] . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>String = texto, entre aspas. <code>""</code> é a string vazia.</li>
+  <li><strong>Aspas simples</strong>: tudo literal (só <code>\'</code> e <code>\\</code> funcionam). <strong>Aspas duplas</strong>: trocam <code>$variavel</code> pelo valor e entendem <code>\n</code>, <code>\t</code>, <code>\"</code>, <code>\$</code>, <code>\\</code>.</li>
+  <li>Aspa dentro de aspa: use o outro tipo por fora ou escape com <code>\</code>.</li>
+  <li><code>strlen</code> conta <strong>bytes</strong>; letras acentuadas valem 2. Para contar letras, <code>mb_strlen</code>.</li>
+  <li>O ponto junta strings: <code>$nome . " " . $sobrenome</code>.</li>
+  <li><code>$s[0]</code> é o primeiro byte, <code>$s[-1]</code> o último. Com acentos, use <code>mb_substr</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
