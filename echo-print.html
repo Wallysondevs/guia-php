@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP echo e print — mostrar texto na tela | Guia PHP</title>
+<meta name="description" content="Aprenda a mostrar texto com echo e print no PHP: a diferença entre os dois, vírgulas no echo, quebras de linha com \n e PHP_EOL, \n × &lt;br&gt; numa página web, e a ideia das aspas simples e duplas, com saídas reais e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">echo e print</span></h1>
+
+<p class="intro">Um programa que não mostra nada não serve para muita coisa. No PHP, o jeito mais comum de mostrar algo, seja no terminal, seja numa página web, é o <code>echo</code>. Ele tem um irmão quase gêmeo, o <code>print</code>. Nesta aula você vai conhecer os dois a fundo, aprender a pular linhas do jeito certo no terminal e no navegador, e entender por que as aspas que você escolhe mudam o resultado.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como mostrar texto, números e variáveis com <code>echo</code>.</li>
+  <li>Como mostrar várias coisas de uma vez, com vírgulas.</li>
+  <li>O que é o <code>print</code> e no que ele difere do <code>echo</code>.</li>
+  <li>Como pular linha: <code>\n</code>, <code>PHP_EOL</code> e, numa página web, <code>&lt;br&gt;</code>.</li>
+  <li>A ideia das aspas simples e duplas.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o alto-falante do programa</h2>
+<p>Pense no PHP como alguém trabalhando numa sala fechada. Ele pode fazer contas, guardar informações, tomar decisões, mas ninguém lá fora fica sabendo. O <code>echo</code> é o <strong>alto-falante</strong> da sala: tudo o que você entrega a ele sai para fora. O nome vem do inglês <em>echo</em>, "eco": o PHP "ecoa" o que você mandou.</p>
+<p>"Para fora" depende de onde o programa está rodando. No terminal, é a tela do terminal. Numa página web, é o HTML que o navegador recebe (veja <a href="como-funciona.html">Como o PHP Funciona</a>). O <code>echo</code> não sabe a diferença: ele só entrega o texto.</p>
+
+<hr>
+
+<h2>O <code>echo</code></h2>
+
+<pre class="file" data-file="ola.php">&lt;?php
+echo "Olá, mundo!\n";
+</pre>
+
+<pre class="term">$ php ola.php
+Olá, mundo!</pre>
+
+<dl class="anatomy">
+  <dt>echo</dt><dd>"Mostre isto." É uma palavra da própria linguagem, não uma função (por isso não precisa de parênteses).</dd>
+  <dt>"Olá, mundo!\n"</dt><dd>O texto a mostrar, entre aspas. O <code>\n</code> no final é a quebra de linha (já vamos chegar nela).</dd>
+  <dt>;</dt><dd>Fim da instrução, como em todo comando PHP (veja <a href="sintaxe.html">Sintaxe</a>).</dd>
+</dl>
+
+<h3>Textos, números e variáveis</h3>
+<p>O <code>echo</code> mostra qualquer valor simples. Textos vão entre aspas; números, não. E ele mostra o <strong>resultado</strong> de uma conta, não a conta:</p>
+
+<pre class="file" data-file="valores.php">&lt;?php
+echo 42, "\n";
+echo 3.5, "\n";
+echo 10 / 4, "\n";
+echo true, "\n";
+echo false, "\n";
+echo null, "\n";
+echo "fim\n";
+</pre>
+
+<pre class="term">$ php valores.php
+42
+3.5
+2.5
+1                                     « true aparece como 1
+
+
+fim                                   « false e null aparecem como nada</pre>
+
+<p>Os números aparecem como você espera. Os valores <code>true</code> ("verdadeiro") e <code>false</code> ("falso") surpreendem: <code>true</code> vira <code>1</code> e <code>false</code> vira nada; <code>null</code> ("nenhum valor") também vira nada. Por isso, para <strong>conferir</strong> um valor, o <code>echo</code> engana, e existe o <code>var_dump</code> (veja <a href="var-dump.html">var_dump e print_r</a> e <a href="booleanos.html">Booleanos</a>).</p>
+
+<p>Com <a href="variaveis.html">variáveis</a>, você escreve o nome da variável, e o <code>echo</code> mostra o valor guardado nela:</p>
+
+<pre class="file" data-file="variavel.php">&lt;?php
+$nome = "Ana";
+echo $nome;
+echo "\n";
+</pre>
+
+<pre class="term">$ php variavel.php
+Ana</pre>
+
+<h3>Várias coisas de uma vez: as vírgulas</h3>
+<p>O <code>echo</code> aceita <strong>vários valores separados por vírgula</strong> e mostra todos, um colado no outro, na ordem. Você já viu isso acima, em <code>echo 42, "\n";</code>: são dois valores, o número e a quebra de linha.</p>
+
+<pre class="file" data-file="virgulas.php">&lt;?php
+$nome = "Ana";
+$idade = 29;
+echo "Nome: ", $nome, " | Idade: ", $idade, "\n";
+echo "Nome: " . $nome . " | Idade: " . $idade . "\n";
+</pre>
+
+<pre class="term">$ php virgulas.php
+Nome: Ana | Idade: 29
+Nome: Ana | Idade: 29</pre>
+
+<p>As duas linhas dão o mesmo resultado, por caminhos diferentes:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que acontece</th></tr>
+<tr><td><code>echo "Nome: ", $nome, …;</code></td><td>O <code>echo</code> recebe <strong>cinco valores</strong> e mostra um depois do outro.</td></tr>
+<tr><td><code>echo "Nome: " . $nome . …;</code></td><td>O ponto <code>.</code> <strong>junta</strong> os pedaços num texto só, e o <code>echo</code> recebe <strong>um valor</strong>. O ponto é o operador de juntar textos (veja <a href="operadores-string.html">Operadores de String</a>).</td></tr>
+</table>
+</div>
+
+<p>Repare que a vírgula <strong>não põe espaço</strong>: <code>echo "a", "b";</code> mostra <code>ab</code>. Os espaços de <code>" | Idade: "</code> estão dentro das aspas. Nos dois jeitos, quem cuida dos espaços é você.</p>
+
+<div class="tip">
+<strong>Vírgula ou ponto?</strong>
+<p>No <code>echo</code>, tanto faz para o resultado. A vírgula só funciona no <code>echo</code>; o ponto funciona em qualquer lugar, inclusive para guardar o texto montado numa variável (<code>$frase = "Olá, " . $nome;</code>). Use o que achar mais fácil de ler.</p>
+</div>
+
+<div class="tryphp" data-goal="outre:Nome: Bruno\nCidade: Recife,src:\$nome,src:\$cidade">
+<p class="try-task"><strong>Missão:</strong> mostre <code>Nome: Bruno</code> numa linha e <code>Cidade: Recife</code> na linha de baixo, usando as variáveis <code>$nome</code> e <code>$cidade</code> (sem digitar "Bruno" e "Recife" nos <code>echo</code>). Use vírgulas ou pontos, como preferir.</p>
+<pre class="script">&lt;?php
+$nome = "Bruno";
+$cidade = "Recife";
+echo "Nome: ", "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Bruno";
+$cidade = "Recife";
+echo "Nome: ", $nome, "\n";
+echo "Cidade: ", $cidade, "\n";
+</pre>
+</div>
+
+<h3>Parênteses e texto em várias linhas</h3>
+<p>Você vai ver <code>echo("…")</code> em códigos por aí. Funciona, mas os parênteses ali não são do <code>echo</code>: são só parênteses em volta de <strong>um</strong> valor, como numa conta. Com vírgula dentro, não funciona:</p>
+
+<pre class="file" data-file="parenteses2.php">&lt;?php
+echo("Nome: ", "Ana");
+</pre>
+
+<pre class="term">$ php parenteses2.php
+
+Parse error: syntax error, unexpected token "," in /home/ana/saida/parenteses2.php on line 2</pre>
+
+<p>Prefira o <code>echo</code> sem parênteses. Já um texto entre aspas pode ocupar várias linhas do arquivo; as quebras de linha viram parte do texto:</p>
+
+<pre class="file" data-file="varias.php">&lt;?php
+echo "Lista de compras:
+- pão
+- leite
+";
+</pre>
+
+<pre class="term">$ php varias.php
+Lista de compras:
+- pão
+- leite</pre>
+
+<p>Para textos grandes há um jeito mais organizado, o <em>heredoc</em> (veja <a href="heredoc.html">Heredoc e Nowdoc</a>).</p>
+
+<hr>
+
+<h2>O <code>print</code></h2>
+<p>O <code>print</code> ("imprimir") faz quase a mesma coisa que o <code>echo</code>:</p>
+
+<pre class="file" data-file="print.php">&lt;?php
+echo "Olá, mundo!\n";
+print "Olá, mundo!\n";
+</pre>
+
+<pre class="term">$ php print.php
+Olá, mundo!
+Olá, mundo!</pre>
+
+<p>Mesma saída. As diferenças são duas, e pequenas.</p>
+
+<h3>Diferença 1: o <code>print</code> aceita um valor só</h3>
+<pre class="file" data-file="print2.php">&lt;?php
+print "Nome: ", "Ana";
+</pre>
+
+<pre class="term">$ php print2.php
+
+Parse error: syntax error, unexpected token "," in /home/ana/saida/print2.php on line 2</pre>
+
+<p>"Vírgula inesperada": o <code>print</code> não sabe o que fazer com um segundo valor. Com ele, junte os pedaços com o ponto: <code>print "Nome: " . "Ana";</code>.</p>
+
+<h3>Diferença 2: o <code>print</code> devolve 1</h3>
+<p>O <code>print</code> é uma <strong>expressão</strong>: além de mostrar o texto, ele produz um valor, sempre o número <code>1</code>. Por isso dá para guardar o que ele devolve numa variável. Com o <code>echo</code>, não dá:</p>
+
+<pre class="file" data-file="retorno.php">&lt;?php
+$r = print "Olá!\n";
+echo "O print devolveu: $r\n";
+</pre>
+
+<pre class="term">$ php retorno.php
+Olá!
+O print devolveu: 1</pre>
+
+<pre class="file" data-file="echoexpr.php">&lt;?php
+$r = echo "Olá!\n";
+</pre>
+
+<pre class="term">$ php echoexpr.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/saida/echoexpr.php on line 2</pre>
+
+<p>Na prática, quase ninguém usa esse <code>1</code>. Ele existe porque o <code>print</code> pode aparecer no meio de expressões, como em <code>$salvou and print "Salvo!\n";</code> ("se salvou, mostre"), um estilo antigo e pouco usado hoje.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>echo</code></th><th><code>print</code></th></tr>
+<tr><td>Mostra texto, números, variáveis</td><td>sim</td><td>sim</td></tr>
+<tr><td>Vários valores com vírgula</td><td>sim</td><td><strong>não</strong> (Parse error)</td></tr>
+<tr><td>Devolve um valor</td><td>não</td><td>sempre <code>1</code></td></tr>
+<tr><td>Precisa de parênteses</td><td>não</td><td>não</td></tr>
+<tr><td>Uso no dia a dia</td><td><strong>o mais comum</strong></td><td>raro</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> O <code>echo</code>. É o que você vai encontrar em quase todo código PHP, e é o que este guia usa. Saber que o <code>print</code> existe serve para entender código alheio. (Diferença de velocidade entre os dois existe, mas é tão pequena que não importa.)</p>
+
+<div class="note">
+<strong>E o <code>print_r</code>?</strong>
+<p>Apesar do nome, o <code>print_r</code> não é parente do <code>print</code>: é uma função para mostrar o conteúdo de <a href="arrays.html">arrays</a>, que o <code>echo</code> não consegue mostrar (ele escreve só a palavra <code>Array</code>, com um aviso). Ele é explicado em <a href="var-dump.html">var_dump e print_r</a>. Também existe o <code>printf</code>, para formatar números e textos, em <a href="sprintf.html">printf e sprintf</a>.</p>
+</div>
+
+<hr>
+
+<h2>Pular linha no terminal: <code>\n</code> e <code>PHP_EOL</code></h2>
+<p>O <code>echo</code> mostra <strong>exatamente</strong> o que recebe, e nada mais. Ele não pula linha sozinho. Veja:</p>
+
+<pre class="file" data-file="linhas.php">&lt;?php
+echo "pão";
+echo "leite";
+echo "café";
+</pre>
+
+<pre class="term">$ php linhas.php
+pãoleitecaféana@notebook:~/saida$     « tudo colado, até o prompt do terminal</pre>
+
+<p>Três <code>echo</code> em três linhas do arquivo não querem dizer três linhas na tela. Para pular linha, você precisa mandar o caractere de <strong>quebra de linha</strong>. Há duas formas:</p>
+
+<pre class="file" data-file="linhas2.php">&lt;?php
+echo "pão\n";
+echo "leite", PHP_EOL;
+echo "café" . PHP_EOL;
+</pre>
+
+<pre class="term">$ php linhas2.php
+pão
+leite
+café</pre>
+
+<dl class="anatomy">
+  <dt>\n</dt><dd>Dentro de <strong>aspas duplas</strong>, a barra invertida seguida de <code>n</code> vira uma quebra de linha (<em>new line</em>, "nova linha"). São dois caracteres no código, mas um só na saída.</dd>
+  <dt>PHP_EOL</dt><dd>Uma <a href="constantes.html">constante</a> que o PHP já traz pronta, com a quebra de linha do sistema operacional (<em>End Of Line</em>, "fim de linha"). Fica fora das aspas, ligada com vírgula ou ponto.</dd>
+</dl>
+
+<p>No Linux e no macOS, as duas dão o mesmo resultado. No Windows, a quebra de linha "oficial" tem dois caracteres (<code>\r\n</code>), e o <code>PHP_EOL</code> se ajusta sozinho. Para mostrar texto no terminal, qualquer uma serve; muita gente usa <code>PHP_EOL</code> quando quer deixar claro "aqui termina a linha", e <code>\n</code> quando a quebra está no meio de um texto.</p>
+
+<hr>
+
+<h2>Pular linha numa página web: <code>&lt;br&gt;</code></h2>
+<p>Agora o mesmo tipo de código, só que numa página web. A lista da Ana, com <code>\n</code> nas duas primeiras linhas e <code>&lt;br&gt;</code> nas duas últimas:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+echo "Pão\n";
+echo "Leite\n";
+echo "Café&lt;br&gt;\n";
+echo "Açúcar&lt;br&gt;\n";
+</pre>
+
+<p>O que o PHP envia para o navegador (o código-fonte da página), visto com o <code>curl</code> pelo <a href="servidor-embutido.html">servidor embutido</a>:</p>
+
+<pre class="term">$ curl -s localhost:8000/index.php
+Pão
+Leite
+Café&lt;br&gt;
+Açúcar&lt;br&gt;</pre>
+
+<p>O PHP enviou as quebras de linha, sim. Mas o navegador lê esse texto como <strong>HTML</strong>, e no HTML quebras de linha e espaços repetidos valem como <strong>um espaço</strong>. Quem pula linha na página é a etiqueta <code>&lt;br&gt;</code> (<em>break</em>, "quebra"). Na tela do navegador, aparecem <strong>duas</strong> linhas: <code>Pão Leite Café</code> na primeira (as quebras <code>\n</code> viraram espaços) e <code>Açúcar</code> na segunda (graças ao <code>&lt;br&gt;</code> depois de <code>Café</code>).</p>
+
+<p>A regra:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde aparece</th><th>Para pular linha</th></tr>
+<tr><td>Terminal (<code>php arquivo.php</code>)</td><td><code>\n</code> ou <code>PHP_EOL</code></td></tr>
+<tr><td>Página web (o que o navegador mostra)</td><td><code>&lt;br&gt;</code>, ou parágrafos <code>&lt;p&gt;…&lt;/p&gt;</code></td></tr>
+<tr><td>Código-fonte da página (o que você vê com "Exibir código-fonte")</td><td><code>\n</code>: deixa o HTML gerado organizado, uma etiqueta por linha</td></tr>
+</table>
+</div>
+
+<p>Por isso é comum escrever os dois juntos, <code>"Café&lt;br&gt;\n"</code>: o <code>&lt;br&gt;</code> para quem vê a página, o <code>\n</code> para quem lê o código-fonte. Misturar PHP e HTML é o assunto de <a href="php-e-html.html">PHP Dentro do HTML</a>.</p>
+
+<div class="tryphp" data-modo="web" data-goal="out:Pão<br>,out:Leite<br>,out:Café<br>">
+<p class="try-task"><strong>Missão:</strong> esta caixa funciona como uma página web. Clique em <strong>Rodar</strong> e veja, na aba <strong>Resultado</strong>, os itens todos na mesma linha. Faça cada item aparecer numa linha própria no navegador. Depois compare com a aba <strong>Código-fonte HTML</strong>.</p>
+<pre class="script">&lt;?php
+echo "Pão\n";
+echo "Leite\n";
+echo "Café\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Pão&lt;br&gt;\n";
+echo "Leite&lt;br&gt;\n";
+echo "Café&lt;br&gt;\n";
+</pre>
+</div>
+
+<div class="warning">
+<strong>Mostrando o que o usuário digitou</strong>
+<p>Numa página web, o <code>echo</code> manda o texto <strong>como HTML</strong>. Se você mostrar algo que veio de um formulário, alguém pode digitar etiquetas HTML (ou até programas JavaScript) e elas vão funcionar na sua página. Por isso, todo texto que vem de fora passa pelo <code>htmlspecialchars</code> antes do <code>echo</code>: <code>echo htmlspecialchars($nome);</code>. A explicação completa está em <a href="escapar-saida.html">Escapar a Saída (XSS)</a>; por enquanto, guarde o hábito.</p>
+</div>
+
+<hr>
+
+<h2>Aspas simples × aspas duplas (a ideia)</h2>
+<p>Até aqui todos os textos usaram aspas duplas. O PHP também aceita aspas simples, e elas <strong>não são iguais</strong>:</p>
+
+<pre class="file" data-file="aspas.php">&lt;?php
+$nome = "Ana";
+echo "Olá, $nome!\n";
+echo 'Olá, $nome!\n';
+echo "\n";
+</pre>
+
+<pre class="term">$ php aspas.php
+Olá, Ana!
+Olá, $nome!\n</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Aspas</th><th>Variáveis (<code>$nome</code>)</th><th>Códigos como <code>\n</code></th><th>Pense como…</th></tr>
+<tr><td><code>"duplas"</code></td><td>trocadas pelo valor</td><td>viram quebra de linha etc.</td><td>"leia e interprete"</td></tr>
+<tr><td><code>'simples'</code></td><td>ficam como estão</td><td>ficam como estão</td><td>"copie ao pé da letra"</td></tr>
+</table>
+</div>
+
+<p>Entre aspas duplas, o PHP procura variáveis e códigos com barra e os troca; isso se chama <strong>interpolação</strong>. Entre aspas simples, o texto sai exatamente como foi escrito. Repare que a segunda linha nem pulou: o <code>\n</code> saiu como os dois caracteres <code>\</code> e <code>n</code>, e foi preciso o <code>echo "\n";</code> da última linha para pular.</p>
+
+<p>Com isso você já consegue escolher: precisa de variável ou de <code>\n</code> dentro do texto? Aspas duplas. Texto fixo? Qualquer uma serve. Os detalhes (como colocar aspas dentro de aspas, <code>{$…}</code>, outros códigos com barra) ficam para <a href="strings.html">Strings</a> e <a href="interpolacao.html">Interpolação</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Tudo saiu numa linha só</strong>
+<pre class="term">$ php linhas.php
+pãoleitecaféana@notebook:~/saida$</pre>
+<p><strong>O que aconteceu:</strong> o <code>echo</code> não pula linha sozinho.</p>
+<p><strong>Como consertar:</strong> termine cada texto com <code>\n</code> (dentro de aspas duplas) ou acrescente <code>, PHP_EOL</code>. Numa página web, use <code>&lt;br&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceu <code>$nome</code> ou <code>\n</code> literalmente</strong>
+<pre class="term">$ php aspas.php
+Olá, Ana!
+Olá, $nome!\n</pre>
+<p><strong>O que aconteceu:</strong> não é erro do PHP: o texto estava entre <strong>aspas simples</strong>, que não interpretam nada.</p>
+<p><strong>Como consertar:</strong> troque por aspas duplas: <code>"Olá, $nome!\n"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>unexpected token ","</code> com <code>print</code> ou <code>echo(…)</code></strong>
+<pre class="term">$ php print2.php
+
+Parse error: syntax error, unexpected token "," in /home/ana/saida/print2.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> o <code>print</code> aceita um valor só, e <code>echo("a", "b")</code> põe a vírgula dentro de parênteses de um valor só.</p>
+<p><strong>Como consertar:</strong> use <code>echo</code> sem parênteses (<code>echo "Nome: ", "Ana";</code>) ou junte com ponto (<code>print "Nome: " . "Ana";</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Apareceu a palavra <code>Array</code></strong>
+<pre class="term">$ php arr.php
+
+Warning: Array to string conversion in /home/ana/saida/arr.php on line 3
+Array</pre>
+<p><strong>O que aconteceu:</strong> você deu um array inteiro para o <code>echo</code>. Ele só sabe mostrar valores simples (texto, número).</p>
+<p><strong>Como consertar:</strong> mostre um item (<code>echo $frutas[0];</code>) ou use <code>print_r($frutas);</code> para ver tudo (veja <a href="var-dump.html">var_dump e print_r</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>true</code> virou <code>1</code> e o <code>false</code> sumiu</strong>
+<pre class="term">$ php valores.php
+42
+3.5
+2.5
+1
+
+
+fim</pre>
+<p><strong>O que aconteceu:</strong> não é erro: é assim que o <code>echo</code> mostra <code>true</code>, <code>false</code> e <code>null</code>.</p>
+<p><strong>Como consertar:</strong> para ver o valor real e o tipo, use <code>var_dump($valor);</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="outre:Recibo da Ana\nProduto: Caderno\nTotal: R\$ 37\.5,src:PHP_EOL,semerro">
+<p class="try-task"><strong>Missão final:</strong> monte o recibo da lojinha da Ana em <strong>três linhas</strong>: <code>Recibo da Ana</code>, <code>Produto: Caderno</code> e <code>Total: R$ 37.5</code>. Use as variáveis, <code>echo</code> com vírgulas e <code>PHP_EOL</code> para pular as linhas. O código atual tem um problema de aspas e não pula linha nenhuma.</p>
+<pre class="script">&lt;?php
+$produto = "Caderno";
+$total = 37.5;
+echo "Recibo da Ana";
+echo 'Produto: $produto';
+echo "Total: R$ ", $total;
+</pre>
+<pre class="solucao">&lt;?php
+$produto = "Caderno";
+$total = 37.5;
+echo "Recibo da Ana", PHP_EOL;
+echo "Produto: ", $produto, PHP_EOL;
+echo "Total: R$ ", $total, PHP_EOL;
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo → saída</th></tr>
+<tr><td><code>echo valor;</code></td><td>Mostra um valor</td><td><code>echo "Oi";</code> → <code>Oi</code></td></tr>
+<tr><td><code>echo a, b, c;</code></td><td>Mostra vários valores, colados</td><td><code>echo "a", 1, "b";</code> → <code>a1b</code></td></tr>
+<tr><td><code>echo a . b;</code></td><td>Junta os textos e mostra</td><td><code>echo "Oi, " . $nome;</code> → <code>Oi, Ana</code></td></tr>
+<tr><td><code>print valor;</code></td><td>Mostra um valor só e devolve <code>1</code></td><td><code>print "Oi";</code> → <code>Oi</code></td></tr>
+<tr><td><code>"\n"</code></td><td>Quebra de linha (só em aspas duplas)</td><td><code>echo "a\nb";</code> → <code>a</code> / <code>b</code></td></tr>
+<tr><td><code>PHP_EOL</code></td><td>Quebra de linha do sistema</td><td><code>echo "a", PHP_EOL;</code></td></tr>
+<tr><td><code>&lt;br&gt;</code></td><td>Quebra de linha numa página web</td><td><code>echo "Pão&lt;br&gt;\n";</code></td></tr>
+<tr><td><code>"Olá, $nome"</code></td><td>Aspas duplas: troca a variável</td><td>→ <code>Olá, Ana</code></td></tr>
+<tr><td><code>'Olá, $nome'</code></td><td>Aspas simples: ao pé da letra</td><td>→ <code>Olá, $nome</code></td></tr>
+<tr><td><code>true</code> / <code>false</code> / <code>null</code></td><td>No <code>echo</code>, viram <code>1</code> / nada / nada</td><td>use <code>var_dump</code> para ver</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete com vírgula</h3>
+<p>Complete para mostrar <code>Olá, Ana</code> (a variável <code>$nome</code> vale <code>"Ana"</code>):</p>
+<div class="ex-code">echo "Olá, "<input data-answer=", $nome;|,$nome;|, $nome" aria-label="resto da linha"></div>
+</div>
+
+<div class="exercise">
+<h3>2. A constante da quebra de linha</h3>
+<p>Qual constante do PHP guarda a quebra de linha do sistema operacional?</p>
+<div class="ex-code"><input data-answer="PHP_EOL" aria-label="constante"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Quebra no navegador</h3>
+<p>Complete a etiqueta HTML que pula linha numa página web:</p>
+<div class="ex-code">echo "Leite<input data-answer="&lt;br&gt;|&lt;br /&gt;|&lt;br/&gt;" aria-label="etiqueta">";</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que <code>echo 'Total: $total\n';</code> mostra, se <code>$total</code> vale <code>10</code>?</p>
+<label><input type="radio" name="q4"> <code>Total: 10</code> e pula a linha</label>
+<label><input type="radio" name="q4"> <code>Total: 10\n</code></label>
+<label><input type="radio" name="q4"> <code>Total: $total\n</code></label>
+<label><input type="radio" name="q4"> Um erro, porque aspas simples não são permitidas</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual destas linhas dá <code>Parse error</code>?</p>
+<label><input type="radio" name="q5"> <code>echo "a", "b";</code></label>
+<label><input type="radio" name="q5"> <code>print "a", "b";</code></label>
+<label><input type="radio" name="q5"> <code>print "a" . "b";</code></label>
+<label><input type="radio" name="q5"> <code>echo "a" . "b";</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O que <code>$x = print "oi";</code> guarda em <code>$x</code>?</p>
+<label><input type="radio" name="q6"> <code>"oi"</code></label>
+<label><input type="radio" name="q6"> nada (<code>null</code>)</label>
+<label><input type="radio" name="q6"> <code>true</code></label>
+<label><input type="radio" name="q6"> <code>1</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Uma página PHP faz <code>echo "Pão\n"; echo "Leite\n";</code>. O que o navegador mostra?</p>
+<label><input type="radio" name="q7"> <code>Pão Leite</code>, na mesma linha</label>
+<label><input type="radio" name="q7"> <code>Pão</code> e <code>Leite</code> em linhas separadas</label>
+<label><input type="radio" name="q7"> <code>Pão\nLeite\n</code></label>
+<label><input type="radio" name="q7"> Uma página em branco</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>echo</code> mostra valores: textos (entre aspas), números, variáveis. Não precisa de parênteses.</li>
+  <li>Com vírgulas, o <code>echo</code> mostra vários valores colados; com o ponto, você junta os textos antes.</li>
+  <li><code>print</code> é parecido, mas aceita um valor só e devolve <code>1</code>. No dia a dia, use <code>echo</code>.</li>
+  <li>O <code>echo</code> não pula linha sozinho: no terminal, <code>\n</code> ou <code>PHP_EOL</code>; na página web, <code>&lt;br&gt;</code>.</li>
+  <li>Aspas duplas trocam variáveis e entendem <code>\n</code>; aspas simples mostram tudo ao pé da letra.</li>
+  <li><code>true</code> aparece como <code>1</code>; <code>false</code> e <code>null</code>, como nada. Para arrays, <code>print_r</code>.</li>
+  <li>Texto que vem do usuário, numa página web: <code>echo htmlspecialchars($texto);</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
