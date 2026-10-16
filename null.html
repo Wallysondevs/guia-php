@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP null — o valor "nenhum valor" | Guia PHP</title>
+<meta name="description" content="null em PHP para quem nunca programou: o que é, de onde ele aparece (variável sem valor, chave inexistente, função sem return), is_null, === null e isset, a diferença entre null, string vazia e zero, o operador ?? e os erros reais de usar null onde se esperava outra coisa.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">null</span></h1>
+
+<p class="intro">No cadastro da lojinha, a Ana pede o telefone dos clientes, mas o campo é opcional. Como guardar "este cliente <strong>não informou</strong> o telefone"? Não é o número zero, nem um texto vazio: é a <strong>ausência</strong> de valor. Para isso, o PHP tem um valor especial, <code>null</code> ("nulo"), que quer dizer exatamente "nada aqui". Nesta aula você aprende o que é <code>null</code>, de onde ele aparece sem você pedir, como testá-lo e por que ele não é a mesma coisa que <code>""</code> e <code>0</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é <code>null</code> e como escrevê-lo.</li>
+  <li>Os lugares onde o <code>null</code> aparece sozinho (variável inexistente, chave que não existe, função sem <code>return</code>).</li>
+  <li>Como testar: <code>is_null</code>, <code>=== null</code> e <code>isset</code>.</li>
+  <li>A diferença entre <code>null</code>, <code>""</code> (texto vazio) e <code>0</code> (zero).</li>
+  <li>O atalho <code>??</code> para "use isto, ou um valor padrão se for null".</li>
+  <li>Os avisos e erros de usar <code>null</code> onde o PHP esperava outra coisa.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia: o campo em branco que ninguém preencheu</h2>
+<p>Pense em três clientes da Ana e na pergunta "quantos filhos você tem?":</p>
+
+<ul>
+  <li>A Bia respondeu <strong>0</strong>. Ela tem zero filhos: é uma resposta, um número.</li>
+  <li>O Caio apagou o que tinha escrito e deixou o campo <strong>em branco</strong>: ele respondeu, com um texto vazio.</li>
+  <li>A Duda nunca viu a pergunta: o formulário antigo não tinha esse campo. <strong>Não existe resposta</strong>.</li>
+</ul>
+
+<p>Em PHP, a resposta da Bia é <code>0</code> (int), a do Caio é <code>""</code> (string vazia) e a da Duda é <code>null</code>. Três coisas diferentes. <code>null</code> é o único valor que diz "não há valor nenhum aqui".</p>
+
+<hr>
+
+<h2>1. Escrever e mostrar <code>null</code></h2>
+
+<pre class="file" data-file="nulo.php">&lt;?php
+$telefone = null;
+var_dump($telefone);
+echo "[", $telefone, "]\n";
+var_dump(get_debug_type($telefone));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php nulo.php
+NULL                     « o var_dump mostra só o tipo: não há valor para mostrar
+[]                       « o echo não mostra nada
+string(4) "null"        « o tipo se chama null</pre>
+
+<dl class="anatomy">
+  <dt>null</dt><dd>A palavra que representa "nenhum valor". Sem aspas: <code>"null"</code> com aspas seria um texto de 4 letras. O PHP aceita <code>NULL</code> e <code>Null</code> também; o costume moderno é <code>null</code> em minúsculas.</dd>
+  <dt>NULL (no var_dump)</dt><dd>O <code>var_dump</code> escreve em maiúsculas, por tradição. É o mesmo valor.</dd>
+  <dt>[]</dt><dd>Para o <code>echo</code>, <code>null</code> vira texto vazio, como o <code>false</code> (aula <a href="booleanos.html">Booleanos</a>). Por isso, investigue sempre com <code>var_dump</code>.</dd>
+</dl>
+
+<p><code>null</code> é ao mesmo tempo um <strong>tipo</strong> e o único <strong>valor</strong> desse tipo: o tipo <code>null</code> só tem um valor possível (veja <a href="tipos-dados.html">Tipos de Dados</a>).</p>
+
+<hr>
+
+<h2>2. De onde vem o <code>null</code></h2>
+<p>Você pode escrever <code>null</code> de propósito, mas muitas vezes ele aparece sozinho:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Exemplo</th><th>Aviso?</th></tr>
+<tr><td>Atribuição de propósito</td><td><code>$telefone = null;</code></td><td>Não</td></tr>
+<tr><td>Variável que não existe</td><td><code>var_dump($naoExiste);</code></td><td><code>Warning: Undefined variable</code></td></tr>
+<tr><td>Chave de array que não existe</td><td><code>$lista["b"]</code></td><td><code>Warning: Undefined array key</code></td></tr>
+<tr><td>Função que não devolve nada</td><td>uma função sem <code>return</code></td><td>Não</td></tr>
+<tr><td>Dados de fora (JSON, banco de dados)</td><td><code>{"telefone": null}</code></td><td>Não</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="origens.php">&lt;?php
+var_dump($naoExiste);
+$lista = ["a" =&gt; 1];
+var_dump($lista["b"]);
+function semRetorno() { $a = 1; }
+var_dump(semRetorno());
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php origens.php
+
+Warning: Undefined variable $naoExiste in /home/ana/site/origens.php on line 2
+NULL                     « a variável não existe: vale null, com aviso
+
+Warning: Undefined array key "b" in /home/ana/site/origens.php on line 4
+NULL                     « o array não tem a chave "b": null, com aviso
+NULL                     « a função não tem return: devolve null</pre>
+
+<p>Os dois avisos são sinais de um provável erro de digitação ou de lógica (você vai entender os arrays em <a href="arrays-associativos.html">Arrays Associativos</a> e as funções em <a href="funcoes.html">Funções</a>). Já o <code>null</code> da função sem <code>return</code> vem quieto. É por isso que é bom saber que ele existe.</p>
+
+<hr>
+
+<h2>3. Testar se é <code>null</code></h2>
+<p>Há três formas de perguntar. Duas são equivalentes; a terceira é parecida, mas não igual:</p>
+
+<pre class="file" data-file="testar.php">&lt;?php
+$telefone = null;
+var_dump(is_null($telefone));
+var_dump($telefone === null);
+var_dump(isset($telefone));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php testar.php
+bool(true)               « é null?
+bool(true)               « é idêntico a null?
+bool(false)              « existe e NÃO é null?</pre>
+
+<dl class="anatomy">
+  <dt>is_null($x)</dt><dd>"É nulo?". Função que devolve <code>true</code> se o valor é <code>null</code>.</dd>
+  <dt>$x === null</dt><dd>"É idêntico a null?". Faz o mesmo com o operador de comparação estrita (aula <a href="operadores-comparacao.html">Comparação</a>). É a forma mais usada em código moderno.</dd>
+  <dt>isset($x)</dt><dd>"Está definida?". É o <strong>contrário</strong>: <code>true</code> se existe <strong>e não é</strong> <code>null</code>. E tem um superpoder: não dá Warning quando a variável não existe (aula <a href="variaveis.html">Variáveis</a>).</dd>
+</dl>
+
+<p>A diferença aparece quando a variável <strong>nem existe</strong>:</p>
+
+<pre class="file" data-file="inexistente.php">&lt;?php
+var_dump(is_null($naoExiste));
+var_dump(isset($naoExiste));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php inexistente.php
+
+Warning: Undefined variable $naoExiste in /home/ana/site/inexistente.php on line 2
+bool(true)               « is_null reclama, depois responde
+bool(false)              « isset responde em silêncio</pre>
+
+<p><strong>Qual usar?</strong> Se a variável com certeza existe e você quer saber se é <code>null</code>: <code>=== null</code> (ou <code>is_null</code>). Se ela pode nem existir (um campo de formulário, uma chave de array): <code>isset</code>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque o valor de <code>$telefone</code> por <code>""</code>, <code>0</code>, <code>"0"</code> e <code>"99999-1234"</code>. Em quais casos <code>is_null</code> dá <code>true</code>? E <code>isset</code>? Depois apague a linha 2 inteira e rode de novo.</p>
+<pre class="script">&lt;?php
+$telefone = null;
+var_dump(is_null($telefone));
+var_dump(isset($telefone));
+</pre>
+</div>
+
+<hr>
+
+<h2>4. <code>null</code>, <code>""</code> e <code>0</code> não são a mesma coisa</h2>
+<p>Voltando às três clientes. Veja como cada teste responde para cada uma:</p>
+
+<pre class="file" data-file="tres.php">&lt;?php
+$duda = null;   // não respondeu
+$caio = "";     // respondeu em branco
+$bia = 0;       // respondeu zero
+var_dump(is_null($duda), is_null($caio), is_null($bia));
+var_dump(isset($duda), isset($caio), isset($bia));
+var_dump(empty($duda), empty($caio), empty($bia));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php tres.php
+bool(true)               « is_null: só a Duda
+bool(false)
+bool(false)
+bool(false)              « isset: Caio e Bia "existem"
+bool(true)
+bool(true)
+bool(true)               « empty: os três parecem "vazios"!
+bool(true)
+bool(true)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>null</code></th><th><code>""</code></th><th><code>0</code></th></tr>
+<tr><td>Quer dizer</td><td>não há valor</td><td>texto sem caracteres</td><td>o número zero</td></tr>
+<tr><td>Tipo</td><td><code>null</code></td><td><code>string</code></td><td><code>int</code></td></tr>
+<tr><td><code>is_null</code> / <code>=== null</code></td><td><code>true</code></td><td><code>false</code></td><td><code>false</code></td></tr>
+<tr><td><code>isset</code></td><td><code>false</code></td><td><code>true</code></td><td><code>true</code></td></tr>
+<tr><td><code>empty</code> / <code>(bool)</code> é falso</td><td>sim</td><td>sim</td><td>sim</td></tr>
+<tr><td><code>echo</code> mostra</td><td>nada</td><td>nada</td><td><code>0</code></td></tr>
+</table>
+</div>
+
+<p>A lição: <code>empty</code> e o <code>if ($x)</code> jogam os três no mesmo saco, porque os três são "falsos" (aula <a href="booleanos.html">Booleanos</a>). Quando a diferença importa, pergunte com <code>=== null</code>, <code>=== ""</code> ou <code>=== 0</code>.</p>
+
+<div class="warning">
+<strong>Cuidado com <code>==</code> (dois iguais)</strong>
+<p>A comparação "frouxa" <code>==</code> converte os tipos antes de comparar, e acha que <code>null</code> é igual a <code>""</code>, a <code>0</code> e a <code>false</code>:</p>
+<pre class="term" data-cwd="~/site">$ php frouxo.php             « var_dump(null == "", null == 0, null == false, null === "", null === 0);
+bool(true)
+bool(true)
+bool(true)
+bool(false)                  « com três iguais, só null é idêntico a null
+bool(false)</pre>
+<p>Use sempre <code>===</code>. A explicação completa está em <a href="operadores-comparacao.html">Comparação (== e ===)</a>.</p>
+</div>
+
+<hr>
+
+<h2>5. Valor padrão com <code>??</code></h2>
+<p>Muito do trabalho com <code>null</code> é "se não tiver valor, use um padrão". O PHP tem um operador só para isso, o <code>??</code> (chamado <em>null coalescing</em>, "união com nulo"):</p>
+
+<pre class="file" data-file="padrao.php">&lt;?php
+$nome = null;
+echo "Olá, " . ($nome ?? "visitante") . "\n";
+$nome = "Ana";
+echo "Olá, " . ($nome ?? "visitante") . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php padrao.php
+Olá, visitante           « $nome é null: usa o padrão
+Olá, Ana                 « $nome tem valor: usa o valor</pre>
+
+<p>Leia <code>$nome ?? "visitante"</code> como "<code>$nome</code>, ou, se for null (ou nem existir), <code>"visitante"</code>". Como o <code>isset</code>, ele não dá Warning para variável inexistente. Repare que o <code>??</code> só olha o <code>null</code>: um <code>0</code> ou um <code>""</code> passam direto. O <code>??</code>, o <code>??=</code> e o <code>?-&gt;</code> estão explicados em <a href="null-coalescing.html">?? e ?-&gt;</a>.</p>
+
+<hr>
+
+<h2>6. <code>null</code> onde o PHP esperava outra coisa</h2>
+<p>O que acontece quando um <code>null</code> "escapa" e entra numa conta, numa função ou num objeto? Depende do lugar:</p>
+
+<pre class="file" data-file="escapou.php">&lt;?php
+var_dump(null + 5);
+var_dump(null . "abc");
+var_dump(strlen(null));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php escapou.php
+int(5)                   « na conta, null vale 0
+string(3) "abc"         « no texto, null vale ""
+
+Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /home/ana/site/escapou.php on line 4
+int(0)</pre>
+
+<p>A última linha mostra um <strong>Deprecated</strong> ("obsoleto"): passar <code>null</code> para uma função do PHP que espera texto ainda funciona, mas foi marcado para deixar de funcionar numa versão futura. <em>Passing null to parameter #1 ($string) of type string</em> = "passando null para o parâmetro nº 1 (<code>$string</code>), que é do tipo string". Corrija sempre que aparecer.</p>
+
+<p>Com objetos (assunto do <a href="classes-objetos.html">Nível 3</a>), o <code>null</code> é mais grave:</p>
+
+<pre class="file" data-file="objeto-nulo.php">&lt;?php
+$cliente = null;
+echo $cliente-&gt;nome;
+echo "\nfim\n";
+echo $cliente-&gt;getNome();
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php objeto-nulo.php
+
+Warning: Attempt to read property "nome" on null in /home/ana/site/objeto-nulo.php on line 3
+
+fim
+
+Fatal error: Uncaught Error: Call to a member function getNome() on null in /home/ana/site/objeto-nulo.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/objeto-nulo.php on line 5</pre>
+
+<p>Ler uma propriedade de <code>null</code> dá Warning (<em>Attempt to read property "nome" on null</em> = "tentativa de ler a propriedade nome em null"); chamar um método em <code>null</code> é fatal (<em>Call to a member function getNome() on null</em> = "chamada de um método getNome() em null"). Esse é um dos erros mais comuns do PHP. O operador <code>?-&gt;</code> (<a href="null-coalescing.html">?? e ?-&gt;</a>) foi criado para ele.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Deprecated: ...: Passing null to parameter #1 ($string) of type string is deprecated</code></strong>
+<p><strong>O que significa:</strong> uma variável que você passou para uma função (como <code>strlen</code>, <code>trim</code>, <code>htmlspecialchars</code>) valia <code>null</code>. Ainda funciona, mas vai virar erro no futuro.</p>
+<p><strong>Como consertar:</strong> descubra por que a variável é <code>null</code> (campo não enviado? chave errada?) ou dê um padrão: <code>strlen($nome ?? "")</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught Error: Call to a member function ...() on null</code></strong>
+<p><strong>O que significa:</strong> a variável antes da seta <code>-&gt;</code> deveria ter um objeto, mas tem <code>null</code>. Típico de uma busca que não encontrou nada ("busque o cliente 42" e o cliente não existe).</p>
+<p><strong>Como consertar:</strong> teste com <code>if ($cliente === null)</code> antes, ou use <code>?-&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key "..."</code> seguido de um <code>NULL</code></strong>
+<p><strong>O que significa:</strong> você pediu uma chave que o array não tem, e recebeu <code>null</code>.</p>
+<p><strong>Como consertar:</strong> confira o nome da chave, ou use <code>$lista["b"] ?? "padrão"</code> quando a chave pode mesmo faltar.</p>
+</div>
+
+<div class="cenario">
+<strong>Um campo com <code>0</code> ou <code>""</code> foi tratado como "não informado"</strong>
+<p><strong>O que significa:</strong> o código testou com <code>empty</code> ou <code>if (!$x)</code>, que juntam <code>null</code>, <code>""</code> e <code>0</code>.</p>
+<p><strong>Como consertar:</strong> teste só o null: <code>$x === null</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Com <code>null</code></th></tr>
+<tr><td><code>$x = null;</code></td><td>Guarda "nenhum valor"</td><td></td></tr>
+<tr><td><code>is_null($x)</code></td><td>É null?</td><td><code>true</code> (Warning se <code>$x</code> não existe)</td></tr>
+<tr><td><code>$x === null</code></td><td>É idêntico a null?</td><td><code>true</code></td></tr>
+<tr><td><code>isset($x)</code></td><td>Existe e não é null?</td><td><code>false</code> (sem Warning)</td></tr>
+<tr><td><code>$x ?? $padrao</code></td><td><code>$x</code>, ou o padrão se for null/inexistente</td><td>o padrão</td></tr>
+<tr><td><code>unset($x);</code></td><td>Apaga a variável (depois, ela "vale" null)</td><td></td></tr>
+<tr><td><code>var_dump($x)</code></td><td>Mostra</td><td><code>NULL</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Testar null</h3>
+<p>Complete com o operador de comparação estrita:</p>
+<div class="ex-code">var_dump($telefone <input data-answer="===" aria-label="operador"> null);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Valor padrão</h3>
+<p>Complete para mostrar <code>"sem e-mail"</code> quando <code>$email</code> for null:</p>
+<div class="ex-code">echo $email <input data-answer="??" aria-label="operador"> "sem e-mail";</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Qual o resultado de <code>isset($x)</code> depois de <code>$x = 0;</code>?</p>
+<label><input type="radio" name="q3"> <code>false</code>, porque 0 é vazio</label>
+<label><input type="radio" name="q3"> <code>null</code></label>
+<label><input type="radio" name="q3"> <code>true</code>, porque 0 é um valor</label>
+<label><input type="radio" name="q3"> Dá Warning</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Uma função sem <code>return</code> devolve…</p>
+<label><input type="radio" name="q4"> <code>null</code></label>
+<label><input type="radio" name="q4"> <code>false</code></label>
+<label><input type="radio" name="q4"> <code>0</code></label>
+<label><input type="radio" name="q4"> um Fatal error</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que <code>var_dump(null == 0);</code> mostra?</p>
+<label><input type="radio" name="q5"> <code>bool(false)</code></label>
+<label><input type="radio" name="q5"> <code>bool(true)</code>, porque <code>==</code> converte os tipos</label>
+<label><input type="radio" name="q5"> <code>NULL</code></label>
+<label><input type="radio" name="q5"> Um Warning</label>
+</div>
+
+<h3>Missão final: a ficha do cliente</h3>
+
+<div class="tryphp" data-goal="out:Nome: Duda,out:Telefone: não informado,out:Filhos: 0,semerro,src:\?\?">
+<p class="try-task"><strong>Missão:</strong> a ficha mostra <code>Telefone: </code> em branco porque o telefone é <code>null</code>. Use o <code>??</code> para mostrar <code>não informado</code> no lugar de qualquer campo null. Atenção: <code>Filhos: 0</code> deve continuar mostrando o zero (ele é uma resposta!).</p>
+<pre class="out">Nome: Duda
+Telefone: não informado
+Filhos: 0</pre>
+<pre class="script">&lt;?php
+$nome = "Duda";
+$telefone = null;
+$filhos = 0;
+echo "Nome: " . $nome . "\n";
+echo "Telefone: " . $telefone . "\n";
+echo "Filhos: " . $filhos . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Duda";
+$telefone = null;
+$filhos = 0;
+echo "Nome: " . ($nome ?? "não informado") . "\n";
+echo "Telefone: " . ($telefone ?? "não informado") . "\n";
+echo "Filhos: " . ($filhos ?? "não informado") . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>null</code> = "nenhum valor". É um tipo com um valor só. Escreva sem aspas.</li>
+  <li>Aparece sozinho: variável inexistente e chave inexistente (com Warning), função sem <code>return</code>, dados de JSON e banco.</li>
+  <li>Teste com <code>=== null</code> ou <code>is_null</code>; use <code>isset</code> quando a variável pode nem existir.</li>
+  <li><code>null</code>, <code>""</code> e <code>0</code> são diferentes, mas <code>empty</code>, <code>if ($x)</code> e <code>==</code> os confundem. Prefira <code>===</code>.</li>
+  <li><code>$x ?? "padrão"</code> dá um valor padrão quando <code>$x</code> é null.</li>
+  <li><code>null</code> numa função que espera texto dá <code>Deprecated</code>; chamar método em <code>null</code> dá <code>Fatal error</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
