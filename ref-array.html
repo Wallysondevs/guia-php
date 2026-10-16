@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções de Array — referência com exemplos e resultados reais | Guia PHP</title>
+<meta name="description" content="Referência das funções de array do PHP 8.5: count, in_array, array_search, array_push, array_slice, array_map, array_filter, array_reduce, array_merge, array_column, sort, usort, array_find, array_first e outras, com assinatura, exemplo e o resultado real.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções de Array</span></h1>
+
+<p class="intro">As funções de array que você vai usar no dia a dia, agrupadas pelo que fazem. Cada linha tem a assinatura, uma explicação curta, um exemplo e o <strong>resultado real</strong>, conferido no PHP 8.5 da máquina da Ana. Para aprender com calma, veja <a href="arrays.html">Arrays Indexados</a>, <a href="arrays-associativos.html">Arrays Associativos</a>, <a href="funcoes-array.html">Funções de Array</a> e <a href="ordenar-arrays.html">Ordenar Arrays</a>.</p>
+
+<div class="note">
+<strong>Como ler as tabelas</strong>
+<ul>
+  <li>Todos os exemplos partem destas três variáveis (cada exemplo começa do zero, com os valores originais):
+<pre class="file" data-file="exemplos.php">&lt;?php
+$frutas = ["maçã", "banana", "uva"];
+$notas  = ["Ana" =&gt; 9.5, "Bia" =&gt; 7, "Caio" =&gt; 8];
+$n      = [5, 3, 8, 1];
+</pre></li>
+  <li>A assinatura mostra os parâmetros e, depois dos dois-pontos, o tipo do resultado: <code>count(array $array): int</code> recebe um array e devolve um <code>int</code>. Parâmetros com <code>= valor</code> são opcionais. <code>&amp;$array</code> quer dizer que a função <strong>muda o próprio array</strong> (e precisa de uma variável).</li>
+  <li>Os resultados estão escritos como código PHP, no formato curto: <code>['maçã', 'uva']</code> é uma lista; <code>['Ana' =&gt; 9.5]</code> mostra as chaves. Quando as chaves de uma lista "pulam" (depois de um <code>unset</code> ou <code>array_filter</code>), elas aparecem: <code>[0 =&gt; 5, 2 =&gt; 8]</code>. <code>9.5</code> é <code>float</code>, <code>7</code> é <code>int</code>.</li>
+  <li>Exemplos com duas linhas (como <code>sort($n);</code> e <code>$n</code>): a primeira executa a função, a segunda mostra como o array ficou.</li>
+</ul>
+</div>
+
+<p>Atalhos: <a href="#contar">Contar e procurar</a> · <a href="#mudar">Acrescentar e remover</a> · <a href="#pedacos">Pedaços, primeiro e último</a> · <a href="#chaves">Chaves e valores</a> · <a href="#juntar">Juntar e comparar</a> · <a href="#transformar">Transformar e calcular</a> · <a href="#ordenar">Ordenar</a> · <a href="#ponteiro">Cursor interno</a> · <a href="#aleatorio">Aleatório</a> · <a href="#armadilhas">Armadilhas</a></p>
+
+<hr>
+
+<h3 id="contar">Contar e procurar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>count(array $array): int</code></td><td>Quantos itens o array tem. <a href="arrays.html">Arrays</a></td><td><code>count($frutas)</code><br><code>count([])</code></td><td><code>3</code><br><code>0</code></td></tr>
+<tr><td><code>in_array(mixed $valor, array $array, bool $strict = false): bool</code></td><td>O valor está no array? Use <code>true</code> no 3º argumento para comparar com <code>===</code> (sem conversão de tipo). <a href="funcoes-array.html">Funções de Array</a></td><td><code>in_array("uva", $frutas)</code><br><code>in_array("0", [0, 1])</code><br><code>in_array("0", [0, 1], true)</code></td><td><code>true</code><br><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>array_search(mixed $valor, array $array, bool $strict = false): int|string|false</code></td><td>A <strong>chave</strong> onde o valor está, ou <code>false</code>. Cuidado: a chave pode ser <code>0</code>; compare com <code>=== false</code>. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_search("banana", $frutas)</code><br><code>array_search(8, $notas)</code><br><code>array_search("kiwi", $frutas)</code></td><td><code>1</code><br><code>'Caio'</code><br><code>false</code></td></tr>
+<tr><td><code>array_key_exists(string|int $chave, array $array): bool</code></td><td>A chave existe? Diferente de <code>isset</code>, dá <code>true</code> mesmo se o valor for <code>null</code>. <a href="arrays-associativos.html">Arrays Associativos</a></td><td><code>array_key_exists("Bia", $notas)</code><br><code>array_key_exists("x", ["x" =&gt; null])</code></td><td><code>true</code><br><code>true</code></td></tr>
+<tr><td><code>isset($array[$chave]): bool</code></td><td>Construção da linguagem: a chave existe <strong>e</strong> o valor não é <code>null</code>? <a href="arrays-associativos.html">Arrays Associativos</a></td><td><code>isset($notas["Ana"])</code><br><code>isset(["x" =&gt; null]["x"])</code></td><td><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>empty($array): bool</code></td><td>Vazio? (<code>[]</code>, e também <code>0</code>, <code>""</code>, <code>null</code>…) <a href="booleanos.html">Booleanos</a></td><td><code>empty([])</code><br><code>empty($frutas)</code></td><td><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>array_is_list(array $array): bool</code> <span class="versao">PHP 8.1+</span></td><td>As chaves são 0, 1, 2… em ordem (uma "lista")? <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_is_list($frutas)</code><br><code>array_is_list($notas)</code><br><code>array_is_list([1 =&gt; "a"])</code></td><td><code>true</code><br><code>false</code><br><code>false</code></td></tr>
+</table>
+</div>
+
+<h3 id="mudar">Acrescentar e remover (mudam o array)</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>array_push(array &amp;$array, mixed ...$valores): int</code></td><td>Acrescenta no fim; devolve o novo tamanho. O mesmo que <code>$frutas[] = …</code>. <a href="arrays.html">Arrays</a></td><td><code>array_push($frutas, "kiwi");</code><br><code>$frutas</code></td><td><br><code>['maçã', 'banana', 'uva', 'kiwi']</code></td></tr>
+<tr><td><code>array_pop(array &amp;$array): mixed</code></td><td>Tira e devolve o <strong>último</strong> item. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_pop($frutas)</code><br><code>array_pop($frutas);</code><br><code>$frutas</code></td><td><code>'uva'</code><br><br><code>['maçã', 'banana']</code></td></tr>
+<tr><td><code>array_shift(array &amp;$array): mixed</code></td><td>Tira e devolve o <strong>primeiro</strong> item (as chaves numéricas são renumeradas). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_shift($frutas)</code><br><code>array_shift($frutas);</code><br><code>$frutas</code></td><td><code>'maçã'</code><br><br><code>['banana', 'uva']</code></td></tr>
+<tr><td><code>array_unshift(array &amp;$array, mixed ...$valores): int</code></td><td>Acrescenta no começo; devolve o novo tamanho. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_unshift($frutas, "kiwi");</code><br><code>$frutas</code></td><td><br><code>['kiwi', 'maçã', 'banana', 'uva']</code></td></tr>
+<tr><td><code>unset($array[$chave])</code></td><td>Construção da linguagem: apaga o item. As outras chaves <strong>não</strong> são renumeradas. <a href="arrays.html">Arrays</a></td><td><code>unset($frutas[0]);</code><br><code>$frutas</code><br><code>unset($notas["Bia"]);</code><br><code>$notas</code></td><td><br><code>[1 =&gt; 'banana', 2 =&gt; 'uva']</code><br><br><code>['Ana' =&gt; 9.5, 'Caio' =&gt; 8]</code></td></tr>
+<tr><td><code>array_splice(array &amp;$array, int $início, ?int $quantos = null, mixed $novos = []): array</code></td><td>Remove <code>$quantos</code> itens a partir de <code>$início</code> (e põe <code>$novos</code> no lugar); devolve os removidos. <a href="funcoes-array.html">Funções de Array</a></td><td><code>$removidos = array_splice($frutas, 1, 1, ["pera", "kiwi"]);</code><br><code>$frutas</code></td><td><br><code>['maçã', 'pera', 'kiwi', 'uva']</code></td></tr>
+</table>
+</div>
+
+<h3 id="pedacos">Pedaços, primeiro e último</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>array_slice(array $array, int $início, ?int $tamanho = null, bool $manterChaves = false): array</code></td><td>Um pedaço, sem mudar o original. Início negativo conta do fim. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_slice($frutas, 1)</code><br><code>array_slice($frutas, 0, 2)</code><br><code>array_slice($frutas, -1)</code></td><td><code>['banana', 'uva']</code><br><code>['maçã', 'banana']</code><br><code>['uva']</code></td></tr>
+<tr><td><code>array_chunk(array $array, int $tamanho, bool $manterChaves = false): array</code></td><td>Divide em grupos de <code>$tamanho</code> (útil para paginação e colunas). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_chunk([1, 2, 3, 4, 5], 2)</code></td><td><code>[[1, 2], [3, 4], [5]]</code></td></tr>
+<tr><td><code>array_first(array $array): mixed</code> <span class="versao">PHP 8.5+</span></td><td>O primeiro valor, ou <code>null</code> se vazio. Antes do 8.5: <code>$a[array_key_first($a)]</code> ou <code>reset($a)</code>. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_first($frutas)</code><br><code>array_first($notas)</code><br><code>array_first([])</code></td><td><code>'maçã'</code><br><code>9.5</code><br><code>null</code></td></tr>
+<tr><td><code>array_last(array $array): mixed</code> <span class="versao">PHP 8.5+</span></td><td>O último valor, ou <code>null</code> se vazio. Antes: <code>end($a)</code>. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_last($frutas)</code><br><code>array_last($notas)</code></td><td><code>'uva'</code><br><code>8</code></td></tr>
+<tr><td><code>array_key_first(array $array): int|string|null</code> <span class="versao">PHP 7.3+</span></td><td>A primeira chave. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_key_first($notas)</code></td><td><code>'Ana'</code></td></tr>
+<tr><td><code>array_key_last(array $array): int|string|null</code> <span class="versao">PHP 7.3+</span></td><td>A última chave. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_key_last($frutas)</code><br><code>array_key_last($notas)</code></td><td><code>2</code><br><code>'Caio'</code></td></tr>
+</table>
+</div>
+
+<h3 id="chaves">Chaves e valores</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>array_keys(array $array, mixed $valor = ?): array</code></td><td>As chaves (só as de um valor, se informado). <a href="arrays-associativos.html">Arrays Associativos</a></td><td><code>array_keys($notas)</code><br><code>array_keys([1, 2, 1], 1)</code></td><td><code>['Ana', 'Bia', 'Caio']</code><br><code>[0, 2]</code></td></tr>
+<tr><td><code>array_values(array $array): array</code></td><td>Os valores, com chaves novas 0, 1, 2… (renumera depois de <code>unset</code>/<code>array_filter</code>). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_values($notas)</code><br><code>unset($frutas[0]);</code><br><code>array_values($frutas)</code></td><td><code>[9.5, 7, 8]</code><br><br><code>['banana', 'uva']</code></td></tr>
+<tr><td><code>array_flip(array $array): array</code></td><td>Troca chaves e valores. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_flip($frutas)</code></td><td><code>['maçã' =&gt; 0, 'banana' =&gt; 1, 'uva' =&gt; 2]</code></td></tr>
+<tr><td><code>array_combine(array $chaves, array $valores): array</code></td><td>Monta um array com as chaves de um e os valores do outro (mesmo tamanho!). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_combine(["a", "b"], [1, 2])</code><br><code>array_combine(["a"], [1, 2])</code></td><td><code>['a' =&gt; 1, 'b' =&gt; 2]</code><br><code>ValueError: array_combine(): Argument #1 ($keys) and argument #2 ($values) must have the same number of elements</code></td></tr>
+<tr><td><code>array_fill(int $início, int $quantos, mixed $valor): array</code></td><td>Um array com o mesmo valor repetido. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_fill(0, 3, "-")</code></td><td><code>['-', '-', '-']</code></td></tr>
+<tr><td><code>array_fill_keys(array $chaves, mixed $valor): array</code></td><td>As chaves dadas, todas com o mesmo valor. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_fill_keys(["Ana", "Bia"], 0)</code></td><td><code>['Ana' =&gt; 0, 'Bia' =&gt; 0]</code></td></tr>
+<tr><td><code>range($início, $fim, $passo = 1): array</code></td><td>Uma sequência de números (ou letras). <a href="for.html">for</a></td><td><code>range(1, 5)</code><br><code>range(0, 10, 5)</code><br><code>range("a", "e")</code></td><td><code>[1, 2, 3, 4, 5]</code><br><code>[0, 5, 10]</code><br><code>['a', 'b', 'c', 'd', 'e']</code></td></tr>
+<tr><td><code>array_column(array $linhas, int|string|null $coluna, int|string|null $chave = null): array</code></td><td>Pega uma "coluna" de um array de arrays (como as linhas de um banco). <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a></td><td><code>$p = [["id" =&gt; 7, "nome" =&gt; "Caneta"], ["id" =&gt; 9, "nome" =&gt; "Lápis"]];</code><br><code>array_column($p, "nome")</code><br><code>$p = [["id" =&gt; 7, "nome" =&gt; "Caneta"], ["id" =&gt; 9, "nome" =&gt; "Lápis"]];</code><br><code>array_column($p, "nome", "id")</code></td><td><br><code>['Caneta', 'Lápis']</code><br><br><code>[7 =&gt; 'Caneta', 9 =&gt; 'Lápis']</code></td></tr>
+<tr><td><code>array_count_values(array $array): array</code></td><td>Conta quantas vezes cada valor aparece. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_count_values(["uva", "maçã", "uva"])</code></td><td><code>['uva' =&gt; 2, 'maçã' =&gt; 1]</code></td></tr>
+<tr><td><code>array_unique(array $array): array</code></td><td>Remove repetidos (mantém a primeira chave de cada). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_unique([3, 1, 3, 2, 1])</code></td><td><code>[0 =&gt; 3, 1 =&gt; 1, 3 =&gt; 2]</code></td></tr>
+</table>
+</div>
+
+
+<div class="tryphp" data-goal="out:Ana\, Caio,src:array_filter">
+<p class="try-task"><strong>Experimente:</strong> mostre os nomes de quem tirou 8 ou mais, separados por vírgula (<code>Ana, Caio</code>). Use <code>array_filter</code> para escolher as notas e <code>array_keys</code> + <code>implode</code> para montar o texto.</p>
+<pre class="script">&lt;?php
+$notas = ["Ana" =&gt; 9.5, "Bia" =&gt; 7, "Caio" =&gt; 8];
+// mostre os nomes de quem tirou 8 ou mais, separados por vírgula
+print_r($notas);
+</pre>
+<pre class="solucao">&lt;?php
+$notas = ["Ana" =&gt; 9.5, "Bia" =&gt; 7, "Caio" =&gt; 8];
+$aprovados = array_filter($notas, fn($nota) =&gt; $nota &gt;= 8);
+echo implode(", ", array_keys($aprovados)), "\n";
+</pre>
+</div>
+
+<h3 id="juntar">Juntar e comparar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>array_merge(array ...$arrays): array</code></td><td>Junta arrays. Chaves numéricas são renumeradas; chaves de texto repetidas: <strong>vence a última</strong>. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_merge($frutas, ["kiwi"])</code><br><code>array_merge(["a" =&gt; 1, "b" =&gt; 2], ["b" =&gt; 3])</code></td><td><code>['maçã', 'banana', 'uva', 'kiwi']</code><br><code>['a' =&gt; 1, 'b' =&gt; 3]</code></td></tr>
+<tr><td><code>[...$a, ...$b]</code></td><td>Operador <em>spread</em>: o mesmo que <code>array_merge</code> (desde o 8.1, também com chaves de texto). <a href="variadicas.html">Funções Variádicas</a></td><td><code>[...$frutas, "kiwi"]</code><br><code>[...["a" =&gt; 1], ...["a" =&gt; 2]]</code></td><td><code>['maçã', 'banana', 'uva', 'kiwi']</code><br><code>['a' =&gt; 2]</code></td></tr>
+<tr><td><code>$a + $b</code></td><td>União: acrescenta só as chaves de <code>$b</code> que <strong>não</strong> existem em <code>$a</code> (vence a primeira). <a href="operadores-aritmeticos.html">Operadores</a></td><td><code>["a" =&gt; 1, "b" =&gt; 2] + ["b" =&gt; 3, "c" =&gt; 4]</code><br><code>["x", "y"] + ["z", "w", "k"]</code></td><td><code>['a' =&gt; 1, 'b' =&gt; 2, 'c' =&gt; 4]</code><br><code>['x', 'y', 'k']</code></td></tr>
+<tr><td><code>array_replace(array $array, array ...$trocas): array</code></td><td>Troca os valores das chaves que aparecem nas trocas (sem renumerar). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_replace($frutas, [1 =&gt; "kiwi"])</code></td><td><code>['maçã', 'kiwi', 'uva']</code></td></tr>
+<tr><td><code>array_diff(array $array, array ...$outros): array</code></td><td>Os valores do primeiro que <strong>não</strong> estão nos outros (mantém as chaves). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_diff($frutas, ["banana"])</code></td><td><code>[0 =&gt; 'maçã', 2 =&gt; 'uva']</code></td></tr>
+<tr><td><code>array_diff_key(array $array, array ...$outros): array</code></td><td>O mesmo, comparando as chaves. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_diff_key($notas, ["Bia" =&gt; 0])</code></td><td><code>['Ana' =&gt; 9.5, 'Caio' =&gt; 8]</code></td></tr>
+<tr><td><code>array_intersect(array $array, array ...$outros): array</code></td><td>Os valores que estão em <strong>todos</strong>. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_intersect([1, 2, 3, 4], [2, 4, 6])</code></td><td><code>[1 =&gt; 2, 3 =&gt; 4]</code></td></tr>
+<tr><td><code>array_intersect_key(array $array, array ...$outros): array</code></td><td>Os itens cujas chaves estão em todos (bom para "pegar só estes campos"). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_intersect_key(["nome" =&gt; "Ana", "senha" =&gt; "x", "idade" =&gt; 29], ["nome" =&gt; 0, "idade" =&gt; 0])</code></td><td><code>['nome' =&gt; 'Ana', 'idade' =&gt; 29]</code></td></tr>
+</table>
+</div>
+
+<h3 id="transformar">Transformar e calcular</h3>
+<p>Várias destas recebem uma <strong>função</strong> como argumento (o teste ou a transformação). O jeito mais curto é a <em>arrow function</em> <code>fn($x) =&gt; …</code>; veja <a href="closures.html">Funções Anônimas e Arrow Functions</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>array_map(?callable $função, array $array, array ...$mais): array</code></td><td>Aplica a função a cada valor e devolve um array novo (mantém chaves de texto se for um array só). <a href="closures.html">Arrow Functions</a></td><td><code>array_map(fn($x) =&gt; $x * 2, $n)</code><br><code>array_map("strtoupper", $frutas)</code><br><code>array_map(fn($nota) =&gt; $nota &gt;= 8, $notas)</code></td><td><code>[10, 6, 16, 2]</code><br><code>['MAçã', 'BANANA', 'UVA']</code><br><code>['Ana' =&gt; true, 'Bia' =&gt; false, 'Caio' =&gt; true]</code></td></tr>
+<tr><td><code>array_filter(array $array, ?callable $função = null, int $modo = 0): array</code></td><td>Mantém os itens para os quais a função devolve <code>true</code> (sem função: tira os "vazios"). <strong>Mantém as chaves</strong>. <a href="closures.html">Arrow Functions</a></td><td><code>array_filter($n, fn($x) =&gt; $x &gt; 3)</code><br><code>array_filter([0, 1, "", "a", null])</code><br><code>array_filter($notas, fn($k) =&gt; $k !== "Bia", ARRAY_FILTER_USE_KEY)</code></td><td><code>[0 =&gt; 5, 2 =&gt; 8]</code><br><code>[1 =&gt; 1, 3 =&gt; 'a']</code><br><code>['Ana' =&gt; 9.5, 'Caio' =&gt; 8]</code></td></tr>
+<tr><td><code>array_reduce(array $array, callable $função, mixed $inicial = null): mixed</code></td><td>"Reduz" o array a um valor, acumulando item a item. <a href="closures.html">Arrow Functions</a></td><td><code>array_reduce($n, fn($soma, $x) =&gt; $soma + $x, 0)</code><br><code>array_reduce($n, fn($maior, $x) =&gt; max($maior, $x), 0)</code></td><td><code>17</code><br><code>8</code></td></tr>
+<tr><td><code>array_walk(array &amp;$array, callable $função): true</code></td><td>Chama a função para cada item (valor e chave); com <code>&amp;$v</code> altera o próprio array. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_walk($notas, function (&amp;$v, $k) { $v = "$k: $v"; });</code><br><code>$notas</code></td><td><br><code>['Ana' =&gt; 'Ana: 9.5', 'Bia' =&gt; 'Bia: 7', 'Caio' =&gt; 'Caio: 8']</code></td></tr>
+<tr><td><code>array_sum(array $array): int|float</code></td><td>Soma dos valores. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_sum($n)</code><br><code>array_sum($notas)</code></td><td><code>17</code><br><code>24.5</code></td></tr>
+<tr><td><code>array_product(array $array): int|float</code></td><td>Produto (multiplicação) dos valores. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_product([2, 3, 4])</code></td><td><code>24</code></td></tr>
+<tr><td><code>max(array $array) / min(array $array)</code></td><td>Maior / menor valor (lista vazia: <code>ValueError</code>). <a href="numeros.html">int e float</a></td><td><code>max($n)</code><br><code>min($notas)</code><br><code>max([])</code></td><td><code>8</code><br><code>7</code><br><code>ValueError: max(): Argument #1 ($value) must contain at least one element</code></td></tr>
+<tr><td><code>array_reverse(array $array, bool $manterChaves = false): array</code></td><td>Ordem invertida. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_reverse($frutas)</code></td><td><code>['uva', 'banana', 'maçã']</code></td></tr>
+<tr><td><code>array_pad(array $array, int $tamanho, mixed $valor): array</code></td><td>Completa até o tamanho com o valor (negativo: completa no começo). <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_pad([1, 2], 4, 0)</code></td><td><code>[1, 2, 0, 0]</code></td></tr>
+<tr><td><code>implode(string $separador, array $array): string</code></td><td>Junta os valores num texto. (Apelido: <code>join</code>.) <a href="funcoes-string.html">Funções de String</a></td><td><code>implode(", ", $frutas)</code><br><code>implode(" | ", $notas)</code></td><td><code>'maçã, banana, uva'</code><br><code>'9.5 | 7 | 8'</code></td></tr>
+<tr><td><code>explode(string $separador, string $texto, int $limite = PHP_INT_MAX): array</code></td><td>Corta um texto num array. <a href="funcoes-string.html">Funções de String</a></td><td><code>explode(",", "maçã,banana,uva")</code><br><code>explode(",", "a,b,c", 2)</code></td><td><code>['maçã', 'banana', 'uva']</code><br><code>['a', 'b,c']</code></td></tr>
+<tr><td><code>compact(string ...$nomes): array</code></td><td>Monta um array a partir de variáveis com esses nomes. <a href="funcoes-array.html">Funções de Array</a></td><td><code>$nome = "Ana"; $idade = 29;</code><br><code>compact("nome", "idade")</code></td><td><br><code>['nome' =&gt; 'Ana', 'idade' =&gt; 29]</code></td></tr>
+<tr><td><code>array_find(array $array, callable $função): mixed</code> <span class="versao">PHP 8.4+</span></td><td>O <strong>primeiro valor</strong> para o qual a função dá <code>true</code>, ou <code>null</code>. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_find($n, fn($x) =&gt; $x &gt; 4)</code><br><code>array_find($n, fn($x) =&gt; $x &gt; 100)</code></td><td><code>5</code><br><code>null</code></td></tr>
+<tr><td><code>array_find_key(array $array, callable $função): mixed</code> <span class="versao">PHP 8.4+</span></td><td>A <strong>chave</strong> do primeiro que passa no teste. <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_find_key($notas, fn($v) =&gt; $v &lt; 8)</code></td><td><code>'Bia'</code></td></tr>
+<tr><td><code>array_any(array $array, callable $função): bool</code> <span class="versao">PHP 8.4+</span></td><td><strong>Algum</strong> item passa no teste? <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_any($notas, fn($v) =&gt; $v &lt; 7.5)</code></td><td><code>true</code></td></tr>
+<tr><td><code>array_all(array $array, callable $função): bool</code> <span class="versao">PHP 8.4+</span></td><td><strong>Todos</strong> passam no teste? <a href="funcoes-array.html">Funções de Array</a></td><td><code>array_all($notas, fn($v) =&gt; $v &gt;= 7)</code></td><td><code>true</code></td></tr>
+</table>
+</div>
+
+<h3 id="ordenar">Ordenar (mudam o array)</h3>
+<p>Todas as funções de ordenar mudam o próprio array e devolvem <code>true</code>. Para escolher: <strong>pelos valores ou pelas chaves?</strong> <strong>Manter as chaves?</strong> (<code>a…</code> e <code>k…</code> mantêm; <code>sort</code>/<code>rsort</code>/<code>usort</code> renumeram) <strong>Do maior para o menor?</strong> (<code>r…</code>) <strong>Regra própria?</strong> (<code>u…</code>).</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>sort(array &amp;$array, int $flags = SORT_REGULAR): true</code></td><td>Ordena os <strong>valores</strong>, do menor ao maior, e renumera as chaves (perde os nomes!). <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>sort($n);</code><br><code>$n</code><br><code>sort($notas);</code><br><code>$notas</code></td><td><br><code>[1, 3, 5, 8]</code><br><br><code>[7, 8, 9.5]</code></td></tr>
+<tr><td><code>rsort(array &amp;$array, int $flags = SORT_REGULAR): true</code></td><td>O mesmo, do maior ao menor. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>rsort($n);</code><br><code>$n</code></td><td><br><code>[8, 5, 3, 1]</code></td></tr>
+<tr><td><code>asort(array &amp;$array, int $flags = SORT_REGULAR): true</code></td><td>Ordena pelos valores <strong>mantendo as chaves</strong>. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>asort($notas);</code><br><code>$notas</code></td><td><br><code>['Bia' =&gt; 7, 'Caio' =&gt; 8, 'Ana' =&gt; 9.5]</code></td></tr>
+<tr><td><code>arsort(array &amp;$array, int $flags = SORT_REGULAR): true</code></td><td>Pelos valores, do maior ao menor, mantendo as chaves (ranking). <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>arsort($notas);</code><br><code>$notas</code></td><td><br><code>['Ana' =&gt; 9.5, 'Caio' =&gt; 8, 'Bia' =&gt; 7]</code></td></tr>
+<tr><td><code>ksort(array &amp;$array, int $flags = SORT_REGULAR): true</code></td><td>Ordena pelas <strong>chaves</strong>. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>$e = ["uva" =&gt; 3, "banana" =&gt; 5, "maçã" =&gt; 2]; ksort($e);</code><br><code>$e</code></td><td><br><code>['banana' =&gt; 5, 'maçã' =&gt; 2, 'uva' =&gt; 3]</code></td></tr>
+<tr><td><code>krsort(array &amp;$array, int $flags = SORT_REGULAR): true</code></td><td>Pelas chaves, ao contrário. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>krsort($notas);</code><br><code>$notas</code></td><td><br><code>['Caio' =&gt; 8, 'Bia' =&gt; 7, 'Ana' =&gt; 9.5]</code></td></tr>
+<tr><td><code>usort(array &amp;$array, callable $comparar): true</code></td><td>Ordena com a sua regra: a função recebe dois itens e devolve negativo, zero ou positivo (o <code>&lt;=&gt;</code> faz isso). Renumera. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>$p = [["nome" =&gt; "Caderno", "preco" =&gt; 15.9], ["nome" =&gt; "Caneta", "preco" =&gt; 2.5]]; usort($p, fn($a, $b) =&gt; $a["preco"] &lt;=&gt; $b["preco"]);</code><br><code>array_column($p, "nome")</code></td><td><br><code>['Caneta', 'Caderno']</code></td></tr>
+<tr><td><code>uasort(array &amp;$array, callable $comparar): true</code></td><td>Como <code>usort</code>, mantendo as chaves. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>uasort($notas, fn($a, $b) =&gt; $b &lt;=&gt; $a);</code><br><code>$notas</code></td><td><br><code>['Ana' =&gt; 9.5, 'Caio' =&gt; 8, 'Bia' =&gt; 7]</code></td></tr>
+<tr><td><code>uksort(array &amp;$array, callable $comparar): true</code></td><td>Como <code>usort</code>, comparando as chaves. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>uksort($notas, fn($a, $b) =&gt; strlen($a) &lt;=&gt; strlen($b));</code><br><code>$notas</code></td><td><br><code>['Ana' =&gt; 9.5, 'Bia' =&gt; 7, 'Caio' =&gt; 8]</code></td></tr>
+<tr><td><code>sort($a, SORT_STRING) / sort($a, SORT_NATURAL | SORT_FLAG_CASE)</code></td><td>Flags: comparar como texto; ordem "natural" (<code>foto2</code> antes de <code>foto10</code>) ignorando maiúsculas. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>$a = ["foto10", "Foto2", "foto1"]; sort($a);</code><br><code>$a</code><br><code>$a = ["foto10", "Foto2", "foto1"]; sort($a, SORT_NATURAL | SORT_FLAG_CASE);</code><br><code>$a</code></td><td><br><code>['Foto2', 'foto1', 'foto10']</code><br><br><code>['foto1', 'Foto2', 'foto10']</code></td></tr>
+<tr><td><code>natcasesort(array &amp;$array): true</code></td><td>Ordem natural sem diferenciar maiúsculas, mantendo as chaves. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>$a = ["foto10", "Foto2", "foto1"]; natcasesort($a);</code><br><code>$a</code></td><td><br><code>[2 =&gt; 'foto1', 1 =&gt; 'Foto2', 0 =&gt; 'foto10']</code></td></tr>
+</table>
+</div>
+
+<h3 id="ponteiro">Cursor interno</h3>
+<p>Todo array tem um "cursor" que aponta para um item. Funções antigas o usam; hoje o <code>foreach</code> resolve quase tudo.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>reset(array &amp;$array): mixed</code></td><td>Volta o "cursor" interno ao começo e devolve o primeiro valor (<code>false</code> se vazio). <a href="funcoes-array.html">Funções de Array</a></td><td><code>reset($frutas)</code></td><td><code>'maçã'</code></td></tr>
+<tr><td><code>end(array &amp;$array): mixed</code></td><td>Leva o cursor ao fim e devolve o último valor. Precisa de uma <strong>variável</strong> (<code>end(explode(…))</code> dá <code>Notice</code>). <a href="funcoes-array.html">Funções de Array</a></td><td><code>end($frutas)</code></td><td><code>'uva'</code></td></tr>
+<tr><td><code>current() / key() / next() / prev()</code></td><td>Valor e chave na posição do cursor; avançar; voltar. Hoje quase sempre se usa <code>foreach</code>. <a href="foreach.html">foreach</a></td><td><code>next($notas);</code><br><code>[key($notas), current($notas)]</code></td><td><br><code>['Bia', 7]</code></td></tr>
+</table>
+</div>
+
+
+<h3 id="aleatorio">Aleatório</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th></tr>
+<tr><td><code>shuffle(array &amp;$array): true</code></td><td>Embaralha o array (renumera as chaves). <a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>array_rand(array $array, int $quantos = 1): int|string|array</code></td><td>Sorteia uma <strong>chave</strong> (ou um array de chaves, se <code>$quantos</code> &gt; 1).</td></tr>
+</table>
+</div>
+<p>O resultado muda a cada execução:</p>
+<pre class="file" data-file="sorteio.php">&lt;?php
+$frutas = ["maçã", "banana", "uva"];
+shuffle($frutas);
+echo implode(", ", $frutas), "\n";
+echo array_rand(["Ana" =&gt; 1, "Bia" =&gt; 2, "Caio" =&gt; 3]), "\n";
+</pre>
+<pre class="term" data-cwd="~/ref">$ php sorteio.php
+uva, banana, maçã
+Caio
+$ php sorteio.php
+uva, maçã, banana
+Bia</pre>
+
+<hr>
+
+<h2 id="armadilhas">Armadilhas comuns</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Armadilha</th><th>O que acontece</th><th>O que fazer</th></tr>
+<tr><td><code>if (array_search("maçã", $frutas))</code></td><td>"maçã" está na posição <code>0</code>, e <code>0</code> conta como falso no <code>if</code>: o teste diz "não achei".</td><td><code>if (array_search(…) !== false)</code>, ou <code>in_array</code>.</td></tr>
+<tr><td><code>sort($notas)</code> num array associativo</td><td>Perde os nomes: vira <code>[7, 8, 9.5]</code>.</td><td><code>asort</code>/<code>arsort</code> (pelos valores) ou <code>ksort</code> (pelas chaves).</td></tr>
+<tr><td><code>array_filter</code> e depois <code>$lista[0]</code></td><td>As chaves originais ficam: o primeiro item pode ser a chave <code>2</code>, e <code>$lista[0]</code> dá <code>Undefined array key 0</code>.</td><td><code>array_values(array_filter(…))</code>, ou <code>array_first</code> (8.5).</td></tr>
+<tr><td><code>array_map("strtoupper", ["maçã"])</code></td><td>Dá <code>'MAçã'</code>: <code>strtoupper</code> só mexe nas letras sem acento.</td><td><code>mb_strtoupper</code>: veja <a href="mbstring.html">Acentos e mbstring</a> e a <a href="ref-string.html">referência de String</a>.</td></tr>
+<tr><td><code>array_merge</code> com chaves numéricas</td><td>As chaves são renumeradas (IDs como chave se perdem).</td><td>Use <code>+</code> ou <code>array_replace</code> para preservar as chaves.</td></tr>
+<tr><td><code>max([])</code>, <code>array_combine</code> com tamanhos diferentes</td><td><code>ValueError</code> (o programa para).</td><td>Confira <code>count</code> antes. Veja <a href="ref-erros.html#outros">Mensagens de Erro</a>.</td></tr>
+<tr><td><code>count</code> de um array dentro de array</td><td><code>count([1, [2, 3]])</code> é <code>2</code>; com <code>COUNT_RECURSIVE</code>, <code>4</code> (conta o array de dentro <strong>e</strong> os itens dele).</td><td>Para somar itens de várias listas, use <code>array_sum(array_map("count", …))</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="missao">Missão: o relatório do estoque</h2>
+<div class="tryphp" data-goal="out:Mochila\, Caderno\, Lápis,out:Valor em estoque: R$ 239\,50,src:usort">
+<p class="try-task"><strong>Missão:</strong> com as funções desta página, mostre (1) os nomes dos produtos <strong>com estoque</strong> (<code>estoque &gt; 0</code>), do mais caro ao mais barato, separados por vírgula; (2) o valor total em estoque (preço × estoque de cada um, somado), formatado como <code>R$ 239,50</code>. Sugestão: <code>array_filter</code>, <code>usort</code> com <code>&lt;=&gt;</code>, <code>array_column</code>, <code>array_map</code>, <code>array_sum</code>.</p>
+<pre class="script">&lt;?php
+$produtos = [
+    ["nome" =&gt; "Caderno", "preco" =&gt; 15.90, "estoque" =&gt; 3],
+    ["nome" =&gt; "Caneta", "preco" =&gt; 2.50, "estoque" =&gt; 0],
+    ["nome" =&gt; "Mochila", "preco" =&gt; 89.90, "estoque" =&gt; 2],
+    ["nome" =&gt; "Lápis", "preco" =&gt; 1.20, "estoque" =&gt; 10],
+];
+// 1) Mochila, Caderno, Lápis
+// 2) Valor em estoque: R$ 239,50
+</pre>
+<pre class="solucao">&lt;?php
+$produtos = [
+    ["nome" =&gt; "Caderno", "preco" =&gt; 15.90, "estoque" =&gt; 3],
+    ["nome" =&gt; "Caneta", "preco" =&gt; 2.50, "estoque" =&gt; 0],
+    ["nome" =&gt; "Mochila", "preco" =&gt; 89.90, "estoque" =&gt; 2],
+    ["nome" =&gt; "Lápis", "preco" =&gt; 1.20, "estoque" =&gt; 10],
+];
+$disponiveis = array_filter($produtos, fn($p) =&gt; $p["estoque"] &gt; 0);
+usort($disponiveis, fn($a, $b) =&gt; $b["preco"] &lt;=&gt; $a["preco"]);
+echo implode(", ", array_column($disponiveis, "nome")), "\n";
+$valor = array_sum(array_map(fn($p) =&gt; $p["preco"] * $p["estoque"], $disponiveis));
+echo "Valor em estoque: R$ ", number_format($valor, 2, ",", "."), "\n";
+</pre>
+</div>
+<pre class="term" data-cwd="~/ref">$ php missao2.php
+Mochila, Caderno, Lápis
+Valor em estoque: R$ 239,50</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Qual função ordena <code>$notas</code> da maior nota para a menor <strong>mantendo os nomes</strong>?</p>
+<label><input type="radio" name="q1"> <code>rsort</code></label>
+<label><input type="radio" name="q1"> <code>arsort</code></label>
+<label><input type="radio" name="q1"> <code>krsort</code></label>
+<label><input type="radio" name="q1"> <code>sort</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. O que <code>array_filter([5, 3, 8, 1], fn($x) =&gt; $x &gt; 3)</code> devolve?</p>
+<label><input type="radio" name="q2"> <code>[5, 8]</code></label>
+<label><input type="radio" name="q2"> <code>true</code></label>
+<label><input type="radio" name="q2"> <code>[0 =&gt; 5, 2 =&gt; 8]</code></label>
+<label><input type="radio" name="q2"> <code>2</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. <code>["a" =&gt; 1, "b" =&gt; 2] + ["b" =&gt; 3, "c" =&gt; 4]</code> dá…</p>
+<label><input type="radio" name="q3"> <code>['a' =&gt; 1, 'b' =&gt; 2, 'c' =&gt; 4]</code></label>
+<label><input type="radio" name="q3"> <code>['a' =&gt; 1, 'b' =&gt; 3, 'c' =&gt; 4]</code></label>
+<label><input type="radio" name="q3"> <code>[1, 2, 3, 4]</code></label>
+<label><input type="radio" name="q3"> Um erro.</label>
+</div>
+
+<div class="exercise">
+<p>Complete para pegar só os nomes de uma lista de produtos (cada um é <code>["nome" =&gt; …, "preco" =&gt; …]</code>):</p>
+<div class="ex-code">$nomes = <input data-answer="array_column">($produtos, "nome");</div>
+</div>
+
+<div class="exercise">
+<p>Complete para saber se <strong>todas</strong> as notas são maiores ou iguais a 7 (PHP 8.4+):</p>
+<div class="ex-code">$todos = <input data-answer="array_all">($notas, fn($v) =&gt; $v &gt;= 7);</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Procurar: <code>in_array</code> (existe?), <code>array_search</code> (onde? compare com <code>!== false</code>), <code>array_key_exists</code>/<code>isset</code> (a chave existe?), <code>array_find</code> (8.4).</li>
+  <li>Mudar: <code>$a[] =</code>/<code>array_push</code>, <code>array_pop</code>, <code>array_shift</code>, <code>array_unshift</code>, <code>unset</code>, <code>array_splice</code>.</li>
+  <li>Transformar: <code>array_map</code> (cada item vira outro), <code>array_filter</code> (escolhe; mantém as chaves), <code>array_reduce</code> (acumula), <code>array_column</code> (uma coluna).</li>
+  <li>Juntar: <code>array_merge</code>/<code>[...$a, ...$b]</code> (renumera), <code>+</code> (vence o primeiro), <code>implode</code>/<code>explode</code> (texto ↔ array).</li>
+  <li>Ordenar: <code>sort</code>/<code>rsort</code> (renumeram), <code>asort</code>/<code>arsort</code> (valores, mantêm chaves), <code>ksort</code>/<code>krsort</code> (chaves), <code>usort</code> + <code>&lt;=&gt;</code> (sua regra).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
