@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Herança — extends, parent::, final e #[\Override] | Guia PHP</title>
+<meta name="description" content="Herança em PHP: extends, o que a classe filha recebe, sobrescrever métodos, parent:: e parent::__construct, protected na prática, final em métodos e classes e o atributo #[\Override] do PHP 8.3, com os erros reais de cada caso.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Herança</span></h1>
+
+<p class="intro">A lojinha da Ana começou a vender e-books. Um e-book é um produto como qualquer outro (tem nome, preço, descrição), mas com uma diferença: não paga frete. Copiar a classe <code>Produto</code> inteira só para mudar o frete seria repetir código. Com <strong>herança</strong>, a Ana cria uma classe <code>ProdutoDigital</code> que <strong>aproveita tudo</strong> de <code>Produto</code> e muda só o que é diferente.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Criar uma classe filha com <code>extends</code> e o que ela herda.</li>
+  <li>Sobrescrever um método e reaproveitar o original com <code>parent::</code>.</li>
+  <li>Chamar o construtor da mãe com <code>parent::__construct()</code>.</li>
+  <li>A diferença entre <code>protected</code> e <code>private</code> na prática.</li>
+  <li>Proibir mudanças com <code>final</code>.</li>
+  <li>Proteger-se de erros de digitação com o atributo <code>#[\Override]</code> do PHP 8.3.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: "é um"</h2>
+<p>Herança descreve uma relação de "<strong>é um</strong>": um e-book <strong>é um</strong> produto; um produto frágil <strong>é um</strong> produto físico. A classe nova (a <strong>filha</strong>, ou <em>subclasse</em>) recebe tudo da classe original (a <strong>mãe</strong>, ou <em>superclasse</em>, <em>classe pai</em>) e pode:</p>
+<ul>
+  <li><strong>acrescentar</strong> coisas novas (o e-book tem tamanho em MB);</li>
+  <li><strong>substituir</strong> o que é diferente (o frete do e-book é zero).</li>
+</ul>
+<p>É como uma receita de família: a filha recebe o caderno de receitas da mãe, usa a maioria como está, troca o açúcar por mel numa delas e acrescenta receitas novas.</p>
+
+<hr>
+
+<h2><code>extends</code>: a filha recebe tudo</h2>
+
+<pre class="file" data-file="basico.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+
+    public function frete(): float
+    {
+        return 15.0;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome} - R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+}
+
+$ebook = new ProdutoDigital("E-book de receitas", 19.90);
+echo $ebook-&gt;descricao() . "\n";
+echo "Frete: " . $ebook-&gt;frete() . "\n";
+var_dump($ebook instanceof ProdutoDigital, $ebook instanceof Produto);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php basico.php
+E-book de receitas - R$ 19,90     « descricao() veio da mãe
+Frete: 15                         « frete() também (ainda não mudamos)
+bool(true)                        « o e-book é um ProdutoDigital…
+bool(true)                        « …e também é um Produto</pre>
+
+<dl class="anatomy">
+  <dt>class ProdutoDigital</dt><dd>A classe nova, a filha.</dd>
+  <dt>extends Produto</dt><dd><code>extends</code> = "estende", "amplia". A filha recebe todas as propriedades, métodos e constantes de <code>Produto</code>, inclusive o construtor.</dd>
+  <dt>{ }</dt><dd>Mesmo vazia, a classe filha já funciona: <code>new ProdutoDigital("…", 19.90)</code> usou o construtor da mãe.</dd>
+</dl>
+
+<p>O <code>instanceof</code> (de <a href="classes-objetos.html">Classes e Objetos</a>) confirma a relação "é um": um objeto da filha é <strong>também</strong> um objeto da mãe. Por isso, uma função que pede <code>Produto $p</code> aceita um <code>ProdutoDigital</code> sem reclamar.</p>
+
+<hr>
+
+<h2>Sobrescrever métodos e usar <code>parent::</code></h2>
+<p>Para mudar um comportamento, a filha declara um método com o <strong>mesmo nome</strong> do da mãe. Isso se chama <strong>sobrescrever</strong> (<em>override</em>). Para aproveitar o método original dentro do novo, use <code>parent::</code> ("a mãe"):</p>
+
+<pre class="file" data-file="sobrescrever.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+
+    public function frete(): float
+    {
+        return 15.0;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome} - R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+    public function __construct(
+        string $nome,
+        float $preco,
+        public float $tamanhoMb,
+    ) {
+        parent::__construct($nome, $preco);
+    }
+
+    public function frete(): float
+    {
+        return 0.0;
+    }
+
+    public function descricao(): string
+    {
+        return parent::descricao() . " (download, {$this-&gt;tamanhoMb} MB)";
+    }
+}
+
+$caneca = new Produto("Caneca", 25.90);
+$ebook = new ProdutoDigital("E-book de receitas", 19.90, 4.5);
+
+foreach ([$caneca, $ebook] as $produto) {
+    echo $produto-&gt;descricao() . " | frete: " . $produto-&gt;frete() . "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php sobrescrever.php
+Caneca - R$ 25,90 | frete: 15
+E-book de receitas - R$ 19,90 (download, 4.5 MB) | frete: 0</pre>
+
+<dl class="anatomy">
+  <dt>public function frete(): float { return 0.0; }</dt><dd>Substitui o <code>frete()</code> da mãe. Para objetos <code>ProdutoDigital</code>, vale este; para os <code>Produto</code> comuns, continua valendo o da mãe.</dd>
+  <dt>parent::descricao()</dt><dd>Chama a versão <strong>da mãe</strong> e acrescenta um pedaço. Sem o <code>parent::</code>, <code>$this-&gt;descricao()</code> chamaria o próprio método da filha, que chamaria ele mesmo de novo, para sempre.</dd>
+  <dt>parent::__construct($nome, $preco)</dt><dd>O construtor da filha recebe os dados da mãe e os <strong>repassa</strong> para o construtor dela. Depois, a promoção cuida do <code>tamanhoMb</code>, que é só da filha.</dd>
+  <dt>string $nome, float $preco (sem <code>public</code>)</dt><dd>Na filha, esses dois são parâmetros comuns: as propriedades já são declaradas (e promovidas) na mãe.</dd>
+</dl>
+
+<p>Repare no <code>foreach</code>: o mesmo código (<code>$produto-&gt;frete()</code>) deu 15 para a caneca e 0 para o e-book. Cada objeto respondeu do seu jeito à mesma chamada. Essa é a ideia de <strong>polimorfismo</strong>, um dos pilares da POO, que você vai aprofundar em <a href="interfaces.html">Interfaces</a>.</p>
+
+<div class="warning">
+<strong>Se a filha tem construtor, chame o da mãe</strong>
+<p>Quando a filha declara o próprio <code>__construct</code>, o da mãe <strong>não roda sozinho</strong>. Esquecer o <code>parent::__construct(…)</code> deixa as propriedades da mãe sem valor (veja o erro em <a href="#erros">Quando dá errado</a>).</p>
+</div>
+
+<div class="tryphp" data-goal="out:Frete da caneca: 16,out:Frete do vaso: 21,src:extends Produto,src:parent::frete,semerro">
+<p class="try-task"><strong>Missão:</strong> produtos físicos pagam R$ 2,00 a mais de frete por quilo. Crie a classe <code>ProdutoFisico</code>, filha de <code>Produto</code>, com a propriedade promovida <code>public float $pesoKg</code> no construtor e um <code>frete()</code> que devolve <code>parent::frete() + 2 * $this-&gt;pesoKg</code>. A saída deve ser <code>Frete da caneca: 16</code> e <code>Frete do vaso: 21</code>.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+// crie a classe ProdutoFisico aqui
+
+
+$caneca = new ProdutoFisico(0.5);
+$vaso = new ProdutoFisico(3);
+echo "Frete da caneca: " . $caneca-&gt;frete() . "\n";
+echo "Frete do vaso: " . $vaso-&gt;frete() . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+class ProdutoFisico extends Produto
+{
+    public function __construct(public float $pesoKg)
+    {
+    }
+
+    public function frete(): float
+    {
+        return parent::frete() + 2 * $this-&gt;pesoKg;
+    }
+}
+
+$caneca = new ProdutoFisico(0.5);
+$vaso = new ProdutoFisico(3);
+echo "Frete da caneca: " . $caneca-&gt;frete() . "\n";
+echo "Frete do vaso: " . $vaso-&gt;frete() . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Herança em vários níveis</h2>
+<p>Uma filha pode ter filhas. Cada nível acrescenta o seu pedaço, e <code>parent::</code> sempre chama o nível logo acima:</p>
+
+<pre class="file" data-file="cadeia.php">&lt;?php
+class Produto
+{
+    public function frete(): float { return 15.0; }
+}
+class ProdutoFisico extends Produto
+{
+    public function __construct(public float $pesoKg) {}
+
+    public function frete(): float
+    {
+        return parent::frete() + 2.0 * $this-&gt;pesoKg;
+    }
+}
+class ProdutoFragil extends ProdutoFisico
+{
+    public function frete(): float
+    {
+        return parent::frete() + 10.0;
+    }
+}
+
+$vaso = new ProdutoFragil(3);
+echo "Frete do vaso: " . $vaso-&gt;frete() . "\n";
+var_dump($vaso instanceof Produto);
+echo get_parent_class($vaso) . "\n";
+print_r(class_parents($vaso));
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php cadeia.php
+Frete do vaso: 31        « 15 (Produto) + 2 × 3 kg (ProdutoFisico) + 10 (ProdutoFragil)
+bool(true)               « um ProdutoFragil é um Produto, dois níveis acima
+ProdutoFisico            « get_parent_class: a mãe direta
+Array
+(
+    [ProdutoFisico] =&gt; ProdutoFisico
+    [Produto] =&gt; Produto
+)</pre>
+
+<p>No PHP, cada classe tem <strong>uma mãe só</strong> (herança simples): <code>class Curso extends Produto, Servico</code> é erro de sintaxe. Para uma classe "ser" várias coisas ao mesmo tempo, o PHP usa <a href="interfaces.html">interfaces</a>; para reaproveitar código de vários lugares, <a href="traits.html">traits</a>. E não exagere nos níveis: mais de dois ou três costuma deixar o código difícil de seguir.</p>
+
+<hr>
+
+<h2><code>protected</code> × <code>private</code> na herança</h2>
+<p>Em <a href="visibilidade.html">Visibilidade</a> você viu que <code>protected</code> é "para a família". Aqui está a diferença na prática:</p>
+
+<pre class="file" data-file="protegido.php">&lt;?php
+class Produto
+{
+    protected int $estoque = 10;
+    private float $custo = 8.0;
+
+    public function __construct(public string $nome)
+    {
+    }
+}
+
+class ProdutoFisico extends Produto
+{
+    public function situacao(): string
+    {
+        return "{$this-&gt;nome}: {$this-&gt;estoque} em estoque";
+    }
+
+    public function lucro(): float
+    {
+        return 25.90 - $this-&gt;custo;
+    }
+}
+
+$caneca = new ProdutoFisico("Caneca");
+echo $caneca-&gt;situacao() . "\n";
+echo $caneca-&gt;lucro() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php protegido.php
+Caneca: 10 em estoque     « protected: a filha enxerga
+
+Warning: Undefined property: ProdutoFisico::$custo in /home/ana/loja/protegido.php on line 21
+25.9                      « private: para a filha, $custo nem existe (a conta usou null)</pre>
+
+<p>O <code>private</code> da mãe é <strong>invisível</strong> para a filha: o PHP diz que a propriedade é "indefinida" e segue com <code>null</code>, produzindo um resultado errado. Regra prática: use <code>private</code> por padrão e passe para <code>protected</code> só o que as filhas realmente precisam. Ou, melhor ainda, ofereça um método <code>protected</code> que a filha possa chamar.</p>
+
+<hr>
+
+<h2>Regras ao sobrescrever</h2>
+<p>Como um objeto da filha pode ser usado em qualquer lugar onde se espera a mãe, o PHP exige que o método da filha seja <strong>compatível</strong> com o da mãe:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Exemplo errado</th><th>Mensagem real</th></tr>
+<tr><td>A visibilidade não pode ficar mais fechada</td><td>Mãe: <code>public function frete()</code>; filha: <code>private function frete()</code></td><td><code>Access level to ProdutoDigital::frete() must be public (as in class Produto)</code></td></tr>
+<tr><td>Os parâmetros obrigatórios não podem aumentar</td><td>Mãe: <code>frete()</code>; filha: <code>frete(float $pesoKg)</code></td><td><code>Declaration of ProdutoFisico::frete(float $pesoKg): float must be compatible with Produto::frete(): float</code></td></tr>
+<tr><td>O tipo de retorno tem que "caber" no da mãe</td><td>Mãe: <code>: float</code>; filha: <code>: string</code></td><td>(a mesma mensagem: <code>must be compatible</code>)</td></tr>
+</table>
+</div>
+<p>Um parâmetro novo <strong>com valor padrão</strong> é permitido (<code>frete(float $pesoKg = 0)</code>), porque quem chama <code>frete()</code> sem argumentos continua funcionando.</p>
+
+<hr>
+
+<h2><code>final</code>: "daqui não passa"</h2>
+<p>Às vezes a Ana quer <strong>proibir</strong> mudanças. A palavra <code>final</code> faz isso:</p>
+<ul>
+  <li><code>final public function total()</code>: nenhuma filha pode sobrescrever este método.</li>
+  <li><code>final class Dinheiro</code>: ninguém pode criar filhas desta classe.</li>
+</ul>
+
+<pre class="file" data-file="final-metodo.php">&lt;?php
+class Pedido
+{
+    final public function total(): float
+    {
+        return 100.0;
+    }
+}
+
+class PedidoEspertinho extends Pedido
+{
+    public function total(): float
+    {
+        return 0.0;
+    }
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php final-metodo.php
+
+Fatal error: Cannot override final method Pedido::total() in /home/ana/loja/final-metodo.php on line 12
+Stack trace:
+#0 {main}</pre>
+
+<pre class="file" data-file="final-classe.php">&lt;?php
+final class Dinheiro
+{
+}
+
+class MeuDinheiro extends Dinheiro
+{
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php final-classe.php
+
+Fatal error: Class MeuDinheiro cannot extend final class Dinheiro in /home/ana/loja/final-classe.php on line 6
+Stack trace:
+#0 {main}</pre>
+
+<p>Os dois erros aparecem antes de o programa rodar. Use <code>final</code> quando uma regra não pode ser trocada (o cálculo do total de um pedido) ou quando a classe não foi pensada para ter filhas. Muitos projetos modernos declaram as classes <code>final</code> por padrão e só "abrem" quando há motivo. (Constantes de classe também aceitam <code>final</code>: <code>final public const …</code>.)</p>
+
+<hr>
+
+<h2><code>#[\Override]</code>: "isto sobrescreve, confira!" <span class="versao">PHP 8.3+</span></h2>
+<p>Existe um erro silencioso perigoso na herança: errar o nome do método que você queria sobrescrever. Olhe:</p>
+
+<pre class="file" data-file="sem-override-erro.php">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+    public function fretes(): float
+    {
+        return 0.0;
+    }
+}
+
+echo (new ProdutoDigital())-&gt;frete() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php sem-override-erro.php
+15                « o e-book pagou frete! fretes() é um método NOVO, não substituiu frete()</pre>
+
+<p>Nenhum erro, nenhum aviso: <code>fretes()</code> (com <code>s</code>) virou um método a mais, e o <code>frete()</code> da mãe continuou valendo. O atributo <code>#[\Override]</code> resolve isso: ele diz ao PHP "este método <strong>tem que</strong> sobrescrever um da mãe; se não sobrescrever, me avise":</p>
+
+<pre class="file" data-file="override-erro.php">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+    #[\Override]
+    public function fretes(): float
+    {
+        return 0.0;
+    }
+}
+
+echo (new ProdutoDigital())-&gt;frete() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php override-erro.php
+
+Fatal error: ProdutoDigital::fretes() has #[\Override] attribute, but no matching parent method exists in /home/ana/loja/override-erro.php on line 13
+Stack trace:
+#0 {main}</pre>
+
+<p>"<code>ProdutoDigital::fretes()</code> tem o atributo <code>#[\Override]</code>, mas não existe método correspondente na mãe". O erro aparece antes de o programa rodar, apontando a linha. Com o nome certo, tudo funciona:</p>
+
+<pre class="file" data-file="override.php">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+    #[\Override]
+    public function frete(): float
+    {
+        return 0.0;
+    }
+}
+
+echo (new ProdutoDigital())-&gt;frete() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php override.php
+0</pre>
+
+<dl class="anatomy">
+  <dt>#[ … ]</dt><dd>A sintaxe de um <strong>atributo</strong>: uma "etiqueta" com informação extra para o PHP (veja <a href="atributos.html">Atributos</a>).</dd>
+  <dt>\Override</dt><dd>O nome do atributo. A barra <code>\</code> diz "o <code>Override</code> do próprio PHP" (assunto de <a href="namespaces.html">Namespaces</a>); sem namespace, <code>#[Override]</code> também funciona, mas <code>#[\Override]</code> funciona sempre.</dd>
+</dl>
+
+<p>O <code>#[\Override]</code> também protege o futuro: se um dia alguém renomear o <code>frete()</code> da mãe, a filha avisa na hora, em vez de passar a ser um método esquecido. Em PHP 8.2 ou anterior, o atributo é simplesmente ignorado (sem erro), então você pode usá-lo sem medo.</p>
+
+<hr>
+
+<h2>Quando usar herança (e quando não)</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>A nova classe <strong>é um</strong> tipo da outra e muda pouca coisa (<code>ProdutoDigital</code> é um <code>Produto</code>)</td><td>Herança (<code>extends</code>)</td></tr>
+<tr><td>Uma classe <strong>tem</strong> outra (um <code>Pedido</code> tem <code>Produto</code>s, tem um <code>Cliente</code>)</td><td>Uma propriedade com o objeto (isso se chama <strong>composição</strong>), não herança</td></tr>
+<tr><td>Classes diferentes precisam prometer os mesmos métodos (<code>pagar()</code> no Pix e no boleto)</td><td><a href="interfaces.html">Interface</a></td></tr>
+<tr><td>Uma "mãe" que nunca deve ser criada sozinha, só servir de base</td><td><a href="abstratas.html">Classe abstrata</a></td></tr>
+<tr><td>O mesmo pedaço de código em classes sem relação de "é um"</td><td><a href="traits.html">Trait</a></td></tr>
+</table>
+</div>
+<p>O teste rápido: leia em voz alta "um <em>X</em> é um <em>Y</em>". "Um pedido é um cliente" soa errado, então <code>Pedido extends Cliente</code> está errado, mesmo que poupe código.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Esquecer o <code>parent::__construct</code></strong>
+<pre class="file" data-file="sem-parent-construct.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+    public function __construct(
+        string $nome,
+        float $preco,
+        public float $tamanhoMb,
+    ) {
+    }
+}
+
+$ebook = new ProdutoDigital("E-book", 19.90, 4.5);
+echo $ebook-&gt;nome;
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-parent-construct.php
+
+Fatal error: Uncaught Error: Typed property Produto::$nome must not be accessed before initialization in /home/ana/loja/sem-parent-construct.php:22
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/sem-parent-construct.php on line 22</pre>
+<p><strong>O que significa:</strong> a filha tem o próprio construtor, que recebeu <code>$nome</code> e <code>$preco</code> e não fez nada com eles. O construtor da mãe (que guardaria esses valores) nunca rodou, e <code>Produto::$nome</code> ficou sem valor.</p>
+<p><strong>Como consertar:</strong> primeira linha do construtor da filha: <code>parent::__construct($nome, $preco);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Declaration of … must be compatible with …</strong>
+<pre class="file" data-file="assinatura.php">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+class ProdutoFisico extends Produto
+{
+    public function frete(float $pesoKg): float
+    {
+        return 15.0 + $pesoKg;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php assinatura.php
+
+Fatal error: Declaration of ProdutoFisico::frete(float $pesoKg): float must be compatible with Produto::frete(): float in /home/ana/loja/assinatura.php on line 12
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> a filha mudou a "assinatura" do método (acrescentou um parâmetro obrigatório). Um código que chama <code>$produto-&gt;frete()</code> sem argumentos quebraria com um <code>ProdutoFisico</code>.</p>
+<p><strong>Como consertar:</strong> mantenha a assinatura da mãe. Se a filha precisa de um dado a mais, guarde-o numa propriedade (como o <code>pesoKg</code> da missão) ou dê um valor padrão ao parâmetro novo.</p>
+</div>
+
+<div class="cenario">
+<strong>Access level to … must be public</strong>
+<pre class="file" data-file="visibilidade-menor.php">&lt;?php
+class Produto
+{
+    public function frete(): float
+    {
+        return 15.0;
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+    private function frete(): float
+    {
+        return 0.0;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php visibilidade-menor.php
+
+Fatal error: Access level to ProdutoDigital::frete() must be public (as in class Produto) in /home/ana/loja/visibilidade-menor.php on line 12
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> a filha tentou esconder um método que a mãe deixava público. <strong>Como consertar:</strong> mantenha <code>public</code> (a filha pode abrir mais, de <code>protected</code> para <code>public</code>, mas nunca fechar).</p>
+</div>
+
+<div class="cenario">
+<strong>Duas mães</strong>
+<pre class="file" data-file="duas-maes.php">&lt;?php
+class Produto {}
+class Servico {}
+class Curso extends Produto, Servico {}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php duas-maes.php
+
+Parse error: syntax error, unexpected token ",", expecting "{" in /home/ana/loja/duas-maes.php on line 4</pre>
+<p><strong>O que significa:</strong> o PHP esperava a chave <code>{</code> logo depois do nome da mãe: só cabe uma. <strong>Como consertar:</strong> escolha uma mãe e use <a href="interfaces.html">interfaces</a> (que podem ser várias) ou <a href="traits.html">traits</a> para o resto.</p>
+</div>
+
+<div class="cenario">
+<strong>A mãe não existe</strong>
+<pre class="file" data-file="pai-nao-existe.php">&lt;?php
+class ProdutoDigital extends Produtos
+{
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php pai-nao-existe.php
+
+Fatal error: Uncaught Error: Class "Produtos" not found in /home/ana/loja/pai-nao-existe.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/pai-nao-existe.php on line 2</pre>
+<p><strong>O que significa:</strong> o nome da mãe está errado (<code>Produtos</code>), ou o arquivo dela não foi incluído antes. <strong>Como consertar:</strong> confira o nome e inclua o arquivo da mãe (com <a href="include-require.html"><code>require_once</code></a> ou <a href="autoload.html">autoload</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>class Filha extends Mae { }</code></td><td>Cria uma classe filha que herda tudo de <code>Mae</code></td></tr>
+<tr><td>Método com o mesmo nome na filha</td><td>Sobrescreve o da mãe</td></tr>
+<tr><td><code>parent::metodo()</code></td><td>Chama a versão da mãe</td></tr>
+<tr><td><code>parent::__construct(…)</code></td><td>Chama o construtor da mãe</td></tr>
+<tr><td><code>protected</code></td><td>Visível na classe e nas filhas</td></tr>
+<tr><td><code>final public function f()</code></td><td>Método que não pode ser sobrescrito</td></tr>
+<tr><td><code>final class X</code></td><td>Classe que não pode ter filhas</td></tr>
+<tr><td><code>#[\Override]</code> <span class="versao">PHP 8.3+</span></td><td>Garante que o método sobrescreve um da mãe</td></tr>
+<tr><td><code>get_parent_class($obj)</code>, <code>class_parents($obj)</code></td><td>A mãe direta / todos os ancestrais</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Clube do Café - R$ 39\,90/mês | frete: 0,out:Caneca - R$ 25\,90 | frete: 15,src:extends Produto,src:#\[\\Override\],src:parent::descricao,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana lançou uma assinatura mensal de café. Crie a classe <code>Assinatura</code>, filha de <code>Produto</code>, que sobrescreve dois métodos, ambos marcados com <code>#[\Override]</code>: <code>frete()</code> devolve <code>0.0</code>, e <code>descricao()</code> devolve a descrição da mãe (<code>parent::descricao()</code>) seguida de <code>/mês</code>. A saída deve ter <code>Clube do Café - R$ 39,90/mês | frete: 0</code>.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+
+    public function frete(): float
+    {
+        return 15.0;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome} - R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+}
+
+// crie a classe Assinatura aqui
+
+
+$itens = [new Produto("Caneca", 25.90), new Assinatura("Clube do Café", 39.90)];
+foreach ($itens as $item) {
+    echo $item-&gt;descricao() . " | frete: " . $item-&gt;frete() . "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+
+    public function frete(): float
+    {
+        return 15.0;
+    }
+
+    public function descricao(): string
+    {
+        return "{$this-&gt;nome} - R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+}
+
+class Assinatura extends Produto
+{
+    #[\Override]
+    public function frete(): float
+    {
+        return 0.0;
+    }
+
+    #[\Override]
+    public function descricao(): string
+    {
+        return parent::descricao() . "/mês";
+    }
+}
+
+$itens = [new Produto("Caneca", 25.90), new Assinatura("Clube do Café", 39.90)];
+foreach ($itens as $item) {
+    echo $item-&gt;descricao() . " | frete: " . $item-&gt;frete() . "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar a filha</h3>
+<p>Complete para <code>Ebook</code> herdar de <code>Produto</code>:</p>
+<div class="ex-code">class Ebook <input data-answer="extends Produto" aria-label="herança"> { }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Construtor da mãe</h3>
+<p>Complete a primeira linha do construtor da filha para repassar <code>$nome</code> e <code>$preco</code> à mãe:</p>
+<div class="ex-code"><input data-answer="parent::__construct($nome, $preco)|parent::__construct($nome,$preco)" aria-label="chamada">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Proibir filhas</h3>
+<p>Complete para que ninguém possa estender a classe <code>Dinheiro</code>:</p>
+<div class="ex-code"><input data-answer="final" aria-label="palavra-chave"> class Dinheiro { }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A mãe tem <code>private float $custo</code>. O que acontece quando um método da filha lê <code>$this-&gt;custo</code>?</p>
+<label><input type="radio" name="q4"> Funciona normalmente</label>
+<label><input type="radio" name="q4"> <code>Fatal error: Cannot access private property</code></label>
+<label><input type="radio" name="q4"> <code>Warning: Undefined property</code>, e o valor é <code>null</code></label>
+<label><input type="radio" name="q4"> <code>Parse error</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Para que serve o <code>#[\Override]</code>?</p>
+<label><input type="radio" name="q5"> Para o PHP dar erro se o método não sobrescrever nenhum método da mãe</label>
+<label><input type="radio" name="q5"> Para impedir que as filhas sobrescrevam o método</label>
+<label><input type="radio" name="q5"> Para chamar o método da mãe</label>
+<label><input type="radio" name="q5"> Para deixar o método mais rápido</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual relação <strong>não</strong> deve ser feita com herança?</p>
+<label><input type="radio" name="q6"> <code>ProdutoDigital extends Produto</code></label>
+<label><input type="radio" name="q6"> <code>ProdutoFragil extends ProdutoFisico</code></label>
+<label><input type="radio" name="q6"> <code>Assinatura extends Produto</code></label>
+<label><input type="radio" name="q6"> <code>Pedido extends Cliente</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">7. <code>$e = new ProdutoDigital(…)</code>, filha de <code>Produto</code>. Quanto vale <code>$e instanceof Produto</code>?</p>
+<label><input type="radio" name="q7"> <code>false</code>: o objeto é um <code>ProdutoDigital</code></label>
+<label><input type="radio" name="q7"> <code>true</code>: a filha também "é um" <code>Produto</code></label>
+<label><input type="radio" name="q7"> Dá erro</label>
+<label><input type="radio" name="q7"> Depende do construtor</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>class Filha extends Mae</code>: a filha herda propriedades, métodos e constantes, e "é um" objeto da mãe também (<code>instanceof</code>).</li>
+  <li>Método com o mesmo nome na filha <strong>sobrescreve</strong> o da mãe; <code>parent::metodo()</code> chama a versão original.</li>
+  <li>Se a filha tem construtor, chame <code>parent::__construct(…)</code>.</li>
+  <li><code>protected</code> passa para as filhas; <code>private</code> não.</li>
+  <li>Ao sobrescrever, mantenha a assinatura compatível e a visibilidade igual ou mais aberta.</li>
+  <li><code>final</code> proíbe sobrescrever (método) ou estender (classe).</li>
+  <li><code>#[\Override]</code> (8.3+) transforma um erro de digitação silencioso num erro claro.</li>
+  <li>Herança é para "é um". Para "tem um", use composição; para várias "capacidades", <a href="interfaces.html">interfaces</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
