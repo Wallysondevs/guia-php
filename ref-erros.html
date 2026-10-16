@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Mensagens de Erro — o que cada erro e aviso do PHP 8.5 quer dizer | Guia PHP</title>
+<meta name="description" content="Referência das mensagens de erro e aviso do PHP 8.5: Parse error, Fatal error, Uncaught Error e TypeError, Warning, Notice e Deprecated. Cada uma com a mensagem real, o código que a provoca, a causa, a correção e a aula do guia.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Mensagens de Erro</span></h1>
+
+<p class="intro">Quando algo dá errado, o PHP escreve uma mensagem em inglês com o <strong>tipo</strong> do problema, o <strong>texto</strong>, o <strong>arquivo</strong> e a <strong>linha</strong>. Esta página junta as mensagens que você mais vai encontrar, cada uma com o código que a provoca, o que ela quer dizer, como consertar e a aula onde o assunto é explicado. Todas foram <strong>provocadas de verdade</strong> no PHP 8.5, na máquina da Ana. Para aprender a ler erros com calma, veja <a href="erros.html">Lendo Erros do PHP</a> e <a href="tipos-erro.html">Tipos de Erro</a>.</p>
+
+<div class="note">
+<strong>Como usar esta página</strong>
+<ul>
+  <li>Copie o começo da mensagem que apareceu para você (por exemplo, <code>Undefined array key</code>) e procure aqui com <kbd>Ctrl</kbd>+<kbd>F</kbd>.</li>
+  <li>As mensagens foram geradas por arquivos pequenos na pasta <code>~/erros</code> da Ana (<code>e08.php</code>, <code>f05.php</code>…). No seu computador, o caminho e o número da linha serão outros; o <strong>texto</strong> é o mesmo.</li>
+  <li>Nas tabelas aparece só a <strong>primeira linha</strong> de cada erro. Os erros "Uncaught" também trazem um <code>Stack trace</code>, explicado <a href="#ler">logo abaixo</a>.</li>
+</ul>
+</div>
+
+<p>Atalhos: <a href="#ler">Ler uma mensagem</a> · <a href="#niveis">Os níveis</a> · <a href="#onde">Terminal × navegador</a> · <a href="#parse">Parse error</a> · <a href="#variaveis">Variáveis e arrays</a> · <a href="#tipos">Tipos e contas</a> · <a href="#funcoes">Funções</a> · <a href="#objetos">Classes e objetos</a> · <a href="#arquivos">Arquivos, include e cabeçalhos</a> · <a href="#banco">Banco de dados</a> · <a href="#outros">JSON, datas e valores</a> · <a href="#limites">Limites</a> · <a href="#deprecated">Deprecated</a></p>
+
+<hr>
+
+<h2 id="ler">Como ler uma mensagem</h2>
+<p>Um exemplo completo. A Ana chamou uma função com um texto onde ela esperava um número:</p>
+
+<pre class="file" data-file="e17.php">&lt;?php
+function dobro(int $n): int {
+    return $n * 2;
+}
+echo dobro("quatro");
+</pre>
+
+<pre class="term" data-cwd="~/erros">$ php e17.php
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/erros/e17.php on line 5 and defined in /home/ana/erros/e17.php:2
+Stack trace:
+#0 /home/ana/erros/e17.php(5): dobro('quatro')
+#1 {main}
+  thrown in /home/ana/erros/e17.php on line 2</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>O que quer dizer</th></tr>
+<tr><td><code>Fatal error</code></td><td>O <strong>nível</strong>: fatal = o programa parou aqui. Veja <a href="#niveis">os níveis</a>.</td></tr>
+<tr><td><code>Uncaught TypeError</code></td><td>"<code>TypeError</code> não capturado": o PHP lançou uma <strong>exceção</strong> do tipo <code>TypeError</code> e ninguém a tratou com <code>try/catch</code>. Veja <a href="excecoes.html">Exceções</a>.</td></tr>
+<tr><td><code>dobro(): Argument #1 ($n) must be of type int, string given</code></td><td>O texto do problema: "o argumento nº 1 (<code>$n</code>) de <code>dobro()</code> precisa ser do tipo <code>int</code>; foi dado um <code>string</code>".</td></tr>
+<tr><td><code>called in … on line 5</code></td><td>Onde a função foi <strong>chamada</strong> (a linha que você precisa consertar).</td></tr>
+<tr><td><code>defined in …:2</code></td><td>Onde a função foi <strong>criada</strong>.</td></tr>
+<tr><td><code>Stack trace:</code></td><td>"Rastro da pilha": o caminho até o erro, do mais recente (<code>#0</code>) ao começo do programa (<code>{main}</code>, o corpo do arquivo). <code>#0 …e17.php(5): dobro('quatro')</code> = "na linha 5, chamou <code>dobro</code> com <code>'quatro'</code>".</td></tr>
+<tr><td><code>thrown in … on line 2</code></td><td>Onde a exceção foi <strong>lançada</strong>.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Regra de ouro</strong>
+<p>Leia a <strong>primeira</strong> mensagem primeiro. Um erro costuma causar outros logo depois (um arquivo que não abriu vira um <code>false</code>, que estoura na linha seguinte). Conserte o primeiro e rode de novo.</p>
+</div>
+
+<h2 id="niveis">Os níveis de erro</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nível (como aparece)</th><th>O programa…</th><th>Código de saída no terminal</th><th>Quando aparece</th></tr>
+<tr><td><code>Parse error</code></td><td>nem começa: o PHP não conseguiu entender o arquivo</td><td>255</td><td>erro de digitação na sintaxe (falta <code>;</code>, <code>}</code>, aspas)</td></tr>
+<tr><td><code>Fatal error</code></td><td><strong>para</strong> na hora</td><td>255</td><td>exceção não tratada (<code>Uncaught …</code>) ou erro grave (classe declarada duas vezes, memória esgotada)</td></tr>
+<tr><td><code>Warning</code> (aviso)</td><td><strong>continua</strong>, mas com um valor errado (normalmente <code>null</code>)</td><td>0</td><td>algo provavelmente errado: variável ou chave que não existe, arquivo que não abriu</td></tr>
+<tr><td><code>Notice</code> (nota)</td><td>continua</td><td>0</td><td>algo estranho, mas que funcionou</td></tr>
+<tr><td><code>Deprecated</code> (obsoleto)</td><td>continua normalmente</td><td>0</td><td>o código usa algo que <strong>vai deixar de funcionar</strong> numa versão futura do PHP</td></tr>
+</table>
+</div>
+<p>Avisos não param o programa, mas <strong>não os ignore</strong>: quase sempre são um defeito de verdade. Neste exemplo, o aviso da linha 3 deixou a aluna sem nome, o da linha 4 escreveu "Array", e só a divisão por zero, na linha 6, parou tudo:</p>
+
+<pre class="term" data-cwd="~/erros">$ php missao.php
+
+Warning: Undefined array key "Nome" in /home/ana/erros/missao.php on line 3
+Aluna:
+
+Warning: Array to string conversion in /home/ana/erros/missao.php on line 4
+Notas: Array
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/erros/missao.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/missao.php on line 6
+$ echo $?
+255</pre>
+<p>(Você vai consertar esse programa na <a href="#missao">missão do fim da página</a>.)</p>
+
+<h2 id="onde">No terminal × no navegador</h2>
+<p>A <strong>mesma</strong> mensagem aparece de jeitos diferentes conforme o lugar e a configuração (<code>php.ini</code>):</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde</th><th>Como aparece</th></tr>
+<tr><td>Terminal (<code>php arquivo.php</code>)</td><td><code>Warning: …</code> na saída normal, com uma linha em branco antes. Se o <code>php.ini</code> tiver <code>log_errors=On</code> (comum no PHP das distribuições Linux), aparece <strong>também</strong> <code>PHP Warning:  …</code> na saída de erro.</td></tr>
+<tr><td>Navegador (<code>php -S</code>, Apache…)</td><td>Em HTML: <code>&lt;b&gt;Warning&lt;/b&gt;</code> em negrito, no meio da página, se <code>display_errors</code> estiver ligado (desenvolvimento).</td></tr>
+<tr><td>Log do servidor</td><td>O <code>php -S</code> escreve os erros fatais no terminal onde ele está rodando, junto com cada requisição.</td></tr>
+<tr><td>Produção (site no ar)</td><td><code>display_errors=Off</code>: o visitante não vê nada (só uma página em branco ou um erro 500); a mensagem vai para o arquivo de log. Veja <a href="depuracao.html">Depurar</a>.</td></tr>
+</table>
+</div>
+
+<p>Com <code>log_errors</code> ligado, a mensagem sai duas vezes. A primeira (<code>PHP Warning:  …</code>, com dois espaços) é o log, na saída de erro; a segunda é a exibição:</p>
+<pre class="term" data-cwd="~/erros">$ php -d log_errors=1 e08.php
+PHP Warning:  Undefined variable $nome in /home/ana/erros/e08.php on line 2
+
+Warning: Undefined variable $nome in /home/ana/erros/e08.php on line 2
+$ php -d log_errors=1 e08.php 2&gt;/dev/null
+
+Warning: Undefined variable $nome in /home/ana/erros/e08.php on line 2
+</pre>
+
+<p>No navegador, a página <code>aviso.php</code> (que usa <code>$_GET["nome"]</code> sem conferir e chama uma função que não existe) chega assim. O <code>curl -si</code> mostra a resposta crua, com os cabeçalhos:</p>
+<pre class="file" data-file="aviso.php">&lt;?php
+echo "&lt;p&gt;Olá, " . $_GET["nome"] . "&lt;/p&gt;";
+echo dobro(2);
+</pre>
+<pre class="term" data-cwd="~/web">$ curl -si localhost:8000/aviso.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:45:59 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "nome" in &lt;b&gt;/home/ana/web/aviso.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+&lt;p&gt;Olá, &lt;/p&gt;&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught Error: Call to undefined function dobro() in /home/ana/web/aviso.php:3
+Stack trace:
+#0 {main}
+  thrown in &lt;b&gt;/home/ana/web/aviso.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+<p>E, no terminal onde o servidor roda:</p>
+<pre class="term" data-cwd="~/web">$ php -S localhost:8000
+[Fri Oct 16 20:45:59 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 20:45:59 2026] 127.0.0.1:57888 Accepted
+[Fri Oct 16 20:45:59 2026] 127.0.0.1:57888 [200]: GET /aviso.php - Uncaught Error: Call to undefined function dobro() in /home/ana/web/aviso.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/web/aviso.php on line 3
+[Fri Oct 16 20:45:59 2026] 127.0.0.1:57888 Closing</pre>
+
+<div class="tip">
+<strong>Só conferir a sintaxe: <code>php -l</code></strong>
+<p><code>php -l arquivo.php</code> ("lint") procura erros de sintaxe <strong>sem rodar</strong> o programa:</p>
+<pre class="term" data-cwd="~/erros">$ php -l e01.php
+
+Parse error: syntax error, unexpected token "echo" in e01.php on line 3
+Errors parsing e01.php
+$ php -l e08.php
+No syntax errors detected in e08.php</pre>
+</div>
+
+<hr>
+
+<h3 id="parse">Parse error (sintaxe)</h3>
+<p>O PHP lê o arquivo inteiro antes de rodar. Se a "gramática" estiver errada, nada é executado. A linha apontada é onde o PHP <strong>percebeu</strong> o problema, que muitas vezes está na linha <strong>anterior</strong>. Aula: <a href="sintaxe.html">Sintaxe</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Parse error: syntax error, unexpected token "echo" in /home/ana/erros/e01.php on line 3</code></td><td><code>$nome = "Ana"</code><br><code>echo "Olá, $nome!";</code></td><td>Faltou o <code>;</code> no fim da linha <strong>2</strong>. "unexpected token" = "palavra inesperada": o PHP achou o <code>echo</code> no meio da atribuição. Ponha o <code>;</code> na linha anterior à apontada.</td><td><a href="sintaxe.html">Sintaxe</a></td></tr>
+<tr><td><code>Parse error: syntax error, unexpected variable "$total" in /home/ana/erros/e05.php on line 3</code></td><td><code>$preco = 10</code><br><code>$total = $preco * 2;</code></td><td>Mesma causa: falta <code>;</code> na linha anterior; aqui o que veio depois foi uma variável.</td><td><a href="sintaxe.html">Sintaxe</a></td></tr>
+<tr><td><code>Parse error: syntax error, unexpected variable "$total", expecting "," or ";" in /home/ana/erros/e06.php on line 2</code></td><td><code>echo "Total: " $total;</code></td><td>Faltou o operador entre o texto e a variável. "expecting" = "esperava". Use o ponto: <code>"Total: " . $total</code>.</td><td><a href="operadores-string.html">Operadores de String</a></td></tr>
+<tr><td><code>Parse error: syntax error, unexpected token "}", expecting ";" in /home/ana/erros/e07.php on line 4</code></td><td><code>return $a + $b</code><br><code>}</code></td><td>Faltou <code>;</code> antes da chave que fecha o bloco.</td><td><a href="funcoes.html">Funções</a></td></tr>
+<tr><td><code>Parse error: syntax error, unexpected end of file, expecting "," or ";" in /home/ana/erros/f32.php on line 4</code></td><td><code>echo $x++ + ++$x</code> (última linha, sem <code>;</code>)</td><td>"end of file" = fim do arquivo. Faltou o <code>;</code> na última instrução. (Exceção: logo antes de <code>?&gt;</code> o <code>;</code> é opcional.)</td><td><a href="sintaxe.html">Sintaxe</a></td></tr>
+<tr><td><code>Parse error: Unclosed '{' on line 2 in /home/ana/erros/e02.php on line 4</code></td><td><code>if (true) {</code><br><code>    echo "oi";</code></td><td>Uma <code>{</code> aberta na linha 2 nunca foi fechada. Conte as chaves; um editor com destaque de pares ajuda (<a href="editores.html">Editores</a>).</td><td><a href="if-else.html">if, elseif, else</a></td></tr>
+<tr><td><code>Parse error: Unmatched '}' in /home/ana/erros/e04.php on line 3</code></td><td><code>echo "oi";</code><br><code>}</code></td><td>Uma <code>}</code> sobrando, sem <code>{</code> correspondente. Apague-a ou ache a <code>{</code> que falta.</td><td><a href="sintaxe.html">Sintaxe</a></td></tr>
+<tr><td><code>Parse error: syntax error, unexpected end of file, expecting variable or "${" or "{$" in /home/ana/erros/e03.php on line 3</code></td><td><code>echo "Olá, mundo!;</code></td><td>Aspas abertas e não fechadas: o PHP leu até o fim do arquivo procurando o <code>"</code> final. Feche as aspas: <code>"Olá, mundo!";</code>.</td><td><a href="strings.html">Strings</a></td></tr>
+<tr><td><code>Parse error: syntax error, unexpected token "{", expecting "," or ";" in /home/ana/erros/f34.php on line 3</code></td><td><code>echo $lista{0};</code></td><td>Chaves para ler posição de array/string eram aceitas em PHP antigo e foram removidas no 8.0. Use colchetes: <code>$lista[0]</code>.</td><td><a href="arrays.html">Arrays</a></td></tr>
+</table>
+</div>
+
+<h3 id="variaveis">Variáveis e arrays</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Warning: Undefined variable $nome in /home/ana/erros/e08.php on line 2</code></td><td><code>echo $nome;</code></td><td>A variável não recebeu valor antes desta linha: nome digitado diferente (<code>$Nome</code>, <code>$name</code>), criada mais abaixo ou dentro de um <code>if</code> que não rodou. O valor usado é <code>null</code>.</td><td><a href="variaveis.html">Variáveis</a></td></tr>
+<tr><td><code>Warning: Undefined array key "idade" in /home/ana/erros/e09.php on line 3</code></td><td><code>$aluno = ["nome" =&gt; "Ana"];</code><br><code>echo $aluno["idade"];</code></td><td>A chave não existe no array (ou foi escrita diferente: <code>"Nome"</code> ≠ <code>"nome"</code>). Muito comum com <code>$_GET</code>/<code>$_POST</code> quando o campo não veio. Use <code>$aluno["idade"] ?? "?"</code> ou <code>isset</code>.</td><td><a href="arrays-associativos.html">Arrays Associativos</a>, <a href="null-coalescing.html">??</a></td></tr>
+<tr><td><code>Warning: Undefined array key 5 in /home/ana/erros/e09.php on line 5</code></td><td><code>$frutas = ["maçã", "banana"];</code><br><code>echo $frutas[5];</code></td><td>Posição que não existe. Os índices vão de <code>0</code> a <code>count($frutas) - 1</code>.</td><td><a href="arrays.html">Arrays</a></td></tr>
+<tr><td><code>Warning: Trying to access array offset on null in /home/ana/erros/e10.php on line 3</code></td><td><code>$x = null;</code><br><code>echo $x["nome"];</code></td><td>Você tratou como array algo que é <code>null</code> (uma busca que não achou nada, um <code>fetch()</code> sem resultado). Confira antes: <code>if ($x !== null)</code>, ou use <code>$x["nome"] ?? ""</code>.</td><td><a href="null.html">null</a></td></tr>
+<tr><td><code>Warning: Attempt to read property "nome" on null in /home/ana/erros/e10.php on line 4</code></td><td><code>$x = null;</code><br><code>echo $x-&gt;nome;</code></td><td>O mesmo, com objeto: <code>$x</code> é <code>null</code>. Use o nullsafe: <code>$x?-&gt;nome</code>.</td><td><a href="null-coalescing.html">?? e ?-&gt;</a></td></tr>
+<tr><td><code>Warning: Undefined global variable $contador in /home/ana/erros/f27.php on line 2</code></td><td><code>echo $GLOBALS["contador"];</code></td><td>Não existe variável global com esse nome. Veja como funcionam as variáveis globais.</td><td><a href="escopo.html">Escopo</a></td></tr>
+<tr><td><code>Warning: Array to string conversion in /home/ana/erros/e11.php on line 3</code></td><td><code>echo "Frutas: " . $frutas;</code></td><td>Tentou escrever um array inteiro como texto; sai a palavra <code>Array</code>. Use <code>implode(", ", $frutas)</code>, um <code>foreach</code> ou <code>print_r</code>.</td><td><a href="var-dump.html">var_dump e print_r</a>, <a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>Warning: foreach() argument must be of type array|object, null given in /home/ana/erros/e12.php on line 3</code></td><td><code>$itens = null;</code><br><code>foreach ($itens as $i) …</code></td><td>O <code>foreach</code> só percorre arrays e objetos. Garanta um array: <code>foreach ($itens ?? [] as $i)</code>.</td><td><a href="foreach.html">foreach</a></td></tr>
+<tr><td><code>Warning: Uninitialized string offset 10 in /home/ana/erros/e41.php on line 3</code></td><td><code>$s = "Ana";</code><br><code>echo $s[10];</code></td><td>Posição além do fim do texto. Confira com <code>strlen</code> (ou <code>mb_strlen</code>).</td><td><a href="strings.html">Strings</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: Cannot access offset of type string on string in /home/ana/erros/f28.php:3</code></td><td><code>$a = "Ana";</code><br><code>echo $a["x"];</code></td><td>A variável é um texto, não um array; num texto só dá para pedir posições numéricas. Confira o tipo com <code>var_dump</code>.</td><td><a href="var-dump.html">var_dump</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Cannot use a scalar value as an array in /home/ana/erros/e55.php:3</code></td><td><code>$total = 10;</code><br><code>$total[] = 5;</code></td><td>Tentou acrescentar item (<code>[]</code>) numa variável que tem um número. Use outra variável ou comece com <code>$total = [];</code>.</td><td><a href="arrays.html">Arrays</a></td></tr>
+<tr><td><code>Fatal error: Cannot use [] for reading in /home/ana/erros/e57.php on line 3</code></td><td><code>$f = $frutas[];</code></td><td><code>[]</code> vazio serve só para <strong>acrescentar</strong> (<code>$frutas[] = "uva";</code>). Para ler, diga a posição: <code>$frutas[0]</code>.</td><td><a href="arrays.html">Arrays</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Undefined constant "PRECO" in /home/ana/erros/e21.php:2</code></td><td><code>echo PRECO;</code></td><td>Constante não definida (ou você esqueceu o <code>$</code> de uma variável: <code>PRECO</code> × <code>$preco</code>).</td><td><a href="constantes.html">Constantes</a></td></tr>
+<tr><td><code>Warning: Constant PI already defined, this will be an error in PHP 9 in /home/ana/erros/e44.php on line 3</code></td><td><code>define("PI", 3.14);</code><br><code>define("PI", 3.1416);</code></td><td>Constantes não mudam de valor. O segundo <code>define</code> é ignorado. Use outro nome ou uma variável.</td><td><a href="constantes.html">Constantes</a></td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-goal="erro:Undefined variable $name">
+<p class="try-task"><strong>Experimente (provoque o erro):</strong> o programa funciona. Troque <code>$nome</code> por <code>$name</code> <strong>só no <code>echo</code></strong>, rode e leia o aviso: qual variável ele diz que não existe? Em que linha?</p>
+<pre class="script">&lt;?php
+$nome = "Ana";
+echo "Olá, $nome!\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Ana";
+echo "Olá, $name!\n";
+</pre>
+</div>
+
+<h3 id="tipos">Tipos e contas</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/erros/e14.php:2</code></td><td><code>echo 10 / 0;</code><br><code>intdiv(10, 0)</code></td><td>Divisão por zero (no PHP 8 é um erro, não um aviso). Confira o divisor antes: <code>if ($qtd &gt; 0)</code>.</td><td><a href="operadores-aritmeticos.html">Operadores Aritméticos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught DivisionByZeroError: Modulo by zero in /home/ana/erros/e15.php:2</code></td><td><code>echo 10 % 0;</code></td><td>Resto da divisão (<code>%</code>) por zero. Mesma correção.</td><td><a href="operadores-aritmeticos.html">Operadores Aritméticos</a></td></tr>
+<tr><td><code>Warning: A non-numeric value encountered in /home/ana/erros/e13.php on line 2</code></td><td><code>echo "5 maçãs" + 1;</code> (mostra <code>6</code>)<br><code>"10" + "5,5"</code></td><td>O texto <strong>começa</strong> com número mas tem lixo depois. O PHP usa só o começo (<code>"5,5"</code> vira 5: a vírgula não é decimal!). Limpe o valor antes ou valide com <code>is_numeric</code>/<code>filter_var</code>.</td><td><a href="conversao-tipos.html">Conversão de Tipos</a>, <a href="validacao.html">Validar Dados</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: Unsupported operand types: string + int in /home/ana/erros/e13.php:4</code></td><td><code>echo "abc" + 1;</code><br><code>"R$ 10" * 2</code> (<code>string * int</code>)</td><td>Conta com um texto que não é número nenhum. Converta e valide antes (<code>(float) str_replace(",", ".", $valor)</code>).</td><td><a href="conversao-tipos.html">Conversão de Tipos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: Unsupported operand types: array + int in /home/ana/erros/e56.php:2</code></td><td><code>$x = [1, 2] + 5;</code></td><td>Conta com um array. Para somar os itens: <code>array_sum([1, 2]) + 5</code>.</td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: Cannot assign string to property Aluno::$idade of type int in /home/ana/erros/e33.php:4</code></td><td><code>public int $idade;</code><br><code>$a-&gt;idade = "vinte";</code></td><td>Propriedade com tipo <code>int</code> recebeu um texto. Converta (<code>(int) $valor</code>) depois de validar.</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Object of class Produto could not be converted to string in /home/ana/erros/e31.php:4</code></td><td><code>echo $p;</code> (um objeto)</td><td>Um objeto não vira texto sozinho. Escreva uma propriedade (<code>$p-&gt;nome</code>) ou crie o método <code>__toString()</code>.</td><td><a href="metodos-magicos.html">Métodos Mágicos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught UnhandledMatchError: Unhandled match case 7 in /home/ana/erros/e26.php:3</code></td><td><code>match ($nota) { 10 =&gt; …, 5 =&gt; … }</code> com <code>$nota = 7</code></td><td>Nenhum braço do <code>match</code> casou com o valor. Acrescente o braço que falta ou um <code>default =&gt; …</code>.</td><td><a href="match.html">match</a></td></tr>
+</table>
+</div>
+
+<h3 id="funcoes">Funções</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Fatal error: Uncaught Error: Call to undefined function dobro() in /home/ana/erros/e16.php:2</code></td><td><code>echo dobro(4);</code></td><td>A função não existe: nome errado, ou ela está em outro arquivo que não foi incluído (<code>require</code>). Funções de extensões também caem aqui se a extensão não estiver instalada (<code>mb_strlen</code> sem mbstring).</td><td><a href="funcoes.html">Funções</a>, <a href="include-require.html">include e require</a></td></tr>
+<tr><td><code>Fatal error: Uncaught ArgumentCountError: Too few arguments to function soma(), 1 passed in /home/ana/erros/e18.php on line 5 and exactly 2 expected in /home/ana/erros/e18.php:2</code></td><td><code>function soma($a, $b)</code><br><code>soma(1);</code></td><td>Faltou argumento: a função pede 2, você passou 1. Passe todos ou dê um valor padrão ao parâmetro (<code>$b = 0</code>).</td><td><a href="parametros.html">Parâmetros</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in … on line 5 …</code></td><td><code>function dobro(int $n)</code><br><code>dobro("quatro");</code></td><td>O argumento não é do tipo declarado. Passe o tipo certo (converta antes, se o valor veio de formulário).</td><td><a href="tipos-retorno.html">Tipos e Retorno</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: idade(): Return value must be of type int, string returned in /home/ana/erros/f07.php:3</code></td><td><code>function idade(): int {</code><br><code>    return "vinte";</code></td><td>A função prometeu devolver <code>int</code> e devolveu outra coisa. Corrija o <code>return</code> ou o tipo.</td><td><a href="tipos-retorno.html">Tipos e Retorno</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Unknown named parameter $nme in /home/ana/erros/e48.php:3</code></td><td><code>saudar(nme: "Ana");</code></td><td>Argumento nomeado com nome que a função não tem (erro de digitação). O nome é o do parâmetro, sem o <code>$</code>: <code>saudar(nome: "Ana")</code>.</td><td><a href="parametros.html">Parâmetros</a></td></tr>
+<tr><td><code>Fatal error: Cannot redeclare function f() (previously declared in /home/ana/erros/e32.php:2) in /home/ana/erros/e32.php on line 3</code></td><td>duas <code>function f()</code>; ou <code>include</code> do mesmo arquivo duas vezes</td><td>Dois arquivos (ou o mesmo, incluído duas vezes) criam a mesma função. Use <code>require_once</code> ou renomeie.</td><td><a href="include-require.html">include e require</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: aumentar(): Argument #1 ($lista) could not be passed by reference in /home/ana/erros/f20.php:3</code></td><td><code>function aumentar(array &amp;$lista)</code><br><code>aumentar([1, 2]);</code></td><td>O parâmetro com <code>&amp;</code> precisa de uma <strong>variável</strong> (que será alterada), não de um valor solto. Guarde em <code>$lista</code> e passe <code>$lista</code>.</td><td><a href="parametros.html">Parâmetros</a></td></tr>
+<tr><td><code>Notice: Only variables should be passed by reference in /home/ana/erros/e50.php on line 3</code></td><td><code>echo end(explode(",", "a,b,c"));</code></td><td>Mesma ideia, mais branda: <code>end</code> quer uma variável. Guarde antes: <code>$partes = explode(…); echo end($partes);</code> (ou <code>array_last</code>, no 8.5).</td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Value of type int is not callable in /home/ana/erros/f26.php:3</code></td><td><code>$x = 10;</code><br><code>$x();</code></td><td>Parênteses depois de uma variável que não guarda uma função.</td><td><a href="closures.html">Funções Anônimas</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: array_map(): Argument #1 ($callback) must be a valid callback or null, function "dobrar" not found or invalid function name in /home/ana/erros/f14.php:2</code></td><td><code>array_map("dobrar", [1, 2, 3]);</code></td><td>O nome da função passada como texto não existe. Confira o nome ou passe uma função anônima: <code>fn($n) =&gt; $n * 2</code>.</td><td><a href="callables.html">Callables</a></td></tr>
+<tr><td><code>Fatal error: Only the last parameter can be variadic in /home/ana/erros/f35.php on line 2</code></td><td><code>function f(int ...$n, $x)</code></td><td>O parâmetro com <code>...</code> tem de ser o último.</td><td><a href="variadicas.html">Funções Variádicas</a></td></tr>
+<tr><td><code>Warning: The return value of function calcular() should either be used or intentionally ignored by casting it as (void) in /home/ana/erros/e52.php on line 4</code> <span class="versao">PHP 8.5+</span></td><td><code>#[\NoDiscard]</code><br><code>function calcular(): int</code><br><code>calcular();</code></td><td>A função foi marcada com <code>#[\NoDiscard]</code> ("não descarte") e você ignorou o resultado. Use-o (<code>$r = calcular();</code>) ou descarte de propósito: <code>(void) calcular();</code>.</td><td><a href="atributos.html">Atributos</a></td></tr>
+</table>
+</div>
+
+<h3 id="objetos">Classes e objetos</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Fatal error: Uncaught Error: Class "Produto" not found in /home/ana/erros/e19.php:2</code></td><td><code>$p = new Produto();</code></td><td>A classe não foi carregada: falta o <code>require</code>, o autoload não achou o arquivo, o nome está diferente ou falta o <code>use</code> do namespace.</td><td><a href="classes-objetos.html">Classes e Objetos</a>, <a href="autoload.html">Autoload</a>, <a href="namespaces.html">Namespaces</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Call to a member function depositar() on null in /home/ana/erros/e20.php:3</code></td><td><code>$conta = null;</code><br><code>$conta-&gt;depositar(50);</code></td><td>Chamou um método numa variável que não tem objeto (<code>null</code>): a busca não achou nada, ou faltou o <code>new</code>. Confira antes, ou use <code>$conta?-&gt;depositar(50)</code>.</td><td><a href="null-coalescing.html">?? e ?-&gt;</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Call to a member function formatar() on string in /home/ana/erros/e59.php:3</code></td><td><code>$valor = "10";</code><br><code>$valor-&gt;formatar();</code></td><td>Textos, números e arrays não têm métodos no PHP: use funções (<code>strtoupper($valor)</code>).</td><td><a href="funcoes-string.html">Funções de String</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Call to undefined method Conta::sacar() in /home/ana/erros/f03.php:4</code></td><td><code>$c-&gt;sacar(10);</code></td><td>A classe não tem esse método (nome errado ou ainda não criado).</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>Warning: Undefined property: Conta::$titular in /home/ana/erros/f04.php on line 4</code></td><td><code>echo $c-&gt;titular;</code></td><td>Leu uma propriedade que a classe não tem.</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>Deprecated: Creation of dynamic property Aluno::$idade is deprecated in /home/ana/erros/e28.php on line 6</code> <span class="versao">PHP 8.2+</span></td><td><code>$a-&gt;idade = 20;</code> (a classe não declara <code>$idade</code>)</td><td>Criar propriedade "na hora", fora da classe. Declare-a na classe: <code>public int $idade;</code>.</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Attempt to assign property "saldo" on null in /home/ana/erros/f12.php:3</code></td><td><code>$conta = null;</code><br><code>$conta-&gt;saldo = 10;</code></td><td>Atribuiu propriedade a algo que não é objeto. Crie o objeto antes (<code>new</code>).</td><td><a href="classes-objetos.html">Classes e Objetos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Typed property Aluno::$idade must not be accessed before initialization in /home/ana/erros/e34.php:4</code></td><td><code>public int $idade;</code><br><code>echo $a-&gt;idade;</code></td><td>Propriedade com tipo ainda sem valor. Dê um valor no construtor ou um padrão (<code>public int $idade = 0;</code>).</td><td><a href="construtores.html">Construtores</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Cannot access private property Conta::$saldo in /home/ana/erros/e27.php:6</code></td><td><code>echo $c-&gt;saldo;</code> (<code>private</code>)</td><td>Propriedade privada só é usada dentro da classe. Crie um método público (<code>getSaldo()</code>).</td><td><a href="visibilidade.html">Visibilidade</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Call to private method Conta::auditar() from global scope in /home/ana/erros/f02.php:6</code></td><td><code>$c-&gt;auditar();</code> (<code>private</code>)</td><td>O mesmo, com método. "from global scope" = chamado de fora de qualquer classe.</td><td><a href="visibilidade.html">Visibilidade</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Cannot modify readonly property Ponto::$x in /home/ana/erros/e29.php:6</code></td><td><code>$p-&gt;x = 2;</code> (<code>readonly</code>)</td><td>Propriedade <code>readonly</code> só recebe valor uma vez. Crie um objeto novo (ou use <code>clone with</code>, 8.5).</td><td><a href="readonly-hooks.html">readonly e Property Hooks</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Non-static method Calc::somar() cannot be called statically in /home/ana/erros/f08.php:5</code></td><td><code>Calc::somar(1, 2);</code></td><td><code>::</code> só chama métodos <code>static</code>. Crie um objeto (<code>(new Calc)-&gt;somar(1, 2)</code>) ou declare o método <code>static</code>.</td><td><a href="static.html">static</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Using $this when not in object context in /home/ana/erros/f09.php:3</code></td><td><code>$this</code> dentro de uma função comum (ou método <code>static</code>)</td><td><code>$this</code> só existe dentro de métodos de um objeto.</td><td><a href="propriedades-metodos.html">Propriedades e Métodos</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Cannot instantiate abstract class Forma in /home/ana/erros/e30.php:3</code></td><td><code>new Forma()</code> (abstrata)</td><td>Classe abstrata é só modelo. Crie um objeto de uma classe filha.</td><td><a href="abstratas.html">Classes Abstratas</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Cannot instantiate interface Forma in /home/ana/erros/f01.php:3</code></td><td><code>new Forma()</code> (interface)</td><td>Interface não vira objeto. Use uma classe que a implementa.</td><td><a href="interfaces.html">Interfaces</a></td></tr>
+<tr><td><code>Fatal error: Class Quadrado contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Forma::area) in /home/ana/erros/e49.php on line 3</code></td><td><code>class Quadrado implements Forma {}</code></td><td>A classe prometeu (<code>implements</code>/<code>extends</code>) um método e não o escreveu. Implemente <code>area()</code>.</td><td><a href="interfaces.html">Interfaces</a></td></tr>
+<tr><td><code>Fatal error: Declaration of B::f(string $x) must be compatible with A::f(int $x) in /home/ana/erros/e58.php on line 3</code></td><td>a filha reescreve <code>f</code> com outro tipo de parâmetro</td><td>Ao sobrescrever, mantenha parâmetros e retorno compatíveis com os da classe mãe.</td><td><a href="heranca.html">Herança</a></td></tr>
+<tr><td><code>Fatal error: Cannot override final method A::f() in /home/ana/erros/f36.php on line 3</code></td><td>a filha reescreve um método <code>final</code></td><td><code>final</code> = "não pode ser sobrescrito". Use outro nome.</td><td><a href="heranca.html">Herança</a></td></tr>
+<tr><td><code>Fatal error: Cannot redeclare class Aluno (previously declared in /home/ana/erros/f11.php:2) in /home/ana/erros/f11.php on line 3</code></td><td>duas <code>class Aluno</code> (ou arquivo incluído duas vezes)</td><td>Use <code>require_once</code>/autoload, ou namespaces para nomes iguais.</td><td><a href="autoload.html">Autoload</a></td></tr>
+<tr><td><code>Fatal error: Uncaught Error: Undefined constant Status::Inativo in /home/ana/erros/f15.php:3</code></td><td><code>Status::Inativo</code> (o enum só tem <code>Ativo</code>)</td><td>Caso de enum (ou constante de classe) que não existe.</td><td><a href="enums.html">Enums</a></td></tr>
+</table>
+</div>
+
+<h3 id="arquivos">Arquivos, include, cabeçalhos e sessão</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Warning: include(config.php): Failed to open stream: No such file or directory in /home/ana/erros/e23.php on line 2</code><br><code>Warning: include(): Failed opening 'config.php' for inclusion (include_path='.:') in /home/ana/erros/e23.php on line 2</code></td><td><code>include "config.php";</code> (arquivo não existe)</td><td>O arquivo não foi achado; com <code>include</code> o programa <strong>continua</strong> (sem as funções/variáveis dele). Caminhos relativos dependem da pasta de onde você rodou: prefira <code>include __DIR__ . "/config.php";</code>.</td><td><a href="include-require.html">include e require</a></td></tr>
+<tr><td><code>Warning: require(config.php): Failed to open stream: No such file or directory in /home/ana/erros/e22.php on line 2</code><br><code>Fatal error: Uncaught Error: Failed opening required 'config.php' (include_path='.:') in /home/ana/erros/e22.php:2</code></td><td><code>require "config.php";</code></td><td>O mesmo com <code>require</code>: aqui o programa <strong>para</strong>. Mesma correção.</td><td><a href="include-require.html">include e require</a></td></tr>
+<tr><td><code>Warning: file_get_contents(notas.txt): Failed to open stream: No such file or directory in /home/ana/erros/e25.php on line 2</code></td><td><code>file_get_contents("notas.txt")</code></td><td>Arquivo inexistente; a função devolve <code>false</code>. Confira com <code>file_exists</code> antes, e use <code>__DIR__</code>.</td><td><a href="arquivos.html">Ler e Escrever Arquivos</a></td></tr>
+<tr><td><code>Warning: fopen(nao-existe/notas.txt): Failed to open stream: No such file or directory …</code><br><code>Fatal error: Uncaught TypeError: fwrite(): Argument #1 ($stream) must be of type resource, false given in /home/ana/erros/f37.php:3</code></td><td><code>$arquivo = fopen("nao-existe/notas.txt", "w");</code><br><code>fwrite($arquivo, "oi");</code></td><td>Um erro puxando outro: a pasta não existe, o <code>fopen</code> devolveu <code>false</code>, e o <code>fwrite</code> recebeu esse <code>false</code>. Conserte o <strong>primeiro</strong> e confira: <code>if ($arquivo === false)</code>. Se o texto for <code>Permission denied</code>, é permissão da pasta.</td><td><a href="arquivos.html">Ler e Escrever Arquivos</a></td></tr>
+<tr><td><code>Warning: Cannot modify header information - headers already sent by (output started at /home/ana/erros/e24.php:2) in /home/ana/erros/e24.php on line 3</code></td><td><code>echo "Olá";</code><br><code>header("Location: /outra.php");</code> (ou <code>setcookie</code>)</td><td>Cabeçalhos HTTP têm de sair <strong>antes</strong> de qualquer conteúdo. A mensagem diz onde a saída começou (<code>e24.php:2</code>): um <code>echo</code>, HTML, ou até um espaço/linha em branco antes do <code>&lt;?php</code>. Mova o <code>header</code>/<code>setcookie</code> para antes.</td><td><a href="redirecionar.html">header e Redirecionamento</a>, <a href="cookies.html">Cookies</a></td></tr>
+<tr><td><code>Warning: session_start(): Session cannot be started after headers have already been sent (sent from /home/ana/erros/f18.php on line 2) in /home/ana/erros/f18.php on line 3</code></td><td><code>echo "Olá";</code><br><code>session_start();</code></td><td>O mesmo para a sessão: <code>session_start()</code> vai no topo, antes de qualquer saída.</td><td><a href="sessoes.html">Sessões</a></td></tr>
+<tr><td><code>Notice: session_start(): Ignoring session_start() because a session is already active (started from /home/ana/erros/e51.php on line 2) in /home/ana/erros/e51.php on line 3</code></td><td>dois <code>session_start()</code> (comum quando um <code>include</code> também chama)</td><td>Chame uma vez só, num arquivo comum (ou <code>if (session_status() === PHP_SESSION_NONE)</code>).</td><td><a href="sessoes.html">Sessões</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: htmlspecialchars(): Argument #1 ($string) must be of type string, array given in /home/ana/erros/f06.php:3</code></td><td><code>htmlspecialchars($_GET["busca"])</code> com <code>?busca[]=a</code></td><td>O visitante pode mandar um array no lugar de um texto (<code>busca[]=</code>). Confira com <code>is_string</code> antes de usar.</td><td><a href="escapar-saida.html">Escapar a Saída</a>, <a href="validacao.html">Validar Dados</a></td></tr>
+</table>
+</div>
+
+<h3 id="banco">Banco de dados (PDO)</h3>
+<p>Desde o PHP 8.0 o PDO lança <code>PDOException</code> em todo erro. O texto depois de <code>SQLSTATE[…]</code> vem do próprio banco (aqui, SQLite). Aula: <a href="pdo.html">Conectar com PDO</a>.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: posts in /home/ana/erros/e46.php:3</code></td><td><code>$pdo-&gt;query("SELECT * FROM posts");</code></td><td>A tabela não existe: falta o <code>CREATE TABLE</code>, o nome está errado, ou o PHP abriu <strong>outro</strong> arquivo de banco (caminho relativo; use <code>__DIR__</code>).</td><td><a href="banco-dados.html">Banco de Dados</a></td></tr>
+<tr><td><code>Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 near "SELEC": syntax error in /home/ana/erros/f25.php:3</code></td><td><code>$pdo-&gt;query("SELEC * FROM t");</code></td><td>Erro de digitação no SQL, perto da palavra indicada.</td><td><a href="crud.html">CRUD com PDO</a></td></tr>
+<tr><td><code>Fatal error: Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: t.nome in /home/ana/erros/f22.php:6</code></td><td>inserir duas vezes o mesmo valor numa coluna <code>UNIQUE</code></td><td>O banco recusou um valor repetido (ou vazio numa coluna <code>NOT NULL</code>: <code>NOT NULL constraint failed</code>). Trate com <code>try/catch</code> e mostre uma mensagem amigável.</td><td><a href="crud.html">CRUD com PDO</a></td></tr>
+<tr><td><code>Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 2 values for 1 columns in /home/ana/erros/f23.php:4</code></td><td><code>INSERT INTO t (nome) VALUES (?, ?)</code></td><td>Número de colunas diferente do número de valores.</td><td><a href="prepared-statements.html">Prepared Statements</a></td></tr>
+<tr><td><code>Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 25 column index out of range in /home/ana/erros/f24.php:5</code></td><td><code>VALUES (:nome)</code><br><code>execute(["name" =&gt; "Ana"])</code></td><td>O nome do marcador no <code>execute</code> não bate com o do SQL (<code>:nome</code> × <code>name</code>). Use os mesmos nomes.</td><td><a href="prepared-statements.html">Prepared Statements</a></td></tr>
+<tr><td><code>Fatal error: Uncaught PDOException: SQLSTATE[HY000] [2002] No such file or directory in /home/ana/erros/f21.php:2</code></td><td><code>new PDO("mysql:host=localhost;dbname=loja", …)</code></td><td>O servidor MySQL/MariaDB não está rodando (ou não está nesse endereço). Ligue o serviço ou confira o <code>host</code>.</td><td><a href="mysql.html">MySQL e MariaDB</a></td></tr>
+</table>
+</div>
+
+<h3 id="outros">JSON, datas e valores inválidos</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Fatal error: Uncaught JsonException: Syntax error in /home/ana/erros/e45.php:2</code></td><td><code>json_decode("{nome: 'Ana'}", flags: JSON_THROW_ON_ERROR)</code></td><td>JSON inválido: as chaves e os textos precisam de aspas <strong>duplas</strong>: <code>{"nome": "Ana"}</code>. (Sem <code>JSON_THROW_ON_ERROR</code>, <code>json_decode</code> só devolve <code>null</code>, em silêncio.)</td><td><a href="json.html">JSON</a></td></tr>
+<tr><td><code>Fatal error: Uncaught DateMalformedStringException: Failed to parse time string (31/12/2026) at position 0 (3): Unexpected character in /home/ana/erros/f30.php:2</code></td><td><code>new DateTime("31/12/2026")</code></td><td>O PHP não entende o formato brasileiro direto. Use <code>"2026-12-31"</code> ou <code>DateTime::createFromFormat("d/m/Y", "31/12/2026")</code>.</td><td><a href="datas.html">Datas e Horas</a></td></tr>
+<tr><td><code>Fatal error: Uncaught ValueError: str_repeat(): Argument #2 ($times) must be greater than or equal to 0 in /home/ana/erros/e47.php:2</code></td><td><code>str_repeat("-", -1)</code></td><td><code>ValueError</code>: o tipo está certo, mas o valor não é aceito. Confira o valor antes.</td><td><a href="funcoes-string.html">Funções de String</a></td></tr>
+<tr><td><code>Fatal error: Uncaught ValueError: max(): Argument #1 ($value) must contain at least one element in /home/ana/erros/f39.php:3</code></td><td><code>max([])</code></td><td>Maior valor de uma lista vazia. Confira <code>count($lista) &gt; 0</code> antes.</td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: count(): Argument #1 ($value) must be of type Countable|array, null given in /home/ana/erros/f05.php:3</code></td><td><code>count(null)</code></td><td>Contar algo que não é array. Use <code>count($itens ?? [])</code>.</td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>Fatal error: Uncaught TypeError: implode(): Argument #2 ($array) must be of type ?array, string given in /home/ana/erros/f13.php:2</code></td><td><code>implode(", ", "maçã")</code></td><td>O segundo argumento precisa ser um array.</td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+</table>
+</div>
+
+<h3 id="limites">Limites: memória, tempo e recursão</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Causa e correção</th><th>Aula</th></tr>
+<tr><td><code>Fatal error: Allowed memory size of 8388608 bytes exhausted (tried to allocate 8388616 bytes) in /home/ana/erros/e43.php on line 4</code></td><td><code>ini_set("memory_limit", "8M");</code><br>um laço que põe 10 milhões de itens num array</td><td>O programa passou do limite de memória (<code>memory_limit</code>, 128 MB por padrão). Processe os dados aos poucos (linha a linha, página a página) em vez de carregar tudo.</td><td><a href="arquivos.html">Ler e Escrever Arquivos</a></td></tr>
+<tr><td><code>Fatal error: Allowed memory size of 134217728 bytes exhausted (tried to allocate 262144 bytes) in /home/ana/erros/e42.php on line 2</code></td><td><code>function f() { return f(); }</code></td><td>Recursão sem fim: a função chama a si mesma para sempre até a memória acabar. Na máquina da Ana, o <code>Stack trace</code> desse erro teve <strong>1.220.313 linhas</strong>. Toda recursão precisa de um caso que <strong>para</strong>.</td><td><a href="recursao.html">Recursão</a></td></tr>
+<tr><td><code>Fatal error: Maximum execution time of 1 second exceeded in /home/ana/erros/f10.php on line 3</code></td><td><code>set_time_limit(1);</code><br><code>while (true) {}</code></td><td>Passou do tempo máximo (<code>max_execution_time</code>: 30 s no servidor web; sem limite no terminal). Normalmente é um laço que nunca termina: confira a condição.</td><td><a href="while.html">while</a></td></tr>
+</table>
+</div>
+
+<h3 id="deprecated">Deprecated (vai deixar de funcionar)</h3>
+<p>O código funciona hoje, mas o PHP avisa que aquilo será removido. Conserte agora: na próxima versão pode virar erro.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem real</th><th>Código que provoca</th><th>Correção</th><th>Desde</th></tr>
+<tr><td><code>Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /home/ana/erros/e36.php on line 2</code></td><td><code>strlen(null)</code></td><td>Uma função de texto recebeu <code>null</code> (campo de formulário que não veio, coluna vazia do banco). Use <code>strlen($x ?? "")</code>.</td><td><span class="versao">PHP 8.1</span></td></tr>
+<tr><td><code>Deprecated: Implicit conversion from float 7.5 to int loses precision in /home/ana/erros/e35.php on line 4</code></td><td><code>$lista[7.5]</code></td><td>Um número com casas decimais foi usado onde só cabe inteiro (as casas se perdem). Converta de propósito: <code>(int)</code>, <code>round</code>, <code>intdiv</code>.</td><td><span class="versao">PHP 8.1</span></td></tr>
+<tr><td><code>Deprecated: Using ${var} in strings is deprecated, use {$var} instead in /home/ana/erros/e37.php on line 3</code></td><td><code>"Olá, ${nome}!"</code></td><td>Escreva <code>"Olá, {$nome}!"</code> ou <code>"Olá, $nome!"</code>.</td><td><span class="versao">PHP 8.2</span></td></tr>
+<tr><td><code>Deprecated: f(): Optional parameter $a declared before required parameter $b is implicitly treated as a required parameter in /home/ana/erros/e39.php on line 2</code></td><td><code>function f($a = 1, $b)</code></td><td>Parâmetros com valor padrão vão por <strong>último</strong>: <code>function f($b, $a = 1)</code>.</td><td><span class="versao">PHP 8.0</span></td></tr>
+<tr><td><code>Deprecated: f(): Implicitly marking parameter $s as nullable is deprecated, the explicit nullable type must be used instead in /home/ana/erros/e38.php on line 2</code></td><td><code>function f(string $s = null)</code></td><td>Diga que aceita <code>null</code>: <code>function f(?string $s = null)</code>.</td><td><span class="versao">PHP 8.4</span></td></tr>
+<tr><td><code>Deprecated: Non-canonical cast (integer) is deprecated, use the (int) cast instead in /home/ana/erros/e40.php on line 2</code></td><td><code>(integer) "5"</code></td><td>Use as formas curtas: <code>(int)</code>, <code>(bool)</code>, <code>(float)</code>, <code>(string)</code>.</td><td><span class="versao">PHP 8.5</span></td></tr>
+<tr><td><code>Deprecated: Case statements followed by a semicolon (;) are deprecated, use a colon (:) instead in /home/ana/erros/e53.php on line 4</code></td><td><code>case 5;</code></td><td>Use dois-pontos: <code>case 5:</code>.</td><td><span class="versao">PHP 8.5</span></td></tr>
+<tr><td><code>Deprecated: Using null as an array offset is deprecated, use an empty string instead in /home/ana/erros/e54.php on line 3</code></td><td><code>$a[null] = 1;</code></td><td>Uma variável <code>null</code> foi usada como chave. Confira de onde ela vem; se quer mesmo a chave vazia, use <code>""</code>.</td><td><span class="versao">PHP 8.5</span></td></tr>
+<tr><td><code>Deprecated: The backtick (`) operator is deprecated, use shell_exec() instead in /home/ana/erros/e60.php on line 2</code></td><td><code>echo `ls`;</code></td><td>Use <code>shell_exec("ls")</code>.</td><td><span class="versao">PHP 8.5</span></td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>O que <em>não</em> gera erro (e engana)</strong>
+<ul>
+  <li><code>(int) "12abc"</code> vale <code>12</code>, sem aviso nenhum; e <code>"12abc" == 12</code> é <code>false</code>. Veja <a href="conversao-tipos.html">Conversão de Tipos</a>.</li>
+  <li><code>json_decode</code> sem <code>JSON_THROW_ON_ERROR</code> devolve <code>null</code> em silêncio quando o JSON está errado; pergunte com <code>json_last_error_msg()</code>.</li>
+  <li>Esquecer o <code>;</code> logo antes de <code>?&gt;</code> não é erro: <code>echo "Oi" ?&gt;</code> funciona.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2 id="missao">Missão: zero avisos</h2>
+<p>O programa da seção <a href="#niveis">Os níveis</a> tem três problemas, um em cada linha que gera mensagem. Rode, leia as mensagens <strong>de cima para baixo</strong> e conserte uma por vez.</p>
+
+<div class="tryphp" data-goal="semerro,out:Aluna: Ana,out:Notas: 7\, 8,out:Média: 7.5">
+<p class="try-task"><strong>Missão:</strong> faça o programa mostrar <code>Aluna: Ana</code>, <code>Notas: 7, 8</code> e <code>Média: 7.5</code> sem nenhum <code>Warning</code> ou erro. Dicas: a chave tem outro nome; um array não vira texto sozinho (<code>implode</code>); quantas notas há? (<code>count</code>).</p>
+<pre class="script">&lt;?php
+$aluno = ["nome" =&gt; "Ana", "notas" =&gt; [7, 8]];
+echo "Aluna: " . $aluno["Nome"] . "\n";
+echo "Notas: " . $aluno["notas"] . "\n";
+$quantidade = 0;
+echo "Média: " . array_sum($aluno["notas"]) / $quantidade . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$aluno = ["nome" =&gt; "Ana", "notas" =&gt; [7, 8]];
+echo "Aluna: " . $aluno["nome"] . "\n";
+echo "Notas: " . implode(", ", $aluno["notas"]) . "\n";
+$quantidade = count($aluno["notas"]);
+echo "Média: " . array_sum($aluno["notas"]) / $quantidade . "\n";
+</pre>
+</div>
+
+<pre class="term" data-cwd="~/erros">$ php missao-sol.php
+Aluna: Ana
+Notas: 7, 8
+Média: 7.5</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. A mensagem é <code>Parse error: syntax error, unexpected token "echo" … on line 8</code>. Onde está o erro, provavelmente?</p>
+<label><input type="radio" name="q1"> Na palavra <code>echo</code>, que está escrita errado.</label>
+<label><input type="radio" name="q1"> Na linha 9.</label>
+<label><input type="radio" name="q1"> No fim da linha 7 (falta um <code>;</code>).</label>
+<label><input type="radio" name="q1"> Em outro arquivo.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Depois de um <code>Warning</code>, o programa…</p>
+<label><input type="radio" name="q2"> para na hora.</label>
+<label><input type="radio" name="q2"> continua, mas provavelmente com um valor errado.</label>
+<label><input type="radio" name="q2"> volta ao começo.</label>
+<label><input type="radio" name="q2"> apaga o arquivo.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. <code>Call to a member function depositar() on null</code> quer dizer que…</p>
+<label><input type="radio" name="q3"> o método <code>depositar</code> não existe.</label>
+<label><input type="radio" name="q3"> o método é privado.</label>
+<label><input type="radio" name="q3"> faltou o <code>;</code>.</label>
+<label><input type="radio" name="q3"> a variável antes da <code>-&gt;</code> não tem um objeto: vale <code>null</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Você vê <code>Cannot modify header information - headers already sent by (output started at index.php:1)</code>. O que conferir primeiro?</p>
+<label><input type="radio" name="q4"> Se há algo (até um espaço ou linha em branco) antes do <code>&lt;?php</code> na linha 1 de <code>index.php</code>.</label>
+<label><input type="radio" name="q4"> Se o servidor está ligado.</label>
+<label><input type="radio" name="q4"> Se a sessão foi iniciada.</label>
+<label><input type="radio" name="q4"> Se o banco de dados existe.</label>
+</div>
+
+<div class="exercise">
+<p>Complete para ler a chave sem aviso quando ela não existir (o padrão é <code>"visitante"</code>):</p>
+<div class="ex-code">$nome = $_GET["nome"] <input data-answer="??"> "visitante";</div>
+</div>
+
+<div class="exercise">
+<p>Que comando confere só a sintaxe de um arquivo, sem rodar?</p>
+<div class="ex-code">php <input data-answer="-l"> index.php</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Toda mensagem tem <strong>nível</strong>, <strong>texto</strong>, <strong>arquivo</strong> e <strong>linha</strong>. "Uncaught X" = exceção X não tratada; o <code>Stack trace</code> mostra o caminho até ela.</li>
+  <li><code>Parse error</code>: nada roda; olhe também a linha <strong>anterior</strong>. <code>Fatal error</code>: para. <code>Warning</code>/<code>Notice</code>: continua com valor errado. <code>Deprecated</code>: funciona, mas vai mudar.</li>
+  <li>Os campeões: <code>Undefined variable</code>, <code>Undefined array key</code>, <code>… on null</code>, <code>Call to undefined function</code>, <code>headers already sent</code>, <code>no such table</code>.</li>
+  <li>Conserte a <strong>primeira</strong> mensagem e rode de novo; muitas das seguintes somem junto.</li>
+  <li><code>php -l</code> confere a sintaxe; no site no ar, os erros vão para o log, não para a tela (<a href="depuracao.html">Depurar</a>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
