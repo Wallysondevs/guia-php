@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Prepared Statements — SQL injection, prepare, execute e transações | Guia PHP</title>
+<meta name="description" content="SQL injection explicado com uma busca vulnerável da lojinha da Ana (só no seu computador), e como os prepared statements do PDO resolvem: prepare e execute com ? e :nome, bindValue, o que um marcador não pode fazer, e transações com beginTransaction, commit e rollBack. Saídas reais do PHP 8.5 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Prepared Statements</span></h1>
+
+<p class="intro">A lojinha da Ana ganhou uma caixa de busca: o visitante digita o nome de um produto e o PHP procura no banco. Parece inofensivo, mas, se o texto digitado for <strong>colado direto no SQL</strong>, o visitante passa a <strong>escrever um pedaço do seu SQL</strong>. Isso se chama <strong>SQL injection</strong> ("injeção de SQL") e está há mais de vinte anos entre as falhas de segurança mais exploradas da web. Nesta aula você vai ver o problema acontecer (no seu computador, com dados de mentira), entender por quê, e corrigir com <strong>prepared statements</strong> ("comandos preparados"). No fim, vai aprender as <strong>transações</strong>, que garantem que um grupo de comandos aconteça inteiro ou não aconteça.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é SQL injection, vendo uma busca vulnerável funcionar errado.</li>
+  <li>Como usar <code>prepare</code> e <code>execute</code> com marcadores <code>?</code> e <code>:nome</code>.</li>
+  <li>Por que isso resolve o problema (e não é só "tirar as aspas").</li>
+  <li>Como usar <code>bindValue</code> e <code>PDO::PARAM_INT</code>.</li>
+  <li>O que um marcador <strong>não</strong> pode substituir (nomes de tabela e coluna) e como lidar com isso.</li>
+  <li>Como usar <code>beginTransaction</code>, <code>commit</code> e <code>rollBack</code> para não deixar o banco "pela metade".</li>
+</ul>
+</div>
+
+<p>Esta aula continua <a href="crud.html">CRUD com PDO</a>. Todos os programas foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/loja</code>, e você pode repetir cada um no editor do guia.</p>
+
+<div class="warning">
+<strong>Só no que é seu</strong>
+<p>Tudo o que esta aula mostra roda num banco de mentira, criado na memória do seu próprio computador. Testar SQL injection em sites de outras pessoas, sem autorização por escrito, é <strong>crime</strong> no Brasil (Lei 12.737/2012, que tipifica a invasão de dispositivo informático) e na maioria dos países. O objetivo aqui é você reconhecer o erro no <strong>seu</strong> código e nunca cometê-lo.</p>
+</div>
+
+<hr>
+
+<h2>O banco dos exemplos</h2>
+<p>Para cada exemplo começar do mesmo jeito, a Ana guardou num arquivo <code>banco.php</code> o código que cria a loja <strong>na memória</strong> (<code>sqlite::memory:</code>, veja <a href="pdo.html">Conectar com PDO</a>). Os outros programas começam com <code>require "banco.php";</code> (veja <a href="include-require.html">include e require</a>) e ganham a variável <code>$pdo</code> pronta.</p>
+
+<pre class="file" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL,
+    ativo INTEGER NOT NULL DEFAULT 1
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque, ativo) VALUES
+    ('Caderno', 15.90, 30, 1),
+    ('Caneta azul', 2.50, 100, 1),
+    ('Mochila', 89.90, 5, 1),
+    ('Lápis', 1.20, 200, 1),
+    ('Estojo antigo', 9.90, 0, 0)");
+</pre>
+
+<p>Repare na coluna <code>ativo</code>: o <strong>Estojo antigo</strong> saiu de linha (<code>ativo = 0</code>) e não deve aparecer para os clientes. Ele vai ser o nosso "dado escondido".</p>
+
+<hr>
+
+<h2>A ideia: o formulário com lacunas</h2>
+<p>Imagine que a Ana manda um bilhete para o estoquista: <em>"Traga o produto ________."</em> e pede ao cliente que complete a lacuna. Se o cliente escreve <code>Caderno</code>, tudo bem. Mas e se ele escreve <code>Caderno. E também abra o cofre</code>? Se o estoquista lê o bilhete inteiro como uma ordem só, ele abre o cofre, porque <strong>não dá para saber onde termina o texto do cliente e onde recomeça a ordem da Ana</strong>.</p>
+
+<p>Agora imagine um formulário impresso, em que o nome do produto vai num <strong>campo cercado</strong>. O que estiver dentro do campo é sempre <strong>o nome de um produto</strong>, nunca uma ordem, mesmo que seja a frase "abra o cofre". Esse formulário é o <strong>prepared statement</strong>: o SQL vai com <strong>lacunas marcadas</strong> (<code>?</code>), e os valores vão <strong>separados</strong>, para dentro das lacunas.</p>
+
+<hr>
+
+<h2>1. A busca vulnerável</h2>
+<p>Este é o jeito <strong>errado</strong>, que você ainda vai encontrar em muito tutorial antigo: montar o SQL juntando textos. Para facilitar o teste no terminal, o termo buscado vem de <code>$argv[1]</code>, o primeiro argumento do comando (veja <a href="linha-comando.html">PHP na Linha de Comando</a>); num site, ele viria de <code>$_GET["busca"]</code> (veja <a href="get-post.html">$_GET e $_POST</a>). O programa mostra o SQL montado antes de rodá-lo, para você ver o que o banco recebe:</p>
+
+<pre class="file" data-file="busca.php">&lt;?php
+require "banco.php";
+
+$busca = $argv[1];   // o que o visitante digitou na caixa de busca
+
+$sql = "SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = '$busca'";
+echo "SQL enviado: $sql\n";
+
+foreach ($pdo-&gt;query($sql) as $p) {
+    echo "- ", $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+}
+</pre>
+
+<p>Com uma busca normal, funciona:</p>
+
+<pre class="term" data-cwd="~/loja">$ php busca.php Caderno
+SQL enviado: SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = 'Caderno'
+- Caderno: R$ 15,90</pre>
+
+<h3>Primeiro sintoma: um apóstrofo quebra tudo</h3>
+<p>Um cliente procura por <code>copo d'água</code>:</p>
+
+<pre class="term" data-cwd="~/loja">$ php busca.php "copo d'água"
+SQL enviado: SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = 'copo d'água'
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 near "água": syntax error in /home/ana/loja/busca.php:9
+Stack trace:
+#0 /home/ana/loja/busca.php(9): PDO-&gt;query('SELECT nome, pr...')
+#1 {main}
+  thrown in /home/ana/loja/busca.php on line 9</pre>
+
+<p>Olhe a linha <code>SQL enviado</code>: o apóstrofo de <code>d'água</code> <strong>fechou</strong> a aspa que a Ana abriu em <code>nome = '</code>. Para o SQLite, o texto acabou em <code>'copo d'</code> e veio em seguida uma palavra solta, <code>água</code>, que não é SQL: <code>near "água": syntax error</code> ("erro de sintaxe perto de água"). O texto do visitante <strong>virou parte do comando</strong>. Isso é um erro de programação, mesmo que ninguém tenha tido má intenção.</p>
+
+<h3>O ataque: o visitante reescreve o <code>WHERE</code></h3>
+<p>Se um apóstrofo fecha a aspa, alguém mal-intencionado pode fechar a aspa <strong>de propósito</strong> e escrever o resto. Este é o exemplo clássico, ensinado em todo curso de segurança:</p>
+
+<pre class="term" data-cwd="~/loja">$ php busca.php "x' OR '1'='1"
+SQL enviado: SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = 'x' OR '1'='1'
+- Caderno: R$ 15,90
+- Caneta azul: R$ 2,50
+- Mochila: R$ 89,90
+- Lápis: R$ 1,20
+- Estojo antigo: R$ 9,90        « o produto escondido apareceu!</pre>
+
+<p>Leia o SQL enviado com calma. O visitante digitou <code>x' OR '1'='1</code>, e o SQL ficou:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>Quem escreveu</th><th>O que significa</th></tr>
+<tr><td><code>WHERE ativo = 1 AND nome = '</code></td><td>Ana</td><td>Início da condição e a aspa que abre o texto.</td></tr>
+<tr><td><code>x'</code></td><td>Visitante</td><td>Um nome qualquer e a aspa que <strong>fecha</strong> o texto antes da hora.</td></tr>
+<tr><td><code> OR '1'='1</code></td><td>Visitante</td><td>"OU 1 é igual a 1": uma condição que é sempre verdadeira.</td></tr>
+<tr><td><code>'</code></td><td>Ana</td><td>A aspa final da Ana, que agora fecha o <code>'1</code> do visitante.</td></tr>
+</table>
+</div>
+
+<p>No SQL, o <code>AND</code> é feito antes do <code>OR</code>, então a condição virou <code>(ativo = 1 AND nome = 'x') OR '1'='1'</code>: "ou é um produto ativo chamado x, <strong>ou</strong> 1 é igual a 1". Como 1 é sempre igual a 1, <strong>todas</strong> as linhas passam, inclusive o produto escondido. Numa tela de login, a mesma técnica pode entrar sem senha; com outras variações, pode ler tabelas que nunca deveriam aparecer (clientes, senhas) e, em alguns bancos, alterar ou apagar dados.</p>
+
+<div class="note">
+<strong>O problema não é o apóstrofo; é misturar código com dados</strong>
+<p>A tentação é "tirar os apóstrofos" do texto, ou trocar <code>'</code> por <code>\'</code> com <code>addslashes</code>. Não faça isso: cada banco tem regras diferentes para escapar texto, há truques com outros caracteres e codificações, e basta esquecer em <strong>um</strong> lugar. A solução de verdade é nunca colar dados no meio do SQL.</p>
+</div>
+
+<hr>
+
+<h2>2. A solução: <code>prepare</code> + <code>execute</code> com <code>?</code></h2>
+<p>A versão segura troca o valor por um <strong>marcador</strong> (<em>placeholder</em>), o <code>?</code>, e manda o valor separado:</p>
+
+<pre class="file" data-file="busca-segura.php">&lt;?php
+require "banco.php";
+
+$busca = $argv[1];
+
+$stmt = $pdo-&gt;prepare("SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = ?");
+$stmt-&gt;execute([$busca]);
+
+$achou = false;
+foreach ($stmt as $p) {
+    echo "- ", $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+    $achou = true;
+}
+if (!$achou) {
+    echo "Nenhum produto encontrado.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>$pdo-&gt;prepare("… nome = ?")</dt><dd><strong>Prepara</strong> o comando: envia ao banco o SQL com a lacuna. O banco analisa e "compila" o SQL <strong>agora</strong>, antes de ver qualquer valor. Devolve um objeto <code>PDOStatement</code> (um "comando preparado"), guardado em <code>$stmt</code> (abreviação comum de <em>statement</em>, "comando").</dd>
+  <dt>?</dt><dd>A lacuna. <strong>Sem aspas em volta</strong>: o banco já sabe que ali vai um valor.</dd>
+  <dt>$stmt-&gt;execute([$busca])</dt><dd><strong>Executa</strong> o comando preparado, mandando os valores num array, na ordem dos <code>?</code>. O valor vai como <strong>dado puro</strong>: o banco nunca o lê como SQL.</dd>
+  <dt>foreach ($stmt as $p)</dt><dd>O próprio <code>$stmt</code> entrega as linhas, uma por vez (também dá para usar <code>fetch</code> e <code>fetchAll</code>, como em <a href="pdo.html">Conectar com PDO</a>).</dd>
+</dl>
+
+<p>As mesmas três buscas:</p>
+
+<pre class="term" data-cwd="~/loja">$ php busca-segura.php Caderno
+- Caderno: R$ 15,90
+$ php busca-segura.php "x' OR '1'='1"
+Nenhum produto encontrado.          « procurou um produto com esse nome esquisito: não existe
+$ php busca-segura.php "copo d'água"
+Nenhum produto encontrado.          « nada de erro de sintaxe</pre>
+
+<p>O texto <code>x' OR '1'='1</code> foi tratado exatamente como o que ele é: <strong>o nome de um produto</strong>, com apóstrofos e tudo. Como não existe produto com esse nome, a busca não achou nada. E o <code>copo d'água</code> deixou de quebrar o programa.</p>
+
+<h3>Por que isso resolve</h3>
+<p>Com o SQL montado por colagem, o banco recebe <strong>uma coisa só</strong> e precisa adivinhar onde termina o seu código e onde começa o texto do visitante. Com o prepared statement, ele recebe <strong>duas coisas separadas</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Colando texto (vulnerável)</th><th>Prepared statement</th></tr>
+<tr><td>O que vai para o banco</td><td><code>… nome = 'x' OR '1'='1'</code> (tudo junto)</td><td>1º: <code>… nome = ?</code><br>2º: o valor <code>x' OR '1'='1</code></td></tr>
+<tr><td>Quando o SQL é analisado</td><td>Depois que o valor já está dentro</td><td><strong>Antes</strong> de o valor chegar</td></tr>
+<tr><td>O valor pode virar código?</td><td>Sim</td><td>Não: a "forma" do comando já estava decidida</td></tr>
+<tr><td>Apóstrofos, acentos, <code>;</code>, <code>--</code></td><td>Quebram ou mudam o comando</td><td>São só letras do valor</td></tr>
+</table>
+</div>
+
+<p>Dá para ver essa separação com <code>$stmt-&gt;debugDumpParams()</code>, que mostra o que o comando preparado guardou:</p>
+
+<pre class="file" data-file="raio-x.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare("SELECT nome FROM produtos WHERE nome = ?");
+$stmt-&gt;execute(["x' OR '1'='1"]);
+$stmt-&gt;debugDumpParams();
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php raio-x.php
+SQL: [40] SELECT nome FROM produtos WHERE nome = ?       « o SQL continua com a lacuna
+Params:  1                                               « e há 1 valor, guardado à parte
+Key: Position #0:
+paramno=0
+name=[0] ""
+is_param=1
+param_type=2                                             « 2 = PDO::PARAM_STR (texto)</pre>
+
+<p>O SQL guardado tem o <code>?</code>, nunca o texto do visitante. O valor fica na "posição 0" (o primeiro <code>?</code>), marcado como texto (<code>param_type=2</code>, que é o valor da constante <code>PDO::PARAM_STR</code>).</p>
+
+<div class="tryphp" data-goal="out:Nenhum produto encontrado,out:- Caderno: R$ 15\,90,src:prepare\(,semerro">
+<p class="try-task"><strong>Missão:</strong> a função <code>buscar</code> está vulnerável: rode e veja a "Busca 2" mostrar todos os produtos, inclusive o <strong>Estojo antigo</strong>. Corrija-a com <code>prepare</code> e <code>execute</code>, usando um <code>?</code> no lugar de <code>'$busca'</code>. Depois da correção, a Busca 1 continua achando o Caderno e a Busca 2 mostra <code>Nenhum produto encontrado.</code></p>
+<pre class="script" data-file="busca.php">&lt;?php
+require "banco.php";
+
+function buscar(PDO $pdo, string $busca): void
+{
+    $sql = "SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = '$busca'";
+
+    $achou = false;
+    foreach ($pdo-&gt;query($sql) as $p) {
+        echo "- ", $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+        $achou = true;
+    }
+    if (!$achou) {
+        echo "Nenhum produto encontrado.\n";
+    }
+}
+
+echo "Busca 1:\n";
+buscar($pdo, "Caderno");
+echo "Busca 2:\n";
+buscar($pdo, "x' OR '1'='1");
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL,
+    ativo INTEGER NOT NULL DEFAULT 1
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque, ativo) VALUES
+    ('Caderno', 15.90, 30, 1),
+    ('Caneta azul', 2.50, 100, 1),
+    ('Mochila', 89.90, 5, 1),
+    ('Lápis', 1.20, 200, 1),
+    ('Estojo antigo', 9.90, 0, 0)");
+</pre>
+<pre class="solucao" data-file="busca.php">&lt;?php
+require "banco.php";
+
+function buscar(PDO $pdo, string $busca): void
+{
+    $stmt = $pdo-&gt;prepare("SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = ?");
+    $stmt-&gt;execute([$busca]);
+
+    $achou = false;
+    foreach ($stmt as $p) {
+        echo "- ", $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+        $achou = true;
+    }
+    if (!$achou) {
+        echo "Nenhum produto encontrado.\n";
+    }
+}
+
+echo "Busca 1:\n";
+buscar($pdo, "Caderno");
+echo "Busca 2:\n";
+buscar($pdo, "x' OR '1'='1");
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Marcadores com nome: <code>:nome</code></h2>
+<p>Com vários valores, contar <code>?</code> fica confuso. A outra forma de marcador tem <strong>nome</strong>: dois-pontos seguidos de uma palavra. Os valores vão num array associativo, cada chave com o nome do marcador:</p>
+
+<pre class="file" data-file="faixa.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare(
+    "SELECT nome, preco FROM produtos
+     WHERE ativo = 1 AND preco BETWEEN :minimo AND :maximo
+     ORDER BY preco"
+);
+$stmt-&gt;execute(["minimo" =&gt; 2, "maximo" =&gt; 20]);
+
+foreach ($stmt as $p) {
+    echo "- ", $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php faixa.php
+- Caneta azul: R$ 2,50
+- Caderno: R$ 15,90</pre>
+
+<dl class="anatomy">
+  <dt>:minimo, :maximo</dt><dd>Duas lacunas com nome. A ordem em que aparecem no SQL não importa mais.</dd>
+  <dt>["minimo" =&gt; 2, "maximo" =&gt; 20]</dt><dd>Os valores, pelo nome. A chave pode ser escrita com ou sem os dois-pontos (<code>":minimo"</code> também funciona).</dd>
+  <dt>BETWEEN … AND …</dt><dd>SQL para "entre … e …", incluindo as pontas.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>?</code> (posicional)</th><th><code>:nome</code> (nomeado)</th></tr>
+<tr><td>Valores</td><td>Array comum, <strong>na ordem</strong> dos <code>?</code></td><td>Array associativo, <strong>pelo nome</strong></td></tr>
+<tr><td>Bom para</td><td>Um ou dois valores</td><td>Muitos valores; SQL longo; o mesmo valor usado duas vezes</td></tr>
+<tr><td>Exemplo</td><td><code>execute([$nome, $preco])</code></td><td><code>execute(["nome" =&gt; $nome, "preco" =&gt; $preco])</code></td></tr>
+</table>
+</div>
+
+<p>Escolha um estilo por comando: <strong>não misture</strong> <code>?</code> e <code>:nome</code> no mesmo SQL.</p>
+
+<div class="tryphp" data-goal="out:Mochila: 5,out:Caderno: 30,out:Caneta azul: 100,src::minimo,src::maximo,semerro">
+<p class="try-task"><strong>Missão:</strong> os números 5 e 100 estão escritos direto no SQL. Troque-os pelos marcadores <code>:minimo</code> e <code>:maximo</code> e passe os valores no <code>execute</code>. A saída deve continuar:</p>
+<pre class="out">Mochila: 5
+Caderno: 30
+Caneta azul: 100</pre>
+<pre class="script" data-file="estoque.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare(
+    "SELECT nome, estoque FROM produtos
+     WHERE estoque BETWEEN 5 AND 100
+     ORDER BY estoque"
+);
+$stmt-&gt;execute();
+
+foreach ($stmt as $p) {
+    echo $p["nome"], ": ", $p["estoque"], "\n";
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL,
+    ativo INTEGER NOT NULL DEFAULT 1
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque, ativo) VALUES
+    ('Caderno', 15.90, 30, 1),
+    ('Caneta azul', 2.50, 100, 1),
+    ('Mochila', 89.90, 5, 1),
+    ('Lápis', 1.20, 200, 1),
+    ('Estojo antigo', 9.90, 0, 0)");
+</pre>
+<pre class="solucao" data-file="estoque.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare(
+    "SELECT nome, estoque FROM produtos
+     WHERE estoque BETWEEN :minimo AND :maximo
+     ORDER BY estoque"
+);
+$stmt-&gt;execute(["minimo" =&gt; 5, "maximo" =&gt; 100]);
+
+foreach ($stmt as $p) {
+    echo $p["nome"], ": ", $p["estoque"], "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Buscar "contém": <code>LIKE</code> com marcador</h2>
+<p>Para achar produtos que <strong>contêm</strong> um pedaço de texto, o SQL usa <code>LIKE</code> com <code>%</code> ("qualquer coisa"). O <code>%</code> faz parte do <strong>valor</strong>, não do SQL: monte-o no PHP e deixe o <code>?</code> sozinho:</p>
+
+<pre class="file" data-file="contem.php">&lt;?php
+require "banco.php";
+
+$termo = $argv[1];
+
+$stmt = $pdo-&gt;prepare("SELECT nome FROM produtos WHERE nome LIKE ?");
+$stmt-&gt;execute(["%$termo%"]);
+
+foreach ($stmt as $p) {
+    echo "- ", $p["nome"], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php contem.php an
+- Caneta azul           « "an" no meio de "Caneta"
+- Estojo antigo         « "an" no começo de "antigo"</pre>
+
+<p>Escrever <code>LIKE '%?%'</code> não funciona: entre aspas, o <code>?</code> é só um ponto de interrogação (veja o <a href="#cenarios">cenário</a> abaixo).</p>
+
+<hr>
+
+<h2>5. <code>bindValue</code>: dizer o tipo do valor</h2>
+<p>O <code>execute([...])</code> manda todos os valores como <strong>texto</strong>. Quase sempre o banco converte sozinho, mas às vezes você quer dizer o tipo com todas as letras, por exemplo no <code>LIMIT</code>, que precisa de um número inteiro (o MySQL recusa <code>LIMIT '2'</code>, com aspas). Para isso existe o <code>bindValue</code> ("ligar valor"):</p>
+
+<pre class="file" data-file="mais-caros.php">&lt;?php
+require "banco.php";
+
+$quantos = $argv[1];   // vem como texto: "2"
+
+$stmt = $pdo-&gt;prepare("SELECT nome, preco FROM produtos ORDER BY preco DESC LIMIT :quantos");
+$stmt-&gt;bindValue(":quantos", (int) $quantos, PDO::PARAM_INT);
+$stmt-&gt;execute();
+
+foreach ($stmt as $p) {
+    echo "- ", $p["nome"], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php mais-caros.php 2
+- Mochila
+- Caderno</pre>
+
+<dl class="anatomy">
+  <dt>bindValue(":quantos", …)</dt><dd>Põe um valor numa lacuna. Com <code>?</code>, a lacuna é um número: <code>bindValue(1, …)</code> para o primeiro <code>?</code> (aqui começa em 1, não em 0).</dd>
+  <dt>(int) $quantos</dt><dd>Converte o texto <code>"2"</code> em número inteiro (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</dd>
+  <dt>PDO::PARAM_INT</dt><dd>Avisa ao banco: "é um inteiro". Outras: <code>PDO::PARAM_STR</code> (texto, o padrão), <code>PDO::PARAM_BOOL</code>, <code>PDO::PARAM_NULL</code>.</dd>
+  <dt>execute()</dt><dd>Sem argumentos: os valores já foram ligados.</dd>
+</dl>
+
+<div class="tip">
+<strong><code>bindValue</code> × <code>bindParam</code></strong>
+<p>Existe também o <code>bindParam</code>, que liga a lacuna a uma <strong>variável</strong> (não ao valor dela naquele momento): o valor é lido só na hora do <code>execute</code>. É útil em laços, mas confunde quem está começando. Prefira <code>execute([...])</code> no dia a dia e <code>bindValue</code> quando precisar do tipo.</p>
+</div>
+
+<h3>Preparar uma vez, executar várias</h3>
+<p>Um comando preparado pode ser executado quantas vezes você quiser, com valores diferentes. O banco analisa o SQL só uma vez:</p>
+
+<pre class="file" data-file="cadastrar-varios.php">&lt;?php
+require "banco.php";
+
+$novos = [
+    ["Borracha", 0.90, 50],
+    ["Régua 30 cm", 4.50, 20],
+    ["Cola bastão", 6.75, 15],
+];
+
+$stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)");
+foreach ($novos as $produto) {
+    $stmt-&gt;execute($produto);
+    echo "Cadastrado com id ", $pdo-&gt;lastInsertId(), ": ", $produto[0], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php cadastrar-varios.php
+Cadastrado com id 6: Borracha
+Cadastrado com id 7: Régua 30 cm
+Cadastrado com id 8: Cola bastão</pre>
+
+<p>Cada <code>$produto</code> já é um array com três valores, na ordem dos três <code>?</code>, então vai direto para o <code>execute</code>. O <code>lastInsertId()</code> está explicado em <a href="crud.html">CRUD com PDO</a>.</p>
+
+<hr>
+
+<h2>6. O que um marcador não pode substituir</h2>
+<p>Um marcador é sempre um <strong>valor</strong>: um texto, um número, uma data. Ele <strong>não</strong> pode ser um pedaço da estrutura do SQL: nome de tabela, nome de coluna, <code>ASC</code>/<code>DESC</code>, palavras do SQL.</p>
+
+<pre class="file" data-file="tabela-marcador.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare("SELECT * FROM ?");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tabela-marcador.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 near "?": syntax error in /home/ana/loja/tabela-marcador.php:4
+Stack trace:
+#0 /home/ana/loja/tabela-marcador.php(4): PDO-&gt;prepare('SELECT * FROM ?')
+#1 {main}
+  thrown in /home/ana/loja/tabela-marcador.php on line 4</pre>
+
+<p>Pior é quando <strong>não dá erro</strong>. A Ana quis deixar o cliente escolher a ordem da lista:</p>
+
+<pre class="file" data-file="ordem.php">&lt;?php
+require "banco.php";
+
+$coluna = $argv[1];   // o visitante escolheu ordenar por "preco"
+
+$stmt = $pdo-&gt;prepare("SELECT nome, preco FROM produtos WHERE ativo = 1 ORDER BY ?");
+$stmt-&gt;execute([$coluna]);
+foreach ($stmt as $p) {
+    echo "- ", $p["nome"], ": ", $p["preco"], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php ordem.php preco
+- Caderno: 15.9          « não ordenou pelo preço!
+- Caneta azul: 2.5
+- Mochila: 89.9
+- Lápis: 1.2</pre>
+
+<p>O banco ordenou pelo <strong>texto fixo</strong> <code>'preco'</code>, que é igual em todas as linhas, ou seja, não ordenou nada. Para escolher colunas, use uma <strong>lista de permitidas</strong> (<em>whitelist</em>): o visitante escolhe, mas só vale o que está na sua lista.</p>
+
+<pre class="file" data-file="ordem-segura.php">&lt;?php
+require "banco.php";
+
+$permitidas = ["nome", "preco", "estoque"];
+$coluna = $argv[1];
+
+if (!in_array($coluna, $permitidas, true)) {
+    $coluna = "nome";   // valor estranho? usa o padrão
+}
+
+$stmt = $pdo-&gt;prepare("SELECT nome, preco FROM produtos WHERE ativo = 1 ORDER BY $coluna");
+$stmt-&gt;execute();
+foreach ($stmt as $p) {
+    echo "- ", $p["nome"], ": ", $p["preco"], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php ordem-segura.php preco
+- Lápis: 1.2
+- Caneta azul: 2.5
+- Caderno: 15.9
+- Mochila: 89.9
+$ php ordem-segura.php "preco; DROP TABLE produtos"
+- Caderno: 15.9          « não estava na lista: ordenou por nome
+- Caneta azul: 2.5
+- Lápis: 1.2
+- Mochila: 89.9</pre>
+
+<p>Aqui a coluna é colada no SQL, mas isso é seguro porque <code>$coluna</code> <strong>só pode</strong> ser uma das três palavras que a Ana escreveu. O <code>in_array(…, true)</code> compara de forma estrita (veja <a href="funcoes-array.html">Funções de Array</a>).</p>
+
+<hr>
+
+<h2>7. Outras formas (e qual usar)</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Segura?</th><th>Quando usar</th></tr>
+<tr><td>Colar o valor no SQL</td><td><code>"… nome = '$busca'"</code></td><td><strong>Não</strong></td><td>Nunca com dados que vêm de fora</td></tr>
+<tr><td><code>addslashes</code> / tirar aspas na mão</td><td><code>"… '" . addslashes($busca) . "'"</code></td><td><strong>Não</strong> (depende do banco e da codificação)</td><td>Nunca</td></tr>
+<tr><td><code>$pdo-&gt;quote()</code></td><td><code>"… nome = " . $pdo-&gt;quote($busca)</code></td><td>Sim, se usada sempre</td><td>Raramente: só onde não dá para preparar</td></tr>
+<tr><td><code>prepare</code> + <code>execute([...])</code></td><td><code>"… nome = ?"</code></td><td><strong>Sim</strong></td><td><strong>Sempre</strong> que houver um valor variável</td></tr>
+<tr><td><code>prepare</code> + <code>bindValue</code></td><td><code>bindValue(":qtd", $n, PDO::PARAM_INT)</code></td><td><strong>Sim</strong></td><td>Quando o tipo importa (<code>LIMIT</code>, <code>NULL</code>)</td></tr>
+<tr><td>Lista de permitidas</td><td><code>in_array($coluna, $permitidas, true)</code></td><td><strong>Sim</strong></td><td>Nomes de coluna, <code>ASC</code>/<code>DESC</code></td></tr>
+<tr><td><code>query</code>/<code>exec</code> com SQL fixo</td><td><code>$pdo-&gt;query("SELECT COUNT(*) FROM produtos")</code></td><td>Sim (não tem valor de fora)</td><td>SQL sem nenhuma variável</td></tr>
+</table>
+</div>
+
+<p>Só para conhecer, o <code>quote</code> põe aspas e dobra os apóstrofos, do jeito que <strong>este</strong> banco espera:</p>
+
+<pre class="file" data-file="quote.php">&lt;?php
+require "banco.php";
+
+echo $pdo-&gt;quote("Caderno"), "\n";
+echo $pdo-&gt;quote("copo d'água"), "\n";
+echo $pdo-&gt;quote("x' OR '1'='1"), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php quote.php
+'Caderno'
+'copo d''água'
+'x'' OR ''1''=''1'</pre>
+
+<p>Funciona, mas depende de você lembrar de usar em todo lugar. O prepared statement é seguro <strong>por construção</strong>. Regra prática: <strong>se o SQL tem uma variável PHP dentro, ele deveria ter um <code>?</code></strong> (a exceção é a lista de permitidas).</p>
+
+<div class="note">
+<strong>E o <code>htmlspecialchars</code>?</strong>
+<p>É outro problema, em outro lugar. O prepared statement protege o <strong>banco</strong> na hora de gravar e buscar. O <code>htmlspecialchars</code> protege a <strong>página</strong> na hora de mostrar o que veio do banco (o ataque XSS). Um site seguro usa os dois. Veja <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</p>
+</div>
+
+<hr>
+
+<h2>8. Transações: tudo ou nada</h2>
+<p>Uma venda na lojinha são <strong>dois</strong> comandos: diminuir o estoque (<code>UPDATE</code>) e registrar a venda (<code>INSERT</code>). E se o primeiro acontecer e o segundo não? O estoque diminui, mas a venda não existe. O banco fica "pela metade".</p>
+
+<p>Pense num caixa eletrônico fazendo uma transferência: tirar da sua conta e pôr na outra. Se a energia cai no meio, o banco precisa garantir que o dinheiro não suma. Uma <strong>transação</strong> faz isso: junta vários comandos num pacote que acontece <strong>inteiro</strong> ou é <strong>desfeito</strong> inteiro.</p>
+
+<h3>O problema, sem transação</h3>
+<p>Este programa vende 2 mochilas (tem 5) e depois tenta vender 10. A conferência de estoque acontece <strong>depois</strong> do <code>UPDATE</code>:</p>
+
+<pre class="file" data-file="venda-sem-transacao.php">&lt;?php
+require "banco.php";
+$pdo-&gt;exec("CREATE TABLE vendas (id INTEGER PRIMARY KEY, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL)");
+
+function vender(PDO $pdo, int $produtoId, int $quantidade): void
+{
+    try {
+        $baixa = $pdo-&gt;prepare("UPDATE produtos SET estoque = estoque - ? WHERE id = ?");
+        $baixa-&gt;execute([$quantidade, $produtoId]);
+
+        $consulta = $pdo-&gt;prepare("SELECT estoque FROM produtos WHERE id = ?");
+        $consulta-&gt;execute([$produtoId]);
+        if ($consulta-&gt;fetchColumn() &lt; 0) {
+            throw new RuntimeException("estoque insuficiente");
+        }
+
+        $registro = $pdo-&gt;prepare("INSERT INTO vendas (produto_id, quantidade) VALUES (?, ?)");
+        $registro-&gt;execute([$produtoId, $quantidade]);
+        echo "Venda registrada: $quantidade unidade(s).\n";
+    } catch (Exception $e) {
+        echo "Venda cancelada: ", $e-&gt;getMessage(), ".\n";
+    }
+}
+
+vender($pdo, 3, 2);    // 2 mochilas
+vender($pdo, 3, 10);   // 10 mochilas: não tem!
+
+echo "Estoque da Mochila: ", $pdo-&gt;query("SELECT estoque FROM produtos WHERE id = 3")-&gt;fetchColumn(), "\n";
+echo "Vendas registradas: ", $pdo-&gt;query("SELECT COUNT(*) FROM vendas")-&gt;fetchColumn(), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php venda-sem-transacao.php
+Venda registrada: 2 unidade(s).
+Venda cancelada: estoque insuficiente.
+Estoque da Mochila: -7          « 5 - 2 - 10: o UPDATE da venda cancelada ficou!
+Vendas registradas: 1</pre>
+
+<p>A segunda venda foi "cancelada", mas o <code>UPDATE</code> já tinha acontecido: o estoque ficou em <strong>−7</strong>. O <code>throw</code> (veja <a href="excecoes.html">Exceções</a>) parou o programa antes do <code>INSERT</code>, mas não desfez o que veio antes.</p>
+
+<h3>A solução: <code>beginTransaction</code>, <code>commit</code>, <code>rollBack</code></h3>
+
+<pre class="file" data-file="venda.php">&lt;?php
+require "banco.php";
+$pdo-&gt;exec("CREATE TABLE vendas (id INTEGER PRIMARY KEY, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL)");
+
+function vender(PDO $pdo, int $produtoId, int $quantidade): void
+{
+    $pdo-&gt;beginTransaction();
+    try {
+        $baixa = $pdo-&gt;prepare("UPDATE produtos SET estoque = estoque - ? WHERE id = ?");
+        $baixa-&gt;execute([$quantidade, $produtoId]);
+
+        $consulta = $pdo-&gt;prepare("SELECT estoque FROM produtos WHERE id = ?");
+        $consulta-&gt;execute([$produtoId]);
+        if ($consulta-&gt;fetchColumn() &lt; 0) {
+            throw new RuntimeException("estoque insuficiente");
+        }
+
+        $registro = $pdo-&gt;prepare("INSERT INTO vendas (produto_id, quantidade) VALUES (?, ?)");
+        $registro-&gt;execute([$produtoId, $quantidade]);
+
+        $pdo-&gt;commit();
+        echo "Venda registrada: $quantidade unidade(s).\n";
+    } catch (Exception $e) {
+        $pdo-&gt;rollBack();
+        echo "Venda cancelada: ", $e-&gt;getMessage(), ".\n";
+    }
+}
+
+vender($pdo, 3, 2);    // 2 mochilas
+vender($pdo, 3, 10);   // 10 mochilas: não tem!
+
+echo "Estoque da Mochila: ", $pdo-&gt;query("SELECT estoque FROM produtos WHERE id = 3")-&gt;fetchColumn(), "\n";
+echo "Vendas registradas: ", $pdo-&gt;query("SELECT COUNT(*) FROM vendas")-&gt;fetchColumn(), "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php venda.php
+Venda registrada: 2 unidade(s).
+Venda cancelada: estoque insuficiente.
+Estoque da Mochila: 3           « 5 - 2: a venda cancelada foi desfeita por inteiro
+Vendas registradas: 1</pre>
+
+<dl class="anatomy">
+  <dt>$pdo-&gt;beginTransaction()</dt><dd>"Comece um pacote." A partir daqui, as mudanças ficam <strong>provisórias</strong>: o próprio programa as enxerga, mas elas ainda não são definitivas.</dd>
+  <dt>$pdo-&gt;commit()</dt><dd>"Confirme o pacote." Todas as mudanças viram definitivas de uma vez. Fica no fim do <code>try</code>, depois do último comando.</dd>
+  <dt>$pdo-&gt;rollBack()</dt><dd>"Desfaça o pacote." Tudo desde o <code>beginTransaction</code> volta ao que era (<em>roll back</em> = "rolar de volta"). Fica no <code>catch</code>: qualquer erro, de SQL ou seu, desfaz tudo.</dd>
+</dl>
+
+<p>Se o programa terminar (ou travar) <strong>sem</strong> <code>commit</code>, o PDO também desfaz a transação sozinho. Repare ainda que o <code>B</code> de <code>rollBack</code> é maiúsculo: o PHP não diferencia maiúsculas em nomes de métodos, mas é assim que a documentação escreve.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Use transação quando…</th><th>Exemplo</th></tr>
+<tr><td>Vários comandos precisam acontecer juntos</td><td>Venda (estoque + registro), transferência (sai de uma conta + entra na outra)</td></tr>
+<tr><td>Você grava muitas linhas de uma vez</td><td>Importar 1.000 produtos de um <a href="csv.html">CSV</a>: tudo ou nada (e, no SQLite, muito mais rápido)</td></tr>
+<tr><td>Não precisa</td><td>Um único <code>INSERT</code>, <code>UPDATE</code> ou <code>DELETE</code> sozinho: ele já é "tudo ou nada" por si</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="cenarios">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Erro de sintaxe com apóstrofo (<code>near "…": syntax error</code>)</strong>
+<pre class="term" data-cwd="~/loja">$ php busca.php "copo d'água"
+SQL enviado: SELECT nome, preco FROM produtos WHERE ativo = 1 AND nome = 'copo d'água'
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 near "água": syntax error in /home/ana/loja/busca.php:9
+Stack trace:
+#0 /home/ana/loja/busca.php(9): PDO-&gt;query('SELECT nome, pr...')
+#1 {main}
+  thrown in /home/ana/loja/busca.php on line 9</pre>
+<p><strong>O que significa:</strong> um valor com apóstrofo foi colado no SQL e quebrou o comando. Esse erro é o <strong>aviso</strong> de que o código está vulnerável a SQL injection.</p>
+<p><strong>Como consertar:</strong> troque <code>'$variavel'</code> por <code>?</code>, <code>query</code> por <code>prepare</code> e passe o valor no <code>execute([...])</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>General error: 25 column index out of range</code></strong>
+<pre class="file" data-file="aspas-no-marcador.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare("SELECT nome FROM produtos WHERE nome LIKE '%?%'");
+$stmt-&gt;execute(["an"]);
+</pre>
+<pre class="term" data-cwd="~/loja">$ php aspas-no-marcador.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 25 column index out of range in /home/ana/loja/aspas-no-marcador.php:5
+Stack trace:
+#0 /home/ana/loja/aspas-no-marcador.php(5): PDOStatement-&gt;execute(Array)
+#1 {main}
+  thrown in /home/ana/loja/aspas-no-marcador.php on line 5</pre>
+<p><strong>O que significa:</strong> "índice fora do intervalo": você mandou <strong>mais valores do que lacunas</strong>. Aqui, o <code>?</code> está entre aspas, então é só um caractere de texto, e o SQL ficou com <strong>zero</strong> lacunas para <strong>um</strong> valor. A mesma mensagem aparece com <code>execute([20, 5])</code> para um SQL com um só <code>?</code>.</p>
+<p><strong>Como consertar:</strong> marcador sempre sem aspas (<code>LIKE ?</code>), e o <code>%</code> vai no valor: <code>execute(["%$termo%"])</code>. Conte os <code>?</code> e os valores.</p>
+</div>
+
+<div class="cenario">
+<strong>A busca não acha nada, e não dá erro (faltou um valor)</strong>
+<pre class="file" data-file="poucos.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare("SELECT nome FROM produtos WHERE preco BETWEEN :minimo AND :maximo");
+$stmt-&gt;execute(["minimo" =&gt; 2]);   // esqueceu o :maximo
+
+print_r($stmt-&gt;fetchAll(PDO::FETCH_COLUMN));
+</pre>
+<pre class="term" data-cwd="~/loja">$ php poucos.php
+Array
+(
+)</pre>
+<p><strong>O que significa:</strong> com o SQLite, uma lacuna sem valor vira <code>NULL</code>, e nenhuma comparação com <code>NULL</code> é verdadeira: a lista volta vazia, em silêncio. (Em outros bancos, como o MySQL, o PDO costuma recusar com um erro <code>HY093</code>, "número de parâmetros inválido".) O mesmo acontece se a chave estiver com o nome errado (<code>"max"</code> em vez de <code>"maximo"</code>).</p>
+<p><strong>Como consertar:</strong> confira se cada <code>:nome</code> do SQL tem uma chave com o <strong>mesmo nome</strong> no array.</p>
+</div>
+
+<div class="cenario">
+<strong><code>There is no active transaction</code></strong>
+<pre class="file" data-file="sem-begin.php">&lt;?php
+require "banco.php";
+
+$pdo-&gt;exec("UPDATE produtos SET estoque = estoque - 1 WHERE id = 3");
+$pdo-&gt;commit();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-begin.php
+
+Fatal error: Uncaught PDOException: There is no active transaction in /home/ana/loja/sem-begin.php:5
+Stack trace:
+#0 /home/ana/loja/sem-begin.php(5): PDO-&gt;commit()
+#1 {main}
+  thrown in /home/ana/loja/sem-begin.php on line 5</pre>
+<p><strong>O que significa:</strong> "não há transação ativa": um <code>commit()</code> (ou <code>rollBack()</code>) sem <code>beginTransaction()</code> antes. Também acontece quando o <code>commit</code> é chamado duas vezes. O contrário, chamar <code>beginTransaction()</code> com uma transação já aberta, dá <code>There is already an active transaction</code>.</p>
+<p><strong>Como consertar:</strong> um <code>beginTransaction</code> antes do <code>try</code>, um <code>commit</code> no fim do <code>try</code>, um <code>rollBack</code> no <code>catch</code>. Na dúvida, <code>$pdo-&gt;inTransaction()</code> diz se há uma aberta.</p>
+</div>
+
+<div class="cenario">
+<strong>As mudanças "sumiram" (esqueceu o <code>commit</code>)</strong>
+<pre class="file" data-file="esqueceu-commit.php">&lt;?php
+$pdo = new PDO("sqlite:estoque.db");
+$pdo-&gt;exec("CREATE TABLE IF NOT EXISTS contador (valor INTEGER)");
+$pdo-&gt;exec("DELETE FROM contador");
+$pdo-&gt;exec("INSERT INTO contador VALUES (1)");
+
+$pdo-&gt;beginTransaction();
+$pdo-&gt;exec("UPDATE contador SET valor = 99");
+echo "Dentro da transação: ", $pdo-&gt;query("SELECT valor FROM contador")-&gt;fetchColumn(), "\n";
+// ... e o programa termina sem commit()
+</pre>
+<pre class="file" data-file="confere.php">&lt;?php
+$pdo = new PDO("sqlite:estoque.db");
+echo "Depois: ", $pdo-&gt;query("SELECT valor FROM contador")-&gt;fetchColumn(), "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php esqueceu-commit.php
+Dentro da transação: 99
+$ php confere.php
+Depois: 1</pre>
+<p><strong>O que significa:</strong> dentro da transação, o programa via o 99. Mas ele terminou sem <code>commit()</code>, e o PDO desfez tudo. Outro programa, abrindo o mesmo arquivo <code>estoque.db</code>, encontra o valor antigo. Sem mensagem nenhuma.</p>
+<p><strong>Como consertar:</strong> todo <code>beginTransaction()</code> precisa de um <code>commit()</code> no caminho em que deu tudo certo.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Venda cancelada: estoque insuficiente,out:Estoque da Mochila: 3,out:Vendas registradas: 1,src:beginTransaction,src:commit,src:rollBack,semerro">
+<p class="try-task"><strong>Missão:</strong> rode e veja o estoque da Mochila terminar em <code>-7</code>. Coloque a venda dentro de uma transação: <code>beginTransaction()</code> antes do <code>try</code>, <code>commit()</code> depois do <code>INSERT</code> e <code>rollBack()</code> no <code>catch</code>. O resultado deve ser:</p>
+<pre class="out">Venda registrada: 2 unidade(s).
+Venda cancelada: estoque insuficiente.
+Estoque da Mochila: 3
+Vendas registradas: 1</pre>
+<pre class="script" data-file="venda.php">&lt;?php
+require "banco.php";
+$pdo-&gt;exec("CREATE TABLE vendas (id INTEGER PRIMARY KEY, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL)");
+
+function vender(PDO $pdo, int $produtoId, int $quantidade): void
+{
+    try {
+        $baixa = $pdo-&gt;prepare("UPDATE produtos SET estoque = estoque - ? WHERE id = ?");
+        $baixa-&gt;execute([$quantidade, $produtoId]);
+
+        $consulta = $pdo-&gt;prepare("SELECT estoque FROM produtos WHERE id = ?");
+        $consulta-&gt;execute([$produtoId]);
+        if ($consulta-&gt;fetchColumn() &lt; 0) {
+            throw new RuntimeException("estoque insuficiente");
+        }
+
+        $registro = $pdo-&gt;prepare("INSERT INTO vendas (produto_id, quantidade) VALUES (?, ?)");
+        $registro-&gt;execute([$produtoId, $quantidade]);
+        echo "Venda registrada: $quantidade unidade(s).\n";
+    } catch (Exception $e) {
+        echo "Venda cancelada: ", $e-&gt;getMessage(), ".\n";
+    }
+}
+
+vender($pdo, 3, 2);    // 2 mochilas
+vender($pdo, 3, 10);   // 10 mochilas: não tem!
+
+echo "Estoque da Mochila: ", $pdo-&gt;query("SELECT estoque FROM produtos WHERE id = 3")-&gt;fetchColumn(), "\n";
+echo "Vendas registradas: ", $pdo-&gt;query("SELECT COUNT(*) FROM vendas")-&gt;fetchColumn(), "\n";
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL,
+    ativo INTEGER NOT NULL DEFAULT 1
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque, ativo) VALUES
+    ('Caderno', 15.90, 30, 1),
+    ('Caneta azul', 2.50, 100, 1),
+    ('Mochila', 89.90, 5, 1),
+    ('Lápis', 1.20, 200, 1),
+    ('Estojo antigo', 9.90, 0, 0)");
+</pre>
+<pre class="solucao" data-file="venda.php">&lt;?php
+require "banco.php";
+$pdo-&gt;exec("CREATE TABLE vendas (id INTEGER PRIMARY KEY, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL)");
+
+function vender(PDO $pdo, int $produtoId, int $quantidade): void
+{
+    $pdo-&gt;beginTransaction();
+    try {
+        $baixa = $pdo-&gt;prepare("UPDATE produtos SET estoque = estoque - ? WHERE id = ?");
+        $baixa-&gt;execute([$quantidade, $produtoId]);
+
+        $consulta = $pdo-&gt;prepare("SELECT estoque FROM produtos WHERE id = ?");
+        $consulta-&gt;execute([$produtoId]);
+        if ($consulta-&gt;fetchColumn() &lt; 0) {
+            throw new RuntimeException("estoque insuficiente");
+        }
+
+        $registro = $pdo-&gt;prepare("INSERT INTO vendas (produto_id, quantidade) VALUES (?, ?)");
+        $registro-&gt;execute([$produtoId, $quantidade]);
+
+        $pdo-&gt;commit();
+        echo "Venda registrada: $quantidade unidade(s).\n";
+    } catch (Exception $e) {
+        $pdo-&gt;rollBack();
+        echo "Venda cancelada: ", $e-&gt;getMessage(), ".\n";
+    }
+}
+
+vender($pdo, 3, 2);    // 2 mochilas
+vender($pdo, 3, 10);   // 10 mochilas: não tem!
+
+echo "Estoque da Mochila: ", $pdo-&gt;query("SELECT estoque FROM produtos WHERE id = 3")-&gt;fetchColumn(), "\n";
+echo "Vendas registradas: ", $pdo-&gt;query("SELECT COUNT(*) FROM vendas")-&gt;fetchColumn(), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>$pdo-&gt;prepare($sql)</code></td><td>Prepara um SQL com lacunas; devolve um <code>PDOStatement</code></td><td><code>$pdo-&gt;prepare("… WHERE id = ?")</code></td></tr>
+<tr><td><code>$stmt-&gt;execute([...])</code></td><td>Executa com os valores (posicionais ou por nome); devolve <code>true</code></td><td><code>execute([$id])</code>, <code>execute(["id" =&gt; $id])</code></td></tr>
+<tr><td><code>$stmt-&gt;bindValue($lacuna, $valor, $tipo)</code></td><td>Liga um valor a uma lacuna, com tipo</td><td><code>bindValue(":qtd", 5, PDO::PARAM_INT)</code></td></tr>
+<tr><td><code>$stmt-&gt;bindParam($lacuna, $variavel)</code></td><td>Liga uma <strong>variável</strong>, lida no <code>execute</code></td><td><code>bindParam(1, $nome)</code></td></tr>
+<tr><td><code>$stmt-&gt;fetch()</code> / <code>fetchAll()</code> / <code>fetchColumn()</code></td><td>Lê o resultado</td><td>veja <a href="pdo.html">Conectar com PDO</a></td></tr>
+<tr><td><code>$stmt-&gt;rowCount()</code></td><td>Linhas afetadas pelo último <code>execute</code></td><td>veja <a href="crud.html">CRUD com PDO</a></td></tr>
+<tr><td><code>$stmt-&gt;debugDumpParams()</code></td><td>Mostra o SQL preparado e os valores ligados</td><td>para depurar</td></tr>
+<tr><td><code>$pdo-&gt;quote($texto)</code></td><td>Põe aspas e escapa para este banco</td><td><code>'copo d''água'</code></td></tr>
+<tr><td><code>$pdo-&gt;beginTransaction()</code></td><td>Abre uma transação</td><td>antes do <code>try</code></td></tr>
+<tr><td><code>$pdo-&gt;commit()</code></td><td>Confirma tudo desde o <code>beginTransaction</code></td><td>no fim do <code>try</code></td></tr>
+<tr><td><code>$pdo-&gt;rollBack()</code></td><td>Desfaz tudo desde o <code>beginTransaction</code></td><td>no <code>catch</code></td></tr>
+<tr><td><code>$pdo-&gt;inTransaction()</code></td><td>Há uma transação aberta?</td><td><code>true</code>/<code>false</code></td></tr>
+<tr><td><code>PDO::PARAM_STR</code>, <code>PARAM_INT</code>, <code>PARAM_BOOL</code>, <code>PARAM_NULL</code></td><td>Tipos para <code>bindValue</code></td><td></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A lacuna</h3>
+<p>Complete o SQL para buscar o produto pelo <code>id</code> com um marcador posicional:</p>
+<div class="ex-code">$stmt = $pdo-&gt;prepare("SELECT * FROM produtos WHERE id = <input data-answer="?" aria-label="marcador" size="4">");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Os valores</h3>
+<p>Complete para executar o comando <code>"… WHERE nome = :nome"</code> com o valor da variável <code>$nome</code>:</p>
+<div class="ex-code">$stmt-&gt;execute(<input data-answer="[&quot;nome&quot; =&gt; $nome]|['nome' =&gt; $nome]|[&quot;:nome&quot; =&gt; $nome]|[':nome' =&gt; $nome]" aria-label="array de valores">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Desfazer</h3>
+<p>Complete o <code>catch</code> para desfazer a transação:</p>
+<div class="ex-code">} catch (Exception $e) { $pdo-&gt;<input data-answer="rollBack();|rollback();|rollBack()|rollback()" aria-label="método">  }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destas linhas é segura contra SQL injection?</p>
+<label><input type="radio" name="q4"> <code>$pdo-&gt;query("SELECT * FROM produtos WHERE nome = '$nome'")</code></label>
+<label><input type="radio" name="q4"> <code>$pdo-&gt;query("SELECT * FROM produtos WHERE nome = '" . addslashes($nome) . "'")</code></label>
+<label><input type="radio" name="q4"> <code>$stmt = $pdo-&gt;prepare("SELECT * FROM produtos WHERE nome = ?"); $stmt-&gt;execute([$nome]);</code></label>
+<label><input type="radio" name="q4"> <code>$stmt = $pdo-&gt;prepare("SELECT * FROM produtos WHERE nome = '$nome'"); $stmt-&gt;execute();</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Por que o prepared statement impede a injeção?</p>
+<label><input type="radio" name="q5"> Porque ele apaga os apóstrofos do texto.</label>
+<label><input type="radio" name="q5"> Porque o SQL é analisado antes, e o valor chega separado, sempre como dado.</label>
+<label><input type="radio" name="q5"> Porque ele criptografa o valor.</label>
+<label><input type="radio" name="q5"> Porque o SQLite não aceita a palavra <code>OR</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. A Ana quer deixar o cliente escolher a coluna do <code>ORDER BY</code>. O que fazer?</p>
+<label><input type="radio" name="q6"> <code>ORDER BY ?</code> com o nome da coluna no <code>execute</code>.</label>
+<label><input type="radio" name="q6"> <code>ORDER BY :coluna</code> com <code>bindValue</code>.</label>
+<label><input type="radio" name="q6"> Colar <code>$_GET["ordem"]</code> direto no SQL.</label>
+<label><input type="radio" name="q6"> Conferir o valor numa lista de colunas permitidas e só então colocá-lo no SQL.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Numa transação, o segundo de três comandos lança uma exceção e o <code>catch</code> chama <code>rollBack()</code>. O que fica gravado?</p>
+<label><input type="radio" name="q7"> Nada: o primeiro comando também é desfeito.</label>
+<label><input type="radio" name="q7"> Só o primeiro comando.</label>
+<label><input type="radio" name="q7"> O primeiro e o terceiro.</label>
+<label><input type="radio" name="q7"> Os três, porque o <code>rollBack</code> só desfaz erros de SQL.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>SQL injection</strong>: quando um valor de fora é colado no SQL, quem digitou passa a escrever um pedaço do seu comando (<code>x' OR '1'='1</code> mostrou até o produto escondido).</li>
+  <li>O primeiro sintoma costuma ser um apóstrofo (<code>copo d'água</code>) dando <code>syntax error</code>.</li>
+  <li>A solução: <code>$stmt = $pdo-&gt;prepare("… = ?")</code> e <code>$stmt-&gt;execute([$valor])</code>. O SQL é analisado antes; o valor vai separado e nunca vira código.</li>
+  <li>Marcadores: <code>?</code> (na ordem) ou <code>:nome</code> (por nome), <strong>sem aspas</strong>. No <code>LIKE</code>, o <code>%</code> vai no valor.</li>
+  <li><code>bindValue(…, PDO::PARAM_INT)</code> quando o tipo importa, como no <code>LIMIT</code>.</li>
+  <li>Marcador é só para <strong>valores</strong>. Nomes de coluna e tabela: lista de permitidas.</li>
+  <li>Nunca <code>addslashes</code> nem "tirar aspas na mão". O <code>htmlspecialchars</code> é para a saída, não para o banco.</li>
+  <li>Transação: <code>beginTransaction()</code> → comandos → <code>commit()</code>; no <code>catch</code>, <code>rollBack()</code>. Tudo ou nada.</li>
+</ul>
+
+<p>Próxima aula: <a href="mysql.html">MySQL e MariaDB</a>, para levar tudo isso para um servidor de banco de dados.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
