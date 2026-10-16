@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Interpolação — variáveis dentro de aspas duplas, {$var} e arrays | Guia PHP</title>
+<meta name="description" content="Como o PHP coloca o valor de variáveis dentro de textos com aspas duplas: $var, {$var}, {$arr['chave']}, {$obj->prop}, o que não é interpolado, os erros reais (Undefined variable, Parse error, Array to string conversion) e quando preferir concatenar ou usar sprintf.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Interpolação</span></h1>
+
+<p class="intro">Você já sabe juntar textos com o ponto: <code>"Olá, " . $nome . "!"</code>. Funciona, mas cansa e é fácil esquecer um ponto ou um espaço. O PHP tem um atalho: escrever a variável <strong>dentro</strong> das aspas duplas, e ele troca pelo valor. Isso se chama <strong>interpolação</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que <code>"Olá, $nome"</code> funciona e <code>'Olá, $nome'</code> não.</li>
+  <li>Como o PHP descobre onde termina o nome da variável, e como as chaves <code>{$var}</code> resolvem as dúvidas.</li>
+  <li>Arrays e objetos dentro do texto: <code>{$aluno['nome']}</code> e <code>{$aluna-&gt;nome}</code>.</li>
+  <li>O que <strong>não</strong> é interpolado: contas, funções, constantes.</li>
+  <li>Os erros reais e quando é melhor concatenar ou usar <code>sprintf</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: um formulário com lacunas</h2>
+<p>Pense num modelo de recado impresso: "Olá, ______! Sua nota foi ______." Você preenche as lacunas e entrega. Na interpolação, o texto entre aspas duplas é o modelo, e cada <code>$variavel</code> é uma lacuna que o PHP preenche com o valor <strong>no momento</strong> em que a linha roda.</p>
+
+<p>A palavra vem do latim <em>interpolare</em>, "inserir no meio". Em inglês: <em>string interpolation</em>.</p>
+
+<hr>
+
+<h2>Só nas aspas duplas</h2>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = "Ana";
+$idade = 29;
+echo "Olá, $nome! Você tem $idade anos.\n";
+echo 'Olá, $nome!', "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>"Olá, $nome! …"</dt><dd>Aspas <strong>duplas</strong>: o PHP procura <code>$</code> seguido de um nome e troca pelo valor da variável. O <code>\n</code> também vira uma quebra de linha.</dd>
+  <dt>'Olá, $nome!'</dt><dd>Aspas <strong>simples</strong>: o texto sai exatamente como está, com o cifrão e tudo. Nada é trocado.</dd>
+</dl>
+
+<pre class="term">$ php ola.php
+Olá, Ana! Você tem 29 anos.
+Olá, $nome!          « aspas simples: literal</pre>
+
+<p>O número <code>29</code> virou texto automaticamente (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). As diferenças entre os dois tipos de aspas estão em <a href="strings.html">Strings</a>; aqui o foco é o que pode ir dentro das duplas.</p>
+
+<hr>
+
+<h2>Onde o nome da variável termina?</h2>
+<p>Quando o PHP vê um <code>$</code> nas aspas duplas, ele lê o nome da variável <strong>enquanto houver letras, números ou <code>_</code></strong>. O primeiro caractere diferente (espaço, ponto, vírgula, <code>@</code>, <code>/</code>, <code>-</code>, aspa…) encerra o nome.</p>
+
+<pre class="file" data-file="fim-nome.php">&lt;?php
+$nome = "Ana";
+$total = 13.5;
+echo "Email: $nome@escola.com\n";
+echo "Arquivo: $nome.txt\n";
+echo "Pasta: /home/$nome/\n";
+echo "$nome's notebook\n";
+echo "R$ $total\n";
+echo "Custa $5\n";
+</pre>
+
+<pre class="term">$ php fim-nome.php
+Email: Ana@escola.com      « o @ encerrou o nome
+Arquivo: Ana.txt           « o ponto também
+Pasta: /home/Ana/
+Ana's notebook             « a aspa simples também
+R$ 13.5                    « "$ " (cifrão + espaço) não é variável: fica como está
+Custa $5                   « nome de variável não pode começar com número: fica como está</pre>
+
+<p>O problema aparece quando a palavra seguinte <strong>gruda</strong> no nome. A Ana quer escrever "Anas" (o plural de brincadeira):</p>
+
+<pre class="file" data-file="grudado.php">&lt;?php
+$nome = "Ana";
+echo "Total: $nomes\n";
+echo "Total: {$nome}s\n";
+</pre>
+
+<pre class="term">$ php grudado.php
+
+Warning: Undefined variable $nomes in /home/ana/php/grudado.php on line 3
+Total:                     « $nomes não existe: vira texto vazio
+Total: Anas                « com chaves: o nome acaba no }</pre>
+
+<p>O PHP leu <code>$nomes</code> inteiro, procurou essa variável, não achou, avisou com <code>Warning</code> e usou texto vazio. O programa continuou (é um aviso, não um erro fatal; veja <a href="erros.html">Lendo Erros do PHP</a>).</p>
+
+<h3>As chaves <code>{$…}</code></h3>
+<p>Colocar a variável entre <strong>chaves</strong> marca exatamente onde ela começa e termina. É a forma "completa" da interpolação, e funciona para tudo que você vai ver nesta aula.</p>
+
+<dl class="anatomy">
+  <dt>{</dt><dd>Abre. Precisa vir <strong>colado</strong> no <code>$</code>: <code>{$</code>.</dd>
+  <dt>$nome</dt><dd>A variável (ou um array, ou um objeto, como você vai ver).</dd>
+  <dt>}</dt><dd>Fecha. As chaves não aparecem na saída.</dd>
+  <dt>s</dt><dd>O texto que vem depois, grudado.</dd>
+</dl>
+
+<p>Se houver espaço entre <code>{</code> e <code>$</code>, as chaves viram texto comum:</p>
+<pre class="file" data-file="chaves.php">&lt;?php
+$nome = "Ana";
+echo "Com espaço: { $nome}\n";
+echo "Sem dólar: {nome}\n";
+</pre>
+<pre class="term">$ php chaves.php
+Com espaço: { Ana}         « as chaves apareceram; só o $nome foi trocado
+Sem dólar: {nome}          « sem $, nada acontece</pre>
+
+<div class="warning">
+<strong><code>"${nome}"</code>: forma antiga, obsoleta <span class="versao">PHP 8.2+</span></strong>
+<p>Códigos antigos usam o cifrão <strong>fora</strong> das chaves: <code>"${nome}s"</code>. Ainda funciona, mas desde o PHP 8.2 gera um aviso:</p>
+<pre class="term">$ php antigo.php
+
+Deprecated: Using ${var} in strings is deprecated, use {$var} instead in /home/ana/php/antigo.php on line 3
+Total: Anas</pre>
+<p>"Usar <code>${var}</code> em strings está obsoleto, use <code>{$var}</code>". Repare que o aviso aparece <strong>antes</strong> da saída: o PHP o detecta ao ler o arquivo, antes de rodar. Troque por <code>{$nome}</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Comprei 3 maçãs,semerro">
+<p class="try-task"><strong>Missão:</strong> o programa deveria mostrar <code>Comprei 3 maçãs</code>, mas aparece um aviso e a fruta some. Rode, leia o <code>Warning</code> e corrija usando chaves (a variável continua sendo <code>$fruta</code>, no singular).</p>
+<pre class="script">&lt;?php
+$fruta = "maçã";
+echo "Comprei 3 $frutas";
+</pre>
+<pre class="solucao">&lt;?php
+$fruta = "maçã";
+echo "Comprei 3 {$fruta}s";
+</pre>
+</div>
+
+<hr>
+
+<h2>Arrays dentro do texto</h2>
+<p>Com <a href="arrays-associativos.html">arrays associativos</a> (listas com "etiquetas", como <code>"nome"</code> e <code>"nota"</code>), existem duas formas que funcionam e uma que dá erro:</p>
+
+<pre class="file" data-file="array.php">&lt;?php
+$aluno = ["nome" =&gt; "Bruno", "nota" =&gt; 8.5];
+$frutas = ["maçã", "uva"];
+echo "Aluno: {$aluno['nome']}, nota {$aluno['nota']}\n";
+echo "Aluno: $aluno[nome], nota $aluno[nota]\n";
+echo "Fruta: $frutas[0] e {$frutas[1]}\n";
+</pre>
+
+<pre class="term">$ php array.php
+Aluno: Bruno, nota 8.5
+Aluno: Bruno, nota 8.5
+Fruta: maçã e uva</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Funciona?</th><th>Comentário</th></tr>
+<tr><td><code>"{$aluno['nome']}"</code></td><td>Sim</td><td><strong>A recomendada.</strong> Dentro das chaves, você escreve exatamente como escreveria fora das aspas.</td></tr>
+<tr><td><code>"$aluno[nome]"</code></td><td>Sim</td><td>Forma curta: <strong>sem</strong> aspas na chave. Só vale dentro de aspas duplas e só para um nível.</td></tr>
+<tr><td><code>"$aluno['nome']"</code></td><td><strong>Não</strong></td><td><code>Parse error</code> (veja abaixo).</td></tr>
+<tr><td><code>"$frutas[0]"</code></td><td>Sim</td><td>Índices numéricos funcionam nas duas formas.</td></tr>
+</table>
+</div>
+
+<p>A forma curta <code>$aluno[nome]</code> confunde, porque fora das aspas <code>$aluno[nome]</code> (sem aspas na chave) é um erro. Por isso, a recomendação é simples: <strong>array dentro do texto, sempre com chaves</strong>.</p>
+
+<h3>Arrays dentro de arrays</h3>
+<p>Para mais de um nível, só as chaves funcionam:</p>
+<pre class="file" data-file="turma.php">&lt;?php
+$turma = ["alunos" =&gt; [["nome" =&gt; "Bruno"]]];
+echo "Primeiro: {$turma['alunos'][0]['nome']}\n";
+echo "Primeiro: $turma[alunos][0][nome]\n";
+</pre>
+<pre class="term">$ php turma.php
+Primeiro: Bruno
+
+Warning: Array to string conversion in /home/ana/php/turma.php on line 4
+Primeiro: Array[0][nome]</pre>
+
+<p>Na segunda linha, a forma curta só leu <code>$turma[alunos]</code> (que é um array) e tratou <code>[0][nome]</code> como texto comum. Um array inteiro não pode virar texto: o PHP avisa "conversão de array para string" e escreve a palavra <code>Array</code>. (Arrays dentro de arrays são o assunto de <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>.)</p>
+
+<div class="tryphp" data-goal="out:Bruno tirou 8.5 em Matemática,src:\{\$aluno\[">
+<p class="try-task"><strong>Missão:</strong> usando o array <code>$aluno</code> e a forma com chaves (<code>{$aluno['…']}</code>), mostre <code>Bruno tirou 8.5 em Matemática</code>.</p>
+<pre class="script">&lt;?php
+$aluno = ["nome" =&gt; "Bruno", "nota" =&gt; 8.5, "materia" =&gt; "Matemática"];
+echo "nome tirou nota em materia";
+</pre>
+<pre class="solucao">&lt;?php
+$aluno = ["nome" =&gt; "Bruno", "nota" =&gt; 8.5, "materia" =&gt; "Matemática"];
+echo "{$aluno['nome']} tirou {$aluno['nota']} em {$aluno['materia']}";
+</pre>
+</div>
+
+<hr>
+
+<h2>Objetos dentro do texto</h2>
+<p>Um <strong>objeto</strong> é parecido com um array associativo, mas os dados (as <strong>propriedades</strong>) são acessados com a setinha <code>-&gt;</code>. Você vai criar os seus em <a href="classes-objetos.html">Classes e Objetos</a>; aqui usamos o objeto "genérico" do PHP, o <code>stdClass</code>, só para ver a interpolação.</p>
+
+<pre class="file" data-file="objeto.php">&lt;?php
+$aluna = new stdClass();
+$aluna-&gt;nome = "Ana";
+$aluna-&gt;cidade = "Recife";
+echo "Professora: $aluna-&gt;nome, de $aluna-&gt;cidade\n";
+echo "Professora: {$aluna-&gt;nome}\n";
+</pre>
+<pre class="term">$ php objeto.php
+Professora: Ana, de Recife
+Professora: Ana</pre>
+
+<p>Como nos arrays, a forma sem chaves só vai <strong>um nível</strong>. Se a propriedade for outro objeto (<code>$aluna-&gt;endereco-&gt;cidade</code>), ou se você quiser chamar um método (<code>$aluna-&gt;apresentar()</code>), use chaves: <code>"{$aluna-&gt;endereco-&gt;cidade}"</code>, <code>"{$aluna-&gt;apresentar()}"</code>. Sem chaves, o PHP para no primeiro nível e tenta transformar o objeto inteiro em texto, o que dá erro fatal:</p>
+
+<pre class="term">$ php objeto2.php
+
+Fatal error: Uncaught Error: Object of class stdClass could not be converted to string in /home/ana/php/objeto2.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/objeto2.php on line 6</pre>
+
+<hr>
+
+<h2>O que <strong>não</strong> é interpolado</h2>
+<p>A interpolação troca <strong>variáveis</strong>. Ela não faz contas, não chama funções soltas e não conhece constantes:</p>
+
+<pre class="file" data-file="nao.php">&lt;?php
+const ESCOLA = "Escola Sol";
+$preco = 4.5;
+$qtd = 3;
+echo "Escola: ESCOLA\n";
+echo "Nome: {strtoupper('ana')}\n";
+echo "Total: $preco * $qtd\n";
+echo "Total: " . $preco * $qtd . "\n";
+</pre>
+<pre class="term">$ php nao.php
+Escola: ESCOLA                  « constante: fica o nome, literal
+Nome: {strtoupper('ana')}       « { sem $ logo depois: texto comum
+Total: 4.5 * 3                  « trocou as variáveis, mas a conta não foi feita
+Total: 13.5                     « fora das aspas, com concatenação, a conta funciona</pre>
+
+<p>E se você tentar fazer a conta dentro das chaves?</p>
+<pre class="file" data-file="conta.php">&lt;?php
+$qtd = 3;
+echo "Total: {$qtd * 2}\n";
+</pre>
+<pre class="term">$ php conta.php
+
+Parse error: syntax error, unexpected token "*", expecting "-&gt;" or "?-&gt;" or "[" in /home/ana/php/conta.php on line 3</pre>
+<p>"Erro de sintaxe: <code>*</code> inesperado; esperava <code>-&gt;</code>, <code>?-&gt;</code> ou <code>[</code>". Dentro de <code>{$…}</code>, o PHP só aceita uma variável seguida de <code>[…]</code> (array) ou <code>-&gt;</code> (objeto). Faça a conta antes, numa variável (<code>$total = $qtd * 2;</code>), ou concatene.</p>
+
+<h3>Valores que viram texto de um jeito estranho</h3>
+<pre class="file" data-file="tipos.php">&lt;?php
+$nada = null;
+$sim = true;
+$nao = false;
+$lista = [1, 2];
+echo "null:[$nada] true:[$sim] false:[$nao]\n";
+echo "Lista: $lista\n";
+</pre>
+<pre class="term">$ php tipos.php
+null:[] true:[1] false:[]
+
+Warning: Array to string conversion in /home/ana/php/tipos.php on line 7
+Lista: Array</pre>
+<p><code>null</code> e <code>false</code> viram texto vazio; <code>true</code> vira <code>"1"</code>. Um array inteiro vira a palavra <code>Array</code>, com aviso. Para mostrar uma lista, junte-a antes com <code>implode</code> (veja <a href="funcoes-string.html">Funções de String</a>).</p>
+
+<hr>
+
+<h2>Caracteres especiais nas aspas duplas</h2>
+<p>Além das variáveis, as aspas duplas entendem <strong>sequências de escape</strong>: uma barra invertida seguida de uma letra.</p>
+
+<pre class="file" data-file="escapes.php">&lt;?php
+$nome = "Ana";
+echo "Barra: \\ Aspas: \" Tab:[\t] Dólar: \$nome\n";
+echo "Unicode: \u{e9} \u{1F600}\n";
+</pre>
+<pre class="term">$ php escapes.php
+Barra: \ Aspas: " Tab:[	] Dólar: $nome
+Unicode: é 😀</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escreva</th><th>Para obter</th></tr>
+<tr><td><code>\n</code></td><td>Quebra de linha</td></tr>
+<tr><td><code>\t</code></td><td>Tab</td></tr>
+<tr><td><code>\"</code></td><td>Aspa dupla dentro das aspas duplas</td></tr>
+<tr><td><code>\\</code></td><td>Uma barra invertida</td></tr>
+<tr><td><code>\$</code></td><td>Um cifrão literal (impede a interpolação)</td></tr>
+<tr><td><code>\u{e9}</code></td><td>Um caractere pelo código Unicode (<code>é</code>)</td></tr>
+</table>
+</div>
+
+<p>Para escrever <code>{$</code> literalmente, use <code>{\$</code>.</p>
+
+<hr>
+
+<h2>Interpolar, concatenar ou <code>sprintf</code>?</h2>
+<p>As três formas abaixo produzem a mesma frase:</p>
+
+<pre class="file" data-file="formas.php">&lt;?php
+$nome = "Ana";
+$nota = 9.5;
+echo "Aluna $nome tirou $nota.\n";
+echo 'Aluna ' . $nome . ' tirou ' . $nota . ".\n";
+echo sprintf("Aluna %s tirou %.1f.\n", $nome, $nota);
+</pre>
+<pre class="term">$ php formas.php
+Aluna Ana tirou 9.5.
+Aluna Ana tirou 9.5.
+Aluna Ana tirou 9.5.</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Prefira</th><th>Exemplo</th></tr>
+<tr><td>Frase com variáveis simples</td><td>Interpolação</td><td><code>"Olá, $nome!"</code></td></tr>
+<tr><td>Arrays, objetos ou texto grudado</td><td>Interpolação com chaves</td><td><code>"Nota: {$aluno['nota']}"</code></td></tr>
+<tr><td>Contas ou chamadas de função</td><td>Concatenação</td><td><code>"Total: " . $preco * $qtd</code>, <code>"Nome: " . mb_strtoupper($nome)</code></td></tr>
+<tr><td>Números com casas decimais fixas, zeros à esquerda, colunas</td><td><code>sprintf</code>/<code>printf</code></td><td><code>sprintf("%.2f", $preco)</code></td></tr>
+<tr><td>Texto longo, várias linhas (HTML, e-mail)</td><td>Heredoc</td><td>veja <a href="heredoc.html">Heredoc e Nowdoc</a></td></tr>
+<tr><td>Texto fixo, sem variáveis</td><td>Aspas simples ou duplas</td><td>Tanto faz; muitos preferem simples para deixar claro que não há variáveis</td></tr>
+</table>
+</div>
+
+<p><code>sprintf</code> e <code>printf</code> têm uma aula só para eles: <a href="sprintf.html">printf e sprintf</a>.</p>
+
+<div class="warning">
+<strong>Interpolação não protege contra HTML malicioso</strong>
+<p>Quando a variável vem do usuário (um formulário, por exemplo) e vai para uma página web, <code>"&lt;p&gt;Olá, $nome&lt;/p&gt;"</code> é perigoso: se alguém digitar código HTML no nome, ele vai parar na página. Escape antes: <code>$nome = htmlspecialchars($nome);</code>. O porquê está em <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Undefined variable $nomes</strong>
+<pre class="term">$ php grudado.php
+
+Warning: Undefined variable $nomes in /home/ana/php/grudado.php on line 3
+Total: </pre>
+<p><strong>O que significa:</strong> o PHP leu um nome de variável maior do que você queria, porque o texto seguinte estava grudado. A variável não existe e vira texto vazio.</p>
+<p><strong>Como consertar:</strong> <code>"{$nome}s"</code>. Se o nome estava mesmo errado (um erro de digitação), corrija o nome.</p>
+</div>
+
+<div class="cenario">
+<strong>Parse error com aspas na chave do array</strong>
+<pre class="file" data-file="aspas-chave.php">&lt;?php
+$aluno = ["nome" =&gt; "Bruno"];
+echo "Aluno: $aluno['nome']\n";
+</pre>
+<pre class="term">$ php aspas-chave.php
+
+Parse error: syntax error, unexpected string content "", expecting "-" or identifier or variable or number in /home/ana/php/aspas-chave.php on line 3</pre>
+<p><strong>O que significa:</strong> na forma curta (sem chaves), o PHP espera a chave do array <strong>sem</strong> aspas. As aspas simples confundiram a leitura. <em>Parse error</em> quer dizer que o PHP nem começou a rodar: o arquivo inteiro foi recusado.</p>
+<p><strong>Como consertar:</strong> <code>"Aluno: {$aluno['nome']}"</code>. O mesmo vale para aspas duplas na chave (<code>"$aluno["nome"]"</code>), que dão <code>unexpected double-quote mark</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Array to string conversion</strong>
+<pre class="term">$ php tipos.php
+null:[] true:[1] false:[]
+
+Warning: Array to string conversion in /home/ana/php/tipos.php on line 7
+Lista: Array</pre>
+<p><strong>O que significa:</strong> você colocou um array inteiro no texto (ou a forma curta parou no meio de um array dentro de array).</p>
+<p><strong>Como consertar:</strong> pegue um item (<code>{$lista[0]}</code>), junte com <code>implode(", ", $lista)</code> antes, ou use chaves para os vários níveis.</p>
+</div>
+
+<div class="cenario">
+<strong>A saída mostra <code>$nome</code> em vez do valor</strong>
+<pre class="term">$ php ola.php
+Olá, Ana! Você tem 29 anos.
+Olá, $nome!          « a segunda linha usa aspas simples</pre>
+<p><strong>O que significa:</strong> o texto está entre aspas <strong>simples</strong>. Não é erro: o PHP fez o que foi pedido.</p>
+<p><strong>Como consertar:</strong> troque por aspas duplas, ou concatene: <code>'Olá, ' . $nome</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dentro de <code>"…"</code></th><th>Resultado</th><th>Observação</th></tr>
+<tr><td><code>$var</code></td><td>O valor</td><td>O nome vai até o primeiro caractere que não é letra, número ou <code>_</code></td></tr>
+<tr><td><code>{$var}</code></td><td>O valor</td><td>Delimita o nome: <code>"{$nome}s"</code></td></tr>
+<tr><td><code>$arr[chave]</code> / <code>$arr[0]</code></td><td>Um item</td><td>Forma curta, um nível, chave sem aspas</td></tr>
+<tr><td><code>{$arr['chave']}</code></td><td>Um item</td><td>Recomendada; aceita vários níveis</td></tr>
+<tr><td><code>$obj-&gt;prop</code></td><td>Uma propriedade</td><td>Forma curta, um nível</td></tr>
+<tr><td><code>{$obj-&gt;a-&gt;b}</code>, <code>{$obj-&gt;metodo()}</code></td><td>Propriedade aninhada, método</td><td>Só com chaves</td></tr>
+<tr><td><code>${var}</code></td><td>O valor + <code>Deprecated</code></td><td>Obsoleto desde o 8.2</td></tr>
+<tr><td><code>CONSTANTE</code>, <code>funcao()</code>, <code>$a * $b</code></td><td>Não interpolados</td><td>Concatene</td></tr>
+<tr><td><code>\$</code>, <code>\"</code>, <code>\\</code>, <code>\n</code>, <code>\t</code>, <code>\u{…}</code></td><td>Escapes</td><td>Só nas aspas duplas (e no heredoc)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Texto grudado</h3>
+<p>Complete para mostrar <code>Bom dia, Anas!</code> sendo <code>$nome = "Ana"</code>:</p>
+<div class="ex-code">echo "Bom dia, <input data-answer="{$nome}" aria-label="variável">s!";</div>
+</div>
+
+<div class="exercise">
+<h3>2. Item do array</h3>
+<p>Complete com a forma recomendada para mostrar a nota do aluno:</p>
+<div class="ex-code">echo "Nota: <input data-answer="{$aluno['nota']}|{$aluno[&quot;nota&quot;]}" aria-label="item">";</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>$fruta = "uva";</code>, o que mostra <code>echo 'Comprei $fruta';</code>?</p>
+<label><input type="radio" name="q3"> <code>Comprei uva</code></label>
+<label><input type="radio" name="q3"> <code>Comprei $fruta</code></label>
+<label><input type="radio" name="q3"> <code>Comprei </code> e um aviso</label>
+<label><input type="radio" name="q3"> Parse error</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Com <code>$qtd = 2;</code>, o que mostra <code>echo "Dobro: $qtd * 2";</code>?</p>
+<label><input type="radio" name="q4"> <code>Dobro: 4</code></label>
+<label><input type="radio" name="q4"> <code>Dobro: $qtd * 2</code></label>
+<label><input type="radio" name="q4"> Parse error</label>
+<label><input type="radio" name="q4"> <code>Dobro: 2 * 2</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas linhas dá <code>Parse error</code>?</p>
+<label><input type="radio" name="q5"> <code>echo "Oi, {$aluno['nome']}";</code></label>
+<label><input type="radio" name="q5"> <code>echo "Oi, $aluno[nome]";</code></label>
+<label><input type="radio" name="q5"> <code>echo "Oi, $aluno['nome']";</code></label>
+<label><input type="radio" name="q5"> <code>echo "Oi, " . $aluno['nome'];</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:3 x maçã = R$ 13.5,src:\{\$item\[">
+<p class="try-task"><strong>Missão final:</strong> na lojinha da Ana, mostre o recibo <code>3 x maçã = R$ 13.5</code> usando as variáveis (nada de escrever "maçã" ou "13.5" à mão). Lembre: a conta não é feita dentro das aspas. Calcule o total numa variável antes e use <code>{$item['fruta']}</code> para o nome.</p>
+<pre class="script">&lt;?php
+$item = ["fruta" =&gt; "maçã", "preco" =&gt; 4.5];
+$qtd = 3;
+echo "$qtd x $item = R$ $qtd * $item";
+</pre>
+<pre class="solucao">&lt;?php
+$item = ["fruta" =&gt; "maçã", "preco" =&gt; 4.5];
+$qtd = 3;
+$total = $qtd * $item['preco'];
+echo "$qtd x {$item['fruta']} = R$ $total";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Interpolação: nas aspas <strong>duplas</strong>, <code>$var</code> é trocada pelo valor. Nas simples, não.</li>
+  <li>O nome da variável vai até o primeiro caractere que não é letra, número ou <code>_</code>. Texto grudado? Use <code>{$var}</code>.</li>
+  <li>Arrays e objetos: prefira sempre as chaves, <code>{$aluno['nome']}</code> e <code>{$aluna-&gt;nome}</code>. A forma curta só vai um nível e não aceita aspas na chave.</li>
+  <li><code>"${var}"</code> é obsoleto desde o PHP 8.2.</li>
+  <li>Contas, funções e constantes não são interpoladas: calcule antes, concatene ou use <code>sprintf</code>.</li>
+  <li><code>null</code>/<code>false</code> viram vazio, <code>true</code> vira <code>1</code>, array vira <code>Array</code> com aviso.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
