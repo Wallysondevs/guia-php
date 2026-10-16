@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Introdução — o que é PHP e para que serve | Guia PHP</title>
+<meta name="description" content="O que é PHP, para que serve, onde é usado (WordPress, Laravel, a maioria dos sites), a história desde a Personal Home Page de Rasmus Lerdorf em 1994, PHP comparado com JavaScript e Python, e o que você vai conseguir fazer com o guia.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Introdução</span></h1>
+
+<p class="intro">O <strong>PHP</strong> é uma linguagem de programação feita para construir <strong>sites que mudam sozinhos</strong>: páginas que mostram o seu nome depois do login, o seu carrinho de compras, os comentários mais recentes. Ele roda no <strong>servidor</strong> (o computador onde o site mora), monta a página e a entrega pronta para o navegador. Nesta aula você vai entender o que isso quer dizer, onde o PHP é usado, de onde ele veio e como ele se compara com outras linguagens famosas.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma linguagem de programação e o que é o PHP.</li>
+  <li>A diferença entre uma página <strong>estática</strong> e uma página <strong>dinâmica</strong>.</li>
+  <li>Onde o PHP é usado: WordPress, Laravel, lojas, sistemas de escola, APIs.</li>
+  <li>A história do nome: de "Personal Home Page" a "PHP: Hypertext Preprocessor".</li>
+  <li>Como o PHP se compara com o JavaScript e o Python.</li>
+  <li>O que você vai conseguir fazer ao terminar o guia.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Primeiro: o que é programar?</h2>
+<p>Um computador não "entende" nada sozinho. Ele só sabe seguir instruções, uma de cada vez, muito rápido. <strong>Programar</strong> é escrever essas instruções. Uma <strong>linguagem de programação</strong> é o idioma combinado entre você e o computador: um conjunto de palavras e símbolos com regras rígidas (onde vai o ponto e vírgula, onde abrem e fecham as aspas).</p>
+
+<p>Pense numa receita de bolo. Ela tem uma lista de passos, em ordem: "pré-aqueça o forno", "misture os ovos com o açúcar", "se a massa estiver grossa, acrescente leite". Um programa é igual: uma lista de passos, alguns com decisões ("se…") e repetições ("bata até ficar homogêneo"). A diferença é que o computador segue a receita <strong>ao pé da letra</strong>. Se você escrever "açúcer", ele não adivinha que era "açúcar": ele para e reclama. Essas reclamações são as <strong>mensagens de erro</strong>, e o guia vai ensinar você a lê-las.</p>
+
+<p>O programa que lê o seu código PHP e executa as instruções também se chama <code>php</code>. Ele é um <strong>interpretador</strong>: lê o arquivo de cima para baixo e vai fazendo o que está escrito. Você não precisa "transformar" o código antes de rodar, como em algumas linguagens (o Java e o C, por exemplo, precisam ser <strong>compilados</strong> antes).</p>
+
+<hr>
+
+<h2>Página estática × página dinâmica</h2>
+<p>Para entender para que o PHP serve, compare dois tipos de página da web.</p>
+
+<p>Uma página <strong>estática</strong> é um arquivo HTML comum (HTML é a linguagem que descreve o conteúdo de uma página: títulos, parágrafos, imagens, links). Ela é como um <strong>cartaz impresso</strong>: todo mundo que olha vê exatamente a mesma coisa. Para mudar o texto, alguém precisa editar o arquivo à mão.</p>
+
+<p>Uma página <strong>dinâmica</strong> é como um <strong>atendente de balcão</strong>: cada pessoa que chega recebe uma resposta montada para ela. O atendente pergunta o nome, consulta o estoque, confere o horário e só então responde. É isso que o PHP faz: a cada visita, ele roda o seu código e <strong>monta</strong> o HTML na hora.</p>
+
+<p>Veja os dois na prática. A Ana tem, na pasta <code>site</code>, um arquivo estático <code>oi.html</code> e um arquivo PHP <code>oi.php</code>:</p>
+
+<pre class="file" data-file="oi.html">&lt;p&gt;Olá, visitante!&lt;/p&gt;
+</pre>
+
+<pre class="file" data-file="oi.php">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+</pre>
+
+<p>Você ainda não precisa entender o <code>oi.php</code> por inteiro; cada pedaço tem a sua aula. Por enquanto, a ideia geral:</p>
+
+<dl class="anatomy">
+  <dt>&lt;?php … ?&gt;</dt><dd>Um trecho de código PHP. Tudo o que está fora dessas marcas é HTML comum, que o PHP manda para o navegador sem mexer.</dd>
+  <dt>$nome = …</dt><dd>Cria uma <strong>variável</strong> chamada <code>$nome</code>: uma "caixinha" com um valor dentro (aula <a href="variaveis.html">Variáveis</a>).</dd>
+  <dt>$_GET["nome"] ?? "visitante"</dt><dd>Pega o nome que veio no endereço da página (<code>?nome=Ana</code>); se não veio nenhum, usa <code>"visitante"</code> (aulas <a href="get-post.html">$_GET e $_POST</a> e <a href="null-coalescing.html">?? e ?-&gt;</a>).</dd>
+  <dt>&lt;?= … ?&gt;</dt><dd>Escreve um valor no meio do HTML.</dd>
+  <dt>htmlspecialchars(…)</dt><dd>Uma proteção: impede que alguém mal-intencionado coloque código no lugar do nome. O guia usa essa proteção desde o começo (aula <a href="escapar-saida.html">Escapar a Saída</a>).</dd>
+</dl>
+
+<p>Agora a Ana liga o servidor de testes do PHP (o <code>php -S</code>, que você vai conhecer em <a href="servidor-embutido.html">O Servidor Embutido</a>) e pede as páginas com o <code>curl</code>, um programa de terminal que faz o mesmo pedido que um navegador faria e mostra o HTML recebido:</p>
+
+<pre class="term">$ curl "localhost:8000/oi.php?nome=Ana"
+&lt;p&gt;Olá, Ana!&lt;/p&gt;                  « o PHP montou a página com o nome da Ana
+$ curl "localhost:8000/oi.php?nome=Bruno"
+&lt;p&gt;Olá, Bruno!&lt;/p&gt;                « o mesmo arquivo, outra resposta
+$ curl "localhost:8000/oi.php"
+&lt;p&gt;Olá, visitante!&lt;/p&gt;            « sem nome no endereço: o valor padrão
+$ curl "localhost:8000/oi.html?nome=Ana"
+&lt;p&gt;Olá, visitante!&lt;/p&gt;            « a página estática ignora o nome: é sempre igual</pre>
+
+<p>Um único arquivo <code>oi.php</code> gerou três páginas diferentes. Agora imagine que, em vez do nome vindo no endereço, o PHP buscasse num banco de dados os produtos da loja, as notas do aluno ou as mensagens novas. É exatamente assim que funcionam as lojas virtuais, os portais de notícia e as redes sociais.</p>
+
+<p>Repare também no que <strong>não</strong> apareceu: nenhum <code>&lt;?php</code>, nenhum <code>$nome</code>. O navegador recebe só o HTML pronto. O código PHP fica guardado no servidor, longe dos olhos de quem visita. A aula <a href="como-funciona.html">Como o PHP Funciona</a> detalha esse caminho.</p>
+
+<p>Experimente a mesma página aqui. Esta caixa funciona em <strong>modo web</strong>: o código é tratado como uma página, aberta no endereço <code>/index.php?nome=Ana</code>.</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=Ana" data-goal="html:Bom dia\, Ana!">
+<p class="try-task"><strong>Missão:</strong> rode e veja <code>Olá, Ana!</code>. Depois troque a palavra <code>Olá</code> por <code>Bom dia</code> (só no HTML, fora do PHP) e rode de novo. A página deve dizer <code>Bom dia, Ana!</code>.</p>
+<pre class="script">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+?&gt;
+&lt;p&gt;Bom dia, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Onde o PHP é usado</h2>
+<p>O PHP está em todo lugar da web, mesmo que você nunca tenha reparado:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde</th><th>O que é</th></tr>
+<tr><td><strong>WordPress</strong></td><td>O sistema de sites e blogs mais usado do mundo, escrito em PHP. Segundo a W3Techs, <strong>39,7% de todos os sites</strong> da internet usam WordPress (levantamento de 16 de outubro de 2026).</td></tr>
+<tr><td><strong>Laravel</strong> e <strong>Symfony</strong></td><td><strong>Frameworks</strong> PHP: "kits" prontos para criar sistemas grandes (lojas, painéis, APIs) sem reinventar login, rotas e banco de dados.</td></tr>
+<tr><td><strong>Wikipédia</strong></td><td>Roda no MediaWiki, um sistema escrito em PHP.</td></tr>
+<tr><td><strong>Moodle</strong></td><td>Plataforma de ensino a distância usada por escolas e universidades, inclusive no Brasil.</td></tr>
+<tr><td><strong>Lojas virtuais</strong></td><td>WooCommerce (uma extensão do WordPress), Magento e muitas lojas brasileiras.</td></tr>
+<tr><td><strong>Sistemas sob medida</strong></td><td>Cadastros de clientes, agendamentos, intranets de empresas, sistemas de prefeituras.</td></tr>
+<tr><td><strong>APIs</strong></td><td>O "lado do servidor" de aplicativos de celular: o app pede dados, o PHP responde em JSON (aula <a href="api-json.html">Criar uma API JSON</a>).</td></tr>
+</table>
+</div>
+
+<p>Em números: segundo a W3Techs, o PHP é usado em <strong>69,4%</strong> dos sites cuja linguagem do servidor é conhecida (levantamento de 16 de outubro de 2026). Ou seja, de cada dez sites em que dá para saber a linguagem, uns sete usam PHP. Muita gente diz que "o PHP morreu" desde os anos 2000; os números dizem o contrário.</p>
+
+<div class="note">
+<strong>De onde vêm esses números</strong>
+<p>A <a href="https://w3techs.com/technologies/details/pl-php">W3Techs</a> é uma empresa que visita os sites mais acessados do mundo e anota quais tecnologias cada um usa. Os números mudam um pouco a cada mês. Por isso o guia sempre diz a data. Se você ler isto anos depois, confira o valor atual no próprio site.</p>
+</div>
+
+<h3>PHP sozinho, sem página nenhuma</h3>
+<p>O PHP também roda fora da web, direto no terminal, como uma linguagem comum: para processar planilhas, mandar e-mails agendados, limpar arquivos, fazer contas. É por aí que o guia começa, porque é o jeito mais simples de ver um programa funcionando. A aula <a href="linha-comando.html">PHP na Linha de Comando</a> mostra esse uso.</p>
+
+<hr>
+
+<h2>Um pouco de história</h2>
+<p>A história do PHP explica muito do jeito dele. Ele não foi planejado por um comitê: nasceu como uma ferramenta pessoal e cresceu porque resolvia problemas reais.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ano</th><th>O que aconteceu</th></tr>
+<tr><td>1994</td><td><strong>Rasmus Lerdorf</strong>, um programador nascido na Groenlândia e criado na Dinamarca, escreve pequenos programas para saber quantas pessoas visitavam o currículo dele na internet. Ele chama o conjunto de <strong>Personal Home Page Tools</strong>, "ferramentas para página pessoal". Daí a sigla <strong>PHP</strong>.</td></tr>
+<tr><td>1995</td><td>Rasmus publica as ferramentas na internet, de graça e com o código aberto, para quem quisesse usar e melhorar.</td></tr>
+<tr><td>1997–1998</td><td>Dois estudantes israelenses, <strong>Andi Gutmans</strong> e <strong>Zeev Suraski</strong>, reescrevem o coração da linguagem. Sai o <strong>PHP 3</strong>, e o nome muda para <strong>PHP: Hypertext Preprocessor</strong> ("pré-processador de hipertexto").</td></tr>
+<tr><td>2000</td><td><strong>PHP 4</strong>, com o motor <strong>Zend Engine</strong> (o nome junta <em>Zeev</em> e <em>Andi</em>).</td></tr>
+<tr><td>2004</td><td><strong>PHP 5</strong>: orientação a objetos de verdade e o PDO para bancos de dados.</td></tr>
+<tr><td>2015</td><td><strong>PHP 7</strong>: cerca de duas vezes mais rápido que o 5. (Houve um PHP 6, mas o projeto foi abandonado antes de ser lançado; por isso o número foi pulado.)</td></tr>
+<tr><td>2020</td><td><strong>PHP 8.0</strong>: <code>match</code>, argumentos nomeados, atributos e o compilador JIT.</td></tr>
+<tr><td>2021</td><td>Nasce a <strong>PHP Foundation</strong>, que paga desenvolvedores para cuidar da linguagem.</td></tr>
+<tr><td>2025</td><td><strong>PHP 8.5</strong> (20 de novembro): operador pipe <code>|&gt;</code>, <code>array_first</code>, <code>array_last</code> e mais. É a versão que este guia ensina.</td></tr>
+</table>
+</div>
+
+<h3>Um nome que se explica sozinho</h3>
+<p>Repare em "<strong>P</strong>HP: <strong>H</strong>ypertext <strong>P</strong>reprocessor". A primeira letra da sigla é a própria sigla: PHP quer dizer "PHP: Hypertext Preprocessor", que quer dizer "PHP: Hypertext Preprocessor"… Isso se chama <strong>acrônimo recursivo</strong>, uma brincadeira comum entre programadores (o GNU, do Linux, também é um: "GNU's Not Unix").</p>
+
+<p>E o que é "pré-processador de hipertexto"? <strong>Hipertexto</strong> é texto com links, ou seja, HTML (<em>HyperText Markup Language</em>). <strong>Pré-processar</strong> é trabalhar no texto <strong>antes</strong> de ele ir para o navegador. O nome descreve exatamente o que você viu no <code>oi.php</code>: o PHP mexe no HTML antes da entrega.</p>
+
+<div class="tip">
+<strong>Por que o PHP tem fama de "bagunçado"?</strong>
+<p>Como cresceu aos poucos, o PHP antigo acumulou nomes de funções sem padrão (<code>strlen</code>, <code>str_replace</code>, <code>htmlspecialchars</code>) e comportamentos que surpreendiam. O PHP moderno (do 7 em diante, e principalmente do 8) corrigiu muito disso: tem tipos, erros mais claros e recursos de linguagens modernas. Este guia ensina o PHP de hoje e avisa quando uma coisa antiga ainda pode aparecer em código que você encontrar por aí.</p>
+</div>
+
+<hr>
+
+<h2>PHP, JavaScript e Python</h2>
+<p>Quem começa a estudar programação quase sempre ouve falar dessas três linguagens. Elas não são rivais: cada uma brilha num lugar, e muitos sites usam PHP e JavaScript juntos.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>PHP</th><th>JavaScript</th><th>Python</th></tr>
+<tr><td><strong>Onde roda, na web</strong></td><td>No <strong>servidor</strong></td><td>No <strong>navegador</strong> (e também no servidor, com Node.js)</td><td>No servidor</td></tr>
+<tr><td><strong>Feito para</strong></td><td>Montar páginas e sistemas web</td><td>Deixar a página interativa (menus, animações, validar campos antes de enviar)</td><td>Uso geral: ciência de dados, automação, inteligência artificial, web</td></tr>
+<tr><td><strong>Quem vê o código</strong></td><td>Só o dono do servidor</td><td>Qualquer visitante (o navegador baixa o código)</td><td>Só o dono do servidor</td></tr>
+<tr><td><strong>Olá, mundo</strong></td><td><code>&lt;?php echo "Olá";</code></td><td><code>console.log("Olá");</code></td><td><code>print("Olá")</code></td></tr>
+<tr><td><strong>Variáveis</strong></td><td>Começam com <code>$</code>: <code>$nome</code></td><td><code>let nome</code></td><td><code>nome</code></td></tr>
+<tr><td><strong>Fim da instrução</strong></td><td><code>;</code> obrigatório</td><td><code>;</code> opcional</td><td>Sem <code>;</code>; a quebra de linha termina</td></tr>
+<tr><td><strong>Para publicar um site</strong></td><td>Quase toda hospedagem barata já tem PHP: copiou os arquivos, funcionou</td><td>No navegador, nada a instalar; no servidor, precisa de Node.js</td><td>Precisa de um servidor configurado para Python</td></tr>
+<tr><td><strong>Projetos famosos</strong></td><td>WordPress, Laravel, Wikipédia</td><td>React, Vue, quase todo site moderno</td><td>Django, Instagram (servidor), bibliotecas de IA</td></tr>
+</table>
+</div>
+
+<p>Resumindo: o <strong>PHP</strong> prepara a página no servidor; o <strong>JavaScript</strong> dá vida a ela depois que chega ao navegador; o <strong>Python</strong> é um "canivete suíço" que também faz web. Aprender PHP primeiro tem uma vantagem para quem quer fazer sites: o caminho do código até uma página publicada é curto e fácil de entender. E o que você aprende aqui (variáveis, decisões, repetições, funções) vale para qualquer outra linguagem.</p>
+
+<div class="note">
+<strong>Preciso saber HTML antes?</strong>
+<p>Ajuda, mas não é obrigatório. O Nível 1 começa com programas de terminal, que não usam HTML. Quando o HTML aparece, o guia explica as marcas usadas (<code>&lt;p&gt;</code> é parágrafo, <code>&lt;h1&gt;</code> é título, <code>&lt;ul&gt;</code> e <code>&lt;li&gt;</code> são listas). Se quiser se aprofundar, qualquer curso básico de HTML de uma ou duas tardes basta.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>Ainda não escrevemos programas, mas há três confusões muito comuns em quem está começando a mexer com PHP:</p>
+
+<div class="cenario">
+<strong>Abri o arquivo <code>.php</code> com dois cliques e apareceu o código (ou o navegador quis baixar o arquivo)</strong>
+<p><strong>O que aconteceu:</strong> o navegador abriu o arquivo direto do disco (o endereço começa com <code>file://</code>). Sem um servidor, ninguém rodou o PHP: o navegador tratou o arquivo como texto ou HTML comum, e mostrou o código cru (ou um pedaço dele).</p>
+<p><strong>Como resolver:</strong> o PHP precisa de alguém que o execute. No terminal: <code>php oi.php</code>. Como página: ligue o servidor com <code>php -S localhost:8000</code> e abra <code>http://localhost:8000/oi.php</code>. Veja <a href="servidor-embutido.html">O Servidor Embutido</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Cliquei em Exibir código-fonte e não achei o meu PHP"</strong>
+<p><strong>O que aconteceu:</strong> não é erro, é o normal. O navegador só recebe o HTML que o PHP <strong>gerou</strong>. O código PHP nunca sai do servidor. Isso é bom: senhas do banco de dados e regras do sistema ficam escondidas de quem visita o site.</p>
+<p><strong>Como ver o código:</strong> abra o arquivo <code>.php</code> no seu editor de código (aula <a href="editores.html">Editores e IDEs</a>), não no navegador.</p>
+</div>
+
+<div class="cenario">
+<strong>"Coloquei PHP num arquivo <code>.html</code> e não funcionou"</strong>
+<pre class="file" data-file="teste.html e teste.php (mesmo conteúdo)">&lt;p&gt;Olá, &lt;?= "Ana" ?&gt;!&lt;/p&gt;
+</pre>
+<pre class="term">$ curl localhost:8000/teste.html
+&lt;p&gt;Olá, &lt;?= "Ana" ?&gt;!&lt;/p&gt;          « entregue como está: o PHP nem foi chamado
+$ curl localhost:8000/teste.php
+&lt;p&gt;Olá, Ana!&lt;/p&gt;                     « passou pelo PHP</pre>
+<p><strong>O que aconteceu:</strong> os servidores só passam pelo PHP os arquivos terminados em <code>.php</code>. Um <code>.html</code> é entregue como está, com o <code>&lt;?=</code> e tudo. No navegador, o resultado parece ainda mais estranho: ele trata <code>&lt;?= "Ana" ?&gt;</code> como uma marca que não conhece e a esconde, e a página mostra só <code>Olá, !</code>.</p>
+<p><strong>Como resolver:</strong> renomeie o arquivo para <code>.php</code>.</p>
+</div>
+
+<hr>
+
+<h2>O que você vai conseguir fazer</h2>
+<p>Ao terminar cada nível do guia, você vai saber:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ao terminar</th><th>Você consegue</th></tr>
+<tr><td><strong>Nível 1 · Iniciante</strong></td><td>Escrever programas que guardam valores, fazem contas, trabalham com textos, tomam decisões, repetem tarefas e organizam listas. Misturar PHP com HTML para gerar páginas.</td></tr>
+<tr><td><strong>Nível 2 · Intermediário</strong></td><td>Criar suas próprias funções, receber e validar formulários, lembrar quem fez login (sessões e cookies), ler e gravar arquivos, CSV e JSON, e guardar dados num banco com PDO, de forma segura.</td></tr>
+<tr><td><strong>Nível 3 · Avançado</strong></td><td>Organizar sistemas grandes com classes, interfaces e enums, usar o Composer e bibliotecas prontas, escrever testes automáticos, proteger senhas e formulários, criar e consumir APIs.</td></tr>
+<tr><td><strong>Projetos</strong></td><td>Juntar tudo: calculadora web, formulário de contato, login, lista de tarefas com SQLite, mini blog e uma API REST.</td></tr>
+</table>
+</div>
+
+<p>Depois disso, aprender um framework como o Laravel ou mexer no código de um tema do WordPress fica natural, porque você vai entender o PHP que está por baixo.</p>
+
+<p>Para fechar, rode o seu primeiro programa da aula. Ele está em <strong>modo terminal</strong>: a saída é texto puro, como no comando <code>php</code>.</p>
+
+<div class="tryphp" data-goal="out:Meu nome é,out:e eu vou aprender PHP!">
+<p class="try-task"><strong>Missão:</strong> o programa já escreve a primeira linha. Complete a segunda: troque <code>???</code> pelo seu nome, para a saída ficar <code>Meu nome é Ana e eu vou aprender PHP!</code> (com o seu nome no lugar de Ana).</p>
+<pre class="script">&lt;?php
+echo "Olá! Este é o meu primeiro programa.\n";
+echo "Meu nome é ??? e eu vou aprender PHP\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Olá! Este é o meu primeiro programa.\n";
+echo "Meu nome é Ana e eu vou aprender PHP!\n";
+</pre>
+</div>
+
+<p>O <code>\n</code> no fim de cada texto é a quebra de linha: ele faz a segunda frase começar numa linha nova. Tente apagar o primeiro <code>\n</code> e rodar: as duas frases ficam grudadas.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Onde o código PHP de um site é executado?</p>
+<label><input type="radio" name="q1"> No navegador de quem visita o site.</label>
+<label><input type="radio" name="q1"> No servidor, antes de a página ser enviada.</label>
+<label><input type="radio" name="q1"> No celular, depois que a página chega.</label>
+<label><input type="radio" name="q1"> Em lugar nenhum: o navegador mostra o código.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Você abre o código-fonte de uma página feita em PHP. O que você vê?</p>
+<label><input type="radio" name="q2"> O código PHP completo, com <code>&lt;?php</code> e variáveis.</label>
+<label><input type="radio" name="q2"> Uma mensagem dizendo que o código é secreto.</label>
+<label><input type="radio" name="q2"> Só o HTML que o PHP gerou.</label>
+<label><input type="radio" name="q2"> Nada: páginas PHP não têm código-fonte.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. O que significava a sigla PHP quando Rasmus Lerdorf a criou, em 1994?</p>
+<label><input type="radio" name="q3"> Personal Home Page</label>
+<label><input type="radio" name="q3"> PHP: Hypertext Preprocessor</label>
+<label><input type="radio" name="q3"> Programming Hypertext Pages</label>
+<label><input type="radio" name="q3"> Pre-Hypertext Processor</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destas tarefas é típica do JavaScript no navegador, e não do PHP?</p>
+<label><input type="radio" name="q4"> Buscar os produtos no banco de dados.</label>
+<label><input type="radio" name="q4"> Conferir a senha no login.</label>
+<label><input type="radio" name="q4"> Montar o HTML da lista de notícias.</label>
+<label><input type="radio" name="q4"> Abrir um menu quando o visitante clica num botão, sem recarregar a página.</label>
+</div>
+
+<div class="exercise">
+<h3>5. A extensão certa</h3>
+<p>Para o servidor passar o arquivo pelo PHP, o nome dele deve terminar em qual extensão? Complete:</p>
+<div class="ex-code">pagina<input data-answer=".php|php" aria-label="extensão"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Programar é escrever instruções para o computador; o PHP é uma linguagem de programação, e o programa <code>php</code> é o interpretador que as executa.</li>
+  <li>O PHP roda no <strong>servidor</strong> e gera páginas <strong>dinâmicas</strong>: o mesmo arquivo responde diferente a cada visita.</li>
+  <li>O navegador recebe só o HTML gerado; o código PHP nunca sai do servidor.</li>
+  <li>O PHP está em <strong>69,4%</strong> dos sites com linguagem conhecida e o WordPress em <strong>39,7%</strong> de todos os sites (W3Techs, 16/10/2026).</li>
+  <li>Nasceu em 1994 como <em>Personal Home Page Tools</em>, de Rasmus Lerdorf; desde o PHP 3 se chama <em>PHP: Hypertext Preprocessor</em>.</li>
+  <li>PHP (servidor), JavaScript (navegador) e Python (uso geral) se complementam.</li>
+  <li>Próximo passo: entender o caminho de uma página, do navegador ao PHP e de volta, em <a href="como-funciona.html">Como o PHP Funciona</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
