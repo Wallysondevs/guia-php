@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Namespaces — namespace, use e nomes qualificados | Guia PHP</title>
+<meta name="description" content="Namespaces no PHP: o problema dos nomes repetidos, a palavra namespace, use e use ... as, nomes totalmente qualificados, a barra na frente de \strlen e \DateTime, use function, use const, um namespace por arquivo e pastas que espelham o namespace, com erros reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Namespaces</span></h1>
+
+<p class="intro">Quando um projeto cresce, os nomes começam a se repetir: a lojinha da Ana tem uma classe <code>Produto</code>, o blog dela também quer uma classe <code>Produto</code> (o produto que aparece num post), e uma biblioteca baixada da internet pode trazer mais uma. O PHP não aceita duas classes com o mesmo nome. Os <strong>namespaces</strong> (em português, "espaços de nomes") resolvem isso: cada parte do código ganha um "sobrenome", e <code>Loja\Produto</code> deixa de brigar com <code>Blog\Produto</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que duas classes com o mesmo nome dão erro, e como o namespace resolve.</li>
+  <li>A declaração <code>namespace</code> e o nome completo de uma classe (<code>Loja\Produto</code>).</li>
+  <li>Os três jeitos de escrever um nome: não qualificado, qualificado e <strong>totalmente qualificado</strong> (com <code>\</code> na frente).</li>
+  <li>O <code>use</code> (importar), o <code>use … as</code> (apelido), o <code>use function</code> e o <code>use const</code>.</li>
+  <li>Por que <code>strlen</code> funciona dentro de um namespace, mas <code>new DateTime</code> não (e o que o <code>\</code> faz).</li>
+  <li>A regra "um namespace por arquivo" e a organização em pastas que prepara o <a href="autoload.html">autoload</a>.</li>
+</ul>
+</div>
+
+<p>Esta aula supõe que você já sabe criar <a href="classes-objetos.html">classes e objetos</a> e juntar arquivos com <a href="include-require.html">include e require</a>. Todas as saídas foram geradas no PHP 8.5 do laboratório, na máquina da Ana (<code>ana@notebook</code>).</p>
+
+<hr>
+
+<h2>A ideia: sobrenomes para o código</h2>
+<p>Numa sala de aula com duas alunas chamadas Maria, a professora passa a usar o sobrenome: "Maria Souza" e "Maria Lima". Ninguém mudou de nome; só ficou claro de quem se está falando.</p>
+<p>O namespace é o sobrenome do código. Uma classe <code>Produto</code> declarada no namespace <code>Loja</code> passa a se chamar, por extenso, <code>Loja\Produto</code>. Outra, no namespace <code>Blog</code>, se chama <code>Blog\Produto</code>. São duas classes diferentes, que convivem no mesmo programa.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dia a dia</th><th>PHP</th></tr>
+<tr><td>Sobrenome da família</td><td>O namespace: <code>Loja</code></td></tr>
+<tr><td>Nome</td><td>O nome da classe: <code>Produto</code></td></tr>
+<tr><td>Nome completo, "Maria Souza"</td><td>O nome totalmente qualificado: <code>\Loja\Produto</code></td></tr>
+<tr><td>Dentro de casa, todo mundo chama só de "Maria"</td><td>Dentro do namespace <code>Loja</code>, basta escrever <code>Produto</code></td></tr>
+<tr><td>Apelido, para não confundir</td><td><code>use Blog\Produto as Post;</code></td></tr>
+</table>
+</div>
+
+<p>O separador é a <strong>barra invertida</strong> <code>\</code> (a mesma dos caminhos do Windows), e não a barra normal <code>/</code>. Ela foi escolhida porque não tinha outro uso no PHP.</p>
+
+<hr>
+
+<h2>O problema: dois <code>Produto</code> no mesmo programa</h2>
+<p>A Ana tem dois arquivos. O <code>loja.php</code> declara a classe da lojinha:</p>
+
+<pre class="file" data-file="loja.php">&lt;?php
+class Produto
+{
+    public function __construct(public string $nome) {}
+}
+</pre>
+
+<p>O <code>blog.php</code> declara outra classe com o mesmo nome, para os produtos citados nos posts:</p>
+
+<pre class="file" data-file="blog.php">&lt;?php
+class Produto
+{
+    public string $titulo = "Post patrocinado";
+}
+</pre>
+
+<p>Um terceiro arquivo usa os dois:</p>
+
+<pre class="file" data-file="conflito.php">&lt;?php
+require 'loja.php';
+require 'blog.php';
+echo "fim\n";
+</pre>
+
+<pre class="term">$ php conflito.php
+
+Fatal error: Cannot redeclare class Produto (previously declared in /home/ana/ns/loja.php:2) in /home/ana/ns/blog.php on line 2
+Stack trace:
+#0 /home/ana/ns/conflito.php(3): require()
+#1 {main}</pre>
+
+<p>A mensagem diz: "não é possível declarar de novo a classe Produto (ela já foi declarada em <code>loja.php</code>, linha 2), em <code>blog.php</code>, linha 2". O programa parou ali: o <code>fim</code> nunca apareceu. O <em>stack trace</em> ("rastro da pilha") mostra o caminho: foi o <code>require</code> da linha 3 de <code>conflito.php</code> que carregou o arquivo com o problema.</p>
+<p>Sem namespaces, a única saída seria renomear uma das classes para algo como <code>BlogProduto</code>. Era assim que o PHP antigo fazia (nomes compridos como <code>Zend_Db_Table_Abstract</code>). Desde o PHP 5.3 existe um jeito melhor.</p>
+
+<hr>
+
+<h2>Declarando um namespace</h2>
+<p>A primeira linha de código do arquivo diz a qual namespace ele pertence:</p>
+
+<pre class="file" data-file="n1.php">&lt;?php
+namespace Loja;
+
+class Produto
+{
+    public function __construct(public string $nome) {}
+}
+
+function preco(float $valor): string
+{
+    return "R$ " . number_format($valor, 2, ",", ".");
+}
+
+const MOEDA = "BRL";
+
+$p = new Produto("Caneca");
+echo $p-&gt;nome, "\n";
+echo preco(19.9), "\n";
+echo MOEDA, "\n";
+echo Produto::class, "\n";
+echo __NAMESPACE__, "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>namespace Loja;</dt><dd>"Tudo o que for declarado daqui para baixo pertence ao namespace <code>Loja</code>." Termina com ponto e vírgula, como uma instrução.</dd>
+  <dt>class Produto</dt><dd>O nome completo dessa classe passa a ser <code>Loja\Produto</code>.</dd>
+  <dt>function preco</dt><dd>Funções também entram no namespace: o nome completo é <code>Loja\preco</code>.</dd>
+  <dt>const MOEDA</dt><dd>Constantes criadas com <code>const</code> também: <code>Loja\MOEDA</code>. (Constantes criadas com <code>define()</code> <strong>não</strong> entram no namespace, a não ser que você escreva o nome completo dentro do <code>define</code>.)</dd>
+  <dt>new Produto(…)</dt><dd>Dentro do próprio namespace, basta o nome curto. O PHP completa sozinho para <code>Loja\Produto</code>.</dd>
+  <dt>Produto::class</dt><dd>Devolve o nome completo da classe, como texto. Ótimo para conferir onde uma classe "mora".</dd>
+  <dt>__NAMESPACE__</dt><dd>Constante mágica com o nome do namespace atual (vazia fora de um namespace).</dd>
+</dl>
+
+<pre class="term">$ php n1.php
+Caneca
+R$ 19,90
+BRL
+Loja\Produto        « o nome completo da classe
+Loja                « o namespace atual</pre>
+
+<p>Repare que nada muda na hora de usar a classe dentro do arquivo: o namespace só acrescenta o "sobrenome" por fora. Variáveis (<code>$p</code>) <strong>nunca</strong> entram em namespaces; só classes (e também interfaces, traits e enums), funções e constantes.</p>
+
+<h3>Nomes com várias partes</h3>
+<p>Um namespace pode ter vários níveis, separados por <code>\</code>, como pastas dentro de pastas: <code>namespace Loja\Pagamento;</code>, <code>namespace AnaSilva\Blog\Comentarios;</code>. O costume é começar pelo nome do autor ou da empresa (o "fornecedor", <em>vendor</em> em inglês) e depois o projeto. Você vai ver isso de novo no <a href="composer.html">Composer</a>.</p>
+
+<hr>
+
+<h2>Usando a classe de outro arquivo</h2>
+<p>Agora a Ana organiza os arquivos em pastas, uma para cada namespace:</p>
+
+<pre>ns2/
+├── index.php
+└── src/
+    ├── Blog/
+    │   └── Produto.php      « namespace Blog
+    └── Loja/
+        ├── Produto.php      « namespace Loja
+        └── funcoes.php      « namespace Loja (funções e constante)</pre>
+
+<pre class="file" data-file="src/Loja/Produto.php">&lt;?php
+namespace Loja;
+
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {}
+}
+</pre>
+
+<pre class="file" data-file="src/Blog/Produto.php">&lt;?php
+namespace Blog;
+
+class Produto
+{
+    public function __construct(public string $titulo) {}
+}
+</pre>
+
+<p>O <code>index.php</code> não tem namespace (está no "namespace global", o espaço sem sobrenome). Para usar as classes, ele pode escrever o nome completo, com uma barra na frente:</p>
+
+<pre class="file" data-file="fqn.php">&lt;?php
+require __DIR__ . '/src/Loja/Produto.php';
+
+$caneca = new \Loja\Produto("Caneca", 19.9);
+$outra = new Loja\Produto("Camiseta", 49.9);
+echo $caneca-&gt;nome, " e ", $outra-&gt;nome, "\n";
+</pre>
+
+<pre class="term">$ php fqn.php
+Caneca e Camiseta</pre>
+
+<p>As duas formas funcionaram, mas por motivos diferentes. Para entender, você precisa conhecer os três tipos de nome.</p>
+
+<h3>Os três tipos de nome</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Exemplo</th><th>Como o PHP lê</th></tr>
+<tr><td><strong>Não qualificado</strong> (sem barra nenhuma)</td><td><code>Produto</code></td><td>"<code>Produto</code> do namespace onde eu estou" (ou o que um <code>use</code> disser)</td></tr>
+<tr><td><strong>Qualificado</strong> (tem barra no meio)</td><td><code>Loja\Produto</code></td><td>"<code>Loja\Produto</code> <em>a partir</em> do namespace onde eu estou" (é relativo, como um caminho de pasta sem <code>/</code> na frente)</td></tr>
+<tr><td><strong>Totalmente qualificado</strong> (começa com barra)</td><td><code>\Loja\Produto</code></td><td>"Exatamente <code>Loja\Produto</code>, a partir da raiz". Nunca muda, esteja onde estiver</td></tr>
+</table>
+</div>
+
+<p>No <code>fqn.php</code>, como o arquivo está no namespace global, <code>Loja\Produto</code> "a partir do global" é o mesmo que <code>\Loja\Produto</code>. Mas veja o que acontece quando o arquivo tem o seu próprio namespace:</p>
+
+<pre class="file" data-file="relativo.php">&lt;?php
+namespace App;
+
+require __DIR__ . '/src/Loja/Produto.php';
+
+$caneca = new Loja\Produto("Caneca", 19.9);
+</pre>
+
+<pre class="term">$ php relativo.php
+
+Fatal error: Uncaught Error: Class "App\Loja\Produto" not found in /home/ana/ns2/relativo.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/ns2/relativo.php on line 6</pre>
+
+<p>O nome qualificado foi lido a partir de <code>App</code>, e virou <code>App\Loja\Produto</code>, que não existe. A barra na frente (<code>new \Loja\Produto</code>) ou um <code>use</code> resolvem. A comparação com pastas ajuda: <code>\Loja\Produto</code> é como <code>/home/ana/foto.png</code> (caminho absoluto); <code>Loja\Produto</code> é como <code>Documentos/foto.png</code> (depende de onde você está).</p>
+
+<hr>
+
+<h2><code>use</code>: importar um nome</h2>
+<p>Escrever <code>\Loja\Produto</code> toda vez cansa. O <code>use</code> ("usar") cria um atalho: depois de <code>use Loja\Produto;</code>, o nome curto <code>Produto</code>, naquele arquivo, quer dizer <code>Loja\Produto</code>.</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+require __DIR__ . '/src/Loja/Produto.php';
+require __DIR__ . '/src/Loja/funcoes.php';
+require __DIR__ . '/src/Blog/Produto.php';
+
+use Loja\Produto;
+use Blog\Produto as Post;
+use function Loja\formatar_preco;
+use const Loja\MOEDA;
+
+$caneca = new Produto("Caneca", 19.9);
+$post = new Post("Review da caneca");
+
+echo $caneca-&gt;nome, ": ", formatar_preco($caneca-&gt;preco), "\n";
+echo $post-&gt;titulo, "\n";
+echo get_class($caneca), " e ", get_class($post), "\n";
+echo "Moeda: ", MOEDA, "\n";
+</pre>
+
+<p>O arquivo <code>src/Loja/funcoes.php</code> tem uma constante e uma função no namespace <code>Loja</code>:</p>
+
+<pre class="file" data-file="src/Loja/funcoes.php">&lt;?php
+namespace Loja;
+
+const MOEDA = "R$";
+
+function formatar_preco(float $valor): string
+{
+    return MOEDA . " " . number_format($valor, 2, ",", ".");
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>use Loja\Produto;</dt><dd>Neste arquivo, <code>Produto</code> significa <code>Loja\Produto</code>. O nome no <code>use</code> é sempre lido como totalmente qualificado: a barra da frente é opcional (<code>use \Loja\Produto;</code> funciona igual, mas ninguém escreve).</dd>
+  <dt>use Blog\Produto as Post;</dt><dd>Importa com um <strong>apelido</strong> (<code>as</code> = "como"). <code>Post</code> significa <code>Blog\Produto</code>. É assim que as duas classes <code>Produto</code> convivem no mesmo arquivo.</dd>
+  <dt>use function Loja\formatar_preco;</dt><dd>Importa uma <strong>função</strong>. Sem a palavra <code>function</code>, o <code>use</code> importa só classes (e interfaces, traits, enums).</dd>
+  <dt>use const Loja\MOEDA;</dt><dd>Importa uma <strong>constante</strong>.</dd>
+  <dt>get_class($caneca)</dt><dd>Mostra o nome completo da classe do objeto.</dd>
+</dl>
+
+<pre class="term">$ php index.php
+Caneca: R$ 19,90
+Review da caneca
+Loja\Produto e Blog\Produto      « duas classes diferentes, sem conflito
+Moeda: R$</pre>
+
+<div class="warning">
+<strong>O <code>use</code> não carrega arquivo nenhum</strong>
+<p>É o erro de entendimento mais comum. O <code>use</code> só cria um <strong>atalho de nome</strong>; quem carrega o código ainda é o <code>require</code>. Se você tirar os <code>require</code> do exemplo, o PHP vai dizer que a classe não existe. Na próxima aula, o <a href="autoload.html">autoload</a> faz o PHP carregar os arquivos sozinho, e aí sim os <code>require</code> somem.</p>
+</div>
+
+<h3>Onde o <code>use</code> vale</h3>
+<ul>
+  <li>O <code>use</code> fica no <strong>topo do arquivo</strong>, logo depois do <code>namespace</code> (se houver), fora de funções e classes.</li>
+  <li>Ele vale <strong>só para aquele arquivo</strong>. Um <code>use</code> no <code>index.php</code> não vale dentro de um arquivo incluído por ele: cada arquivo faz os seus.</li>
+  <li>Ele só afeta os nomes que você escreve <strong>no código</strong>. Nomes dentro de textos (por exemplo, <code>new $nomeDaClasse</code> com <code>$nomeDaClasse = "Produto"</code>) são sempre lidos como nome completo, sem olhar os <code>use</code>.</li>
+</ul>
+
+<h3>Agrupando vários <code>use</code></h3>
+<p>Quando você importa várias coisas do mesmo namespace, pode agrupar com chaves:</p>
+
+<pre class="file" data-file="grupo-exemplo.php">&lt;?php
+use Loja\{Produto, Carrinho, Pedido};
+// é o mesmo que:
+// use Loja\Produto;
+// use Loja\Carrinho;
+// use Loja\Pedido;
+
+use Blog\{Produto as Post, Comentario};
+</pre>
+
+<p>As duas formas são equivalentes. Muitos projetos preferem um <code>use</code> por linha, porque fica mais fácil ver, numa comparação de versões, o que foi acrescentado ou removido.</p>
+
+<div class="tryphp" data-goal="out:Blog\Produto,semerro">
+<p class="try-task"><strong>Missão:</strong> o <code>index.php</code> já usa a classe <code>Produto</code> da loja. Importe também a classe <code>Produto</code> do arquivo <code>blog.php</code> com o apelido <code>Post</code> e descomente as duas últimas linhas. A saída deve mostrar <code>Blog\Produto</code>. (Tente primeiro <code>use Blog\Produto;</code>, sem apelido, para ver o erro.)</p>
+<pre class="script" data-file="index.php">&lt;?php
+require 'loja.php';
+require 'blog.php';
+
+use Loja\Produto;
+
+$caneca = new Produto("Caneca");
+echo get_class($caneca), ": ", $caneca-&gt;nome, "\n";
+
+// $post = new Post("Review da caneca");
+// echo get_class($post), ": ", $post-&gt;titulo, "\n";
+</pre>
+<pre class="script" data-file="loja.php">&lt;?php
+namespace Loja;
+
+class Produto
+{
+    public function __construct(public string $nome) {}
+}
+</pre>
+<pre class="script" data-file="blog.php">&lt;?php
+namespace Blog;
+
+class Produto
+{
+    public function __construct(public string $titulo) {}
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require 'loja.php';
+require 'blog.php';
+
+use Loja\Produto;
+use Blog\Produto as Post;
+
+$caneca = new Produto("Caneca");
+echo get_class($caneca), ": ", $caneca-&gt;nome, "\n";
+
+$post = new Post("Review da caneca");
+echo get_class($post), ": ", $post-&gt;titulo, "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2 id="strlen">Funções globais: <code>strlen</code> e <code>\strlen</code></h2>
+<p>As funções e classes que vêm com o PHP (<code>strlen</code>, <code>count</code>, <code>DateTime</code>, <code>Exception</code>…) moram no <strong>namespace global</strong>, o de nome vazio. O nome completo de <code>strlen</code> é <code>\strlen</code>. O que acontece quando você as usa dentro do seu namespace?</p>
+
+<pre class="file" data-file="n3.php">&lt;?php
+namespace Loja;
+
+echo strlen("Caneca"), "\n";
+echo \strlen("Caneca"), "\n";
+$hoje = new DateTime("2026-10-16");
+echo $hoje-&gt;format("d/m/Y"), "\n";
+</pre>
+
+<pre class="term">$ php n3.php
+6
+6
+
+Fatal error: Uncaught Error: Class "Loja\DateTime" not found in /home/ana/ns/n3.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/ns/n3.php on line 6</pre>
+
+<p>As funções funcionaram; a classe, não. A diferença é uma regra do PHP chamada <strong>recuo para o global</strong> (<em>fallback</em>):</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você escreve, dentro de <code>namespace Loja</code></th><th>O PHP procura</th></tr>
+<tr><td>Uma <strong>função</strong> não qualificada: <code>strlen(…)</code></td><td>Primeiro <code>Loja\strlen</code>; se não existir, <strong>recua</strong> para a global <code>\strlen</code></td></tr>
+<tr><td>Uma <strong>constante</strong> não qualificada: <code>PHP_EOL</code></td><td>Primeiro <code>Loja\PHP_EOL</code>; se não existir, recua para <code>\PHP_EOL</code></td></tr>
+<tr><td>Uma <strong>classe</strong> não qualificada: <code>new DateTime</code></td><td><strong>Só</strong> <code>Loja\DateTime</code>. Classes <strong>não</strong> recuam</td></tr>
+</table>
+</div>
+
+<p>Por isso, dentro de um namespace, toda classe do PHP precisa da barra na frente ou de um <code>use</code>:</p>
+
+<pre class="file" data-file="n4.php">&lt;?php
+namespace Loja;
+
+$hoje = new \DateTime("2026-10-16");
+echo $hoje-&gt;format("d/m/Y"), "\n";
+</pre>
+
+<pre class="term">$ php n4.php
+16/10/2026</pre>
+
+<p>Ou, com <code>use</code> no topo: <code>use DateTime;</code> e depois <code>new DateTime(…)</code>. O mesmo vale para <code>\Exception</code>, <code>\PDO</code>, <code>\InvalidArgumentException</code>, <code>\ArrayObject</code>… Esse é o erro número 1 de quem começa a usar namespaces, principalmente em <code>catch (Exception $e)</code>, que dentro de um namespace procura <code>Loja\Exception</code> (e, como essa classe não existe, o <code>catch</code> simplesmente não pega nada).</p>
+
+<div class="tip">
+<strong>Por que alguns projetos escrevem <code>\strlen()</code> com barra?</strong>
+<p>Não é obrigatório: o recuo encontra a função. Mas com a barra o PHP não precisa "tentar <code>Loja\strlen</code> primeiro", e o OPcache (o otimizador que vem com o PHP) consegue trocar algumas funções, como <code>\strlen</code> e <code>\count</code>, por instruções mais rápidas. A diferença é pequena; o mais importante é seguir o estilo do projeto. Ferramentas de estilo (veja <a href="psr.html">Padrões PSR</a>) podem colocar as barras automaticamente.</p>
+</div>
+
+<hr>
+
+<h2>Um namespace por arquivo</h2>
+<p>O PHP permite declarar vários namespaces no mesmo arquivo (com chaves: <code>namespace Loja { … }</code> e <code>namespace Blog { … }</code>), mas <strong>ninguém faz isso</strong> em projetos de verdade. A regra prática, seguida por todo o ecossistema PHP, é:</p>
+<ol>
+  <li><strong>Um arquivo, um namespace</strong>, declarado logo no começo.</li>
+  <li><strong>Uma classe por arquivo</strong>, e o arquivo tem o nome da classe: <code>Produto.php</code> contém <code>class Produto</code>.</li>
+  <li><strong>As pastas imitam o namespace</strong>: <code>Loja\Pagamento\Pix</code> fica em <code>src/Loja/Pagamento/Pix.php</code>.</li>
+</ol>
+<p>A regra 3 parece só capricho, mas é o que permite ao PHP <strong>descobrir sozinho</strong> em qual arquivo está cada classe. Essa é a próxima aula: <a href="autoload.html">Autoload e PSR-4</a>.</p>
+
+<h3>O <code>namespace</code> tem que vir primeiro</h3>
+<p>Antes da linha <code>namespace</code> só pode haver o <code>&lt;?php</code>, comentários e o <code>declare(strict_types=1);</code>. Qualquer outra coisa dá erro:</p>
+
+<pre class="file" data-file="n2.php">&lt;?php
+echo "Olá\n";
+namespace Loja;
+</pre>
+
+<pre class="term">$ php n2.php
+
+Fatal error: Namespace declaration statement has to be the very first statement or after any declare call in the script in /home/ana/ns/n2.php on line 3
+Stack trace:
+#0 {main}</pre>
+
+<p>Tradução: "a declaração de namespace precisa ser a primeiríssima instrução do script, ou vir logo depois de um <code>declare</code>". O começo padrão de um arquivo moderno fica assim:</p>
+
+<pre class="file" data-file="src/Loja/Carrinho.php">&lt;?php
+
+declare(strict_types=1);
+
+namespace Loja;
+
+use DateTimeImmutable;
+use Loja\Pagamento\Pix;
+
+class Carrinho
+{
+    // ...
+}
+</pre>
+
+<p>A ordem é sempre: <code>&lt;?php</code> → <code>declare</code> → <code>namespace</code> → <code>use</code> → o código. (O <code>declare(strict_types=1)</code> é explicado em <a href="tipos-avancados.html">Tipos Avançados</a>.) Atenção também a espaços ou linhas em branco <strong>antes</strong> do <code>&lt;?php</code>: eles contam como saída de HTML e também disparam o erro.</p>
+
+<hr>
+
+<h2>Formas de se referir a uma classe: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td><code>use</code> no topo + nome curto</td><td><code>use Loja\Produto;</code> … <code>new Produto</code></td><td><strong>O padrão.</strong> Deixa claro, no topo, de quais classes o arquivo depende.</td></tr>
+<tr><td><code>use … as</code></td><td><code>use Blog\Produto as Post;</code></td><td>Dois nomes iguais no mesmo arquivo, ou um nome muito genérico.</td></tr>
+<tr><td>Totalmente qualificado</td><td><code>new \Loja\Produto</code>, <code>new \DateTime</code></td><td>Uso único e rápido; classes do PHP dentro de um namespace (se você não quiser um <code>use</code>).</td></tr>
+<tr><td>Qualificado (relativo)</td><td><code>new Pagamento\Pix</code> dentro de <code>namespace Loja</code></td><td>Raramente. Funciona, mas confunde; prefira <code>use</code>.</td></tr>
+<tr><td>Nome como texto</td><td><code>$c = "Loja\\Produto"; new $c(…)</code></td><td>Nome decidido em tempo de execução. Sempre o nome completo, sem a barra da frente; dentro de aspas duplas, a barra precisa ser dobrada (ou use <code>Produto::class</code>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Class "Produto" not found (esqueceu o <code>use</code>)</strong>
+<pre class="file" data-file="sem-use.php">&lt;?php
+require __DIR__ . '/src/Loja/Produto.php';
+
+$caneca = new Produto("Caneca", 19.9);
+</pre>
+<pre class="term">$ php sem-use.php
+
+Fatal error: Uncaught Error: Class "Produto" not found in /home/ana/ns2/sem-use.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/ns2/sem-use.php on line 4</pre>
+<p><strong>O que significa:</strong> o arquivo foi carregado, mas a classe se chama <code>Loja\Produto</code>, e o PHP procurou <code>Produto</code> no namespace global. Leia o nome entre aspas na mensagem: ele mostra <strong>exatamente</strong> o nome completo que o PHP procurou.</p>
+<p><strong>Como consertar:</strong> <code>use Loja\Produto;</code> no topo, ou <code>new \Loja\Produto(…)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Class "Loja\DateTime" not found</strong>
+<p><strong>O que significa:</strong> dentro de <code>namespace Loja</code>, você usou uma classe do próprio PHP sem barra. Classes não recuam para o global (veja <a href="#strlen">a seção sobre <code>strlen</code></a>, acima).</p>
+<p><strong>Como consertar:</strong> <code>new \DateTime(…)</code> ou <code>use DateTime;</code> no topo.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>catch</code> não pegou a exceção</strong>
+<pre class="file" data-file="catch.php">&lt;?php
+namespace Loja;
+
+try {
+    throw new \Exception("Deu ruim");
+} catch (Exception $e) {
+    echo "peguei\n";
+}
+echo "fim\n";
+</pre>
+<pre class="term">$ php catch.php
+
+Fatal error: Uncaught Exception: Deu ruim in /home/ana/ns3/catch.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/ns3/catch.php on line 5</pre>
+<p><strong>O que significa:</strong> o <code>catch (Exception $e)</code>, dentro de <code>namespace Loja</code>, espera uma <code>Loja\Exception</code>. Essa classe não existe, mas o PHP <strong>não reclama</strong> disso no <code>catch</code>: ele só não pega nada, e a exceção escapa ("Uncaught" = não capturada). Nem o <code>peguei</code> nem o <code>fim</code> apareceram.</p>
+<p><strong>Como consertar:</strong> <code>catch (\Exception $e)</code> ou <code>use Exception;</code> no topo. Veja <a href="excecoes.html">Exceções</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Class "App\Loja\Produto" not found (nome qualificado lido como relativo)</strong>
+<p><strong>O que significa:</strong> você escreveu <code>Loja\Produto</code> (sem barra na frente) dentro de <code>namespace App</code>, e o PHP o leu como <code>App\Loja\Produto</code>. O nome na mensagem entrega o problema: tem um pedaço a mais na frente.</p>
+<p><strong>Como consertar:</strong> <code>use Loja\Produto;</code> ou <code>\Loja\Produto</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot use … because the name is already in use</strong>
+<pre class="file" data-file="dois-use.php">&lt;?php
+require __DIR__ . '/src/Loja/Produto.php';
+require __DIR__ . '/src/Blog/Produto.php';
+
+use Loja\Produto;
+use Blog\Produto;
+</pre>
+<pre class="term">$ php dois-use.php
+
+Fatal error: Cannot use Blog\Produto as Produto because the name is already in use in /home/ana/ns2/dois-use.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "não é possível usar <code>Blog\Produto</code> como <code>Produto</code>, porque esse nome já está em uso". Os dois <code>use</code> tentaram criar o mesmo atalho. Repare que o erro aparece antes de qualquer linha rodar: é um erro de compilação.</p>
+<p><strong>Como consertar:</strong> dê um apelido a um deles: <code>use Blog\Produto as Post;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Call to undefined function formatar_preco()</strong>
+<pre class="term">$ php funcao-sem-use.php
+
+Fatal error: Uncaught Error: Call to undefined function formatar_preco() in /home/ana/ns2/funcao-sem-use.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/ns2/funcao-sem-use.php on line 4</pre>
+<p><strong>O que significa:</strong> a função está em <code>Loja\formatar_preco</code>, e o arquivo (no namespace global) chamou só <code>formatar_preco</code>. Um <code>use Loja\Produto</code> não serviria: <code>use</code> sem <code>function</code> não importa funções.</p>
+<p><strong>Como consertar:</strong> <code>use function Loja\formatar_preco;</code> ou <code>\Loja\formatar_preco(10)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Namespace declaration statement has to be the very first statement</strong>
+<p><strong>O que significa:</strong> há código, HTML ou até um espaço/linha em branco antes do <code>&lt;?php</code> ou entre ele e o <code>namespace</code>. (Arquivos salvos com "UTF-8 com BOM", uma marca invisível no começo do arquivo, também causam isso.)</p>
+<p><strong>Como consertar:</strong> deixe só <code>&lt;?php</code>, comentários e <code>declare(…)</code> antes do <code>namespace</code>. No editor, salve como "UTF-8" (sem BOM).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>namespace Loja;</code></td><td>Coloca o resto do arquivo no namespace <code>Loja</code></td></tr>
+<tr><td><code>namespace Loja\Pagamento;</code></td><td>Namespace com vários níveis</td></tr>
+<tr><td><code>use Loja\Produto;</code></td><td>Atalho: <code>Produto</code> = <code>Loja\Produto</code></td></tr>
+<tr><td><code>use Blog\Produto as Post;</code></td><td>Atalho com apelido</td></tr>
+<tr><td><code>use Loja\{Produto, Carrinho};</code></td><td>Vários atalhos do mesmo namespace</td></tr>
+<tr><td><code>use function Loja\formatar_preco;</code></td><td>Atalho para uma função</td></tr>
+<tr><td><code>use const Loja\MOEDA;</code></td><td>Atalho para uma constante</td></tr>
+<tr><td><code>\Loja\Produto</code></td><td>Nome totalmente qualificado (absoluto)</td></tr>
+<tr><td><code>\strlen()</code>, <code>\DateTime</code></td><td>Função/classe do namespace global</td></tr>
+<tr><td><code>Produto::class</code></td><td>O nome completo, como texto: <code>"Loja\Produto"</code></td></tr>
+<tr><td><code>__NAMESPACE__</code></td><td>O namespace atual, como texto</td></tr>
+<tr><td><code>namespace\funcao()</code></td><td>"Do namespace atual", escrito de forma explícita (raro)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar o namespace</h3>
+<p>Complete a primeira linha de código para a classe <code>Aluno</code> se chamar <code>Escola\Aluno</code>:</p>
+<div class="ex-code">&lt;?php<br><input data-answer="namespace Escola;" aria-label="declaração"><br>class Aluno {}</div>
+</div>
+
+<div class="exercise">
+<h3>2. Importar com apelido</h3>
+<p>Complete para que, neste arquivo, <code>Post</code> signifique <code>Blog\Produto</code>:</p>
+<div class="ex-code"><input data-answer="use Blog\Produto as Post;" aria-label="use com apelido"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A classe do PHP dentro do namespace</h3>
+<p>O arquivo começa com <code>namespace Loja;</code>. Complete para criar uma exceção do próprio PHP sem nenhum <code>use</code>:</p>
+<div class="ex-code">throw new <input data-answer="\Exception" aria-label="nome da classe">("Erro");</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Dentro de <code>namespace Loja;</code>, você chama <code>count($itens)</code>. O que acontece, se não existir <code>Loja\count</code>?</p>
+<label><input type="radio" name="q4"> Erro: <code>Call to undefined function Loja\count()</code></label>
+<label><input type="radio" name="q4"> Funciona: funções recuam para o namespace global</label>
+<label><input type="radio" name="q4"> Funciona só se houver <code>use function count;</code></label>
+<label><input type="radio" name="q4"> Erro de sintaxe</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Num arquivo com <code>namespace App;</code>, você escreve <code>new Loja\Produto()</code>. Qual classe o PHP procura?</p>
+<label><input type="radio" name="q5"> <code>Loja\Produto</code></label>
+<label><input type="radio" name="q5"> <code>\Produto</code></label>
+<label><input type="radio" name="q5"> <code>App\Loja\Produto</code></label>
+<label><input type="radio" name="q5"> <code>App\Produto</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O que o <code>use Loja\Produto;</code> faz?</p>
+<label><input type="radio" name="q6"> Cria um atalho de nome; não carrega nenhum arquivo</label>
+<label><input type="radio" name="q6"> Carrega o arquivo <code>Loja/Produto.php</code></label>
+<label><input type="radio" name="q6"> Cria um objeto da classe <code>Produto</code></label>
+<label><input type="radio" name="q6"> Coloca o arquivo atual no namespace <code>Loja</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Média: 7.5,src:use function Escola\\media,semerro">
+<p class="try-task"><strong>Missão final:</strong> o arquivo <code>escola.php</code> tem a função <code>media()</code> sem namespace. (1) Coloque-a no namespace <code>Escola</code>. (2) No <code>index.php</code>, importe-a com <code>use function Escola\media;</code>. A saída deve ser <code>Média: 7.5</code>. Rode depois do passo 1 e antes do passo 2 para ver o erro <code>Call to undefined function media()</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+require 'escola.php';
+
+echo "Média: ", media([7, 8, 6.5, 8.5]), "\n";
+</pre>
+<pre class="script" data-file="escola.php">&lt;?php
+
+function media(array $notas): float
+{
+    return array_sum($notas) / count($notas);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require 'escola.php';
+
+use function Escola\media;
+
+echo "Média: ", media([7, 8, 6.5, 8.5]), "\n";
+</pre>
+<pre class="solucao" data-file="escola.php">&lt;?php
+namespace Escola;
+
+function media(array $notas): float
+{
+    return array_sum($notas) / count($notas);
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Namespace é o "sobrenome" de classes, funções e constantes: <code>Loja\Produto</code> e <code>Blog\Produto</code> convivem sem conflito.</li>
+  <li><code>namespace Loja;</code> vem logo no começo do arquivo (só <code>declare</code> e comentários podem vir antes).</li>
+  <li>Nome com <code>\</code> na frente é absoluto; sem barra na frente, é relativo ao namespace atual.</li>
+  <li><code>use</code> cria atalhos (só de nome, não carrega arquivo); <code>as</code> dá apelido; <code>use function</code> e <code>use const</code> para funções e constantes.</li>
+  <li>Funções e constantes do PHP recuam para o global (<code>strlen</code> funciona); <strong>classes não</strong>: use <code>\DateTime</code>, <code>\Exception</code> ou um <code>use</code>.</li>
+  <li>Um namespace por arquivo, uma classe por arquivo, pastas iguais ao namespace: isso prepara o <a href="autoload.html">autoload</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
