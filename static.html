@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP static — propriedades e métodos estáticos, self:: e constantes de classe | Guia PHP</title>
+<meta name="description" content="Membros static em PHP: propriedades e métodos da classe (e não do objeto), self::, um contador de instâncias, métodos fábrica, a ideia do static:: (late static binding) e as constantes de classe, tipadas desde o PHP 8.3, com saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">static</span></h1>
+
+<p class="intro">Tudo o que você escreveu até agora pertencia a <strong>cada objeto</strong>: cada produto tem o seu nome, o seu preço, o seu estoque. Mas algumas coisas pertencem à <strong>classe inteira</strong>: quantos produtos já foram criados, o valor do frete da loja, uma função para formatar dinheiro. Para isso existem os membros <code>static</code> (estáticos) e as <strong>constantes de classe</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre algo "de cada objeto" e algo "da classe".</li>
+  <li>Propriedades <code>static</code>, com um contador de instâncias.</li>
+  <li>Métodos <code>static</code>, chamados com <code>Classe::metodo()</code>, e métodos "fábrica".</li>
+  <li><code>self::</code> e a ideia do <code>static::</code> (<em>late static binding</em>).</li>
+  <li>Constantes de classe com <code>const</code>, e as constantes tipadas do PHP 8.3.</li>
+  <li>Quando <code>static</code> ajuda e quando atrapalha.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o que é de cada um e o que é de todos</h2>
+<p>Numa sala de aula, cada aluno tem o seu caderno: o que um escreve não aparece no caderno do outro. Mas o <strong>quadro</strong> é um só, da sala inteira: o que a professora escreve ali, todos veem. Nas classes:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Normal (de instância)</th><th><code>static</code> (da classe)</th></tr>
+<tr><td>Comparação</td><td>O caderno de cada aluno</td><td>O quadro da sala</td></tr>
+<tr><td>Quantas cópias</td><td>Uma por objeto</td><td><strong>Uma só</strong>, compartilhada</td></tr>
+<tr><td>Dentro da classe</td><td><code>$this-&gt;estoque</code></td><td><code>self::$criados</code></td></tr>
+<tr><td>Fora da classe</td><td><code>$caneca-&gt;estoque</code> (precisa de um objeto)</td><td><code>Produto::$criados</code> (não precisa de objeto)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Propriedades <code>static</code>: o contador de produtos</h2>
+
+<pre class="file" data-file="contador.php">&lt;?php
+class Produto
+{
+    public static int $criados = 0;
+
+    public function __construct(public string $nome)
+    {
+        self::$criados++;
+    }
+}
+
+echo "Antes: " . Produto::$criados . "\n";
+$caneca = new Produto("Caneca");
+$camiseta = new Produto("Camiseta");
+$adesivo = new Produto("Adesivo");
+echo "Depois: " . Produto::$criados . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php contador.php
+Antes: 0          « a propriedade existe antes de qualquer objeto
+Depois: 3         « cada construtor somou 1 no mesmo contador</pre>
+
+<dl class="anatomy">
+  <dt>public static int $criados = 0;</dt><dd>Uma propriedade <strong>da classe</strong>. A palavra <code>static</code> vem depois da visibilidade. Existe uma só, não importa quantos objetos sejam criados (nem se nenhum for).</dd>
+  <dt>self::$criados++</dt><dd><code>self</code> ("a própria") é a classe onde o código está escrito; <code>::</code> (dois-pontos duplos) acessa o que é estático. Repare: <strong>com</strong> <code>$</code> depois do <code>::</code>, diferente da seta.</dd>
+  <dt>Produto::$criados</dt><dd>Fora da classe, use o nome dela no lugar de <code>self</code>.</dd>
+</dl>
+
+<p>O <code>::</code> tem um nome curioso em PHP: <em>Paamayim Nekudotayim</em> ("dois-pontos duplos" em hebraico). Você talvez veja esse nome em mensagens de erro antigas.</p>
+
+<h3>Por objeto × por classe, lado a lado</h3>
+
+<pre class="file" data-file="compara-static.php">&lt;?php
+class Produto
+{
+    public int $vendidos = 0;          // um por objeto
+    public static int $vendasDaLoja = 0; // um só, da classe
+
+    public function __construct(public string $nome)
+    {
+    }
+
+    public function vender(int $quantidade): void
+    {
+        $this-&gt;vendidos += $quantidade;
+        self::$vendasDaLoja += $quantidade;
+    }
+}
+
+$caneca = new Produto("Caneca");
+$camiseta = new Produto("Camiseta");
+$caneca-&gt;vender(3);
+$camiseta-&gt;vender(2);
+$caneca-&gt;vender(1);
+
+echo "Canecas vendidas: {$caneca-&gt;vendidos}\n";
+echo "Camisetas vendidas: {$camiseta-&gt;vendidos}\n";
+echo "Total da loja: " . Produto::$vendasDaLoja . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php compara-static.php
+Canecas vendidas: 4       « o caderno da caneca: 3 + 1
+Camisetas vendidas: 2     « o caderno da camiseta
+Total da loja: 6          « o quadro: todas as vendas somadas</pre>
+
+<div class="tryphp" data-goal="out:Pedido #1 - Ana,out:Pedido #2 - Bruno,out:Pedido #3 - Carla,src:static,semerro">
+<p class="try-task"><strong>Missão:</strong> cada pedido precisa de um número único, em sequência. Acrescente na classe uma propriedade <code>private static int $proximo = 1;</code> e, no construtor, faça <code>$this-&gt;numero = self::$proximo++;</code>. A saída deve ser <code>Pedido #1 - Ana</code>, <code>Pedido #2 - Bruno</code> e <code>Pedido #3 - Carla</code>.</p>
+<pre class="script">&lt;?php
+class Pedido
+{
+    public int $numero = 0;
+
+    public function __construct(public string $cliente)
+    {
+        // dê o número ao pedido aqui
+    }
+}
+
+$pedidos = [new Pedido("Ana"), new Pedido("Bruno"), new Pedido("Carla")];
+foreach ($pedidos as $p) {
+    echo "Pedido #{$p-&gt;numero} - {$p-&gt;cliente}\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+class Pedido
+{
+    private static int $proximo = 1;
+    public int $numero = 0;
+
+    public function __construct(public string $cliente)
+    {
+        $this-&gt;numero = self::$proximo++;
+    }
+}
+
+$pedidos = [new Pedido("Ana"), new Pedido("Bruno"), new Pedido("Carla")];
+foreach ($pedidos as $p) {
+    echo "Pedido #{$p-&gt;numero} - {$p-&gt;cliente}\n";
+}
+</pre>
+</div>
+
+<p>Repare que a propriedade estática pode ser <code>private</code>: aí só a classe enxerga o contador, e ninguém de fora consegue "pular" números.</p>
+
+<hr>
+
+<h2>Métodos <code>static</code></h2>
+<p>Um método estático pertence à classe e é chamado <strong>sem objeto</strong>: <code>Classe::metodo()</code>. Ele serve para tarefas que não dependem dos dados de um objeto específico, como formatar dinheiro:</p>
+
+<pre class="file" data-file="metodo-static.php">&lt;?php
+class Dinheiro
+{
+    public static function formatar(float $valor): string
+    {
+        return "R$ " . number_format($valor, 2, ",", ".");
+    }
+
+    public static function somar(float ...$valores): float
+    {
+        return round(array_sum($valores), 2);
+    }
+}
+
+echo Dinheiro::formatar(1234.5) . "\n";
+$total = Dinheiro::somar(25.90, 49.90, 3.50);
+echo "Total: " . Dinheiro::formatar($total) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php metodo-static.php
+R$ 1.234,50
+Total: R$ 79,30</pre>
+
+<p>Ninguém escreveu <code>new Dinheiro()</code>: a classe aqui funciona como uma "caixa de ferramentas" com nome. A regra de ouro: <strong>dentro de um método estático não existe <code>$this</code></strong>, porque não há "este objeto" (veja o erro em <a href="#erros">Quando dá errado</a>).</p>
+
+<h3>Métodos fábrica: jeitos diferentes de criar</h3>
+<p>Um uso muito comum de métodos estáticos é criar objetos a partir de fontes diferentes. Cada jeito ganha um nome que explica de onde vêm os dados (por isso são chamados de "construtores nomeados" ou <strong>métodos fábrica</strong>):</p>
+
+<pre class="file" data-file="fabrica.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+
+    public static function deArray(array $dados): self
+    {
+        return new self($dados["nome"], (float) $dados["preco"]);
+    }
+
+    public static function deLinhaCsv(string $linha): self
+    {
+        [$nome, $preco] = explode(";", $linha);
+        return new self(trim($nome), (float) str_replace(",", ".", $preco));
+    }
+}
+
+$a = Produto::deArray(["nome" =&gt; "Caneca", "preco" =&gt; "25.90"]);
+$b = Produto::deLinhaCsv("Camiseta; 49,90");
+echo "{$a-&gt;nome}: {$a-&gt;preco}\n";
+echo "{$b-&gt;nome}: {$b-&gt;preco}\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php fabrica.php
+Caneca: 25.9
+Camiseta: 49.9</pre>
+
+<dl class="anatomy">
+  <dt>: self</dt><dd>Tipo de retorno: "devolve um objeto desta classe".</dd>
+  <dt>new self(…)</dt><dd>Cria um objeto da própria classe (o mesmo que <code>new Produto(…)</code>, sem repetir o nome).</dd>
+  <dt>Produto::deArray(…)</dt><dd>Lê melhor que um <code>new Produto(…)</code> com um monte de conversões em volta: o nome conta de onde vêm os dados.</dd>
+</dl>
+
+<p>Você já usou métodos fábrica do próprio PHP, talvez sem saber: <code>DateTime::createFromFormat(…)</code>, em <a href="datas.html">Datas e Horas</a>.</p>
+
+<h3><code>self::</code> × <code>static::</code> (só a ideia)</h3>
+<p>Existe um parente do <code>self::</code>: o <code>static::</code>. A diferença só aparece com <a href="heranca.html">herança</a>. <code>self</code> é sempre a classe onde o código foi <strong>escrito</strong>; <code>static</code> é a classe que foi <strong>chamada</strong>. Num exemplo rápido (o <code>extends</code> você vai aprender em Herança: <code>ProdutoDigital</code> é uma "filha" de <code>Produto</code>):</p>
+
+<pre class="file" data-file="lsb.php">&lt;?php
+class Produto
+{
+    public static function comSelf(): Produto
+    {
+        return new self();
+    }
+
+    public static function comStatic(): static
+    {
+        return new static();
+    }
+}
+
+class ProdutoDigital extends Produto
+{
+}
+
+echo get_class(ProdutoDigital::comSelf()) . "\n";
+echo get_class(ProdutoDigital::comStatic()) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php lsb.php
+Produto           « new self(): a classe onde o método foi escrito
+ProdutoDigital    « new static(): a classe usada na chamada</pre>
+
+<p>Esse comportamento se chama <strong>late static binding</strong> ("ligação estática tardia"): o PHP decide qual classe é <code>static</code> só na hora da chamada. Na prática: em métodos fábrica de classes que terão filhas, prefira <code>new static()</code> e o tipo de retorno <code>: static</code>. Nas outras situações, <code>self::</code> basta.</p>
+
+<hr>
+
+<h2>Constantes de classe</h2>
+<p>Uma <strong>constante</strong> é um valor fixo, que nunca muda enquanto o programa roda (você conheceu as constantes soltas em <a href="constantes.html">Constantes</a>). Dentro de uma classe, elas são declaradas com <code>const</code> e acessadas com <code>::</code>, como os membros estáticos, mas <strong>sem</strong> <code>$</code>:</p>
+
+<pre class="file" data-file="constantes.php">&lt;?php
+class Loja
+{
+    const NOME = "Lojinha da Ana";
+    public const float FRETE = 15.0;
+    public const float FRETE_GRATIS_ACIMA = 100.0;
+    private const array CUPONS = ["ANA10" =&gt; 10, "BEMVINDO" =&gt; 5];
+
+    public static function frete(float $subtotal): float
+    {
+        return $subtotal &gt;= self::FRETE_GRATIS_ACIMA ? 0 : self::FRETE;
+    }
+
+    public static function desconto(string $cupom): int
+    {
+        return self::CUPONS[$cupom] ?? 0;
+    }
+}
+
+echo Loja::NOME . "\n";
+echo "Frete para R$ 75,80: " . Loja::frete(75.80) . "\n";
+echo "Frete para R$ 120,00: " . Loja::frete(120.00) . "\n";
+echo "Cupom ANA10: " . Loja::desconto("ANA10") . "%\n";
+echo "Cupom XYZ: " . Loja::desconto("XYZ") . "%\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php constantes.php
+Lojinha da Ana
+Frete para R$ 75,80: 15
+Frete para R$ 120,00: 0
+Cupom ANA10: 10%
+Cupom XYZ: 0%</pre>
+
+<dl class="anatomy">
+  <dt>const NOME = "Lojinha da Ana";</dt><dd>A forma mais simples: sem visibilidade (é <code>public</code>) e sem tipo. Por convenção, nomes de constante são em MAIÚSCULAS, com <code>_</code> entre as palavras.</dd>
+  <dt>public const float FRETE = 15.0;</dt><dd>Com visibilidade e <strong>tipo</strong>. O tipo em constantes de classe chegou no PHP 8.3.</dd>
+  <dt>private const array CUPONS</dt><dd>Constantes também podem ser privadas: só a classe usa a tabela de cupons.</dd>
+  <dt>self::FRETE</dt><dd>Dentro da classe. Fora: <code>Loja::FRETE</code>. Com um objeto, também funciona: <code>$loja::NOME</code>.</dd>
+</dl>
+
+<h3>Constantes tipadas <span class="versao">PHP 8.3+</span></h3>
+<p>Com o tipo declarado, o PHP confere o valor logo ao ler a classe:</p>
+
+<pre class="file" data-file="const-tipo-errado.php">&lt;?php
+class Loja
+{
+    public const int PARCELAS_MAXIMAS = "doze";
+}
+echo Loja::PARCELAS_MAXIMAS;
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php const-tipo-errado.php
+
+Fatal error: Cannot use string as value for class constant Loja::PARCELAS_MAXIMAS of type int in /home/ana/loja/const-tipo-errado.php on line 4
+Stack trace:
+#0 {main}</pre>
+
+<p>"Não dá para usar uma <code>string</code> como valor da constante <code>Loja::PARCELAS_MAXIMAS</code>, do tipo <code>int</code>". Repare que o <code>echo</code> da linha 6 nem rodou: o erro aparece antes. Em PHP 8.2 ou anterior, escreva <code>const PARCELAS_MAXIMAS = 12;</code>, sem o tipo. O tipo faz mais diferença em <a href="interfaces.html">interfaces</a> e em <a href="heranca.html">classes filhas</a>, que podem redefinir constantes: com tipo, a filha não pode trocar o número por um texto.</p>
+
+<h3>Constante, propriedade estática ou <code>define</code>?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Muda?</th><th>Acesso</th><th>Quando usar</th></tr>
+<tr><td><code>const X = …</code> na classe</td><td>Nunca</td><td><code>Loja::X</code></td><td>Valores fixos que pertencem a um assunto (frete, limites, nomes)</td></tr>
+<tr><td><code>static $x</code></td><td>Sim</td><td><code>Loja::$x</code></td><td>Estado compartilhado que muda (contadores, cache)</td></tr>
+<tr><td><code>define("X", …)</code> / <code>const X</code> solto</td><td>Nunca</td><td><code>X</code></td><td>Configurações globais do projeto todo</td></tr>
+<tr><td><a href="enums.html">Enum</a></td><td>Nunca</td><td><code>Status::Pago</code></td><td>Uma lista fechada de opções (status de pedido)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando usar (e quando não usar) <code>static</code></h2>
+<div class="tip">
+<strong>Bons usos</strong>
+<ul>
+  <li>Constantes da classe (<code>Loja::FRETE</code>).</li>
+  <li>Métodos fábrica (<code>Produto::deArray()</code>).</li>
+  <li>Funções utilitárias "puras", que só dependem dos parâmetros (<code>Dinheiro::formatar()</code>).</li>
+  <li>Contadores e números de sequência simples, como os desta aula.</li>
+</ul>
+</div>
+
+<div class="warning">
+<strong>Cuidado com o excesso</strong>
+<p>Uma propriedade estática pública é, na prática, uma <a href="escopo.html">variável global</a> com sobrenome: qualquer parte do programa pode mudá-la, e fica difícil saber quem mudou. Ela também dificulta os <a href="phpunit.html">testes automáticos</a>, porque o valor "vaza" de um teste para o outro. Se você está criando muitas coisas estáticas, provavelmente precisa de objetos normais.</p>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Non-static method … cannot be called statically</strong>
+<pre class="file" data-file="nao-static.php">&lt;?php
+class Produto
+{
+    public function __construct(public string $nome = "Caneca")
+    {
+    }
+
+    public function descricao(): string
+    {
+        return "Produto: " . $this-&gt;nome;
+    }
+}
+echo Produto::descricao();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php nao-static.php
+
+Fatal error: Uncaught Error: Non-static method Produto::descricao() cannot be called statically in /home/ana/loja/nao-static.php:13
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/nao-static.php on line 13</pre>
+<p><strong>O que significa:</strong> <code>descricao()</code> é um método normal (de objeto): ele precisa de "um produto" para descrever. Chamá-lo pela classe (<code>Produto::</code>) não diz qual produto.</p>
+<p><strong>Como consertar:</strong> crie um objeto e chame pela seta: <code>(new Produto())-&gt;descricao()</code>. Se o método realmente não usa <code>$this</code>, declare-o <code>static</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Using $this when not in object context (dentro de um método static)</strong>
+<pre class="file" data-file="this-static.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+
+    public static function descricao(): string
+    {
+        return "Produto: " . $this-&gt;nome;
+    }
+}
+echo Produto::descricao();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php this-static.php
+
+Fatal error: Uncaught Error: Using $this when not in object context in /home/ana/loja/this-static.php:8
+Stack trace:
+#0 /home/ana/loja/this-static.php(11): Produto::descricao()
+#1 {main}
+  thrown in /home/ana/loja/this-static.php on line 8</pre>
+<p><strong>O que significa:</strong> o método é estático, então não existe objeto, e <code>$this</code> não existe.</p>
+<p><strong>Como consertar:</strong> se o método precisa de dados de um objeto, tire o <code>static</code> (e chame com <code>$obj-&gt;</code>), ou receba o objeto como parâmetro.</p>
+</div>
+
+<div class="cenario">
+<strong>Acessar uma propriedade estática com a seta</strong>
+<pre class="file" data-file="seta-static.php">&lt;?php
+class Produto
+{
+    public static int $criados = 0;
+}
+$p = new Produto();
+echo $p-&gt;criados;
+echo "\n";
+echo $p::$criados . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php seta-static.php
+
+Notice: Accessing static property Produto::$criados as non static in /home/ana/loja/seta-static.php on line 7
+
+Warning: Undefined property: Produto::$criados in /home/ana/loja/seta-static.php on line 7
+                  « o echo da linha 7 não mostrou nada
+0                 « $p::$criados funciona</pre>
+<p><strong>O que significa:</strong> <code>$p-&gt;criados</code> procura uma propriedade <strong>do objeto</strong>, e ela não existe: a propriedade é da classe. O PHP avisa (<code>Notice</code> = "observação") e não acha nada.</p>
+<p><strong>Como consertar:</strong> propriedades estáticas usam <code>::</code> e <code>$</code>: <code>Produto::$criados</code> (ou <code>$p::$criados</code>). (Métodos estáticos, por outro lado, até funcionam com a seta: <code>$obj-&gt;formatar(10)</code>; mas use <code>Classe::formatar(10)</code> para deixar claro que é estático.)</p>
+</div>
+
+<div class="cenario">
+<strong>Esquecer o <code>self::</code></strong>
+<pre class="file" data-file="static-sem-self.php">&lt;?php
+class Produto
+{
+    public static int $criados = 0;
+
+    public function __construct()
+    {
+        $criados++;
+    }
+}
+new Produto();
+echo Produto::$criados . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php static-sem-self.php
+
+Warning: Undefined variable $criados in /home/ana/loja/static-sem-self.php on line 8
+0</pre>
+<p><strong>O que significa:</strong> <code>$criados</code> sozinho é uma variável local do construtor, que não existe. O contador da classe ficou em 0.</p>
+<p><strong>Como consertar:</strong> <code>self::$criados++;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Undefined constant / Cannot access private constant</strong>
+<pre class="file" data-file="const-objeto.php">&lt;?php
+class Loja
+{
+    const NOME = "Lojinha da Ana";
+}
+$loja = new Loja();
+echo $loja::NOME . "\n";
+echo Loja::NOMEE . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php const-objeto.php
+Lojinha da Ana
+
+Fatal error: Uncaught Error: Undefined constant Loja::NOMEE in /home/ana/loja/const-objeto.php:8
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/const-objeto.php on line 8</pre>
+<p><strong>O que significa:</strong> o nome da constante está errado (<code>NOMEE</code>). Se a constante existe mas é <code>private</code>, a mensagem é outra: <code>Error: Cannot access private constant Loja::CUPONS</code>. E tentar mudar uma constante (<code>Loja::NOME = "Outra";</code>) nem roda: <code>Parse error: syntax error, unexpected token "="</code>.</p>
+<p><strong>Como consertar:</strong> confira o nome (maiúsculas importam em constantes) e a visibilidade.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>public static tipo $x = valor;</code></td><td>Propriedade da classe (uma só para todos)</td></tr>
+<tr><td><code>public static function f() { … }</code></td><td>Método da classe (sem <code>$this</code>)</td></tr>
+<tr><td><code>self::$x</code> / <code>self::f()</code></td><td>Dentro da classe: membro estático da classe onde o código está</td></tr>
+<tr><td><code>static::f()</code> / <code>new static()</code></td><td>A classe que foi chamada (late static binding)</td></tr>
+<tr><td><code>Classe::$x</code> / <code>Classe::f()</code></td><td>Fora da classe</td></tr>
+<tr><td><code>const NOME = valor;</code></td><td>Constante de classe</td></tr>
+<tr><td><code>public const tipo NOME = valor;</code> <span class="versao">PHP 8.3+</span></td><td>Constante tipada</td></tr>
+<tr><td><code>self::NOME</code> / <code>Classe::NOME</code></td><td>Lê a constante (sem <code>$</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:US$ 10.00 = R$ 54\,00,out:US$ 25.50 = R$ 137\,70,src:const float,src:static function,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana compra peças de fora. Escreva a classe <code>Cambio</code> com uma constante <strong>tipada</strong> <code>public const float DOLAR = 5.40;</code> e um método estático <code>paraReais(float $dolares): string</code> que devolve, por exemplo, <code>US$ 10.00 = R$ 54,00</code> (use <code>number_format($dolares, 2)</code> para o dólar e <code>number_format(…, 2, ",", ".")</code> para o real, e <code>self::DOLAR</code> na conta). A saída deve ter <code>US$ 10.00 = R$ 54,00</code> e <code>US$ 25.50 = R$ 137,70</code>.</p>
+<pre class="script">&lt;?php
+// escreva a classe Cambio aqui
+
+
+echo Cambio::paraReais(10) . "\n";
+echo Cambio::paraReais(25.5) . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Cambio
+{
+    public const float DOLAR = 5.40;
+
+    public static function paraReais(float $dolares): string
+    {
+        $reais = $dolares * self::DOLAR;
+        return "US$ " . number_format($dolares, 2) . " = R$ " . number_format($reais, 2, ",", ".");
+    }
+}
+
+echo Cambio::paraReais(10) . "\n";
+echo Cambio::paraReais(25.5) . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Dentro da classe</h3>
+<p>Complete para somar 1 à propriedade estática <code>$criados</code>, dentro de um método da própria classe:</p>
+<div class="ex-code"><input data-answer="self::$criados|static::$criados" aria-label="propriedade estática">++;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Fora da classe</h3>
+<p>Complete para chamar o método estático <code>formatar</code> da classe <code>Dinheiro</code>:</p>
+<div class="ex-code">echo <input data-answer="Dinheiro::formatar" aria-label="chamada estática">(9.9);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Constante</h3>
+<p>Complete para ler a constante <code>FRETE</code> da classe <code>Loja</code>, de fora dela:</p>
+<div class="ex-code">echo <input data-answer="Loja::FRETE" aria-label="constante">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Três objetos <code>Produto</code> foram criados. Quantas cópias de <code>public static int $criados</code> existem?</p>
+<label><input type="radio" name="q4"> Três, uma por objeto</label>
+<label><input type="radio" name="q4"> Uma, da classe</label>
+<label><input type="radio" name="q4"> Nenhuma, até alguém chamar um método estático</label>
+<label><input type="radio" name="q4"> Quatro: uma da classe e três dos objetos</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece ao usar <code>$this</code> dentro de um método <code>static</code> chamado com <code>Produto::metodo()</code>?</p>
+<label><input type="radio" name="q5"> <code>$this</code> vale <code>null</code></label>
+<label><input type="radio" name="q5"> <code>$this</code> é o último objeto criado</label>
+<label><input type="radio" name="q5"> Um <code>Warning</code></label>
+<label><input type="radio" name="q5"> <code>Error: Using $this when not in object context</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Num método da classe <code>Produto</code>, chamado como <code>ProdutoDigital::criar()</code> (filha de <code>Produto</code>), que classe <code>new static()</code> cria?</p>
+<label><input type="radio" name="q6"> <code>ProdutoDigital</code></label>
+<label><input type="radio" name="q6"> <code>Produto</code></label>
+<label><input type="radio" name="q6"> <code>stdClass</code></label>
+<label><input type="radio" name="q6"> Dá erro</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">7. Qual declaração só funciona do PHP 8.3 em diante?</p>
+<label><input type="radio" name="q7"> <code>const MAX = 10;</code></label>
+<label><input type="radio" name="q7"> <code>private const MAX = 10;</code></label>
+<label><input type="radio" name="q7"> <code>public const int MAX = 10;</code></label>
+<label><input type="radio" name="q7"> <code>public static int $max = 10;</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>static</code> = da <strong>classe</strong>, não do objeto: uma cópia só, compartilhada (o quadro da sala).</li>
+  <li>Dentro da classe: <code>self::$prop</code> e <code>self::metodo()</code>; fora: <code>Classe::$prop</code> e <code>Classe::metodo()</code>. Com <code>$</code> para propriedades.</li>
+  <li>Métodos estáticos não têm <code>$this</code>. Servem para utilitários e <strong>métodos fábrica</strong> (<code>Produto::deArray()</code>).</li>
+  <li><code>self</code> é a classe onde o código foi escrito; <code>static</code> é a classe chamada (late static binding).</li>
+  <li><strong>Constantes de classe</strong>: <code>const NOME = valor;</code>, lidas com <code>Classe::NOME</code>. Tipadas desde o 8.3: <code>public const float FRETE = 15.0;</code>.</li>
+  <li>Use <code>static</code> com moderação: propriedade estática pública é quase uma variável global.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
