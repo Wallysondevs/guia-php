@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Validar Dados — trim, filter_var e mensagens de erro | Guia PHP</title>
+<meta name="description" content="Como conferir no servidor o que chega de um formulário: por que o navegador não garante nada, campos obrigatórios com trim, filter_var com FILTER_VALIDATE_EMAIL e FILTER_VALIDATE_INT com faixa, mensagens de erro ao lado do campo e manter os valores digitados.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Validar Dados</span></h1>
+
+<p class="intro">Um formulário é uma porta aberta: qualquer pessoa, ou qualquer programa, pode mandar qualquer coisa para o seu PHP. Nome em branco, e-mail sem arroba, idade "vinte", idade 150, um array onde você esperava texto. <strong>Validar</strong> é conferir cada dado antes de usar, e responder com educação quando algo está errado. Nesta aula você monta um formulário de cadastro completo: confere os campos, mostra a mensagem de erro ao lado de cada um e não obriga a pessoa a digitar tudo de novo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que a conferência do navegador (<code>required</code>, <code>type="email"</code>) não basta.</li>
+  <li>Como tratar campos obrigatórios com <code>trim</code> (tirar os espaços das pontas).</li>
+  <li>Como usar <code>filter_var</code> para e-mails (<code>FILTER_VALIDATE_EMAIL</code>) e números inteiros (<code>FILTER_VALIDATE_INT</code>), inclusive com faixa mínima e máxima.</li>
+  <li>Por que comparar com <code>=== false</code> (a armadilha do zero).</li>
+  <li>Como guardar os erros num array e mostrar cada mensagem ao lado do seu campo.</li>
+  <li>Como manter os valores que a pessoa digitou quando há erro.</li>
+  <li>A diferença entre validar no cliente (navegador) e no servidor (PHP).</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o porteiro e a recepcionista</h2>
+<p>Pense num prédio com duas pessoas na entrada. A <strong>recepcionista</strong> fica na calçada e avisa, gentilmente: "o senhor esqueceu de preencher o nome". Ela ajuda quem está de boa-fé, mas qualquer um pode passar direto por ela. O <strong>porteiro</strong> fica na porta, confere o documento de todo mundo, e sem ele ninguém entra.</p>
+<ul>
+  <li>A recepcionista é a validação no <strong>navegador</strong> (atributos <code>required</code>, <code>type="email"</code>, <code>min</code>, <code>max</code>, JavaScript): rápida e simpática, mas fácil de pular.</li>
+  <li>O porteiro é a validação no <strong>PHP</strong>: a única que vale de verdade.</li>
+</ul>
+
+<h3>Prova: pulando a recepcionista</h3>
+<p>A Ana fez um formulário com tudo o que o HTML oferece:</p>
+<pre class="file" data-file="form.html">&lt;form method="post" action="cadastro.php"&gt;
+  &lt;input name="nome" required maxlength="60"&gt;
+  &lt;input type="email" name="email" required&gt;
+  &lt;input type="number" name="idade" min="1" max="120" required&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;</pre>
+
+<p>No navegador, ninguém consegue enviar o nome vazio nem a idade 150. Mas o <code>curl</code> não é um navegador: ele manda o pedido direto para o <code>cadastro.php</code>, sem passar pelo formulário. E o PHP recebe exatamente o que foi mandado (aqui, com um <code>var_dump($_POST)</code>):</p>
+
+<pre class="term">$ curl -s localhost:8000/dump.php -d "nome=&amp;email=isso+nao+e+email&amp;idade=150"
+array(3) {
+  ["nome"]=&gt;
+  string(0) ""
+  ["email"]=&gt;
+  string(16) "isso nao e email"
+  ["idade"]=&gt;
+  string(3) "150"
+}</pre>
+
+<p>Do mesmo jeito, qualquer pessoa pode abrir as ferramentas do navegador (<kbd>F12</kbd>), apagar o <code>required</code> e enviar. Por isso a regra:</p>
+
+<div class="warning"><strong>Regra de ouro da validação:</strong> trate tudo o que vem de <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code> e <code>$_FILES</code> como <strong>suspeito</strong>, até o PHP conferir. O navegador ajuda o visitante; o servidor protege o sistema.</div>
+
+<hr>
+
+<h2>Passo 1: limpar com <code>trim</code></h2>
+<p>Um campo "preenchido" só com espaços parece cheio para o computador (<code>"   "</code> não é vazio), mas não tem nada. E é comum a pessoa digitar um espaço sem querer no começo ou no fim do e-mail. A função <code>trim</code> ("aparar") tira espaços, tabulações e quebras de linha <strong>das pontas</strong> do texto (o meio fica intacto):</p>
+
+<pre class="file" data-file="trim.php">&lt;?php
+var_dump(trim("  Ana Souza  "));
+var_dump(trim("   "));
+var_dump(trim("\tAna\n"));
+</pre>
+
+<pre class="term">$ php trim.php
+string(9) "Ana Souza"       « o espaço do meio ficou
+string(0) ""                « só espaços → vazio
+string(3) "Ana"             « tab e quebra de linha também saem</pre>
+
+<p>Então, para um campo <strong>obrigatório</strong>, a receita é: ler com <code>?? ''</code> (para não ter aviso se o campo nem veio), aparar com <code>trim</code> e comparar com o texto vazio:</p>
+
+<pre class="file" data-file="trecho.php">$nome = trim($_POST['nome'] ?? '');
+if ($nome === '') {
+    $erros['nome'] = 'Informe o seu nome.';
+}</pre>
+
+<p>Para limitar o tamanho, use <code>mb_strlen</code> (que conta letras acentuadas certo; veja <a href="mbstring.html">Acentos e mbstring</a>): <code>mb_strlen($nome) &gt; 60</code>.</p>
+
+<hr>
+
+<h2>Passo 2: <code>filter_var</code>, o conferente pronto</h2>
+<p>Conferir se um texto "tem cara de e-mail" ou "é um número inteiro" à mão é difícil e cheio de casos estranhos. O PHP já traz uma função para isso: <code>filter_var</code> ("filtrar variável"). Você passa o valor e o <strong>filtro</strong>, e ela devolve:</p>
+<ul>
+  <li>o valor <strong>aprovado</strong> (já convertido para o tipo certo, no caso de números), ou</li>
+  <li><code>false</code>, se o valor não passou.</li>
+</ul>
+
+<h3>E-mail: <code>FILTER_VALIDATE_EMAIL</code></h3>
+<pre class="file" data-file="email.php">&lt;?php
+$testes = ['ana@exemplo.com', 'ana.souza@padaria.com.br', 'ana@', 'ana exemplo.com', 'ana@exemplo', '@exemplo.com', ' ana@exemplo.com'];
+foreach ($testes as $t) {
+    echo str_pad("'$t'", 30), " → ";
+    var_dump(filter_var($t, FILTER_VALIDATE_EMAIL));
+}
+</pre>
+
+<pre class="term">$ php email.php
+'ana@exemplo.com'              → string(15) "ana@exemplo.com"
+'ana.souza@padaria.com.br'     → string(24) "ana.souza@padaria.com.br"
+'ana@'                         → bool(false)
+'ana exemplo.com'              → bool(false)
+'ana@exemplo'                  → bool(false)
+'@exemplo.com'                 → bool(false)
+' ana@exemplo.com'             → bool(false)       « o espaço na frente reprova: use trim antes</pre>
+
+<dl class="anatomy">
+  <dt>filter_var(</dt><dd>A função conferente.</dd>
+  <dt>$t,</dt><dd>O valor a conferir (aqui, cada texto da lista).</dd>
+  <dt>FILTER_VALIDATE_EMAIL)</dt><dd>Uma constante do PHP que escolhe o filtro: "valide como e-mail". Ela confere o <strong>formato</strong> (algo@domínio.algo), não se o e-mail existe. Para saber se existe, só mandando uma mensagem.</dd>
+</dl>
+
+<h3>Inteiro: <code>FILTER_VALIDATE_INT</code></h3>
+<pre class="file" data-file="inteiro.php">&lt;?php
+$testes = ['29', '0', '-3', '29.5', 'vinte', '29 anos', ' 29 ', '', '150', '007'];
+foreach ($testes as $t) {
+    echo str_pad("'$t'", 10), " → ";
+    var_dump(filter_var($t, FILTER_VALIDATE_INT));
+}
+</pre>
+
+<pre class="term">$ php inteiro.php
+'29'       → int(29)        « aprovado E convertido: agora é int, não string
+'0'        → int(0)
+'-3'       → int(-3)
+'29.5'     → bool(false)    « tem vírgula decimal: não é inteiro
+'vinte'    → bool(false)
+'29 anos'  → bool(false)    « diferente do (int), que aceitaria o "29" do começo
+' 29 '     → int(29)        « espaços nas pontas são tolerados neste filtro
+''         → bool(false)
+'150'      → int(150)
+'007'      → bool(false)    « zero à esquerda não é aceito</pre>
+
+<p>Repare na vantagem sobre <code>(int)</code>: <code>(int) "29 anos"</code> daria <code>29</code> sem reclamar, e <code>(int) "vinte"</code> daria <code>0</code>. O <code>filter_var</code> diz claramente "isso não é um inteiro".</p>
+
+<h3>Com faixa: <code>min_range</code> e <code>max_range</code></h3>
+<p>O terceiro argumento do <code>filter_var</code> recebe <strong>opções</strong>. Para o inteiro, as opções <code>min_range</code> e <code>max_range</code> definem o menor e o maior valor aceitos:</p>
+
+<pre class="file" data-file="faixa.php">&lt;?php
+$opcoes = ['options' =&gt; ['min_range' =&gt; 1, 'max_range' =&gt; 120]];
+foreach (['29', '0', '120', '150', 'vinte'] as $t) {
+    echo str_pad("'$t'", 8), " → ";
+    var_dump(filter_var($t, FILTER_VALIDATE_INT, $opcoes));
+}
+</pre>
+
+<pre class="term">$ php faixa.php
+'29'     → int(29)
+'0'      → bool(false)      « abaixo do mínimo
+'120'    → int(120)         « os limites valem (1 e 120 são aceitos)
+'150'    → bool(false)      « acima do máximo
+'vinte'  → bool(false)</pre>
+
+<dl class="anatomy">
+  <dt>['options' =&gt; [ … ]]</dt><dd>Um array com a chave <code>'options'</code>, e dentro dela outro array. Parece burocrático, mas é o formato que a função exige: escreva igualzinho.</dd>
+  <dt>'min_range' =&gt; 1</dt><dd>O menor valor aceito ("faixa mínima").</dd>
+  <dt>'max_range' =&gt; 120</dt><dd>O maior valor aceito.</dd>
+</dl>
+
+<h3>A armadilha do zero: compare com <code>=== false</code></h3>
+<p>O <code>filter_var</code> devolve <code>false</code> para reprovar, mas também pode devolver <code>0</code> para aprovar o número zero. Num <code>if</code>, os dois "parecem falso" (veja <a href="booleanos.html">Booleanos</a>):</p>
+
+<pre class="file" data-file="zero.php">&lt;?php
+$qtd = filter_var('0', FILTER_VALIDATE_INT);
+if (!$qtd) {
+    echo "Errado: 0 foi tratado como inválido\n";
+}
+if ($qtd === false) {
+    echo "Inválido\n";
+} else {
+    echo "Válido: $qtd\n";
+}
+</pre>
+<pre class="term">$ php zero.php
+Errado: 0 foi tratado como inválido
+Válido: 0</pre>
+
+<p>Por isso: <strong>sempre</strong> <code>=== false</code> para saber se o <code>filter_var</code> reprovou.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Filtro</th><th>Aprova</th><th>Devolve</th></tr>
+<tr><td><code>FILTER_VALIDATE_EMAIL</code></td><td>Formato de e-mail</td><td>o texto, ou <code>false</code></td></tr>
+<tr><td><code>FILTER_VALIDATE_INT</code></td><td>Inteiro (com <code>min_range</code>/<code>max_range</code> opcionais)</td><td><code>int</code>, ou <code>false</code></td></tr>
+<tr><td><code>FILTER_VALIDATE_FLOAT</code></td><td>Número com ponto decimal (<code>"9.90"</code>)</td><td><code>float</code>, ou <code>false</code></td></tr>
+<tr><td><code>FILTER_VALIDATE_URL</code></td><td>Endereço com esquema (<code>https://…</code>)</td><td>o texto, ou <code>false</code></td></tr>
+<tr><td><code>FILTER_VALIDATE_BOOL</code></td><td><code>"1"</code>, <code>"true"</code>, <code>"on"</code>, <code>"yes"</code> → <code>true</code>; <code>"0"</code>, <code>"false"</code>, <code>"off"</code>, <code>"no"</code>, <code>""</code> e qualquer outro texto → <code>false</code></td><td><code>bool</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Passo 3: o formulário completo</h2>
+<p>Agora juntamos tudo num cadastro com nome, e-mail e idade. A estrutura é sempre a mesma, em três partes: <strong>ler e limpar</strong>, <strong>conferir</strong> (guardando cada problema num array <code>$erros</code>), <strong>decidir</strong> (sem erros, segue em frente; com erros, mostra o formulário de novo).</p>
+
+<pre class="file" data-file="cadastro.php">&lt;?php
+$dados = ['nome' =&gt; '', 'email' =&gt; '', 'idade' =&gt; ''];
+$erros = [];
+$sucesso = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // 1. Ler e limpar
+    $dados['nome']  = trim($_POST['nome'] ?? '');
+    $dados['email'] = trim($_POST['email'] ?? '');
+    $dados['idade'] = trim($_POST['idade'] ?? '');
+
+    // 2. Conferir cada campo
+    if ($dados['nome'] === '') {
+        $erros['nome'] = 'Informe o seu nome.';
+    } elseif (mb_strlen($dados['nome']) &gt; 60) {
+        $erros['nome'] = 'O nome pode ter no máximo 60 letras.';
+    }
+
+    if ($dados['email'] === '') {
+        $erros['email'] = 'Informe o seu e-mail.';
+    } elseif (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Este e-mail não parece válido.';
+    }
+
+    $idade = filter_var($dados['idade'], FILTER_VALIDATE_INT,
+        ['options' =&gt; ['min_range' =&gt; 1, 'max_range' =&gt; 120]]);
+    if ($idade === false) {
+        $erros['idade'] = 'A idade deve ser um número inteiro de 1 a 120.';
+    }
+
+    // 3. Decidir
+    if (count($erros) === 0) {
+        $sucesso = true;   // aqui você salvaria no banco, enviaria o e-mail…
+    }
+}
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Cadastro&lt;/title&gt;
+&lt;style&gt;.erro { color: #c00; } .ok { color: #070; }&lt;/style&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;?php if ($sucesso): ?&gt;
+  &lt;p class="ok"&gt;Cadastro recebido, &lt;?= htmlspecialchars($dados['nome']) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" novalidate&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input name="nome" value="&lt;?= htmlspecialchars($dados['nome']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['nome'])): ?&gt;&lt;span class="erro"&gt;&lt;?= $erros['nome'] ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail: &lt;input type="email" name="email" value="&lt;?= htmlspecialchars($dados['email']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['email'])): ?&gt;&lt;span class="erro"&gt;&lt;?= $erros['email'] ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Idade: &lt;input type="number" name="idade" value="&lt;?= htmlspecialchars($dados['idade']) ?&gt;"&gt;&lt;/label&gt;
+    &lt;?php if (isset($erros['idade'])): ?&gt;&lt;span class="erro"&gt;&lt;?= $erros['idade'] ?&gt;&lt;/span&gt;&lt;?php endif; ?&gt;&lt;/p&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Por quê</th></tr>
+<tr><td><code>$dados = ['nome' =&gt; '', …]</code></td><td>Começa tudo vazio. Na primeira visita (GET), o formulário usa esses valores e aparece em branco, sem avisos de chave inexistente.</td></tr>
+<tr><td><code>$erros = []</code></td><td>Um array <strong>associativo</strong>: a chave é o nome do campo, o valor é a mensagem. Assim cada mensagem sabe ao lado de qual campo aparecer.</td></tr>
+<tr><td><code>if (… === 'POST')</code></td><td>Só confere quando houve envio (de <a href="get-post.html">$_GET e $_POST</a>). Na primeira visita, nenhuma mensagem de erro.</td></tr>
+<tr><td><code>if … elseif …</code></td><td>Para cada campo, uma mensagem só: se está vazio, nem adianta conferir o formato.</td></tr>
+<tr><td><code>count($erros) === 0</code></td><td>Nenhum problema: pode seguir (salvar, enviar). Num sistema de verdade, aqui viria um redirecionamento (<a href="redirecionar.html">header e Redirecionamento</a>).</td></tr>
+<tr><td><code>value="&lt;?= htmlspecialchars($dados['nome']) ?&gt;"</code></td><td><strong>Mantém o que a pessoa digitou.</strong> Se o e-mail estava errado, ela corrige só o e-mail, sem redigitar o resto. O <code>htmlspecialchars</code> é obrigatório aqui (veja <a href="escapar-saida.html">Escapar a Saída</a>).</td></tr>
+<tr><td><code>isset($erros['nome'])</code></td><td>Mostra o <code>&lt;span class="erro"&gt;</code> só se aquele campo tem erro.</td></tr>
+<tr><td><code>novalidate</code></td><td>Desliga a conferência do navegador neste formulário, para você <strong>ver</strong> a do PHP funcionando. Num site de verdade, pode deixar as duas.</td></tr>
+</table>
+</div>
+
+<h3>As três situações</h3>
+<p><strong>Primeira visita</strong> (GET): formulário vazio, nenhuma mensagem.</p>
+<pre class="term">$ curl -s localhost:8000/cadastro.php
+…
+&lt;form method="post" novalidate&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input name="nome" value=""&gt;&lt;/label&gt;
+    &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail: &lt;input type="email" name="email" value=""&gt;&lt;/label&gt;
+    &lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Idade: &lt;input type="number" name="idade" value=""&gt;&lt;/label&gt;
+    &lt;/p&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+…</pre>
+
+<p><strong>Envio com problemas</strong>: nome só com espaços, e-mail sem o ".com", idade 150.</p>
+<pre class="term">$ curl -s localhost:8000/cadastro.php -d "nome=+++&amp;email=ana%40exemplo&amp;idade=150"
+…
+&lt;form method="post" novalidate&gt;
+  &lt;p&gt;&lt;label&gt;Nome: &lt;input name="nome" value=""&gt;&lt;/label&gt;
+    &lt;span class="erro"&gt;Informe o seu nome.&lt;/span&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail: &lt;input type="email" name="email" value="ana@exemplo"&gt;&lt;/label&gt;
+    &lt;span class="erro"&gt;Este e-mail não parece válido.&lt;/span&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Idade: &lt;input type="number" name="idade" value="150"&gt;&lt;/label&gt;
+    &lt;span class="erro"&gt;A idade deve ser um número inteiro de 1 a 120.&lt;/span&gt;&lt;/p&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+…</pre>
+<p>Cada mensagem está ao lado do seu campo, e o e-mail e a idade voltaram preenchidos (<code>value="ana@exemplo"</code>, <code>value="150"</code>). O nome voltou vazio porque o <code>trim</code> transformou os três espaços em nada.</p>
+
+<p><strong>Envio correto</strong> (com espaços sobrando no nome, que o <code>trim</code> resolve):</p>
+<pre class="term">$ curl -s localhost:8000/cadastro.php -d "nome=++Ana+Souza+&amp;email=ana%40exemplo.com&amp;idade=29"
+…
+&lt;body&gt;
+  &lt;p class="ok"&gt;Cadastro recebido, Ana Souza!&lt;/p&gt;
+&lt;form method="post" novalidate&gt;
+…</pre>
+
+<div class="tryphp" data-modo="web" data-post="nome=+++&amp;email=ana%40exemplo&amp;idade=150">
+<p class="try-task">O cadastro completo, aberto com um envio cheio de problemas. Veja as mensagens na aba <strong>Resultado</strong>, corrija um campo de cada vez e envie de novo: as mensagens somem uma a uma, e o que você digitou continua lá. Experimente idade <code>0</code>, <code>29.5</code>, <code>vinte</code>.</p>
+<pre class="script">&lt;?php
+$dados = ['nome' =&gt; '', 'email' =&gt; '', 'idade' =&gt; ''];
+$erros = [];
+$sucesso = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $dados['nome']  = trim($_POST['nome'] ?? '');
+    $dados['email'] = trim($_POST['email'] ?? '');
+    $dados['idade'] = trim($_POST['idade'] ?? '');
+
+    if ($dados['nome'] === '') {
+        $erros['nome'] = 'Informe o seu nome.';
+    }
+    if (filter_var($dados['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $erros['email'] = 'Este e-mail não parece válido.';
+    }
+    $idade = filter_var($dados['idade'], FILTER_VALIDATE_INT,
+        ['options' =&gt; ['min_range' =&gt; 1, 'max_range' =&gt; 120]]);
+    if ($idade === false) {
+        $erros['idade'] = 'A idade deve ser um número inteiro de 1 a 120.';
+    }
+    $sucesso = count($erros) === 0;
+}
+?&gt;
+&lt;style&gt;.erro { color: #c00; } .ok { color: #070; }&lt;/style&gt;
+&lt;?php if ($sucesso): ?&gt;
+  &lt;p class="ok"&gt;Cadastro recebido, &lt;?= htmlspecialchars($dados['nome']) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" novalidate&gt;
+  &lt;p&gt;Nome: &lt;input name="nome" value="&lt;?= htmlspecialchars($dados['nome']) ?&gt;"&gt;
+    &lt;span class="erro"&gt;&lt;?= $erros['nome'] ?? '' ?&gt;&lt;/span&gt;&lt;/p&gt;
+  &lt;p&gt;E-mail: &lt;input name="email" value="&lt;?= htmlspecialchars($dados['email']) ?&gt;"&gt;
+    &lt;span class="erro"&gt;&lt;?= $erros['email'] ?? '' ?&gt;&lt;/span&gt;&lt;/p&gt;
+  &lt;p&gt;Idade: &lt;input name="idade" value="&lt;?= htmlspecialchars($dados['idade']) ?&gt;"&gt;
+    &lt;span class="erro"&gt;&lt;?= $erros['idade'] ?? '' ?&gt;&lt;/span&gt;&lt;/p&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<p>Repare num atalho que a caixa acima usa: <code>&lt;?= $erros['nome'] ?? '' ?&gt;</code> escreve a mensagem se existir, ou nada. É uma alternativa mais curta ao <code>if (isset(…))</code>; o <code>&lt;span&gt;</code> vazio não aparece na tela.</p>
+
+<hr>
+
+<h2>Formas diferentes de organizar</h2>
+
+<h3>Uma função para ler campos com segurança</h3>
+<p>Quando o formulário tem muitos campos, repetir <code>trim($_POST['x'] ?? '')</code> cansa. E tem um furo: se alguém mandar um <strong>array</strong> no lugar do texto (<code>idade[]=29</code>), o <code>trim</code> para o programa (veja o cenário em <a href="#errado">Quando dá errado</a>). Uma função pequena resolve as duas coisas (funções em <a href="funcoes.html">Funções</a>):</p>
+
+<pre class="file" data-file="trecho.php">function campo(string $nome): string
+{
+    $valor = $_POST[$nome] ?? '';
+    return is_string($valor) ? trim($valor) : '';
+}
+
+$dados['nome']  = campo('nome');
+$dados['email'] = campo('email');</pre>
+
+<h3>Lista de opções permitidas</h3>
+<p>Para campos de escolha (<code>&lt;select&gt;</code>, radio), confira se o valor está na lista do que você ofereceu. Alguém pode mandar <code>sabor=pizza</code> mesmo que o <code>&lt;select&gt;</code> só tenha bolos:</p>
+<pre class="file" data-file="trecho.php">$sabores = ['cenoura', 'chocolate', 'limao'];
+$sabor = campo('sabor');
+if (!in_array($sabor, $sabores, true)) {
+    $erros['sabor'] = 'Escolha um sabor da lista.';
+}</pre>
+<p>O <code>true</code> no fim do <code>in_array</code> faz a comparação ser estrita (<code>===</code>), como você viu em <a href="funcoes-array.html">Funções de Array</a>.</p>
+
+<h3>Erros todos no topo, ou ao lado de cada campo?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Como</th><th>Quando usar</th></tr>
+<tr><td>Ao lado do campo</td><td><code>$erros['email']</code> junto do <code>&lt;input name="email"&gt;</code></td><td>O melhor para o visitante: ele vê exatamente o que corrigir. Use sempre que puder.</td></tr>
+<tr><td>Lista no topo</td><td><code>foreach ($erros as $msg) { echo "&lt;li&gt;$msg&lt;/li&gt;"; }</code></td><td>Formulários curtos, ou em conjunto com o anterior (um resumo no topo e o detalhe ao lado).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Validar no cliente × no servidor</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>No cliente (navegador)</th><th>No servidor (PHP)</th></tr>
+<tr><td>Como</td><td><code>required</code>, <code>type="email"</code>, <code>min</code>/<code>max</code>, <code>maxlength</code>, <code>pattern</code>, JavaScript</td><td><code>trim</code>, <code>filter_var</code>, <code>in_array</code>, <code>mb_strlen</code>, <code>if</code></td></tr>
+<tr><td>Quando acontece</td><td>Antes de enviar; resposta instantânea</td><td>Depois do envio; precisa ir e voltar do servidor</td></tr>
+<tr><td>Pode ser pulada?</td><td><strong>Sim</strong>: <code>curl</code>, <kbd>F12</kbd>, JavaScript desligado, outro programa</td><td><strong>Não</strong>: todo pedido passa pelo PHP</td></tr>
+<tr><td>Serve para</td><td>Conforto: avisar cedo, sem recarregar a página</td><td>Segurança e dados corretos no sistema</td></tr>
+<tr><td>Obrigatória?</td><td>Não (mas é gentil)</td><td><strong>Sim, sempre</strong></td></tr>
+</table>
+</div>
+<p>O ideal é ter as duas: o navegador avisa rápido quem errou sem querer, e o PHP barra o resto. Se for escolher uma só, é a do servidor.</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>trim(): Argument #1 ($string) must be of type string, array given</code></strong>
+<pre class="term">$ curl -s localhost:8000/cadastro.php -d "nome=Ana&amp;email=ana%40exemplo.com&amp;idade%5B%5D=29"
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: trim(): Argument #1 ($string) must be of type string, array given in /home/ana/site/cadastro.php:10
+Stack trace:
+#0 /home/ana/site/cadastro.php(10): trim(Array)
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/site/cadastro.php&lt;/b&gt; on line &lt;b&gt;10&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> alguém mandou <code>idade[]=29</code> (com colchetes), e o PHP transformou a idade em array (como em <a href="get-post.html">name="frutas[]"</a>). O <code>trim</code> só aceita texto e o programa parou com um erro fatal (<em>Uncaught TypeError</em> = erro de tipo não tratado). O seu formulário nunca mandaria isso; um atacante ou um robô, sim.</p>
+<p><strong>Como resolver:</strong> confira o tipo antes, com a função <code>campo()</code> mostrada acima (<code>is_string($valor) ? trim($valor) : ''</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>A quantidade <code>0</code> foi recusada (ou aceita) sem querer</strong>
+<pre class="term">$ php zero.php
+Errado: 0 foi tratado como inválido
+Válido: 0</pre>
+<p><strong>O que aconteceu:</strong> <code>if (!filter_var(…))</code> trata o <code>0</code> aprovado como se fosse <code>false</code>. O mesmo acontece com <code>empty($_POST['qtd'])</code>, que acha <code>"0"</code> vazio.</p>
+<p><strong>Como resolver:</strong> <code>if ($qtd === false)</code>. Se o zero não for permitido, diga isso com <code>min_range</code>, não por acidente.</p>
+</div>
+
+<div class="cenario">
+<strong>Um e-mail válido foi recusado</strong>
+<p><strong>O que aconteceu:</strong> quase sempre, espaço nas pontas (<code>' ana@exemplo.com'</code> → <code>bool(false)</code>, como na tabela acima). Celulares adoram colocar um espaço depois do e-mail.</p>
+<p><strong>Como resolver:</strong> <code>trim</code> antes do <code>filter_var</code>. E guarde o valor já aparado.</p>
+</div>
+
+<div class="cenario">
+<strong>Depois do erro, o formulário voltou em branco</strong>
+<p><strong>O que aconteceu:</strong> os <code>&lt;input&gt;</code> não têm <code>value</code>, então o navegador mostra o formulário vazio. A pessoa precisa digitar tudo de novo, e muitas desistem.</p>
+<p><strong>Como resolver:</strong> <code>value="&lt;?= htmlspecialchars($dados['campo']) ?&gt;"</code> em cada campo. Para <code>&lt;textarea&gt;</code>, o valor vai entre as tags; para <code>&lt;select&gt;</code>, coloque <code>selected</code> na opção que bate (<code>&lt;?= $dados['sabor'] === 'limao' ? 'selected' : '' ?&gt;</code>); para checkbox e radio, <code>checked</code>. <strong>Nunca</strong> devolva o campo de senha preenchido.</p>
+</div>
+
+<div class="cenario">
+<strong>O campo voltou "cortado" quando tinha aspas</strong>
+<p><strong>O que aconteceu:</strong> o valor foi escrito no <code>value="…"</code> sem <code>htmlspecialchars</code>. Um nome como <code>Ana "Aninha" Souza</code> fecha as aspas do atributo no meio, e o resto some (ou vira HTML). Esse é o começo de um ataque XSS.</p>
+<p><strong>Como resolver:</strong> sempre <code>htmlspecialchars</code> ao devolver dados para a página. A aula seguinte, <a href="escapar-saida.html">Escapar a Saída (XSS)</a>, é inteira sobre isso.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>trim($s)</code></td><td>Tira espaços, tabs e quebras de linha das pontas</td></tr>
+<tr><td><code>$s === ''</code></td><td>Campo obrigatório vazio (depois do <code>trim</code>)</td></tr>
+<tr><td><code>mb_strlen($s) &gt; 60</code></td><td>Texto longo demais (contando acentos certo)</td></tr>
+<tr><td><code>filter_var($s, FILTER_VALIDATE_EMAIL)</code></td><td>O e-mail, ou <code>false</code></td></tr>
+<tr><td><code>filter_var($s, FILTER_VALIDATE_INT)</code></td><td>O <code>int</code>, ou <code>false</code></td></tr>
+<tr><td><code>filter_var($s, FILTER_VALIDATE_INT, ['options' =&gt; ['min_range' =&gt; 1, 'max_range' =&gt; 10]])</code></td><td>Inteiro de 1 a 10, ou <code>false</code></td></tr>
+<tr><td><code>… === false</code></td><td>A forma certa de saber se o filtro reprovou</td></tr>
+<tr><td><code>in_array($v, $permitidos, true)</code></td><td>O valor está na lista de opções?</td></tr>
+<tr><td><code>is_string($v)</code></td><td>Chegou texto (e não um array)?</td></tr>
+<tr><td><code>$erros['campo'] = 'mensagem'</code></td><td>Guarda o erro de um campo</td></tr>
+<tr><td><code>value="&lt;?= htmlspecialchars($v) ?&gt;"</code></td><td>Devolve ao campo o que foi digitado</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Obrigatório de verdade</h3>
+<p>Complete para que um nome feito só de espaços seja considerado vazio:</p>
+<div class="ex-code">$nome = <input data-answer="trim" aria-label="função">($_POST['nome'] ?? '');</div>
+</div>
+
+<div class="exercise">
+<h3>2. O filtro de e-mail</h3>
+<p>Complete com a constante do filtro:</p>
+<div class="ex-code">filter_var($email, <input data-answer="FILTER_VALIDATE_EMAIL" aria-label="filtro">)</div>
+</div>
+
+<div class="exercise">
+<h3>3. Reprovou?</h3>
+<p>Complete a comparação que não confunde o número zero com reprovação:</p>
+<div class="ex-code">if ($qtd <input data-answer="=== false|===false" aria-label="comparação">) { … }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O formulário tem <code>&lt;input type="number" min="1" max="10" required&gt;</code>. O PHP ainda precisa conferir o valor?</p>
+<label><input type="radio" name="q4"> Não: o navegador já impede valores fora da faixa.</label>
+<label><input type="radio" name="q4"> Só se o site não usar HTTPS.</label>
+<label><input type="radio" name="q4"> Sim: o pedido pode vir de fora do formulário (curl, F12, robôs).</label>
+<label><input type="radio" name="q4"> Só em formulários GET.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que <code>filter_var('29 anos', FILTER_VALIDATE_INT)</code> devolve?</p>
+<label><input type="radio" name="q5"> <code>int(29)</code></label>
+<label><input type="radio" name="q5"> <code>bool(false)</code></label>
+<label><input type="radio" name="q5"> <code>string(7) "29 anos"</code></label>
+<label><input type="radio" name="q5"> Um Warning.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que guardar os erros como <code>$erros['email'] = '…'</code>, com o nome do campo na chave?</p>
+<label><input type="radio" name="q6"> Para mostrar cada mensagem ao lado do campo certo.</label>
+<label><input type="radio" name="q6"> Porque o PHP não aceita arrays indexados com texto.</label>
+<label><input type="radio" name="q6"> Para o navegador ler os erros sozinho.</label>
+<label><input type="radio" name="q6"> Porque <code>count</code> só funciona assim.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="cliente=Bia&amp;qtd=15" data-goal="html:Escolha de 1 a 10 bolos.,src:FILTER_VALIDATE_INT,src:max_range,semerro">
+<p class="try-task"><strong>Missão:</strong> a encomenda da padaria aceita de 1 a 10 bolos. A página foi aberta com um envio de <strong>15</strong>. Complete a conferência da quantidade com <code>filter_var</code> e <code>FILTER_VALIDATE_INT</code> com <code>min_range</code> 1 e <code>max_range</code> 10; se reprovar, guarde em <code>$erros['qtd']</code> a mensagem <code>Escolha de 1 a 10 bolos.</code> Depois teste na aba <strong>Resultado</strong> com 0, 3, 10 e "dois".</p>
+<pre class="script">&lt;?php
+$cliente = '';
+$qtd = '';
+$erros = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $cliente = trim($_POST['cliente'] ?? '');
+    $qtd = trim($_POST['qtd'] ?? '');
+    if ($cliente === '') {
+        $erros['cliente'] = 'Informe o nome.';
+    }
+    // confira a quantidade aqui
+
+    if (count($erros) === 0) {
+        echo "&lt;p&gt;Encomenda de $qtd bolo(s) para " . htmlspecialchars($cliente) . " anotada!&lt;/p&gt;";
+    }
+}
+?&gt;
+&lt;form method="post" novalidate&gt;
+  &lt;p&gt;Nome: &lt;input name="cliente" value="&lt;?= htmlspecialchars($cliente) ?&gt;"&gt;
+     &lt;?= $erros['cliente'] ?? '' ?&gt;&lt;/p&gt;
+  &lt;p&gt;Quantidade: &lt;input name="qtd" value="&lt;?= htmlspecialchars($qtd) ?&gt;"&gt;
+     &lt;?= $erros['qtd'] ?? '' ?&gt;&lt;/p&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$cliente = '';
+$qtd = '';
+$erros = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $cliente = trim($_POST['cliente'] ?? '');
+    $qtd = trim($_POST['qtd'] ?? '');
+    if ($cliente === '') {
+        $erros['cliente'] = 'Informe o nome.';
+    }
+    $n = filter_var($qtd, FILTER_VALIDATE_INT, ['options' =&gt; ['min_range' =&gt; 1, 'max_range' =&gt; 10]]);
+    if ($n === false) {
+        $erros['qtd'] = 'Escolha de 1 a 10 bolos.';
+    }
+
+    if (count($erros) === 0) {
+        echo "&lt;p&gt;Encomenda de $qtd bolo(s) para " . htmlspecialchars($cliente) . " anotada!&lt;/p&gt;";
+    }
+}
+?&gt;
+&lt;form method="post" novalidate&gt;
+  &lt;p&gt;Nome: &lt;input name="cliente" value="&lt;?= htmlspecialchars($cliente) ?&gt;"&gt;
+     &lt;?= $erros['cliente'] ?? '' ?&gt;&lt;/p&gt;
+  &lt;p&gt;Quantidade: &lt;input name="qtd" value="&lt;?= htmlspecialchars($qtd) ?&gt;"&gt;
+     &lt;?= $erros['qtd'] ?? '' ?&gt;&lt;/p&gt;
+  &lt;button&gt;Encomendar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="nome=Ana+Souza&amp;email=ana%40exemplo" data-goal="out:value=&quot;Ana Souza&quot;,out:value=&quot;ana@exemplo&quot;,html:Este e-mail não parece válido.">
+<p class="try-task"><strong>Missão:</strong> o formulário mostra o erro, mas apaga o que a pessoa digitou. A página foi aberta com um envio (nome certo, e-mail errado). Faça os dois campos voltarem preenchidos, com <code>value="&lt;?= htmlspecialchars(…) ?&gt;"</code>.</p>
+<pre class="script">&lt;?php
+$nome = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$erros = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    &amp;&amp; filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+    $erros['email'] = 'Este e-mail não parece válido.';
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;Nome: &lt;input name="nome"&gt;&lt;/p&gt;
+  &lt;p&gt;E-mail: &lt;input name="email"&gt; &lt;?= $erros['email'] ?? '' ?&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$erros = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    &amp;&amp; filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+    $erros['email'] = 'Este e-mail não parece válido.';
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;Nome: &lt;input name="nome" value="&lt;?= htmlspecialchars($nome) ?&gt;"&gt;&lt;/p&gt;
+  &lt;p&gt;E-mail: &lt;input name="email" value="&lt;?= htmlspecialchars($email) ?&gt;"&gt; &lt;?= $erros['email'] ?? '' ?&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>A validação do navegador é conforto; a do PHP é obrigatória. Tudo o que vem do visitante é suspeito até ser conferido.</li>
+  <li>Leia com <code>?? ''</code>, apare com <code>trim</code>, compare com <code>=== ''</code> para campos obrigatórios.</li>
+  <li><code>filter_var</code> devolve o valor aprovado ou <code>false</code>: <code>FILTER_VALIDATE_EMAIL</code>, <code>FILTER_VALIDATE_INT</code> (com <code>min_range</code>/<code>max_range</code>).</li>
+  <li>Sempre <code>=== false</code>: o zero aprovado parece falso num <code>if</code>.</li>
+  <li>Guarde os problemas em <code>$erros['campo']</code>; sem erros (<code>count($erros) === 0</code>), siga em frente.</li>
+  <li>Mostre cada erro ao lado do campo e devolva os valores digitados com <code>value="&lt;?= htmlspecialchars(…) ?&gt;"</code>.</li>
+  <li>Para escolhas, confira com <code>in_array(…, true)</code>; para texto, garanta que não chegou um array (<code>is_string</code>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
