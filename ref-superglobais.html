@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Superglobais — $_GET, $_POST, $_SERVER, $_FILES, $_COOKIE, $_SESSION e outras | Guia PHP</title>
+<meta name="description" content="Referência das superglobais do PHP 8.5: $_GET, $_POST, $_SERVER (cada chave com o valor real do php -S), $_FILES (estrutura e códigos de erro), $_COOKIE, $_SESSION, $_ENV, $_REQUEST e $GLOBALS, com exemplos conferidos e links para as aulas.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Superglobais</span></h1>
+
+<p class="intro">As <strong>superglobais</strong> são arrays que o PHP preenche sozinho a cada requisição: o que veio na URL, o que o formulário mandou, os cookies, os arquivos enviados, dados do servidor. "Super" porque estão disponíveis <strong>em qualquer lugar</strong>, até dentro de funções, sem <code>global</code>. Esta página é a consulta rápida; os valores mostrados são <strong>reais</strong>, do servidor embutido (<code>php -S</code>) na máquina da Ana. Para aprender com calma, veja <a href="get-post.html">$_GET e $_POST</a> e <a href="superglobais.html">$_SERVER e Outras Superglobais</a>.</p>
+
+<div class="note">
+<strong>Regra de segurança para a página inteira</strong>
+<p>Tudo o que vem de <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code>, <code>$_FILES</code>, <code>$_REQUEST</code> e das chaves <code>HTTP_*</code> de <code>$_SERVER</code> foi <strong>escrito pelo visitante</strong>, que pode mandar qualquer coisa. Sempre: confira se existe (<code>??</code>), valide (<a href="validacao.html">Validar Dados</a>), escape na saída com <code>htmlspecialchars</code> (<a href="escapar-saida.html">XSS</a>) e use prepared statements no banco (<a href="prepared-statements.html">SQL Injection</a>).</p>
+</div>
+
+<p>Atalhos: <a href="#visao">Visão geral</a> · <a href="#get">$_GET</a> · <a href="#post">$_POST</a> · <a href="#server">$_SERVER</a> · <a href="#files">$_FILES</a> · <a href="#cookie">$_COOKIE</a> · <a href="#session">$_SESSION</a> · <a href="#env">$_ENV</a> · <a href="#request">$_REQUEST</a> · <a href="#globals">$GLOBALS</a></p>
+
+<hr>
+
+<h2 id="visao">Visão geral</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Superglobal</th><th>O que guarda</th><th>De onde vem</th><th>Aula</th></tr>
+<tr><td><code>$_GET</code></td><td>Os parâmetros da URL (depois do <code>?</code>)</td><td>Links e formulários <code>method="get"</code></td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>$_POST</code></td><td>Os campos de um formulário enviado por POST</td><td>Formulários <code>method="post"</code></td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>$_SERVER</code></td><td>Dados da requisição e do servidor (método, URL, cabeçalhos…)</td><td>O servidor web (ou o terminal, no CLI)</td><td><a href="superglobais.html">$_SERVER</a></td></tr>
+<tr><td><code>$_FILES</code></td><td>Os arquivos enviados num formulário</td><td><code>&lt;input type="file"&gt;</code> com <code>enctype="multipart/form-data"</code></td><td><a href="upload.html">Upload de Arquivos</a></td></tr>
+<tr><td><code>$_COOKIE</code></td><td>Os cookies que o navegador mandou</td><td>Cookies criados antes com <code>setcookie</code></td><td><a href="cookies.html">Cookies</a></td></tr>
+<tr><td><code>$_SESSION</code></td><td>Dados guardados <strong>no servidor</strong> para este visitante</td><td>O seu código, depois de <code>session_start()</code></td><td><a href="sessoes.html">Sessões</a></td></tr>
+<tr><td><code>$_ENV</code></td><td>Variáveis de ambiente</td><td>O sistema operacional (se <code>variables_order</code> tiver <code>E</code>)</td><td><a href="superglobais.html">$_SERVER</a></td></tr>
+<tr><td><code>$_REQUEST</code></td><td><code>$_GET</code> + <code>$_POST</code> (+ <code>$_COOKIE</code>) misturados</td><td>Os três acima</td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>$GLOBALS</code></td><td>Todas as variáveis globais do script</td><td>O seu código</td><td><a href="escopo.html">Escopo</a></td></tr>
+</table>
+</div>
+
+<p>Todas são <strong>arrays associativos</strong> (<a href="arrays-associativos.html">aula</a>): lê-se com colchetes e a chave entre aspas, e uma chave que não existe dá <code>Warning: Undefined array key</code>. Por isso o jeito seguro de ler é com <code>??</code> (<a href="null-coalescing.html">aula</a>):</p>
+<pre class="file" data-file="index.php">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";   // se não veio, usa "visitante"
+echo "Olá, " . htmlspecialchars($nome);
+</pre>
+
+<p>E elas funcionam dentro de funções sem nenhuma declaração (as variáveis comuns não: veja <a href="escopo.html">Escopo</a>):</p>
+<pre class="file" data-file="g4.php">&lt;?php
+function f() { echo $_GET["x"] ?? "sem x", " | ", $_SERVER["PHP_SELF"], "\n"; }
+f();
+</pre>
+<pre class="term" data-cwd="~/sg">$ php g4.php
+sem x | g4.php</pre>
+
+<hr>
+
+<h2 id="get">$_GET</h2>
+<p>Cada par <code>nome=valor</code> da URL vira uma chave. <strong>Os valores são sempre texto</strong> (<code>string</code>), mesmo que pareçam números; colchetes no nome (<code>cores[]</code>) fazem o PHP montar um array.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>URL pedida</th><th>Resultado</th><th>Observação</th></tr>
+<tr><td><code>/tudo.php?nome=Bia&amp;pagina=2</code></td><td><code>["nome" =&gt; "Bia", "pagina" =&gt; "2"]</code></td><td><code>"2"</code> é texto: converta com <code>(int)</code> ou valide com <code>filter_var</code>.</td></tr>
+<tr><td><code>/tudo.php</code></td><td><code>[]</code> (array vazio)</td><td><code>$_GET["nome"]</code> daria <code>Undefined array key "nome"</code>; use <code>$_GET["nome"] ?? ""</code>.</td></tr>
+<tr><td><code>/busca.php?q=caf%C3%A9+com+leite</code></td><td><code>["q" =&gt; "café com leite"]</code></td><td>O PHP já decodifica <code>%C3%A9</code> e <code>+</code> (espaço). Para montar URLs, use <code>urlencode</code> ou <code>http_build_query</code>.</td></tr>
+<tr><td><code>?cores[]=azul&amp;cores[]=verde</code></td><td><code>["cores" =&gt; ["azul", "verde"]]</code></td><td>Vira array (o mesmo vale para <code>$_POST</code>). Por isso confira com <code>is_string</code> antes de passar a funções de texto.</td></tr>
+<tr><td><code>/ola.php?nome=&lt;b&gt;Ana&lt;/b&gt;</code></td><td><code>["nome" =&gt; "&lt;b&gt;Ana&lt;/b&gt;"]</code></td><td>O visitante pode mandar HTML. Com <code>htmlspecialchars</code>, sai <code>&amp;lt;b&amp;gt;Ana&amp;lt;/b&amp;gt;</code> (inofensivo).</td></tr>
+</table>
+</div>
+
+<p>Conferido com <code>curl</code>. O servidor roda num terminal; os pedidos, em outro:</p>
+<pre class="term" data-cwd="~/sg">$ php -S localhost:8000
+[Fri Oct 16 20:51:24 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;p&gt;Método: &lt;?= $_SERVER["REQUEST_METHOD"] ?&gt;&lt;/p&gt;
+</pre>
+<pre class="term" data-cwd="~/sg">$ curl -s "localhost:8000/ola.php?nome=Ana&amp;cidade=Recife"
+&lt;p&gt;Olá, Ana!&lt;/p&gt;
+&lt;p&gt;Método: GET&lt;/p&gt;
+$ curl -s "localhost:8000/ola.php?nome=&lt;b&gt;Ana&lt;/b&gt;"
+&lt;p&gt;Olá, &amp;lt;b&amp;gt;Ana&amp;lt;/b&amp;gt;!&lt;/p&gt;
+&lt;p&gt;Método: GET&lt;/p&gt;</pre>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=Ana&amp;cidade=Recife" data-goal="html:Ana mora em Recife.">
+<p class="try-task"><strong>Experimente:</strong> a página recebe <code>?nome=Ana&amp;cidade=Recife</code>, mas só usa o nome. Leia também <code>cidade</code> (com <code>??</code>) e acrescente o parágrafo <code>Ana mora em Recife.</code>, escapado com <code>htmlspecialchars</code>.</p>
+<pre class="script">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;p&gt;Método: &lt;?= $_SERVER["REQUEST_METHOD"] ?&gt;&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = $_GET["nome"] ?? "visitante";
+$cidade = $_GET["cidade"] ?? "algum lugar";
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;p&gt;Método: &lt;?= $_SERVER["REQUEST_METHOD"] ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;?= htmlspecialchars($nome) ?&gt; mora em &lt;?= htmlspecialchars($cidade) ?&gt;.&lt;/p&gt;
+</pre>
+</div>
+
+<h2 id="post">$_POST</h2>
+<p>Os campos de um formulário com <code>method="post"</code>. A chave é o <code>name</code> do campo. Os dados vão no <strong>corpo</strong> da requisição, não na URL (não aparecem no histórico nem no log do servidor).</p>
+<pre class="file" data-file="tudo.php">&lt;?php
+header("Content-Type: text/plain; charset=utf-8");
+echo "GET: "; var_dump($_GET);
+echo "POST: "; var_dump($_POST);
+echo "COOKIE: "; var_dump($_COOKIE);
+echo "REQUEST: "; var_dump($_REQUEST);
+</pre>
+<p>Um pedido com tudo ao mesmo tempo: parâmetros na URL, campos de formulário (<code>-d</code> faz o <code>curl</code> enviar por POST, como um formulário) e um cookie (<code>-b</code>):</p>
+<pre class="term" data-cwd="~/sg">$ curl -s -b "tema=escuro" -d "nome=Ana&amp;cores[]=azul&amp;cores[]=verde" "localhost:8000/tudo.php?nome=Bia&amp;pagina=2"
+GET: array(2) {
+  ["nome"]=&gt;
+  string(3) "Bia"
+  ["pagina"]=&gt;
+  string(1) "2"
+}
+POST: array(2) {
+  ["nome"]=&gt;
+  string(3) "Ana"
+  ["cores"]=&gt;
+  array(2) {
+    [0]=&gt;
+    string(4) "azul"
+    [1]=&gt;
+    string(5) "verde"
+  }
+}
+COOKIE: array(1) {
+  ["tema"]=&gt;
+  string(6) "escuro"
+}
+REQUEST: array(4) {
+  ["nome"]=&gt;
+  string(3) "Ana"
+  ["pagina"]=&gt;
+  string(1) "2"
+  ["cores"]=&gt;
+  array(2) {
+    [0]=&gt;
+    string(4) "azul"
+    [1]=&gt;
+    string(5) "verde"
+  }
+  ["tema"]=&gt;
+  string(6) "escuro"
+}</pre>
+<p>Repare: um mesmo pedido POST pode ter <code>$_GET</code> (o que está na URL) <strong>e</strong> <code>$_POST</code> (o corpo). E <code>$_REQUEST</code> misturou tudo: o <code>nome</code> do POST (<code>Ana</code>) apagou o do GET (<code>Bia</code>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que acontece</th></tr>
+<tr><td>Checkbox desmarcado</td><td>O campo <strong>não vem</strong>: use <code>isset($_POST["aceito"])</code>.</td></tr>
+<tr><td><code>&lt;select multiple name="cores[]"&gt;</code></td><td><code>$_POST["cores"]</code> é um array (ou não existe, se nada foi escolhido).</td></tr>
+<tr><td>Campo vazio</td><td>Vem como <code>""</code> (texto vazio), não como <code>null</code>.</td></tr>
+<tr><td>Corpo em JSON (<code>Content-Type: application/json</code>)</td><td><code>$_POST</code> fica <strong>vazio</strong>. Leia com <code>json_decode(file_get_contents("php://input"), true)</code>. Veja <a href="api-json.html">Criar uma API JSON</a> e o <a href="projeto-api.html">projeto da API</a>.</td></tr>
+<tr><td>Saber se o formulário foi enviado</td><td><code>if ($_SERVER["REQUEST_METHOD"] === "POST")</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="server">$_SERVER</h2>
+<p>Informações sobre a requisição atual e o servidor. Os valores abaixo são os <strong>reais</strong> que o <code>php -S</code> da Ana entregou para este pedido (o <code>-H</code> do <code>curl</code> manda um cabeçalho, como um navegador faria):</p>
+<pre class="term" data-cwd="~/sg">$ curl -s "localhost:8000/server.php?busca=caneta&amp;pagina=2" -H "Referer: http://localhost:8000/" -H "Accept-Language: pt-BR"
+REQUEST_METHOD         =&gt; 'GET'
+REQUEST_URI            =&gt; '/server.php?busca=caneta&amp;pagina=2'
+QUERY_STRING           =&gt; 'busca=caneta&amp;pagina=2'
+SCRIPT_NAME            =&gt; '/server.php'
+SCRIPT_FILENAME        =&gt; '/home/ana/sg/server.php'
+PHP_SELF               =&gt; '/server.php'
+PATH_INFO              =&gt; NULL
+DOCUMENT_ROOT          =&gt; '/home/ana/sg'
+SERVER_NAME            =&gt; 'localhost'
+SERVER_PORT            =&gt; '8000'
+SERVER_PROTOCOL        =&gt; 'HTTP/1.1'
+SERVER_SOFTWARE        =&gt; 'PHP/8.5.8 (Development Server)'
+SERVER_ADDR            =&gt; NULL
+REMOTE_ADDR            =&gt; '127.0.0.1'
+REMOTE_PORT            =&gt; '46668'
+HTTP_HOST              =&gt; 'localhost:8000'
+HTTP_USER_AGENT        =&gt; 'curl/8.18.0'
+HTTP_ACCEPT            =&gt; '*/*'
+HTTP_ACCEPT_LANGUAGE   =&gt; 'pt-BR'
+HTTP_REFERER           =&gt; 'http://localhost:8000/'
+CONTENT_TYPE           =&gt; NULL
+CONTENT_LENGTH         =&gt; NULL
+HTTPS                  =&gt; NULL
+REQUEST_TIME           =&gt; 1792194685
+REQUEST_TIME_FLOAT     =&gt; 1792194685.127057</pre>
+<p>O <code>server.php</code> só percorre uma lista de chaves e mostra cada valor com <code>var_export</code> (<code>NULL</code> = a chave não existe neste pedido):</p>
+<pre class="file" data-file="server.php">&lt;?php
+header("Content-Type: text/plain; charset=utf-8");
+$chaves = ["REQUEST_METHOD", "REQUEST_URI", "QUERY_STRING", /* … */ "REQUEST_TIME_FLOAT"];
+foreach ($chaves as $c) {
+    echo str_pad($c, 22), " =&gt; ", var_export($_SERVER[$c] ?? null, true), "\n";
+}
+</pre>
+
+<h3>As chaves principais</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>Valor real (php -S)</th><th>Para que serve</th></tr>
+<tr><td><code>REQUEST_METHOD</code></td><td><code>'GET'</code>; num envio de formulário, <code>'POST'</code></td><td>Saber se o formulário foi enviado; numa API, escolher a ação (<code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code>).</td></tr>
+<tr><td><code>REQUEST_URI</code></td><td><code>'/server.php?busca=caneta&amp;pagina=2'</code></td><td>O caminho pedido, com a query string. Base de roteadores: <code>parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH)</code>.</td></tr>
+<tr><td><code>QUERY_STRING</code></td><td><code>'busca=caneta&amp;pagina=2'</code></td><td>Só a parte depois do <code>?</code> (já separada em <code>$_GET</code>).</td></tr>
+<tr><td><code>SCRIPT_NAME</code></td><td><code>'/server.php'</code></td><td>O caminho do script na URL.</td></tr>
+<tr><td><code>SCRIPT_FILENAME</code></td><td><code>'/home/ana/sg/server.php'</code></td><td>O caminho do arquivo no disco.</td></tr>
+<tr><td><code>PHP_SELF</code></td><td><code>'/server.php'</code></td><td>O script atual na URL, <strong>incluindo</strong> o <code>PATH_INFO</code>. Cuidado: veja o <a href="#phpself">cenário abaixo</a>.</td></tr>
+<tr><td><code>PATH_INFO</code></td><td>em <code>/server.php/posts/3</code>: <code>'/posts/3'</code></td><td>O que vem depois do nome do script; usado em APIs simples.</td></tr>
+<tr><td><code>DOCUMENT_ROOT</code></td><td><code>'/home/ana/sg'</code></td><td>A pasta raiz do site (onde o <code>php -S</code> foi iniciado, ou a de <code>-t</code>).</td></tr>
+<tr><td><code>SERVER_NAME</code> / <code>SERVER_PORT</code></td><td><code>'localhost'</code> / <code>'8000'</code></td><td>Nome e porta do servidor.</td></tr>
+<tr><td><code>SERVER_PROTOCOL</code></td><td><code>'HTTP/1.1'</code></td><td>Versão do HTTP; útil em <code>header($_SERVER["SERVER_PROTOCOL"] . " 404 Not Found")</code>.</td></tr>
+<tr><td><code>SERVER_SOFTWARE</code></td><td><code>'PHP/8.5.8 (Development Server)'</code></td><td>Que servidor está rodando (no Apache: <code>Apache/2.4…</code>).</td></tr>
+<tr><td><code>REMOTE_ADDR</code> / <code>REMOTE_PORT</code></td><td><code>'127.0.0.1'</code> / <code>'46668'</code></td><td>O IP (e a porta) de quem pediu. Atrás de um proxy, é o IP do proxy.</td></tr>
+<tr><td><code>HTTP_HOST</code></td><td><code>'localhost:8000'</code></td><td>O endereço que o visitante digitou (cabeçalho <code>Host</code>). Vem do visitante: não confie cegamente.</td></tr>
+<tr><td><code>HTTP_USER_AGENT</code></td><td><code>'curl/8.18.0'</code></td><td>O programa/navegador do visitante. Qualquer um pode mandar qualquer texto aqui.</td></tr>
+<tr><td><code>HTTP_ACCEPT</code></td><td><code>'*/*'</code></td><td>Que formatos o cliente aceita (<code>text/html</code>, <code>application/json</code>…).</td></tr>
+<tr><td><code>HTTP_ACCEPT_LANGUAGE</code></td><td><code>'pt-BR'</code></td><td>Idiomas preferidos do visitante.</td></tr>
+<tr><td><code>HTTP_REFERER</code></td><td><code>'http://localhost:8000/'</code></td><td>A página de onde o visitante veio (escrito assim mesmo, "referer", com um <code>r</code>). Só existe se o navegador mandar.</td></tr>
+<tr><td><code>HTTP_*</code> (qualquer)</td><td>—</td><td>Todo cabeçalho vira uma chave: <code>X-Token: abc</code> → <code>$_SERVER["HTTP_X_TOKEN"]</code>.</td></tr>
+<tr><td><code>CONTENT_TYPE</code> / <code>CONTENT_LENGTH</code></td><td>no POST: <code>'application/x-www-form-urlencoded'</code> / <code>'17'</code></td><td>O formato e o tamanho do corpo. Não existem em GET.</td></tr>
+<tr><td><code>HTTPS</code></td><td><code>NULL</code> (não existe)</td><td>Em servidores com HTTPS, costuma valer <code>'on'</code>.</td></tr>
+<tr><td><code>SERVER_ADDR</code></td><td><code>NULL</code> no <code>php -S</code></td><td>O IP do servidor (o Apache e o nginx preenchem).</td></tr>
+<tr><td><code>REQUEST_TIME</code></td><td><code>1792194685</code></td><td>Quando o pedido chegou, em segundos desde 1970 (timestamp). <code>date("d/m/Y H:i", $_SERVER["REQUEST_TIME"])</code>; veja <a href="datas.html">Datas</a>.</td></tr>
+<tr><td><code>REQUEST_TIME_FLOAT</code></td><td><code>1792194685.127057</code></td><td>O mesmo, com microssegundos (para medir quanto a página demorou).</td></tr>
+</table>
+</div>
+
+<p>Num pedido POST e num pedido com <code>PATH_INFO</code>, as chaves que mudam:</p>
+<pre class="term" data-cwd="~/sg">$ curl -s -d "nome=Ana&amp;idade=29" localhost:8000/server.php | grep -E "METHOD|CONTENT|QUERY"
+REQUEST_METHOD         =&gt; 'POST'
+QUERY_STRING           =&gt; NULL
+CONTENT_TYPE           =&gt; 'application/x-www-form-urlencoded'
+CONTENT_LENGTH         =&gt; '17'
+$ curl -s "localhost:8000/server.php/posts/3" | grep -E "PATH_INFO|SCRIPT_NAME|PHP_SELF|REQUEST_URI"
+REQUEST_URI            =&gt; '/server.php/posts/3'
+SCRIPT_NAME            =&gt; '/server.php'
+PHP_SELF               =&gt; '/server.php/posts/3'
+PATH_INFO              =&gt; '/posts/3'</pre>
+
+<p>Todas as chaves que o <code>php -S</code> criou num GET simples (o Apache e o nginx criam mais):</p>
+<pre class="term" data-cwd="~/sg">$ curl -s localhost:8000/chaves.php | tr "\n" " "
+DOCUMENT_ROOT HTTP_ACCEPT HTTP_HOST HTTP_USER_AGENT PHP_SELF REMOTE_ADDR REMOTE_PORT REQUEST_METHOD REQUEST_TIME REQUEST_TIME_FLOAT REQUEST_URI SCRIPT_FILENAME SCRIPT_NAME SERVER_NAME SERVER_PORT SERVER_PROTOCOL SERVER_SOFTWARE </pre>
+
+<h3>$_SERVER no terminal (CLI)</h3>
+<p>Rodando <code>php arquivo.php</code>, não há requisição: as chaves <code>REQUEST_*</code> e <code>HTTP_*</code> não existem, e aparecem outras, como <code>argv</code> (os argumentos) e as variáveis de ambiente (<code>HOME</code>, <code>PATH</code>…). Veja <a href="linha-comando.html">PHP na Linha de Comando</a>.</p>
+<pre class="file" data-file="cli.php">&lt;?php
+echo $_SERVER["argc"], "\n";
+print_r($_SERVER["argv"]);
+echo $_SERVER["PHP_SELF"], " | ", $_SERVER["SCRIPT_NAME"], " | ", $_SERVER["SCRIPT_FILENAME"], "\n";
+echo $_SERVER["REQUEST_METHOD"] ?? "(sem REQUEST_METHOD)", "\n";
+echo PHP_SAPI, "\n";
+</pre>
+<pre class="term" data-cwd="~/sg">$ php cli.php ana 29
+3
+Array
+(
+    [0] =&gt; cli.php
+    [1] =&gt; ana
+    [2] =&gt; 29
+)
+cli.php | cli.php | cli.php
+(sem REQUEST_METHOD)
+cli</pre>
+<p><code>PHP_SAPI</code> (uma constante, não uma superglobal) diz onde o PHP está rodando: <code>cli</code> no terminal, <code>cli-server</code> no <code>php -S</code>, <code>apache2handler</code> ou <code>fpm-fcgi</code> em servidores.</p>
+
+<div class="cenario" id="phpself">
+<strong>Quando dá errado: <code>PHP_SELF</code> no <code>action</code> do formulário</strong>
+<p>Um atalho antigo e perigoso, comum em tutoriais:</p>
+<pre class="file" data-file="self.php">&lt;form action="&lt;?= $_SERVER["PHP_SELF"] ?&gt;" method="post"&gt;
+</pre>
+<p>Como <code>PHP_SELF</code> inclui o <code>PATH_INFO</code>, que o visitante escreve na URL, alguém pode montar um link que injeta HTML na sua página:</p>
+<pre class="term" data-cwd="~/sg">$ curl -s "localhost:8000/self.php/%22%3E%3Cscript%3Ealert(1)%3C/script%3E"
+&lt;form action="/self.php/"&gt;&lt;script&gt;alert(1)&lt;/script&gt;" method="post"&gt;</pre>
+<p>O <code>&lt;script&gt;</code> entrou no HTML: é um ataque XSS (<a href="escapar-saida.html">aula</a>). <strong>Como consertar:</strong> para enviar o formulário à própria página, deixe o <code>action</code> vazio (<code>action=""</code>) ou omita-o; se precisar do valor, escape: <code>htmlspecialchars($_SERVER["PHP_SELF"])</code>.</p>
+</div>
+
+<hr>
+
+<h2 id="files">$_FILES</h2>
+<p>Os arquivos enviados por um formulário com <code>method="post"</code> e <code>enctype="multipart/form-data"</code>. Cada campo <code>&lt;input type="file" name="foto"&gt;</code> vira <code>$_FILES["foto"]</code>, um array com 6 chaves. O <code>-F</code> do <code>curl</code> envia como esse formulário:</p>
+<pre class="term" data-cwd="~/sg">$ curl -s -F "foto=@produtos.csv" -F "titulo=Lista" localhost:8000/upload.php
+Array
+(
+    [foto] =&gt; Array
+        (
+            [name] =&gt; produtos.csv
+            [full_path] =&gt; produtos.csv
+            [type] =&gt; application/octet-stream
+            [tmp_name] =&gt; /tmp/php3tfhotbf0m9h7eJjneJ
+            [error] =&gt; 0
+            [size] =&gt; 23
+        )
+
+)</pre>
+<p>(O <code>upload.php</code> só faz <code>print_r($_FILES)</code>. O campo de texto <code>titulo</code> foi para <code>$_POST</code>, não para <code>$_FILES</code>.)</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>Exemplo real</th><th>O que é</th></tr>
+<tr><td><code>name</code></td><td><code>produtos.csv</code></td><td>O nome do arquivo no computador do visitante. <strong>Não use</strong> para salvar sem limpar: pode ter <code>../</code> ou nomes repetidos.</td></tr>
+<tr><td><code>full_path</code> <span class="versao">PHP 8.1+</span></td><td><code>produtos.csv</code></td><td>O caminho relativo, quando o visitante envia uma pasta inteira.</td></tr>
+<tr><td><code>type</code></td><td><code>application/octet-stream</code> (para um <code>.txt</code>: <code>text/plain</code>)</td><td>O tipo que o <strong>navegador</strong> disse. Não confie: confira o conteúdo com <code>finfo</code>/<code>mime_content_type</code>.</td></tr>
+<tr><td><code>tmp_name</code></td><td><code>/tmp/php3tfhotbf0m9h7eJjneJ</code></td><td>Onde o PHP guardou o arquivo, temporariamente. Ele é <strong>apagado</strong> no fim da requisição: mova com <code>move_uploaded_file</code>.</td></tr>
+<tr><td><code>error</code></td><td><code>0</code></td><td>O código de erro (tabela abaixo). Confira <strong>antes</strong> de tudo.</td></tr>
+<tr><td><code>size</code></td><td><code>23</code></td><td>Tamanho em bytes.</td></tr>
+</table>
+</div>
+
+<h3>Códigos de <code>error</code></h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Constante</th><th>Valor</th><th>Quando</th></tr>
+<tr><td><code>UPLOAD_ERR_OK</code></td><td>0</td><td>Deu certo.</td></tr>
+<tr><td><code>UPLOAD_ERR_INI_SIZE</code></td><td>1</td><td>Maior que <code>upload_max_filesize</code> do <code>php.ini</code> (padrão: <code>2M</code>). Conferido: um arquivo de 3 MB chegou com <code>[error] =&gt; 1</code>, <code>[size] =&gt; 0</code> e <code>tmp_name</code> vazio.</td></tr>
+<tr><td><code>UPLOAD_ERR_FORM_SIZE</code></td><td>2</td><td>Maior que o campo oculto <code>MAX_FILE_SIZE</code> do formulário.</td></tr>
+<tr><td><code>UPLOAD_ERR_PARTIAL</code></td><td>3</td><td>Chegou só um pedaço (conexão caiu).</td></tr>
+<tr><td><code>UPLOAD_ERR_NO_FILE</code></td><td>4</td><td>O formulário foi enviado <strong>sem</strong> escolher arquivo (todas as outras chaves vêm vazias).</td></tr>
+<tr><td><code>UPLOAD_ERR_NO_TMP_DIR</code></td><td>6</td><td>Falta a pasta temporária no servidor.</td></tr>
+<tr><td><code>UPLOAD_ERR_CANT_WRITE</code></td><td>7</td><td>Não conseguiu gravar no disco.</td></tr>
+<tr><td><code>UPLOAD_ERR_EXTENSION</code></td><td>8</td><td>Uma extensão do PHP interrompeu o envio.</td></tr>
+</table>
+</div>
+<p>Outros limites do <code>php.ini</code> (valores padrão, conferidos com <code>ini_get</code>): <code>post_max_size = 8M</code> (se o pedido inteiro passar disso, <code>$_POST</code> <strong>e</strong> <code>$_FILES</code> chegam vazios, com o aviso <code>Warning: PHP Request Startup: POST Content-Length of 9000312 bytes exceeds the limit of 8388608 bytes in Unknown on line 0</code>, conferido com um envio de 9 MB) e <code>max_file_uploads = 20</code>.</p>
+
+<h3>Vários arquivos</h3>
+<p>Com <code>name="fotos[]"</code> (e <code>multiple</code>), cada chave vira um array, na mesma ordem: <code>$_FILES["fotos"]["name"][0]</code>, <code>$_FILES["fotos"]["size"][0]</code>…</p>
+<pre class="file" data-file="upload2.php">&lt;?php
+header("Content-Type: text/plain; charset=utf-8");
+foreach ($_FILES["fotos"]["name"] as $i =&gt; $nome) {
+    echo $i, ": ", $nome, " (", $_FILES["fotos"]["size"][$i], " bytes, erro ", $_FILES["fotos"]["error"][$i], ")\n";
+}
+</pre>
+<pre class="term" data-cwd="~/sg">$ curl -s -F "fotos[]=@produtos.csv" -F "fotos[]=@notas.txt" localhost:8000/upload2.php
+0: produtos.csv (23 bytes, erro 0)
+1: notas.txt (8 bytes, erro 0)</pre>
+<p>O passo a passo completo (validar tipo e tamanho, gerar um nome seguro, <code>move_uploaded_file</code>) está na aula <a href="upload.html">Upload de Arquivos</a>.</p>
+
+<hr>
+
+<h2 id="cookie">$_COOKIE</h2>
+<p>Os cookies que o navegador mandou <strong>neste</strong> pedido (veja o exemplo com <code>-b "tema=escuro"</code> em <a href="#post">$_POST</a>). Pontos que confundem:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que acontece</th></tr>
+<tr><td><code>setcookie("tema", "escuro")</code> e logo depois <code>echo $_COOKIE["tema"]</code></td><td>Não aparece ainda: <code>setcookie</code> só pede ao navegador para guardar; ele manda de volta no <strong>próximo</strong> pedido.</td></tr>
+<tr><td><code>setcookie</code> depois de um <code>echo</code></td><td><code>Warning: Cannot modify header information - headers already sent</code> (<a href="ref-erros.html#arquivos">mensagem</a>). Chame antes de qualquer saída.</td></tr>
+<tr><td>Apagar um cookie</td><td><code>setcookie("tema", "", time() - 3600)</code> (data no passado).</td></tr>
+<tr><td>Confiar no valor</td><td>Nunca: o visitante pode editar seus cookies. Para dados importantes (quem está logado), use <code>$_SESSION</code>.</td></tr>
+</table>
+</div>
+<p>Aula: <a href="cookies.html">Cookies</a>.</p>
+
+<h2 id="session">$_SESSION</h2>
+<p>Dados que ficam <strong>no servidor</strong>, ligados ao visitante por um cookie (<code>PHPSESSID</code>) com um código aleatório. Só existe depois de <code>session_start()</code>, que precisa vir antes de qualquer saída.</p>
+<pre class="file" data-file="sessao.php">&lt;?php
+session_start();
+$_SESSION["visitas"] = ($_SESSION["visitas"] ?? 0) + 1;
+header("Content-Type: text/plain; charset=utf-8");
+echo "Visitas: ", $_SESSION["visitas"], "\n";
+print_r($_SESSION);
+</pre>
+<p>No primeiro pedido, o PHP cria a sessão e manda o cookie (<code>-i</code> mostra os cabeçalhos):</p>
+<pre class="term" data-cwd="~/sg">$ curl -s -i localhost:8000/sessao.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:51:41 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Set-Cookie: PHPSESSID=4eb6a76472acd99cab32775c3082d5e2; path=/
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-Type: text/plain; charset=utf-8
+
+Visitas: 1
+Array
+(
+    [visitas] =&gt; 1
+)</pre>
+<p>Quem devolve o cookie, como um navegador (<code>-c</code> guarda os cookies num arquivo, <code>-b</code> os manda de volta), continua a mesma sessão:</p>
+<pre class="term" data-cwd="~/sg">$ curl -s -c /tmp/c.txt -b /tmp/c.txt localhost:8000/sessao.php
+Visitas: 1
+Array
+(
+    [visitas] =&gt; 1
+)
+$ curl -s -c /tmp/c.txt -b /tmp/c.txt localhost:8000/sessao.php
+Visitas: 2
+Array
+(
+    [visitas] =&gt; 2
+)</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação</th><th>Código</th></tr>
+<tr><td>Iniciar (no topo de toda página que usa sessão)</td><td><code>session_start();</code></td></tr>
+<tr><td>Guardar / ler</td><td><code>$_SESSION["usuario"] = "ana";</code> / <code>$_SESSION["usuario"] ?? null</code></td></tr>
+<tr><td>Apagar um item</td><td><code>unset($_SESSION["carrinho"]);</code></td></tr>
+<tr><td>Trocar o código depois do login (contra roubo de sessão)</td><td><code>session_regenerate_id(true);</code></td></tr>
+<tr><td>Sair (logout)</td><td><code>$_SESSION = []; session_destroy();</code></td></tr>
+</table>
+</div>
+<p>Aulas: <a href="sessoes.html">Sessões</a> e o <a href="projeto-login.html">projeto Login com Sessão</a>.</p>
+
+<hr>
+
+<h2 id="env">$_ENV</h2>
+<p>As variáveis de ambiente do sistema (como <code>HOME</code>). Se ela vem preenchida depende da opção <code>variables_order</code> do <code>php.ini</code>: só com a letra <code>E</code>. Sem <code>php.ini</code> o padrão é <code>EGPCS</code> (preenchida); os <code>php.ini</code> recomendados (<code>php.ini-development</code> e <code>-production</code>, usados pelas distribuições Linux) trazem <code>GPCS</code> (vazia):</p>
+<pre class="file" data-file="env2.php">&lt;?php var_dump(count($_ENV)); var_dump(getenv("HOME"));
+</pre>
+<pre class="term" data-cwd="~/sg">$ php env2.php
+int(14)
+string(9) "/home/ana"
+$ php -d variables_order=GPCS env2.php
+int(0)
+string(9) "/home/ana"</pre>
+<p><strong>Use <code>getenv("NOME")</code></strong>: funciona nos dois casos. Variáveis de ambiente são o lugar certo para senhas de banco e chaves de API (fora do código).</p>
+
+<h2 id="request">$_REQUEST</h2>
+<p>Uma mistura de <code>$_GET</code>, <code>$_POST</code> e, conforme o <code>php.ini</code>, <code>$_COOKIE</code>. Quando a mesma chave existe em mais de um, vence o que vem depois na ordem (<code>request_order</code>, ou <code>variables_order</code> se ela estiver vazia): no exemplo de <a href="#post">$_POST</a>, o <code>nome</code> do POST apagou o do GET, e o cookie <code>tema</code> entrou junto. Nos <code>php.ini</code> recomendados, <code>request_order = "GP"</code> (sem cookies).</p>
+<p><strong>Evite.</strong> Você não sabe de onde o valor veio, e um link (GET) pode se passar por um formulário (POST). Use <code>$_GET</code> ou <code>$_POST</code>, explicitamente.</p>
+
+<h2 id="globals">$GLOBALS</h2>
+<p>Um array com todas as variáveis globais do script (as criadas fora de funções), acessível de dentro das funções:</p>
+<pre class="file" data-file="g3.php">&lt;?php
+$total = 10;
+function somar5() {
+    $GLOBALS["total"] += 5;
+}
+somar5();
+echo $total, "\n";
+</pre>
+<pre class="term" data-cwd="~/sg">$ php g3.php
+15</pre>
+<p>Desde o PHP 8.1 não dá para substituir o array inteiro:</p>
+<pre class="term" data-cwd="~/sg">$ cat g2.php
+&lt;?php
+$GLOBALS = [];
+$ php g2.php
+
+Fatal error: $GLOBALS can only be modified using the $GLOBALS[$name] = $value syntax in /home/ana/sg/g2.php on line 2
+Stack trace:
+#0 {main}</pre>
+<p>Funções que mexem em variáveis globais são difíceis de entender e testar. Prefira passar valores por <strong>parâmetro</strong> e devolver com <code>return</code> (<a href="escopo.html">Escopo</a>, <a href="funcoes.html">Funções</a>).</p>
+
+<hr>
+
+<h2 id="missao">Missão: um pedido pelo formulário</h2>
+<div class="tryphp" data-modo="web" data-post="produto=Caneta&amp;quantidade=3" data-goal="html:Total: R$ 7\,50,semerro">
+<p class="try-task"><strong>Missão:</strong> a caixa já começa enviando o formulário (POST) com <code>produto=Caneta</code> e <code>quantidade=3</code>. Dentro do <code>if</code>, leia os dois campos de <code>$_POST</code> (com <code>??</code>), converta a quantidade com <code>(int)</code>, confira se o produto existe em <code>$precos</code> e mostre <code>Total: R$ 7,50</code> (use <code>number_format($total, 2, ",", ".")</code>). Produto desconhecido: <code>Pedido inválido.</code></p>
+<pre class="script">&lt;?php
+$precos = ["Caneta" =&gt; 2.50, "Caderno" =&gt; 15.90];
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // leia "produto" e "quantidade" de $_POST,
+    // calcule o total e mostre "Total: R$ 7,50"
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;select name="produto"&gt;&lt;option&gt;Caneta&lt;/option&gt;&lt;option&gt;Caderno&lt;/option&gt;&lt;/select&gt;
+  &lt;input name="quantidade" type="number" value="1"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$precos = ["Caneta" =&gt; 2.50, "Caderno" =&gt; 15.90];
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $produto = $_POST["produto"] ?? "";
+    $qtd = (int) ($_POST["quantidade"] ?? 0);
+    if (isset($precos[$produto]) &amp;&amp; $qtd &gt; 0) {
+        $total = $precos[$produto] * $qtd;
+        echo "&lt;p&gt;" . htmlspecialchars($produto) . " x $qtd&lt;/p&gt;";
+        echo "&lt;p&gt;Total: R$ " . number_format($total, 2, ",", ".") . "&lt;/p&gt;";
+    } else {
+        echo "&lt;p&gt;Pedido inválido.&lt;/p&gt;";
+    }
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;select name="produto"&gt;&lt;option&gt;Caneta&lt;/option&gt;&lt;option&gt;Caderno&lt;/option&gt;&lt;/select&gt;
+  &lt;input name="quantidade" type="number" value="1"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+<p>A solução, conferida no laboratório:</p>
+<pre class="term" data-cwd="~/sg">$ curl -s -d "produto=Caneta&amp;quantidade=3" localhost:8000/pedido-sol.php
+&lt;p&gt;Caneta x 3&lt;/p&gt;&lt;p&gt;Total: R$ 7,50&lt;/p&gt;&lt;form method="post"&gt;
+  &lt;select name="produto"&gt;&lt;option&gt;Caneta&lt;/option&gt;&lt;option&gt;Caderno&lt;/option&gt;&lt;/select&gt;
+  &lt;input name="quantidade" type="number" value="1"&gt;
+  &lt;button&gt;Calcular&lt;/button&gt;
+&lt;/form&gt;
+$ curl -s -d "produto=Lápis&amp;quantidade=3" localhost:8000/pedido-sol.php | head -1
+&lt;p&gt;Pedido inválido.&lt;/p&gt;&lt;form method="post"&gt;</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. Na URL <code>/loja.php?id=7</code>, qual é o tipo de <code>$_GET["id"]</code>?</p>
+<label><input type="radio" name="q1"> <code>int</code></label>
+<label><input type="radio" name="q1"> <code>float</code></label>
+<label><input type="radio" name="q1"> <code>string</code></label>
+<label><input type="radio" name="q1"> <code>null</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Um cliente envia JSON no corpo de um POST. Onde estão os dados?</p>
+<label><input type="radio" name="q2"> Em <code>$_POST</code>.</label>
+<label><input type="radio" name="q2"> Em <code>php://input</code>, lidos com <code>file_get_contents</code> e <code>json_decode</code>.</label>
+<label><input type="radio" name="q2"> Em <code>$_GET</code>.</label>
+<label><input type="radio" name="q2"> Em <code>$_FILES</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. <code>$_FILES["foto"]["error"]</code> vale <code>4</code>. O que houve?</p>
+<label><input type="radio" name="q3"> O arquivo era grande demais.</label>
+<label><input type="radio" name="q3"> O disco está cheio.</label>
+<label><input type="radio" name="q3"> Deu certo.</label>
+<label><input type="radio" name="q3"> O formulário foi enviado sem escolher arquivo.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Por que <code>action="&lt;?= $_SERVER["PHP_SELF"] ?&gt;"</code> é perigoso?</p>
+<label><input type="radio" name="q4"> Porque <code>PHP_SELF</code> inclui o que o visitante escreve depois do nome do script, e sem escapar isso vira HTML na página (XSS).</label>
+<label><input type="radio" name="q4"> Porque <code>PHP_SELF</code> não existe no PHP 8.</label>
+<label><input type="radio" name="q4"> Porque mostra a senha do banco.</label>
+<label><input type="radio" name="q4"> Porque deixa a página mais lenta.</label>
+</div>
+
+<div class="exercise">
+<p>Complete para saber se o formulário foi enviado:</p>
+<div class="ex-code">if ($_SERVER["<input data-answer="REQUEST_METHOD">"] === "POST") { … }</div>
+</div>
+
+<div class="exercise">
+<p>Complete para ler uma variável de ambiente de um jeito que funciona com qualquer <code>variables_order</code>:</p>
+<div class="ex-code">$senha = <input data-answer="getenv">("DB_SENHA");</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>$_GET</code> (URL), <code>$_POST</code> (corpo do formulário), <code>$_COOKIE</code>, <code>$_FILES</code>: vêm do visitante. Leia com <code>??</code>, valide, escape com <code>htmlspecialchars</code>.</li>
+  <li>Valores de <code>$_GET</code>/<code>$_POST</code> são sempre texto (ou array, com <code>[]</code> no nome).</li>
+  <li><code>$_SERVER["REQUEST_METHOD"]</code>, <code>["REQUEST_URI"]</code>, <code>["HTTP_…"]</code> são as chaves mais usadas; no terminal, <code>["argv"]</code>.</li>
+  <li><code>$_FILES["campo"]</code>: <code>name</code>, <code>full_path</code>, <code>type</code>, <code>tmp_name</code>, <code>error</code>, <code>size</code>. Confira <code>error === UPLOAD_ERR_OK</code>.</li>
+  <li><code>$_SESSION</code> fica no servidor (depois de <code>session_start()</code>); <code>$_COOKIE</code> fica no navegador.</li>
+  <li>Prefira <code>getenv</code> a <code>$_ENV</code>; evite <code>$_REQUEST</code> e <code>$GLOBALS</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
