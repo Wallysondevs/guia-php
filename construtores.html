@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Construtores — __construct, promoção de propriedades e argumentos nomeados | Guia PHP</title>
+<meta name="description" content="O construtor __construct em PHP: receber os dados na hora do new, valores padrão, validar, a promoção de propriedades no construtor do PHP 8.0, argumentos nomeados e a ideia do __destruct, com os erros reais ArgumentCountError e TypeError.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Construtores</span></h1>
+
+<p class="intro">Até agora, a Ana criava um produto vazio com <code>new Produto()</code> e preenchia as propriedades uma por uma. É fácil esquecer uma. O <strong>construtor</strong> resolve isso: é um método especial que roda <strong>sozinho</strong> no momento do <code>new</code> e recebe os dados que o objeto precisa para nascer completo. Nesta aula você também vai ver a <strong>promoção de propriedades</strong> do PHP 8.0, que faz a mesma coisa com muito menos código.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Escrever um construtor com <code>__construct</code> e passar os dados no <code>new</code>.</li>
+  <li>Dar valores padrão aos parâmetros do construtor.</li>
+  <li>Validar os dados e recusar um objeto inválido.</li>
+  <li>A <strong>promoção de propriedades no construtor</strong> (PHP 8.0).</li>
+  <li>Criar objetos com <strong>argumentos nomeados</strong>: <code>new Produto(nome: "Caneca", preco: 25.90)</code>.</li>
+  <li>A ideia do <code>__destruct</code>, o método que roda quando o objeto é descartado.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O problema: objetos "pela metade"</h2>
+<p>Com propriedades sem valor inicial (como você viu em <a href="propriedades-metodos.html">Propriedades e Métodos</a>), basta esquecer uma atribuição para o programa quebrar mais adiante:</p>
+
+<pre class="file" data-file="esqueceu.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+// a Ana esqueceu o preço...
+
+echo "{$caneca-&gt;nome}: R$ {$caneca-&gt;preco}\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php esqueceu.php
+
+Fatal error: Uncaught Error: Typed property Produto::$preco must not be accessed before initialization in /home/ana/loja/esqueceu.php:12
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/esqueceu.php on line 12</pre>
+
+<p>O erro aparece na linha 12, longe da linha onde o preço deveria ter sido dado. Num programa grande, achar onde a Ana "esqueceu" é difícil. O ideal é que seja <strong>impossível</strong> criar um produto sem nome e sem preço.</p>
+
+<p>Pense na maternidade: um bebê não sai do hospital sem certidão de nascimento com nome, data e local. O construtor é essa certidão: o objeto só "nasce" com os dados obrigatórios.</p>
+
+<hr>
+
+<h2>O construtor: <code>__construct</code></h2>
+
+<pre class="file" data-file="construtor.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function __construct(string $nome, float $preco, int $estoque)
+    {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+        $this-&gt;estoque = $estoque;
+        echo "Produto criado: {$this-&gt;nome}\n";
+    }
+}
+
+$caneca = new Produto("Caneca", 25.90, 10);
+$camiseta = new Produto("Camiseta", 49.90, 4);
+
+echo "{$caneca-&gt;nome} custa R$ {$caneca-&gt;preco} ({$caneca-&gt;estoque} em estoque)\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php construtor.php
+Produto criado: Caneca
+Produto criado: Camiseta
+Caneca custa R$ 25.9 (10 em estoque)</pre>
+
+<dl class="anatomy">
+  <dt>public function __construct(…)</dt><dd>O construtor. O nome é fixo: <strong>dois</strong> sublinhados e <code>construct</code> ("construir"). Métodos que começam com <code>__</code> são <strong>métodos mágicos</strong>: o PHP os chama sozinho em momentos especiais (veja <a href="metodos-magicos.html">Métodos Mágicos</a>).</dd>
+  <dt>string $nome, float $preco, int $estoque</dt><dd>Parâmetros, como em qualquer função. São <strong>variáveis locais</strong> do construtor: somem quando ele termina.</dd>
+  <dt>$this-&gt;nome = $nome;</dt><dd>Copia o valor do parâmetro <code>$nome</code> para a propriedade <code>nome</code> do objeto. Os dois têm o mesmo nome por costume, mas são coisas diferentes: <code>$nome</code> é o parâmetro, <code>$this-&gt;nome</code> é a propriedade.</dd>
+  <dt>new Produto("Caneca", 25.90, 10)</dt><dd>Os valores entre parênteses no <code>new</code> vão para os parâmetros do construtor, na ordem.</dd>
+  <dt>: (sem tipo de retorno)</dt><dd>O construtor não tem tipo de retorno e não devolve nada: quem "devolve" o objeto é o <code>new</code>.</dd>
+</dl>
+
+<p>Repare na saída: a mensagem <code>Produto criado</code> apareceu duas vezes, uma em cada <code>new</code>. Ninguém chamou <code>__construct</code> diretamente: o PHP chamou sozinho. A sequência de um <code>new</code> é:</p>
+<ol class="passo">
+  <li>O PHP cria um objeto novo, com as propriedades nos valores iniciais (ou não inicializadas).</li>
+  <li>Chama o <code>__construct</code> desse objeto, passando os valores dos parênteses.</li>
+  <li>Quando o construtor termina, o <code>new</code> entrega o objeto pronto para a variável.</li>
+</ol>
+
+<p>Agora, esquecer o preço vira um erro <strong>na linha do <code>new</code></strong>, que é exatamente onde está o problema (veja <a href="#erros">Quando dá errado</a>).</p>
+
+<h3>Valores padrão</h3>
+<p>Parâmetros do construtor podem ter valor padrão, como os de qualquer <a href="parametros.html">função</a>. Os opcionais ficam no fim:</p>
+
+<pre class="file" data-file="padrao.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function __construct(string $nome, float $preco, int $estoque = 0)
+    {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+        $this-&gt;estoque = $estoque;
+    }
+}
+
+$caneca = new Produto("Caneca", 25.90, 10);
+$chaveiro = new Produto("Chaveiro", 12.00);
+
+echo "{$caneca-&gt;nome}: {$caneca-&gt;estoque}\n";
+echo "{$chaveiro-&gt;nome}: {$chaveiro-&gt;estoque}\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php padrao.php
+Caneca: 10
+Chaveiro: 0</pre>
+
+<h3>Validar no construtor</h3>
+<p>O construtor é o porteiro do objeto: é o lugar certo para recusar dados inválidos. Se algo está errado, ele <strong>lança uma exceção</strong> (<code>throw</code>) e o objeto não é criado. (Exceções têm a sua aula: <a href="excecoes.html">Exceções</a>.)</p>
+
+<pre class="file" data-file="validar.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+
+    public function __construct(string $nome, float $preco)
+    {
+        if (trim($nome) === "") {
+            throw new InvalidArgumentException("O nome não pode ser vazio");
+        }
+        if ($preco &lt; 0) {
+            throw new InvalidArgumentException("Preço negativo: $preco");
+        }
+        $this-&gt;nome = trim($nome);
+        $this-&gt;preco = $preco;
+    }
+}
+
+$caneca = new Produto("  Caneca ", 25.90);
+echo "[{$caneca-&gt;nome}]\n";
+
+try {
+    $erro = new Produto("Camiseta", -5);
+} catch (InvalidArgumentException $e) {
+    echo "Não criei o produto: " . $e-&gt;getMessage() . "\n";
+}
+
+$outro = new Produto("", 10);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php validar.php
+[Caneca]                                  « o construtor também limpou os espaços
+Não criei o produto: Preço negativo: -5   « o try/catch tratou a exceção
+
+Fatal error: Uncaught InvalidArgumentException: O nome não pode ser vazio in /home/ana/loja/validar.php:10
+Stack trace:
+#0 /home/ana/loja/validar.php(29): Produto-&gt;__construct('', 10.0)
+#1 {main}
+  thrown in /home/ana/loja/validar.php on line 10</pre>
+
+<p>Três situações: a caneca passou nas regras (e o nome foi limpo com <code>trim</code>); a camiseta com preço negativo foi recusada, e o <code>try/catch</code> tratou o problema; o produto sem nome foi recusado sem <code>try</code>, e o programa parou com <code>Uncaught</code> ("não capturada"). Nos três casos, <strong>nenhum produto inválido chegou a existir</strong>.</p>
+
+<hr>
+
+<h2>Promoção de propriedades no construtor <span class="versao">PHP 8.0+</span></h2>
+<p>Olhe de novo o construtor da caneca. Cada dado aparece <strong>três vezes</strong>: na declaração da propriedade, no parâmetro e na atribuição <code>$this-&gt;nome = $nome</code>. O PHP 8.0 criou um atalho: escreva a <strong>visibilidade</strong> na frente do parâmetro, e ele vira propriedade e recebe o valor sozinho. Isso se chama <strong>promoção de propriedades no construtor</strong> (<em>constructor property promotion</em>):</p>
+
+<pre class="file" data-file="promocao.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $estoque = 0,
+    ) {
+    }
+}
+
+$caneca = new Produto("Caneca", 25.90, 10);
+var_dump($caneca);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php promocao.php
+object(Produto)#1 (3) {
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["preco"]=&gt;
+  float(25.9)
+  ["estoque"]=&gt;
+  int(10)
+}</pre>
+
+<p>O resultado é idêntico ao da versão longa: o objeto tem as três propriedades com os valores certos. Compare as duas formas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma longa (qualquer versão)</th><th>Com promoção (PHP 8.0+)</th></tr>
+<tr><td><pre class="file">class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function __construct(
+        string $nome,
+        float $preco,
+        int $estoque = 0,
+    ) {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+        $this-&gt;estoque = $estoque;
+    }
+}</pre></td><td><pre class="file">class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $estoque = 0,
+    ) {
+    }
+}</pre></td></tr>
+</table>
+</div>
+
+<dl class="anatomy">
+  <dt>public string $nome</dt><dd>Dentro dos parênteses do construtor, a palavra <code>public</code> (ou <code>protected</code>/<code>private</code>, de <a href="visibilidade.html">Visibilidade</a>) é o que "promove" o parâmetro a propriedade. Sem ela, é um parâmetro comum.</dd>
+  <dt>um parâmetro por linha</dt><dd>Costume para construtores promovidos: fica fácil de ler e de acrescentar um campo.</dd>
+  <dt>, (vírgula depois do último)</dt><dd>A "vírgula final" é permitida (PHP 8.0+) e recomendada: ao acrescentar um parâmetro, você não esquece a vírgula.</dd>
+  <dt>{ }</dt><dd>O corpo pode ficar vazio. As atribuições acontecem sozinhas, <strong>antes</strong> do corpo rodar.</dd>
+</dl>
+
+<h3>Misturando: promovidos, comuns e código no corpo</h3>
+<p>Nem todo parâmetro precisa virar propriedade, e o corpo pode ter código. Aqui o número só serve para montar o código do produto:</p>
+
+<pre class="file" data-file="misto.php">&lt;?php
+class Produto
+{
+    public string $codigo;
+
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        int $numero,
+    ) {
+        $this-&gt;codigo = "P-" . str_pad((string) $numero, 4, "0", STR_PAD_LEFT);
+    }
+}
+
+$caneca = new Produto("Caneca", 25.90, 7);
+echo "{$caneca-&gt;codigo} {$caneca-&gt;nome}\n";
+var_dump(isset($caneca-&gt;numero));
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php misto.php
+P-0007 Caneca
+bool(false)       « $numero não tem public: é só um parâmetro, não virou propriedade</pre>
+
+<div class="tryphp" data-goal="out:Camiseta: R$ 49.9 (4 em estoque),src:public string \$nome,semerro">
+<p class="try-task"><strong>Missão:</strong> reescreva a classe com <strong>promoção de propriedades</strong>: apague as três declarações e as três atribuições, e ponha <code>public</code> na frente de cada parâmetro do construtor. A saída deve continuar <code>Camiseta: R$ 49.9 (4 em estoque)</code>, sem avisos.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+    public int $estoque;
+
+    public function __construct(string $nome, float $preco, int $estoque = 0)
+    {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+        $this-&gt;estoque = $estoque;
+    }
+}
+
+$camiseta = new Produto("Camiseta", 49.90, 4);
+echo "{$camiseta-&gt;nome}: R$ {$camiseta-&gt;preco} ({$camiseta-&gt;estoque} em estoque)\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $estoque = 0,
+    ) {
+    }
+}
+
+$camiseta = new Produto("Camiseta", 49.90, 4);
+echo "{$camiseta-&gt;nome}: R$ {$camiseta-&gt;preco} ({$camiseta-&gt;estoque} em estoque)\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Argumentos nomeados com construtores <span class="versao">PHP 8.0+</span></h2>
+<p>Com muitos parâmetros, <code>new Produto("Caneca", 25.90, 0, true, "Cozinha")</code> fica difícil de ler: o que é o <code>0</code>? E o <code>true</code>? Os <strong>argumentos nomeados</strong> (que você conheceu em <a href="parametros.html">Parâmetros</a>) funcionam no <code>new</code> também: escreva o nome do parâmetro, dois-pontos e o valor:</p>
+
+<pre class="file" data-file="nomeados.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        public int $estoque = 0,
+        public bool $ativo = true,
+        public string $categoria = "Geral",
+    ) {
+    }
+}
+
+$a = new Produto("Caneca", 25.90, 0, true, "Cozinha");
+$b = new Produto(nome: "Caneca", preco: 25.90, categoria: "Cozinha");
+$c = new Produto(preco: 3.50, nome: "Adesivo");
+$d = new Produto("Camiseta", 49.90, ativo: false);
+
+echo "{$b-&gt;nome} | {$b-&gt;estoque} | {$b-&gt;categoria}\n";
+echo "{$c-&gt;nome} | {$c-&gt;preco} | {$c-&gt;categoria}\n";
+var_dump($d-&gt;ativo);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php nomeados.php
+Caneca | 0 | Cozinha
+Adesivo | 3.5 | Geral
+bool(false)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que mostra</th></tr>
+<tr><td><code>$a = new Produto("Caneca", 25.90, 0, true, "Cozinha");</code></td><td>Tudo por posição: para dar a categoria, a Ana teve que repetir os padrões <code>0</code> e <code>true</code>.</td></tr>
+<tr><td><code>$b = new Produto(nome: "Caneca", preco: 25.90, categoria: "Cozinha");</code></td><td>Com nomes, ela <strong>pula</strong> os do meio: <code>estoque</code> e <code>ativo</code> ficam no padrão.</td></tr>
+<tr><td><code>$c = new Produto(preco: 3.50, nome: "Adesivo");</code></td><td>Com nomes, a <strong>ordem não importa</strong>.</td></tr>
+<tr><td><code>$d = new Produto("Camiseta", 49.90, ativo: false);</code></td><td>Dá para misturar: primeiro os posicionais, depois os nomeados.</td></tr>
+</table>
+</div>
+
+<p>Os nomes são os dos <strong>parâmetros</strong> do construtor, sem o <code>$</code>. Com a promoção, eles coincidem com os nomes das propriedades, o que torna a leitura ainda mais clara.</p>
+
+<hr>
+
+<h2><code>__destruct</code>: quando o objeto vai embora (só a ideia)</h2>
+<p>O contrário do construtor é o <strong>destrutor</strong>, <code>__destruct</code> ("destruir"). O PHP o chama sozinho quando o objeto deixa de ser usado: quando nenhuma variável aponta mais para ele, ou no fim do script.</p>
+
+<pre class="file" data-file="destrutor.php">&lt;?php
+class Conexao
+{
+    public function __construct(public string $nome)
+    {
+        echo "Abrindo {$this-&gt;nome}\n";
+    }
+
+    public function __destruct()
+    {
+        echo "Fechando {$this-&gt;nome}\n";
+    }
+}
+
+$a = new Conexao("banco");
+$b = new Conexao("arquivo de log");
+unset($a);
+echo "Fim do script\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php destrutor.php
+Abrindo banco
+Abrindo arquivo de log
+Fechando banco            « o unset tirou a última "etiqueta" do objeto: ele foi destruído na hora
+Fim do script
+Fechando arquivo de log   « o $b foi destruído quando o script terminou</pre>
+
+<p>Na prática, você quase nunca vai escrever um <code>__destruct</code>: o PHP já libera memória, fecha arquivos e conexões sozinho no fim de cada script (e cada página da web é um script curto). Ele aparece em classes que guardam um recurso que precisa ser "devolvido" (um arquivo aberto, uma trava). Basta saber que existe e quando roda.</p>
+
+<hr>
+
+<h2>Formas de criar um objeto com dados</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Vantagem</th><th>Quando usar</th></tr>
+<tr><td>Sem construtor; atribuir depois do <code>new</code></td><td>Simples</td><td>Só em testes rápidos. Fácil esquecer um campo.</td></tr>
+<tr><td>Construtor na forma longa</td><td>Funciona em qualquer versão; dá para tratar cada valor antes de guardar</td><td>Código antigo, ou quando cada valor precisa de transformação.</td></tr>
+<tr><td><strong>Construtor com promoção</strong></td><td>Curto, sem repetição</td><td><strong>O padrão no PHP moderno.</strong> Combine com validação no corpo, se precisar.</td></tr>
+<tr><td>Método estático "fábrica" (<code>Produto::deArray($dados)</code>)</td><td>Vários jeitos de criar, cada um com nome próprio</td><td>Quando os dados vêm de fontes diferentes (formulário, banco, JSON). Veja <a href="static.html">static</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Too few arguments (ArgumentCountError)</strong>
+<pre class="file" data-file="poucos.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+
+    public function __construct(string $nome, float $preco)
+    {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+    }
+}
+
+$caneca = new Produto("Caneca");
+</pre>
+<pre class="term" data-cwd="~/loja">$ php poucos.php
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function Produto::__construct(), 1 passed in /home/ana/loja/poucos.php on line 14 and exactly 2 expected in /home/ana/loja/poucos.php:7
+Stack trace:
+#0 /home/ana/loja/poucos.php(14): Produto-&gt;__construct('Caneca')
+#1 {main}
+  thrown in /home/ana/loja/poucos.php on line 7</pre>
+<p><strong>O que significa:</strong> "argumentos de menos para <code>Produto::__construct()</code>: 1 passado na linha 14, e exatamente 2 esperados". O <code>Stack trace</code> mostra a chamada: <code>Produto-&gt;__construct('Caneca')</code>, só com o nome.</p>
+<p><strong>Como consertar:</strong> passe todos os obrigatórios no <code>new</code> (<code>new Produto("Caneca", 25.90)</code>) ou dê um valor padrão ao parâmetro que pode faltar.</p>
+</div>
+
+<div class="cenario">
+<strong>Argument #2 ($preco) must be of type float (TypeError)</strong>
+<pre class="file" data-file="tipo-errado.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+
+    public function __construct(string $nome, float $preco)
+    {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+    }
+}
+
+$caneca = new Produto("Caneca", "barato");
+</pre>
+<pre class="term" data-cwd="~/loja">$ php tipo-errado.php
+
+Fatal error: Uncaught TypeError: Produto::__construct(): Argument #2 ($preco) must be of type float, string given, called in /home/ana/loja/tipo-errado.php on line 14 and defined in /home/ana/loja/tipo-errado.php:7
+Stack trace:
+#0 /home/ana/loja/tipo-errado.php(14): Produto-&gt;__construct('Caneca', 'barato')
+#1 {main}
+  thrown in /home/ana/loja/tipo-errado.php on line 7</pre>
+<p><strong>O que significa:</strong> o segundo argumento (<code>$preco</code>) devia ser <code>float</code>, mas chegou uma <code>string</code>. A mensagem diz onde foi chamado (linha 14) e onde o construtor está definido (linha 7).</p>
+<p><strong>Como consertar:</strong> passe um número. Se o valor vem de um formulário (onde tudo é texto), converta e valide antes (veja <a href="validacao.html">Validar Dados</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Um sublinhado só: o construtor não roda</strong>
+<pre class="file" data-file="construct-errado.php">&lt;?php
+class Produto
+{
+    public string $nome = "sem nome";
+
+    public function _construct(string $nome)
+    {
+        $this-&gt;nome = $nome;
+    }
+}
+
+$c = new Produto("Caneca");
+echo $c-&gt;nome . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php construct-errado.php
+sem nome</pre>
+<p><strong>O que significa:</strong> nenhum erro, mas o nome não foi guardado. <code>_construct</code> (com <strong>um</strong> sublinhado) é um método comum, que ninguém chamou. E o PHP não reclama dos argumentos extras do <code>new</code>, porque a classe não tem construtor. O mesmo acontece com um método chamado igual à classe (<code>function Produto(…)</code>): era o construtor no PHP 4, e desde o PHP 8 é só um método comum.</p>
+<p><strong>Como consertar:</strong> são <strong>dois</strong> sublinhados: <code>__construct</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Esquecer o <code>public</code> na promoção</strong>
+<pre class="file" data-file="sem-public.php">&lt;?php
+class Produto
+{
+    public function __construct(string $nome, float $preco)
+    {
+    }
+}
+
+$c = new Produto("Caneca", 25.90);
+echo $c-&gt;nome . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-public.php
+
+Warning: Undefined property: Produto::$nome in /home/ana/loja/sem-public.php on line 10</pre>
+<p><strong>O que significa:</strong> sem a visibilidade, <code>string $nome</code> é só um parâmetro: o valor chega ao construtor e some. O objeto não tem propriedade <code>nome</code>.</p>
+<p><strong>Como consertar:</strong> <code>public string $nome</code> dentro dos parênteses.</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot redeclare Produto::$nome</strong>
+<pre class="file" data-file="repetida.php">&lt;?php
+class Produto
+{
+    public string $nome;
+
+    public function __construct(public string $nome)
+    {
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php repetida.php
+
+Fatal error: Cannot redeclare Produto::$nome in /home/ana/loja/repetida.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> a propriedade foi declarada duas vezes: na classe (linha 4) e promovida no construtor (linha 6).</p>
+<p><strong>Como consertar:</strong> escolha uma forma. Com promoção, apague a declaração de cima.</p>
+</div>
+
+<div class="cenario">
+<strong>Unknown named parameter</strong>
+<pre class="file" data-file="nome-errado.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+}
+
+$c = new Produto(nome: "Caneca", preço: 25.90);
+</pre>
+<pre class="term" data-cwd="~/loja">$ php nome-errado.php
+
+Fatal error: Uncaught Error: Unknown named parameter $preço in /home/ana/loja/nome-errado.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/nome-errado.php on line 11</pre>
+<p><strong>O que significa:</strong> "parâmetro nomeado desconhecido <code>$preço</code>". O construtor tem <code>$preco</code>, sem cedilha.</p>
+<p><strong>Como consertar:</strong> use exatamente o nome do parâmetro: <code>preco: 25.90</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot use positional argument after named argument</strong>
+<pre class="file" data-file="posicional-depois.php">&lt;?php
+class Produto
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+    ) {
+    }
+}
+
+$c = new Produto(nome: "Caneca", 25.90);
+</pre>
+<pre class="term" data-cwd="~/loja">$ php posicional-depois.php
+
+Fatal error: Cannot use positional argument after named argument in /home/ana/loja/posicional-depois.php on line 11
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> depois de um argumento com nome, o PHP não sabe a que posição um argumento sem nome corresponde. O arquivo nem começa a rodar.</p>
+<p><strong>Como consertar:</strong> primeiro os posicionais, depois os nomeados: <code>new Produto("Caneca", preco: 25.90)</code>, ou todos com nome.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>public function __construct(tipo $p) { … }</code></td><td>Construtor: roda sozinho no <code>new</code></td></tr>
+<tr><td><code>new Classe(arg1, arg2)</code></td><td>Passa os argumentos para o construtor</td></tr>
+<tr><td><code>tipo $p = valor</code></td><td>Parâmetro opcional, com valor padrão</td></tr>
+<tr><td><code>public tipo $p</code> (nos parênteses do construtor) <span class="versao">PHP 8.0+</span></td><td>Promoção: vira propriedade e recebe o valor</td></tr>
+<tr><td><code>new Classe(nome: valor)</code> <span class="versao">PHP 8.0+</span></td><td>Argumento nomeado</td></tr>
+<tr><td><code>throw new InvalidArgumentException("…")</code></td><td>Recusa dados inválidos no construtor</td></tr>
+<tr><td><code>public function __destruct() { … }</code></td><td>Destrutor: roda quando o objeto é descartado</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Ana (ana@exemplo.com) - Recife,out:Bruno (bruno@exemplo.com) - Natal,src:function __construct,src:email:">
+<p class="try-task"><strong>Missão:</strong> escreva a classe <code>Cliente</code> com um construtor <strong>promovido</strong> com três propriedades públicas: <code>nome</code> (texto), <code>email</code> (texto) e <code>cidade</code> (texto, com padrão <code>"Recife"</code>). Escreva também o método <code>ficha(): string</code>, que devolve <code>"Nome (email) - Cidade"</code>. Crie a Ana só com nome e e-mail, e o Bruno usando <strong>argumentos nomeados</strong> (<code>nome:</code>, <code>email:</code>, <code>cidade: "Natal"</code>). A saída deve ser <code>Ana (ana@exemplo.com) - Recife</code> e <code>Bruno (bruno@exemplo.com) - Natal</code>.</p>
+<pre class="script">&lt;?php
+// escreva a classe Cliente aqui
+
+
+$ana = new Cliente("Ana", "ana@exemplo.com");
+// crie o $bruno com argumentos nomeados
+
+
+echo $ana-&gt;ficha() . "\n";
+echo $bruno-&gt;ficha() . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Cliente
+{
+    public function __construct(
+        public string $nome,
+        public string $email,
+        public string $cidade = "Recife",
+    ) {
+    }
+
+    public function ficha(): string
+    {
+        return "{$this-&gt;nome} ({$this-&gt;email}) - {$this-&gt;cidade}";
+    }
+}
+
+$ana = new Cliente("Ana", "ana@exemplo.com");
+$bruno = new Cliente(nome: "Bruno", email: "bruno@exemplo.com", cidade: "Natal");
+
+echo $ana-&gt;ficha() . "\n";
+echo $bruno-&gt;ficha() . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O nome do construtor</h3>
+<p>Complete a declaração do construtor:</p>
+<div class="ex-code">public function <input data-answer="__construct" aria-label="nome do construtor">(string $nome)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Promoção</h3>
+<p>Complete o parâmetro para ele virar uma propriedade pública do tipo <code>float</code>:</p>
+<div class="ex-code">public function __construct(<input data-answer="public float $preco" aria-label="parâmetro promovido">) {}</div>
+</div>
+
+<div class="exercise">
+<h3>3. Argumento nomeado</h3>
+<p>O construtor é <code>__construct(public string $nome, public int $estoque = 0, public bool $ativo = true)</code>. Complete para criar um "Chaveiro" inativo, sem informar o estoque:</p>
+<div class="ex-code">new Produto("Chaveiro", <input data-answer="ativo: false|ativo:false" aria-label="argumento">)</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quando o <code>__construct</code> é executado?</p>
+<label><input type="radio" name="q4"> Quando você escreve <code>$obj-&gt;__construct()</code></label>
+<label><input type="radio" name="q4"> Automaticamente, a cada <code>new</code></label>
+<label><input type="radio" name="q4"> Uma vez só, quando a classe é declarada</label>
+<label><input type="radio" name="q4"> No fim do script</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O construtor é <code>__construct(string $nome, float $preco)</code>. O que acontece com <code>new Produto("Caneca")</code>?</p>
+<label><input type="radio" name="q5"> O preço fica <code>0</code></label>
+<label><input type="radio" name="q5"> O preço fica <code>null</code></label>
+<label><input type="radio" name="q5"> Um <code>Warning</code>, e o objeto é criado</label>
+<label><input type="radio" name="q5"> <code>ArgumentCountError: Too few arguments</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Em <code>__construct(public string $nome, int $codigo)</code>, quais propriedades o objeto ganha?</p>
+<label><input type="radio" name="q6"> Só <code>nome</code></label>
+<label><input type="radio" name="q6"> <code>nome</code> e <code>codigo</code></label>
+<label><input type="radio" name="q6"> Nenhuma</label>
+<label><input type="radio" name="q6"> Só <code>codigo</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">7. Qual destas chamadas dá erro de sintaxe?</p>
+<label><input type="radio" name="q7"> <code>new Produto("Caneca", preco: 25.90)</code></label>
+<label><input type="radio" name="q7"> <code>new Produto(preco: 25.90, nome: "Caneca")</code></label>
+<label><input type="radio" name="q7"> <code>new Produto(nome: "Caneca", 25.90)</code></label>
+<label><input type="radio" name="q7"> <code>new Produto("Caneca", 25.90)</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O <strong>construtor</strong> <code>__construct</code> (dois sublinhados) roda sozinho a cada <code>new</code> e recebe os argumentos dos parênteses.</li>
+  <li>Use-o para que todo objeto <strong>nasça completo</strong> e para <strong>validar</strong> os dados (lançando uma exceção se algo estiver errado).</li>
+  <li>Parâmetros podem ter <strong>valor padrão</strong>; os opcionais ficam no fim.</li>
+  <li><strong>Promoção</strong> (8.0+): <code>public tipo $nome</code> nos parênteses do construtor declara a propriedade e guarda o valor. É o padrão no PHP moderno.</li>
+  <li><strong>Argumentos nomeados</strong>: <code>new Produto(nome: "Caneca", preco: 25.90)</code>; pule opcionais e esqueça a ordem. Posicionais sempre antes dos nomeados.</li>
+  <li><code>__destruct</code> roda quando o objeto é descartado; raramente é necessário.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
