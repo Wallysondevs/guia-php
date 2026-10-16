@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções de Array — procurar, juntar, cortar, transformar | Guia PHP</title>
+<meta name="description" content="As funções de array mais usadas do PHP com saídas reais: in_array e o modo estrito, array_search, array_keys, array_merge × +, array_slice e array_splice, push, pop, shift e unshift, array_map, array_filter e array_reduce, array_sum, array_unique, array_column, range, array_find (8.4) e array_first/array_last (8.5).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções de Array</span></h1>
+
+<p class="intro">O PHP traz mais de 70 funções prontas para trabalhar com arrays. Você não precisa decorar nenhuma: precisa saber que elas <strong>existem</strong>, para não escrever à mão um laço que já vem pronto. Esta aula mostra as que aparecem em quase todo programa, agrupadas pelo que fazem, com a saída real de cada uma. A lista completa, para consulta, está na <a href="ref-array.html">Referência de Funções de Array</a>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre funções que <strong>devolvem um array novo</strong> e funções que <strong>mudam o array</strong> que você passou.</li>
+  <li>Procurar: <code>in_array</code> (e o modo estrito), <code>array_search</code>, <code>array_find</code>, <code>array_any</code>, <code>array_all</code>.</li>
+  <li>Chaves e valores: <code>array_keys</code>, <code>array_values</code>, <code>array_first</code>, <code>array_last</code>.</li>
+  <li>Juntar e cortar: <code>array_merge</code> × <code>+</code>, <code>array_slice</code>, <code>array_splice</code>.</li>
+  <li>Pilha e fila: <code>array_push</code>, <code>array_pop</code>, <code>array_shift</code>, <code>array_unshift</code>.</li>
+  <li>Transformar: <code>array_map</code>, <code>array_filter</code>, <code>array_reduce</code>.</li>
+  <li>Contas e limpeza: <code>array_sum</code>, <code>array_unique</code>, <code>array_column</code>, <code>range</code>.</li>
+</ul>
+</div>
+
+<p>Nos exemplos, quando a ordem das chaves não importa, a saída usa <code>implode(", ", …)</code> para mostrar o array numa linha só; quando as chaves importam, usa <code>print_r</code>.</p>
+
+<hr>
+
+<h2>Antes de tudo: devolve um novo ou muda o original?</h2>
+<p>As funções de array se dividem em dois grupos, e confundir os dois é o erro número um desta aula:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Como usar</th><th>Exemplos</th></tr>
+<tr><td><strong>Devolvem um array novo</strong>; o original fica igual</td><td>Guarde o resultado: <code>$novo = array_map(…, $a);</code></td><td><code>array_map</code>, <code>array_filter</code>, <code>array_slice</code>, <code>array_merge</code>, <code>array_unique</code>, <code>array_values</code>, <code>array_reverse</code></td></tr>
+<tr><td><strong>Mudam o array</strong> que você passou (recebem o array "por referência")</td><td>Só chame: <code>array_push($a, "x");</code></td><td><code>array_push</code>, <code>array_pop</code>, <code>array_shift</code>, <code>array_unshift</code>, <code>array_splice</code>, <code>sort</code> e companhia</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="f-ref3.php">&lt;?php
+$fila = ["Ana", "Bruno"];
+$fila[] = "Carla";
+array_push($fila, "Diego");                       // muda $fila
+echo implode(", ", $fila), "\n";
+array_filter($fila, fn($n) =&gt; $n !== "Ana");      // devolve um novo... que ninguém guardou
+echo implode(", ", $fila), "\n";
+</pre>
+
+<pre class="term">$ php f-ref3.php
+Ana, Bruno, Carla, Diego
+Ana, Bruno, Carla, Diego        « a Ana continua: o resultado do array_filter foi jogado fora</pre>
+
+<p>O certo seria <code>$fila = array_filter($fila, …);</code>. Quando uma função "não fez nada", a primeira pergunta é: ela devolve um array novo que eu esqueci de guardar? A passagem "por referência" é explicada na aula <a href="parametros.html">Parâmetros</a>.</p>
+
+<hr>
+
+<h2>Procurar</h2>
+
+<h3><code>in_array</code>: "está na lista?"</h3>
+<p><code>in_array(valor, array)</code> responde <code>true</code> ou <code>false</code>. O nome é literal: "no array".</p>
+
+<pre class="file" data-file="f-inarray.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+var_dump(in_array("café", $compras));
+var_dump(in_array("Café", $compras));
+var_dump(in_array("leite", $compras));
+
+$codigos = [7, 12, 30];
+var_dump(in_array("7", $codigos));
+var_dump(in_array("7", $codigos, true));
+var_dump(in_array(7, $codigos, true));
+
+var_dump(in_array(true, ["qualquer coisa"]));
+var_dump(in_array(true, ["qualquer coisa"], true));
+var_dump(in_array(null, [0, 1]));
+</pre>
+
+<pre class="term">$ php f-inarray.php
+bool(true)
+bool(false)             « diferencia maiúsculas: "Café" não é "café"
+bool(false)
+bool(true)              « o texto "7" foi considerado igual ao número 7
+bool(false)             « com true no fim (modo estrito), "7" não é 7
+bool(true)
+bool(true)              « true == "qualquer coisa"?! sem modo estrito, sim
+bool(false)
+bool(true)              « null == 0, sem modo estrito</pre>
+
+<p>Por padrão, o <code>in_array</code> compara com <code>==</code> (igualdade "frouxa", que converte tipos). O terceiro argumento, <code>true</code>, liga o <strong>modo estrito</strong>: a comparação passa a ser <code>===</code> (mesmo valor <strong>e</strong> mesmo tipo). As diferenças entre <code>==</code> e <code>===</code> estão em <a href="operadores-comparacao.html">Comparação</a>.</p>
+
+<div class="tip">
+<strong>Use o modo estrito sempre que puder</strong>
+<p><code>in_array($x, $lista, true)</code> evita as surpresas das três últimas linhas. Ele só atrapalha quando os tipos podem mesmo variar, por exemplo um código que chega como texto de um formulário (<code>"7"</code>) e uma lista de números; aí converta antes (<code>(int) $codigo</code>) e continue usando o modo estrito.</p>
+</div>
+
+<h3><code>array_search</code>: "em que posição está?"</h3>
+<p>Parecida com <code>in_array</code>, mas devolve a <strong>chave</strong> onde achou o valor, ou <code>false</code> se não achou. Também aceita o <code>true</code> no fim, para o modo estrito.</p>
+
+<pre class="file" data-file="f-search.php">&lt;?php
+$compras = ["arroz", "feijão", "café"];
+var_dump(array_search("café", $compras));
+var_dump(array_search("arroz", $compras));
+var_dump(array_search("leite", $compras));
+
+$precos = ["café" =&gt; 18.9, "pão" =&gt; 0.75, "leite" =&gt; 5.49];
+var_dump(array_search(0.75, $precos));
+
+if (!array_search("arroz", $compras)) {
+    echo "Não achei arroz?!\n";
+}
+$pos = array_search("arroz", $compras);
+if ($pos !== false) {
+    echo "Arroz está na posição $pos\n";
+}
+</pre>
+
+<pre class="term">$ php f-search.php
+int(2)
+int(0)                  « achou, na posição 0
+bool(false)             « não achou
+string(4) "pão"         « num array associativo, devolve a chave com nome
+Não achei arroz?!       « ERRADO: o 0 foi tratado como "falso"
+Arroz está na posição 0 « certo: comparar com !== false</pre>
+
+<div class="warning">
+<strong>A armadilha do 0</strong>
+<p>Quando o valor está na posição <code>0</code>, o <code>array_search</code> devolve <code>0</code>, e o <code>if</code> trata 0 como falso (veja <a href="booleanos.html">Booleanos</a>). Nunca teste o resultado com <code>if (!array_search(…))</code>. Teste com <code>!== false</code>, ou use <code>in_array</code> se só precisa saber se existe.</p>
+</div>
+
+<h3><code>array_find</code>, <code>array_find_key</code>, <code>array_any</code>, <code>array_all</code> <span class="versao">PHP 8.4+</span></h3>
+<p><code>in_array</code> procura um valor exato. Para procurar por uma <strong>condição</strong> ("o primeiro aluno com nota menor que 7"), o PHP 8.4 trouxe quatro funções que recebem uma pequena função com a pergunta. A forma <code>fn($a) =&gt; …</code> é uma <strong>arrow function</strong>: uma função de uma linha, escrita ali mesmo. Por enquanto leia como "para cada <code>$a</code>, responda isto"; ela é explicada em <a href="closures.html">Funções Anônimas e Arrow Functions</a>.</p>
+
+<pre class="file" data-file="f-find.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "nota" =&gt; 6.0],
+    ["nome" =&gt; "Carla", "nota" =&gt; 8.5],
+];
+$primeiroReprovado = array_find($alunos, fn($a) =&gt; $a["nota"] &lt; 7);
+print_r($primeiroReprovado);
+var_dump(array_find($alunos, fn($a) =&gt; $a["nota"] &gt; 10));
+var_dump(array_find_key($alunos, fn($a) =&gt; $a["nome"] === "Carla"));
+var_dump(array_any($alunos, fn($a) =&gt; $a["nota"] &lt; 7));
+var_dump(array_all($alunos, fn($a) =&gt; $a["nota"] &gt;= 5));
+var_dump(array_all([], fn($a) =&gt; false));
+</pre>
+
+<pre class="term">$ php f-find.php
+Array
+(
+    [nome] =&gt; Bruno         « o primeiro que atende à condição
+    [nota] =&gt; 6
+)
+NULL                    « ninguém atende: null
+int(2)                  « array_find_key devolve a chave (a Carla está no índice 2)
+bool(true)              « array_any: algum aluno tem nota &lt; 7?
+bool(true)              « array_all: todos têm nota &gt;= 5?
+bool(true)              « array_all de um array vazio é sempre true</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Pergunta</th><th>Devolve</th><th>Antes do 8.4</th></tr>
+<tr><td><code>array_find</code></td><td>Qual é o primeiro que…?</td><td>o valor, ou <code>null</code></td><td>um <code>foreach</code> com <code>return</code>/<code>break</code></td></tr>
+<tr><td><code>array_find_key</code></td><td>Onde está o primeiro que…?</td><td>a chave, ou <code>null</code></td><td>idem</td></tr>
+<tr><td><code>array_any</code></td><td>Existe algum que…?</td><td><code>true</code>/<code>false</code></td><td><code>count(array_filter(…)) &gt; 0</code></td></tr>
+<tr><td><code>array_all</code></td><td>Todos são…?</td><td><code>true</code>/<code>false</code></td><td><code>count(array_filter(…)) === count($a)</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Chaves, valores, primeiro e último</h2>
+
+<pre class="file" data-file="f-keys.php">&lt;?php
+$precos = ["café" =&gt; 18.9, "pão" =&gt; 0.75, "leite" =&gt; 5.49, "bolo" =&gt; 0.75];
+print_r(array_keys($precos));
+print_r(array_values($precos));
+print_r(array_keys($precos, 0.75));
+echo array_key_first($precos), " ... ", array_key_last($precos), "\n";
+</pre>
+
+<pre class="term">$ php f-keys.php
+Array
+(
+    [0] =&gt; café             « só as chaves, numa lista nova
+    [1] =&gt; pão
+    [2] =&gt; leite
+    [3] =&gt; bolo
+)
+Array
+(
+    [0] =&gt; 18.9             « só os valores, renumerados de 0
+    [1] =&gt; 0.75
+    [2] =&gt; 5.49
+    [3] =&gt; 0.75
+)
+Array
+(
+    [0] =&gt; pão              « com um 2º argumento: as chaves que têm aquele valor
+    [1] =&gt; bolo
+)
+café ... bolo</pre>
+
+<p><code>array_values</code> é também a forma de <strong>renumerar</strong> um array cheio de buracos (depois de um <code>unset</code> ou de um <code>array_filter</code>). <code>array_key_first</code> e <code>array_key_last</code> (PHP 7.3) dão a primeira e a última <strong>chave</strong>.</p>
+
+<h3><code>array_first</code> e <code>array_last</code> <span class="versao">PHP 8.5+</span></h3>
+<p>Para pegar o primeiro ou o último <strong>valor</strong>, sem se preocupar com as chaves, o PHP 8.5 trouxe estas duas:</p>
+
+<pre class="file" data-file="f-first.php">&lt;?php
+$fila = ["Ana", "Bruno", "Carla"];
+var_dump(array_first($fila));
+var_dump(array_last($fila));
+$precos = ["café" =&gt; 18.9, "pão" =&gt; 0.75];
+var_dump(array_last($precos));
+var_dump(array_first([]));
+</pre>
+
+<pre class="term">$ php f-first.php
+string(3) "Ana"
+string(5) "Carla"
+float(0.75)             « funciona com chaves de nome
+NULL                    « array vazio: null, sem aviso</pre>
+
+<p>Em versões anteriores, use <code>$a[array_key_last($a)]</code>, ou <code>$a[count($a) - 1]</code> se os índices forem 0, 1, 2… em sequência (veja <a href="arrays.html">Arrays Indexados</a>).</p>
+
+<hr>
+
+<h2>Juntar: <code>array_merge</code> × <code>+</code></h2>
+<p>Há duas formas de juntar arrays, e elas fazem coisas diferentes. Primeiro, com listas:</p>
+
+<pre class="file" data-file="f-merge.php">&lt;?php
+$manha = ["Ana", "Bruno"];
+$noite = ["Carla", "Diego", "Elisa"];
+print_r(array_merge($manha, $noite));
+print_r($manha + $noite);
+</pre>
+
+<pre class="term">$ php f-merge.php
+Array
+(
+    [0] =&gt; Ana              « array_merge: põe um depois do outro e renumera
+    [1] =&gt; Bruno
+    [2] =&gt; Carla
+    [3] =&gt; Diego
+    [4] =&gt; Elisa
+)
+Array
+(
+    [0] =&gt; Ana              « +: as chaves 0 e 1 já existiam à esquerda,
+    [1] =&gt; Bruno            « então Carla e Diego foram ignorados;
+    [2] =&gt; Elisa            « só a chave 2 (Elisa) era nova
+)</pre>
+
+<p>O <code>+</code> não "soma" listas: ele junta <strong>por chave</strong>, e quem chegou primeiro (à esquerda) fica. Com listas, isso quase nunca é o que você quer. Com arrays associativos, os dois são úteis:</p>
+
+<pre class="file" data-file="f-merge2.php">&lt;?php
+$padrao  = ["cor" =&gt; "azul", "tamanho" =&gt; "M", "fonte" =&gt; "Arial"];
+$escolha = ["cor" =&gt; "verde", "tamanho" =&gt; "G"];
+print_r(array_merge($padrao, $escolha));
+print_r($escolha + $padrao);
+print_r($padrao + $escolha);
+</pre>
+
+<pre class="term">$ php f-merge2.php
+Array
+(
+    [cor] =&gt; verde          « array_merge: em chave repetida, vence o da DIREITA
+    [tamanho] =&gt; G
+    [fonte] =&gt; Arial
+)
+Array
+(
+    [cor] =&gt; verde          « +: vence o da ESQUERDA ($escolha)
+    [tamanho] =&gt; G
+    [fonte] =&gt; Arial        « o que faltava veio do $padrao
+)
+Array
+(
+    [cor] =&gt; azul           « invertendo, vence o $padrao
+    [tamanho] =&gt; M
+    [fonte] =&gt; Arial
+)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>array_merge($a, $b)</code></th><th><code>$a + $b</code></th></tr>
+<tr><td>Chaves numéricas</td><td>Põe tudo em sequência e renumera</td><td>Ignora as de <code>$b</code> que já existem em <code>$a</code></td></tr>
+<tr><td>Chaves de nome repetidas</td><td>Vence <code>$b</code> (direita)</td><td>Vence <code>$a</code> (esquerda)</td></tr>
+<tr><td>Uso típico</td><td>Juntar listas; sobrescrever configurações</td><td>Completar com valores padrão: <code>$escolha + $padrao</code></td></tr>
+</table>
+</div>
+
+<p>Uma terceira forma, moderna, é o <strong>spread</strong>: <code>[...$manha, ...$noite]</code>, que funciona como o <code>array_merge</code>. Ela é explicada em <a href="desestruturacao.html">Desestruturação</a>.</p>
+
+<hr>
+
+<h2>Cortar: <code>array_slice</code> e <code>array_splice</code></h2>
+<p>Os nomes são quase iguais, mas o comportamento é oposto. <code>array_slice</code> ("fatia") <strong>copia</strong> um pedaço e deixa o original intacto. <code>array_splice</code> ("emenda") <strong>tira</strong> (e opcionalmente põe) itens no próprio array.</p>
+
+<pre class="file" data-file="f-slice.php">&lt;?php
+$fila = ["Ana", "Bruno", "Carla", "Diego", "Elisa"];
+echo implode(", ", array_slice($fila, 1, 2)), "\n";
+echo implode(", ", array_slice($fila, 3)), "\n";
+echo implode(", ", array_slice($fila, -2)), "\n";
+print_r(array_slice($fila, 2, 2));
+print_r(array_slice($fila, 2, 2, true));
+echo "A fila continua: ", implode(", ", $fila), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>array_slice($fila, 1, 2)</dt><dd>A partir da posição 1, pegue 2 itens: Bruno e Carla.</dd>
+  <dt>array_slice($fila, 3)</dt><dd>Sem a quantidade: da posição 3 até o fim.</dd>
+  <dt>array_slice($fila, -2)</dt><dd>Posição negativa conta do fim: os 2 últimos. (Aqui o negativo funciona; em <code>$fila[-1]</code>, não.)</dd>
+  <dt>…, true</dt><dd>O 4º argumento mantém as chaves originais, em vez de renumerar.</dd>
+</dl>
+
+<pre class="term">$ php f-slice.php
+Bruno, Carla
+Diego, Elisa
+Diego, Elisa
+Array
+(
+    [0] =&gt; Carla
+    [1] =&gt; Diego
+)
+Array
+(
+    [2] =&gt; Carla            « com true, as chaves 2 e 3 foram mantidas
+    [3] =&gt; Diego
+)
+A fila continua: Ana, Bruno, Carla, Diego, Elisa</pre>
+
+<p>O <code>array_slice</code> é o jeito de fazer <strong>paginação</strong> ("mostre os itens 11 a 20"): <code>array_slice($produtos, 10, 10)</code>.</p>
+
+<pre class="file" data-file="f-splice.php">&lt;?php
+$fila = ["Ana", "Bruno", "Carla", "Diego", "Elisa"];
+$saiu = array_splice($fila, 1, 2);
+echo "Saíram: ", implode(", ", $saiu), "\n";
+echo "Ficou:  ", implode(", ", $fila), "\n";
+array_splice($fila, 1, 0, ["Fábio", "Gabi"]);
+echo "Depois de inserir: ", implode(", ", $fila), "\n";
+array_splice($fila, 0, 1, "Helena");
+echo "Depois de trocar:  ", implode(", ", $fila), "\n";
+</pre>
+
+<pre class="term">$ php f-splice.php
+Saíram: Bruno, Carla
+Ficou:  Ana, Diego, Elisa                       « o próprio $fila mudou
+Depois de inserir: Ana, Fábio, Gabi, Diego, Elisa   « tirou 0 itens na posição 1 e pôs dois
+Depois de trocar:  Helena, Fábio, Gabi, Diego, Elisa  « tirou 1 na posição 0 e pôs Helena</pre>
+
+<p>Os argumentos do <code>array_splice</code> são: o array, a posição, quantos tirar, e (opcional) o que colocar no lugar. Ele devolve os itens retirados e <strong>renumera</strong> o array, sem deixar buracos (ao contrário do <code>unset</code>).</p>
+
+<hr>
+
+<h2>Pilha e fila: <code>push</code>, <code>pop</code>, <code>shift</code>, <code>unshift</code></h2>
+<p>Quatro funções para pôr e tirar nas pontas. Todas <strong>mudam</strong> o array.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Ponta</th><th>Faz</th><th>Devolve</th></tr>
+<tr><td><code>array_push($a, …)</code></td><td>fim</td><td>põe um ou mais itens</td><td>o novo tamanho</td></tr>
+<tr><td><code>array_pop($a)</code></td><td>fim</td><td>tira o último</td><td>o item tirado (ou <code>null</code>)</td></tr>
+<tr><td><code>array_unshift($a, …)</code></td><td>começo</td><td>põe um ou mais itens</td><td>o novo tamanho</td></tr>
+<tr><td><code>array_shift($a)</code></td><td>começo</td><td>tira o primeiro</td><td>o item tirado (ou <code>null</code>)</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="f-pushpop.php">&lt;?php
+$fila = ["Ana", "Bruno"];
+array_push($fila, "Carla", "Diego");
+echo implode(", ", $fila), "\n";
+$ultimo = array_pop($fila);
+echo "pop tirou $ultimo: ", implode(", ", $fila), "\n";
+$primeiro = array_shift($fila);
+echo "shift tirou $primeiro: ", implode(", ", $fila), "\n";
+array_unshift($fila, "Zeca");
+echo "unshift pôs Zeca: ", implode(", ", $fila), "\n";
+print_r($fila);
+</pre>
+
+<pre class="term">$ php f-pushpop.php
+Ana, Bruno, Carla, Diego
+pop tirou Diego: Ana, Bruno, Carla
+shift tirou Ana: Bruno, Carla
+unshift pôs Zeca: Zeca, Bruno, Carla
+Array
+(
+    [0] =&gt; Zeca             « shift e unshift renumeram as chaves
+    [1] =&gt; Bruno
+    [2] =&gt; Carla
+)</pre>
+
+<ul>
+  <li><strong>Pilha</strong> (como uma pilha de pratos: o último a entrar é o primeiro a sair): <code>array_push</code> + <code>array_pop</code>.</li>
+  <li><strong>Fila</strong> (como a fila do banco: o primeiro a chegar é o primeiro atendido): <code>array_push</code> + <code>array_shift</code>.</li>
+  <li>Para pôr <strong>um</strong> item no fim, <code>$a[] = "x";</code> faz o mesmo que <code>array_push</code> e é a forma mais comum.</li>
+</ul>
+
+<div class="tryphp">
+<p class="try-task">Experimente as funções desta aula. Troque os valores, mude os argumentos e veja o que cada uma devolve. Repare que <code>mb_strtoupper</code> (e não <code>strtoupper</code>) é a que acerta os acentos (aula <a href="mbstring.html">Acentos e mbstring</a>).</p>
+<pre class="script">&lt;?php
+$compras = ["arroz", "feijão", "café", "leite", "café"];
+
+var_dump(in_array("leite", $compras));
+var_dump(array_search("café", $compras));
+echo implode(", ", array_unique($compras)), "\n";
+echo implode(", ", array_slice($compras, 1, 3)), "\n";
+echo implode(", ", array_map(fn($item) =&gt; mb_strtoupper($item), $compras)), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Transformar: <code>array_map</code>, <code>array_filter</code>, <code>array_reduce</code></h2>
+<p>Estas três recebem uma função (normalmente uma arrow function <code>fn(…) =&gt; …</code>) e a aplicam a cada item. Juntas, substituem a maioria dos <code>foreach</code> que "montam um array novo".</p>
+
+<h3><code>array_map</code>: transformar cada item</h3>
+
+<pre class="file" data-file="f-map2.php">&lt;?php
+$precos = [10.0, 25.5, 4.0];
+$comAumento = array_map(fn($p) =&gt; $p * 1.1, $precos);
+print_r($comAumento);
+echo "Os preços originais: ", implode(", ", $precos), "\n";
+$nomes = ["ana", "bruno", "carla"];
+echo implode(", ", array_map(fn($n) =&gt; ucfirst($n), $nomes)), "\n";
+echo implode(", ", array_map("strtoupper", $nomes)), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>array_map(</dt><dd>"Mapeie": aplique uma função a cada item e devolva um array novo com os resultados.</dd>
+  <dt>fn($p) =&gt; $p * 1.1</dt><dd>A função: recebe um preço em <code>$p</code> e devolve o preço com 10% a mais. Atenção à ordem: no <code>array_map</code>, a <strong>função vem primeiro</strong>, o array depois.</dd>
+  <dt>"strtoupper"</dt><dd>Também dá para passar o <strong>nome</strong> de uma função pronta, entre aspas.</dd>
+</dl>
+
+<pre class="term">$ php f-map2.php
+Array
+(
+    [0] =&gt; 11
+    [1] =&gt; 28.05
+    [2] =&gt; 4.4
+)
+Os preços originais: 10, 25.5, 4      « o array original não mudou
+Ana, Bruno, Carla
+ANA, BRUNO, CARLA</pre>
+
+<h3><code>array_filter</code>: ficar só com alguns</h3>
+
+<pre class="file" data-file="f-filter.php">&lt;?php
+$notas = [9.5, 6.0, 8.5, 5.5, 7.0];
+$aprovadas = array_filter($notas, fn($n) =&gt; $n &gt;= 7);
+print_r($aprovadas);
+print_r(array_values($aprovadas));
+print_r(array_filter(["Ana", "", null, "Bruno", 0, "0", false]));
+</pre>
+
+<pre class="term">$ php f-filter.php
+Array
+(
+    [0] =&gt; 9.5
+    [2] =&gt; 8.5              « as chaves originais foram mantidas: há buracos
+    [4] =&gt; 7
+)
+Array
+(
+    [0] =&gt; 9.5              « array_values renumera
+    [1] =&gt; 8.5
+    [2] =&gt; 7
+)
+Array
+(
+    [0] =&gt; Ana              « sem função: tira tudo o que é "falso"
+    [3] =&gt; Bruno            « ("", null, 0, "0" e false)
+)</pre>
+
+<p>A função do <code>array_filter</code> responde <code>true</code> (fica) ou <code>false</code> (sai). Aqui a ordem é a <strong>inversa</strong> do <code>array_map</code>: <strong>o array primeiro</strong>, a função depois. Sim, é inconsistente; até programadores experientes conferem na documentação. E lembre: as chaves são mantidas, então use <code>array_values</code> se precisar de 0, 1, 2…</p>
+
+<h3><code>array_reduce</code>: reduzir a um valor só</h3>
+
+<pre class="file" data-file="f-reduce.php">&lt;?php
+$notas = [9.5, 6.0, 8.5, 5.5, 7.0];
+$soma = array_reduce($notas, fn($total, $n) =&gt; $total + $n, 0);
+echo "Soma: $soma\n";
+echo "Soma: ", array_sum($notas), "\n";
+echo "Média: ", array_sum($notas) / count($notas), "\n";
+echo "Maior: ", max($notas), " / Menor: ", min($notas), "\n";
+echo "Produto: ", array_product([2, 3, 4]), "\n";
+echo array_sum([]), "\n";
+</pre>
+
+<p>O <code>array_reduce</code> passa por todos os itens carregando um "acumulado". A função recebe o acumulado até ali (<code>$total</code>) e o item da vez (<code>$n</code>), e devolve o novo acumulado. O último argumento (<code>0</code>) é o valor inicial. Volta a volta: 0 + 9.5 = 9.5; 9.5 + 6 = 15.5; … até 36.5.</p>
+
+<pre class="term">$ php f-reduce.php
+Soma: 36.5
+Soma: 36.5              « array_sum faz o mesmo, pronto
+Média: 7.3
+Maior: 9.5 / Menor: 5.5
+Produto: 24             « 2 × 3 × 4
+0                       « soma de um array vazio: 0</pre>
+
+<p>Para somas, prefira <code>array_sum</code>; para maior e menor, <code>max</code> e <code>min</code>. O <code>array_reduce</code> fica para contas que não têm função pronta.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Entra</th><th>Sai</th><th>Ordem dos argumentos</th></tr>
+<tr><td><code>array_map</code></td><td>N itens</td><td>N itens transformados</td><td>função, array</td></tr>
+<tr><td><code>array_filter</code></td><td>N itens</td><td>até N itens (chaves mantidas)</td><td>array, função</td></tr>
+<tr><td><code>array_reduce</code></td><td>N itens</td><td>1 valor</td><td>array, função, inicial</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Limpar, contar e tirar colunas</h2>
+
+<h3><code>array_unique</code>: tirar repetidos</h3>
+
+<pre class="file" data-file="f-unique.php">&lt;?php
+$cidades = ["Recife", "Olinda", "Recife", "Caruaru", "Olinda"];
+print_r(array_unique($cidades));
+print_r(array_values(array_unique($cidades)));
+print_r(array_count_values($cidades));
+print_r(array_reverse(["a", "b", "c"]));
+</pre>
+
+<pre class="term">$ php f-unique.php
+Array
+(
+    [0] =&gt; Recife           « fica a primeira ocorrência, com a chave original
+    [1] =&gt; Olinda
+    [3] =&gt; Caruaru
+)
+Array
+(
+    [0] =&gt; Recife
+    [1] =&gt; Olinda
+    [2] =&gt; Caruaru
+)
+Array
+(
+    [Recife] =&gt; 2           « array_count_values: quantas vezes cada valor aparece
+    [Olinda] =&gt; 2
+    [Caruaru] =&gt; 1
+)
+Array
+(
+    [0] =&gt; c                « array_reverse: de trás para frente
+    [1] =&gt; b
+    [2] =&gt; a
+)</pre>
+
+<h3><code>array_column</code>: uma coluna da tabela</h3>
+<p>Com uma lista de fichas (aula <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>), <code>array_column</code> tira um campo de todas elas de uma vez.</p>
+
+<pre class="file" data-file="f-column.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "cidade" =&gt; "Recife", "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "cidade" =&gt; "Olinda", "nota" =&gt; 7.0],
+    ["nome" =&gt; "Carla", "cidade" =&gt; "Recife", "nota" =&gt; 8.5],
+];
+print_r(array_column($alunos, "nome"));
+print_r(array_column($alunos, "nota", "nome"));
+echo "Média: ", array_sum(array_column($alunos, "nota")) / count($alunos), "\n";
+</pre>
+
+<pre class="term">$ php f-column.php
+Array
+(
+    [0] =&gt; Ana
+    [1] =&gt; Bruno
+    [2] =&gt; Carla
+)
+Array
+(
+    [Ana] =&gt; 9.5            « com o 3º argumento, o campo "nome" vira a chave
+    [Bruno] =&gt; 7
+    [Carla] =&gt; 8.5
+)
+Média: 8.3333333333333</pre>
+
+<p>Repare na última linha: funções de array se encaixam umas nas outras. <code>array_column</code> pega as notas, <code>array_sum</code> soma, <code>count</code> conta.</p>
+
+<h3><code>range</code>: gerar uma sequência</h3>
+
+<pre class="file" data-file="f-range.php">&lt;?php
+echo implode(" ", range(1, 10)), "\n";
+echo implode(" ", range(0, 100, 25)), "\n";
+echo implode(" ", range(5, 1)), "\n";
+echo implode(" ", range("a", "e")), "\n";
+</pre>
+
+<pre class="term">$ php f-range.php
+1 2 3 4 5 6 7 8 9 10    « de 1 a 10, incluindo os dois
+0 25 50 75 100          « 3º argumento: o passo
+5 4 3 2 1               « de trás para frente
+a b c d e               « também com letras</pre>
+
+<p><code>range</code> é prático com <code>foreach</code> (<code>foreach (range(1, 12) as $mes)</code>) e para montar listas de opções, como os anos num formulário.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"A função não fez nada"</strong>
+<p><strong>O que aconteceu:</strong> você chamou uma função que <strong>devolve</strong> um array novo (<code>array_filter</code>, <code>array_map</code>, <code>array_unique</code>, <code>array_slice</code>, <code>array_merge</code>…) e não guardou o resultado. Não há erro nem aviso: o resultado simplesmente se perde, como no exemplo <code>f-ref3.php</code> do começo da aula.</p>
+<p><strong>Como resolver:</strong> <code>$fila = array_filter($fila, …);</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O array virou um número</strong>
+<pre class="file" data-file="f-ref2.php">&lt;?php
+$fila = ["Ana", "Bruno"];
+$fila = array_push($fila, "Carla");
+var_dump($fila);
+</pre>
+<pre class="term">$ php f-ref2.php
+int(3)</pre>
+<p><strong>O que aconteceu:</strong> o erro oposto. <code>array_push</code> já muda <code>$fila</code> e <strong>devolve o novo tamanho</strong> (3). Guardar esse retorno em <code>$fila</code> joga a lista fora. O mesmo acontece com <code>sort</code>, que devolve <code>true</code> (aula <a href="ordenar-arrays.html">Ordenar Arrays</a>).</p>
+<p><strong>Como resolver:</strong> chame só <code>array_push($fila, "Carla");</code>, sem atribuição.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Argument #1 ($array) could not be passed by reference</code></strong>
+<pre class="file" data-file="f-ref.php">&lt;?php
+$ultimo = array_pop(["a", "b"]);
+</pre>
+<pre class="term">$ php f-ref.php
+
+Fatal error: Uncaught Error: array_pop(): Argument #1 ($array) could not be passed by reference in /home/ana/site/f-ref.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/f-ref.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> as funções que mudam o array precisam de uma <strong>variável</strong> para mudar. Um array escrito direto ali (ou o resultado de outra função) não é uma variável: não há onde guardar a mudança.</p>
+<p><strong>Como resolver:</strong> guarde numa variável antes: <code>$letras = ["a", "b"]; $ultimo = array_pop($letras);</code>. Se você só quer o último valor, sem tirá-lo, use <code>array_last</code> (8.5).</p>
+</div>
+
+<div class="cenario">
+<strong><code>array_search</code> "não achou" o primeiro item</strong>
+<p><strong>O que aconteceu:</strong> o item estava na posição <code>0</code>, e <code>if (!array_search(…))</code> trata 0 como falso. Veja a saída de <code>f-search.php</code>, mais acima: <code>Não achei arroz?!</code>.</p>
+<p><strong>Como resolver:</strong> compare com <code>!== false</code>. O mesmo vale para <code>array_find_key</code> e <code>array_key_first</code>, que podem devolver <code>0</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<p>A lista completa, com todos os argumentos, está na <a href="ref-array.html">Referência de Funções de Array</a>. As desta aula:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Faz</th><th>Muda o array?</th></tr>
+<tr><td><code>count($a)</code></td><td>Quantos itens</td><td>não</td></tr>
+<tr><td><code>in_array($v, $a, true)</code></td><td>O valor existe? (<code>true</code> = estrito)</td><td>não</td></tr>
+<tr><td><code>array_search($v, $a, true)</code></td><td>Chave do valor, ou <code>false</code></td><td>não</td></tr>
+<tr><td><code>array_find($a, fn)</code> <span class="versao">8.4</span></td><td>Primeiro valor que atende, ou <code>null</code></td><td>não</td></tr>
+<tr><td><code>array_find_key($a, fn)</code> <span class="versao">8.4</span></td><td>Chave do primeiro que atende, ou <code>null</code></td><td>não</td></tr>
+<tr><td><code>array_any</code> / <code>array_all</code> <span class="versao">8.4</span></td><td>Algum / todos atendem?</td><td>não</td></tr>
+<tr><td><code>array_keys($a)</code> / <code>array_values($a)</code></td><td>Só as chaves / só os valores</td><td>não</td></tr>
+<tr><td><code>array_key_first</code> / <code>array_key_last</code></td><td>Primeira / última chave</td><td>não</td></tr>
+<tr><td><code>array_first</code> / <code>array_last</code> <span class="versao">8.5</span></td><td>Primeiro / último valor</td><td>não</td></tr>
+<tr><td><code>array_merge($a, $b)</code></td><td>Junta (renumera; nomes: vence a direita)</td><td>não</td></tr>
+<tr><td><code>$a + $b</code></td><td>Junta por chave (vence a esquerda)</td><td>não</td></tr>
+<tr><td><code>array_slice($a, pos, qtd)</code></td><td>Copia um pedaço</td><td>não</td></tr>
+<tr><td><code>array_splice($a, pos, qtd, novos)</code></td><td>Tira e/ou insere</td><td><strong>sim</strong></td></tr>
+<tr><td><code>array_push</code> / <code>array_pop</code></td><td>Põe / tira no fim</td><td><strong>sim</strong></td></tr>
+<tr><td><code>array_unshift</code> / <code>array_shift</code></td><td>Põe / tira no começo</td><td><strong>sim</strong></td></tr>
+<tr><td><code>array_map(fn, $a)</code></td><td>Transforma cada item</td><td>não</td></tr>
+<tr><td><code>array_filter($a, fn)</code></td><td>Fica com os que atendem (mantém chaves)</td><td>não</td></tr>
+<tr><td><code>array_reduce($a, fn, inicial)</code></td><td>Reduz a um valor</td><td>não</td></tr>
+<tr><td><code>array_sum</code> / <code>array_product</code></td><td>Soma / multiplica tudo</td><td>não</td></tr>
+<tr><td><code>max($a)</code> / <code>min($a)</code></td><td>Maior / menor valor</td><td>não</td></tr>
+<tr><td><code>array_unique($a)</code></td><td>Tira repetidos (mantém chaves)</td><td>não</td></tr>
+<tr><td><code>array_count_values($a)</code></td><td>Conta quantas vezes cada valor aparece</td><td>não</td></tr>
+<tr><td><code>array_reverse($a)</code></td><td>Inverte a ordem</td><td>não</td></tr>
+<tr><td><code>array_column($a, campo, chave)</code></td><td>Uma coluna de uma lista de fichas</td><td>não</td></tr>
+<tr><td><code>range(início, fim, passo)</code></td><td>Gera uma sequência</td><td>—</td></tr>
+<tr><td><code>implode(", ", $a)</code></td><td>Junta os valores num texto</td><td>não</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="out:Aprovados: Ana\, Carla\, Elisa,out:Média: 7.3,src:array_filter,src:array_column,semerro">
+<p class="try-task"><strong>Missão:</strong> sem escrever nenhum <code>foreach</code>, mostre (1) os nomes dos alunos com nota 7 ou mais, separados por vírgula: <code>Aprovados: Ana, Carla, Elisa</code>; e (2) a média da turma: <code>Média: 7.3</code>. Use <code>array_filter</code> para escolher os aprovados e <code>array_column</code> para pegar os nomes e as notas.</p>
+<pre class="script">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "nota" =&gt; 6.0],
+    ["nome" =&gt; "Carla", "nota" =&gt; 8.5],
+    ["nome" =&gt; "Diego", "nota" =&gt; 5.5],
+    ["nome" =&gt; "Elisa", "nota" =&gt; 7.0],
+];
+
+$aprovados = $alunos; // troque por um array_filter
+echo "Aprovados: ", "?", "\n";
+echo "Média: ", "?", "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "nota" =&gt; 6.0],
+    ["nome" =&gt; "Carla", "nota" =&gt; 8.5],
+    ["nome" =&gt; "Diego", "nota" =&gt; 5.5],
+    ["nome" =&gt; "Elisa", "nota" =&gt; 7.0],
+];
+
+$aprovados = array_filter($alunos, fn($a) =&gt; $a["nota"] &gt;= 7);
+echo "Aprovados: ", implode(", ", array_column($aprovados, "nome")), "\n";
+echo "Média: ", array_sum(array_column($alunos, "nota")) / count($alunos), "\n";
+</pre>
+</div>
+
+<pre class="term">$ php turma.php
+Aprovados: Ana, Carla, Elisa
+Média: 7.3</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Busca estrita</h3>
+<p>Complete para o <code>in_array</code> usar o modo estrito:</p>
+<div class="ex-code">in_array("7", $codigos, <input data-answer="true" aria-label="terceiro argumento">)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Tirar o primeiro da fila</h3>
+<p>Complete com a função que tira e devolve o <strong>primeiro</strong> item:</p>
+<div class="ex-code">$atendido = <input data-answer="array_shift" aria-label="função">($fila);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Os 3 primeiros</h3>
+<p>Complete para copiar os 3 primeiros itens, sem mudar o original:</p>
+<div class="ex-code">$top3 = array_slice($ranking, <input data-answer="0, 3|0,3" aria-label="posição e quantidade">);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual é o resultado de <code>["a", "b"] + ["x", "y", "z"]</code>?</p>
+<label><input type="radio" name="q4"> <code>["a", "b", "x", "y", "z"]</code></label>
+<label><input type="radio" name="q4"> <code>["a", "b", "z"]</code></label>
+<label><input type="radio" name="q4"> <code>["x", "y", "z"]</code></label>
+<label><input type="radio" name="q4"> Dá erro: não se somam arrays.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. <code>array_search("Ana", ["Ana", "Bruno"])</code> devolve <code>0</code>. Qual teste diz corretamente "achou"?</p>
+<label><input type="radio" name="q5"> <code>if (array_search(…))</code></label>
+<label><input type="radio" name="q5"> <code>if (array_search(…) == true)</code></label>
+<label><input type="radio" name="q5"> <code>if (array_search(…) &gt; 0)</code></label>
+<label><input type="radio" name="q5"> <code>if (array_search(…) !== false)</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Depois de <code>$n = array_filter([5, 8, 3, 9], fn($x) =&gt; $x &gt; 4);</code>, quais são as chaves de <code>$n</code>?</p>
+<label><input type="radio" name="q6"> 0, 1, 3</label>
+<label><input type="radio" name="q6"> 0, 1, 2</label>
+<label><input type="radio" name="q6"> 1, 2, 3</label>
+<label><input type="radio" name="q6"> 5, 8, 9</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Saiba se a função <strong>devolve um array novo</strong> (guarde o resultado) ou <strong>muda o array</strong> (só chame).</li>
+  <li><code>in_array</code> e <code>array_search</code> comparam com <code>==</code>; passe <code>true</code> para o modo estrito. Teste o <code>array_search</code> com <code>!== false</code>.</li>
+  <li><code>array_merge</code> junta e renumera (nomes: vence a direita); <code>+</code> junta por chave (vence a esquerda).</li>
+  <li><code>array_slice</code> copia um pedaço; <code>array_splice</code> tira e insere no próprio array.</li>
+  <li><code>push</code>/<code>pop</code> no fim, <code>unshift</code>/<code>shift</code> no começo.</li>
+  <li><code>array_map</code> transforma, <code>array_filter</code> escolhe (mantém chaves), <code>array_reduce</code> resume.</li>
+  <li>PHP 8.4: <code>array_find</code>, <code>array_any</code>, <code>array_all</code>. PHP 8.5: <code>array_first</code>, <code>array_last</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
