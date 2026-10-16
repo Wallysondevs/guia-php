@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Operadores de String — juntar textos com . e .= | Guia PHP</title>
+<meta name="description" content="Os operadores de string do PHP: o ponto . que junta (concatena) textos e o .= que acrescenta no fim. Espaços que somem, números colados (1 . 2), por que + não junta texto, Array to string conversion e quando trocar a concatenação pela interpolação. Saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Operadores de String</span></h1>
+
+<p class="intro">O PHP tem só <strong>dois</strong> operadores de texto, e você vai usá-los em quase todo programa: o ponto <code>.</code>, que <strong>junta</strong> textos, e o <code>.=</code>, que <strong>acrescenta</strong> um texto no fim de uma variável. Parece simples, e é, mas há detalhes que pegam quem vem de outras linguagens: o <code>+</code> não junta texto, os espaços não aparecem sozinhos e números colados viram texto.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como juntar textos e variáveis com o ponto <code>.</code> (a <strong>concatenação</strong>).</li>
+  <li>O que acontece quando você junta números, <code>true</code>, <code>false</code> e <code>null</code>.</li>
+  <li>Por que <code>"Ana" + "Bia"</code> dá erro fatal no PHP.</li>
+  <li>Como montar um texto aos poucos com <code>.=</code>.</li>
+  <li>Quando usar concatenação e quando usar <a href="interpolacao.html">interpolação</a> (<code>"Olá, $nome"</code>).</li>
+</ul>
+</div>
+
+<p>Você já conhece textos (<a href="strings.html">Strings</a>) e variáveis (<a href="variaveis.html">Variáveis</a>). Para ver o tipo e o tamanho de cada resultado, usamos o <a href="var-dump.html"><code>var_dump</code></a>.</p>
+
+<hr>
+
+<h2>A ideia: engatar vagões</h2>
+<p>Pense num trem de brinquedo. Cada vagão é um pedaço de texto: <code>"Olá, "</code>, <code>"Ana"</code>, <code>"!"</code>. O ponto <code>.</code> é o <strong>engate</strong> entre os vagões. Depois de engatados, eles viram <strong>um trem só</strong>: o texto <code>"Olá, Ana!"</code>.</p>
+
+<p>Juntar textos assim tem um nome técnico: <strong>concatenação</strong> (do latim <em>catena</em>, "corrente": ligar elos de uma corrente). O ponto é o <strong>operador de concatenação</strong>.</p>
+
+<hr>
+
+<h2>O ponto <code>.</code></h2>
+
+<pre class="file" data-file="ponto.php">&lt;?php
+$nome = "Ana";
+echo "Olá, " . $nome . "!\n";
+echo "Olá," . $nome . "\n";
+$saudacao = "Bom dia, " . $nome . ". Tudo bem?";
+echo $saudacao . "\n";
+var_dump($saudacao);
+</pre>
+
+<pre class="term">$ php ponto.php
+Olá, Ana!
+Olá,Ana
+Bom dia, Ana. Tudo bem?
+string(23) "Bom dia, Ana. Tudo bem?"</pre>
+
+<dl class="anatomy">
+  <dt>"Olá, "</dt><dd>O primeiro vagão: um texto fixo. Repare no <strong>espaço</strong> depois da vírgula, dentro das aspas.</dd>
+  <dt>.</dt><dd>O engate: "junte o que está à esquerda com o que está à direita".</dd>
+  <dt>$nome</dt><dd>O segundo vagão: o valor da variável (<code>"Ana"</code>).</dd>
+  <dt>. "!\n"</dt><dd>Mais um engate e o último vagão: a exclamação e a quebra de linha.</dd>
+</dl>
+
+<p>Três coisas para notar na saída:</p>
+<ol>
+  <li><strong>O ponto não coloca espaço.</strong> Na segunda linha, <code>"Olá,"</code> não terminava com espaço, e saiu <code>Olá,Ana</code>. Todo espaço que você quer ver precisa estar <strong>dentro</strong> das aspas.</li>
+  <li><strong>Os espaços em volta do ponto não contam.</strong> <code>"Olá, " . $nome</code> e <code>"Olá, ".$nome</code> dão o mesmo resultado. Os espaços fora das aspas servem só para você ler melhor (e são o estilo recomendado).</li>
+  <li><strong>O resultado pode ser guardado.</strong> <code>$saudacao</code> recebeu o texto já pronto: um texto de 23 bytes, como mostra o <code>var_dump</code>.</li>
+</ol>
+
+<div class="tip">
+<strong>E os pontos dentro das aspas?</strong>
+<p>Em <code>"Bom dia, " . $nome . ". Tudo bem?"</code> há pontos de dois tipos. Os que estão <strong>fora</strong> das aspas são o operador. O que está <strong>dentro</strong> de <code>". Tudo bem?"</code> é só um ponto final, parte do texto. Dentro das aspas, nada é operador.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Nome completo: Ana Souza,src:\$sobrenome">
+<p class="try-task"><strong>Missão:</strong> rode e veja <code>AnaSouza</code>, tudo grudado. Conserte a linha do <code>$completo</code> para sair <code>Nome completo: Ana Souza</code>, juntando um espaço entre o nome e o sobrenome. Não escreva "Souza" à mão: use as variáveis.</p>
+<pre class="script">&lt;?php
+$nome = "Ana";
+$sobrenome = "Souza";
+
+$completo = $nome . $sobrenome;
+echo "Nome completo: " . $completo . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Ana";
+$sobrenome = "Souza";
+
+$completo = $nome . " " . $sobrenome;
+echo "Nome completo: " . $completo . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Juntando números e outros tipos</h2>
+<p>O ponto <strong>sempre</strong> dá um texto. Se um dos lados não for texto, o PHP o <a href="conversao-tipos.html">converte</a> para texto antes de juntar:</p>
+
+<pre class="file" data-file="numeros.php">&lt;?php
+var_dump(1 . 2);
+var_dump(1.2);
+var_dump("Idade: " . 29);
+var_dump("Preço: " . 9.90);
+var_dump("Total: " . 10 / 3);
+var_dump("Ativo: " . true);
+var_dump("Ativo: " . false);
+var_dump("Nada: " . null);
+$a = 1; $b = 2;
+var_dump($a . $b);
+var_dump($a + $b);
+</pre>
+
+<pre class="term">$ php numeros.php
+string(2) "12"
+float(1.2)
+string(9) "Idade: 29"
+string(11) "Preço: 9.9"
+string(22) "Total: 3.3333333333333"
+string(8) "Ativo: 1"
+string(7) "Ativo: "
+string(6) "Nada: "
+string(2) "12"
+int(3)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Expressão</th><th>Resultado</th><th>Por quê</th></tr>
+<tr><td><code>1 . 2</code></td><td><code>"12"</code></td><td>Os números viram os textos <code>"1"</code> e <code>"2"</code> e são colados. Não é uma soma.</td></tr>
+<tr><td><code>1.2</code></td><td><code>1.2</code> (float)</td><td>Sem espaços, o ponto é a <strong>casa decimal</strong>: é o número um vírgula dois.</td></tr>
+<tr><td><code>"Preço: " . 9.90</code></td><td><code>"Preço: 9.9"</code></td><td>O número <code>9.90</code> é o mesmo que <code>9.9</code>; o zero do fim some. Para mostrar dinheiro, use <a href="number-format.html">number_format</a>.</td></tr>
+<tr><td><code>"Total: " . 10 / 3</code></td><td><code>"Total: 3.3333333333333"</code></td><td>A divisão é feita antes (veja <a href="precedencia.html">Precedência</a>), depois o resultado vira texto.</td></tr>
+<tr><td><code>"Ativo: " . true</code></td><td><code>"Ativo: 1"</code></td><td><code>true</code> vira <code>"1"</code>.</td></tr>
+<tr><td><code>"Ativo: " . false</code></td><td><code>"Ativo: "</code></td><td><code>false</code> vira texto vazio: não aparece nada.</td></tr>
+<tr><td><code>"Nada: " . null</code></td><td><code>"Nada: "</code></td><td><code>null</code> também vira texto vazio.</td></tr>
+<tr><td><code>$a . $b</code> × <code>$a + $b</code></td><td><code>"12"</code> × <code>3</code></td><td>O ponto cola; o <code>+</code> soma. O operador decide o que acontece, não o tipo das variáveis.</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong><code>1 . 2</code> precisa dos espaços</strong>
+<p>Sem espaços, <code>1.2</code> é um número decimal. E <code>echo 1. 2;</code> (espaço só depois do ponto) é um erro: o PHP lê <code>1.</code> como o número <code>1.0</code> e depois não sabe o que fazer com o <code>2</code>:</p>
+<pre class="term">$ php umdois.php
+
+Parse error: syntax error, unexpected integer "2", expecting "," or ";" in /home/ana/site/umdois.php on line 2</pre>
+<p>Com variáveis isso não acontece (<code>$a.$b</code> funciona), mas o costume de colocar um espaço de cada lado do ponto evita a confusão.</p>
+</div>
+
+<hr>
+
+<h2>O <code>+</code> não junta texto</h2>
+<p>Em linguagens como JavaScript e Java, <code>"Olá, " + nome</code> junta textos. <strong>No PHP, não.</strong> O <code>+</code> é sempre uma <a href="operadores-aritmeticos.html">soma</a>. Se os textos parecem números, ele soma os números; se não parecem, o programa para com um erro:</p>
+
+<pre class="file" data-file="mais.php">&lt;?php
+var_dump("10" + "5");
+var_dump("10" . "5");
+var_dump("Ana" + "Bia");
+</pre>
+
+<pre class="term">$ php mais.php
+int(15)
+string(3) "105"
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + string in /home/ana/site/mais.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/mais.php on line 4</pre>
+
+<dl class="anatomy">
+  <dt>"10" + "5" → int(15)</dt><dd>Os dois textos contêm números, então o <code>+</code> converte e <strong>soma</strong>: o resultado é o número 15.</dd>
+  <dt>"10" . "5" → "105"</dt><dd>O ponto <strong>junta</strong>: o texto <code>"105"</code>.</dd>
+  <dt>"Ana" + "Bia" → Fatal error</dt><dd><em>Unsupported operand types: string + string</em> = "tipos de operando não suportados: texto + texto". Não existe soma de nomes; o programa para.</dd>
+</dl>
+
+<p>Lembre: <strong>no PHP, texto se junta com ponto</strong>. O <code>+</code> é para contas.</p>
+
+<hr>
+
+<h2>O <code>.=</code>: acrescentar no fim</h2>
+<p>Muitas vezes você monta um texto aos poucos: uma lista, um recibo, uma página. O <code>.=</code> (ponto e igual) pega o que já está na variável e <strong>acrescenta</strong> mais um pedaço no fim. É uma <a href="operadores-atribuicao.html">atribuição combinada</a>, como o <code>+=</code>:</p>
+
+<pre class="file" data-file="lista.php">&lt;?php
+$lista = "Lista de compras:\n";
+$lista .= "- arroz\n";
+$lista .= "- feijão\n";
+$lista .= "- café\n";
+echo $lista;
+</pre>
+
+<pre class="term">$ php lista.php
+Lista de compras:
+- arroz
+- feijão
+- café</pre>
+
+<dl class="anatomy">
+  <dt>$lista = "Lista de compras:\n";</dt><dd>Cria a variável com o primeiro pedaço (o título).</dd>
+  <dt>$lista .= "- arroz\n";</dt><dd>Atalho de <code>$lista = $lista . "- arroz\n";</code>: pega o texto antigo, junta o novo no fim e guarda de volta.</dd>
+  <dt>echo $lista;</dt><dd>Mostra o texto completo, montado em quatro passos.</dd>
+</dl>
+
+<p>Do lado direito do <code>.=</code> pode vir qualquer expressão, inclusive outras concatenações:</p>
+
+<pre class="file" data-file="recibo.php">&lt;?php
+$cliente = "Ana";
+$produto = "caderno";
+$preco = 15;
+$quantidade = 3;
+
+$recibo = "Cliente: " . $cliente . "\n";
+$recibo .= "Produto: " . $produto . "\n";
+$recibo .= "Total: R$ " . $preco * $quantidade . "\n";
+echo $recibo;
+</pre>
+
+<pre class="term">$ php recibo.php
+Cliente: Ana
+Produto: caderno
+Total: R$ 45</pre>
+
+<p>Na última linha, a multiplicação é feita antes de juntar, porque <code>*</code> tem prioridade maior que o ponto. Funciona, mas <code>"Total: R$ " . ($preco * $quantidade)</code> deixa a intenção mais clara (veja <a href="precedencia.html">Precedência</a>).</p>
+
+<div class="warning">
+<strong>Crie a variável antes do primeiro <code>.=</code></strong>
+<p>O <code>.=</code> precisa ler o valor antigo. Se a variável ainda não existe, o PHP avisa (e depois continua, tratando o valor antigo como vazio):</p>
+<pre class="term">$ php lista-erro.php
+
+Warning: Undefined variable $texto in /home/ana/site/lista-erro.php on line 2
+primeira linha</pre>
+<p>A solução é começar com <code>$texto = "";</code> (texto vazio) ou com um <code>=</code> no primeiro pedaço.</p>
+</div>
+
+<hr>
+
+<h2>Concatenação × interpolação</h2>
+<p>Existe outra forma de colocar variáveis num texto: escrever a variável <strong>dentro</strong> das aspas duplas. O PHP troca a variável pelo valor. Isso se chama <strong>interpolação</strong> e tem uma aula só para ela: <a href="interpolacao.html">Interpolação</a>. Aqui vai a comparação:</p>
+
+<pre class="file" data-file="interp.php">&lt;?php
+$nome = "Ana";
+$idade = 29;
+echo "Olá, " . $nome . "! Você tem " . $idade . " anos.\n";
+echo "Olá, $nome! Você tem $idade anos.\n";
+echo 'Olá, $nome!' . "\n";
+$preco = 12.5;
+$qtd = 2;
+echo "Total: $preco * $qtd\n";
+echo "Total: " . $preco * $qtd . "\n";
+echo "Nome: " . strtoupper($nome) . "\n";
+echo "Nome: strtoupper($nome)\n";
+</pre>
+
+<pre class="term">$ php interp.php
+Olá, Ana! Você tem 29 anos.
+Olá, Ana! Você tem 29 anos.
+Olá, $nome!
+Total: 12.5 * 2
+Total: 25
+Nome: ANA
+Nome: strtoupper(Ana)</pre>
+
+<dl class="anatomy">
+  <dt>Linhas 1 e 2 da saída</dt><dd>Concatenação e interpolação dão o <strong>mesmo</strong> texto. A interpolação é mais curta e fácil de ler quando são só variáveis.</dd>
+  <dt>'Olá, $nome!'</dt><dd>Com <strong>aspas simples</strong>, não há interpolação: o <code>$nome</code> aparece como está. Para usar uma variável com aspas simples, só concatenando.</dd>
+  <dt>"Total: $preco * $qtd"</dt><dd>A interpolação troca as variáveis, mas <strong>não faz contas</strong>: o <code>*</code> ficou como texto.</dd>
+  <dt>"Nome: strtoupper($nome)"</dt><dd>Também não chama funções: o nome da função saiu como texto. Para contas e funções, use concatenação.</dd>
+</dl>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Melhor forma</th><th>Exemplo</th></tr>
+<tr><td>Texto com algumas variáveis</td><td>Interpolação</td><td><code>"Olá, $nome! Você tem $idade anos."</code></td></tr>
+<tr><td>Resultado de uma conta</td><td>Concatenação</td><td><code>"Total: " . ($preco * $qtd)</code></td></tr>
+<tr><td>Resultado de uma função</td><td>Concatenação</td><td><code>"Nome: " . strtoupper($nome)</code></td></tr>
+<tr><td>Texto entre aspas simples</td><td>Concatenação</td><td><code>'Preço: ' . $preco</code></td></tr>
+<tr><td>Montar um texto aos poucos</td><td><code>.=</code></td><td><code>$html .= "&lt;li&gt;$item&lt;/li&gt;";</code></td></tr>
+<tr><td>Muitos valores com formato (casas decimais, alinhamento)</td><td><code>sprintf</code></td><td>veja <a href="sprintf.html">printf e sprintf</a></td></tr>
+</table>
+</div>
+
+<p>Não existe forma "errada": as duas produzem o mesmo texto. Escolha a que deixa a linha mais fácil de ler. E as duas podem ser misturadas: <code>"Olá, $nome! Total: " . ($preco * $qtd)</code>.</p>
+
+<h3>E a vírgula do <code>echo</code>?</h3>
+<p>Você já viu <code>echo "Olá, ", $nome, "!\n";</code> na aula <a href="echo-print.html">echo e print</a>. As vírgulas <strong>não</strong> são concatenação: o <code>echo</code> recebe vários valores e mostra um depois do outro. Na tela, o resultado é igual:</p>
+
+<pre class="file" data-file="virgula.php">&lt;?php
+$nome = "Ana";
+echo "Olá, ", $nome, "!\n";
+echo "Olá, " . $nome . "!\n";
+$frase = "Olá, " . $nome . "!";
+echo $frase, "\n";
+</pre>
+
+<pre class="term">$ php virgula.php
+Olá, Ana!
+Olá, Ana!
+Olá, Ana!</pre>
+
+<p>A diferença: a vírgula só funciona no <code>echo</code>. Para <strong>guardar</strong> o texto numa variável (<code>$frase</code>), ou entregar a uma função, você precisa do ponto. <code>$frase = "Olá, ", $nome;</code> dá <code>Parse error: syntax error, unexpected token ","</code>.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Laboratório livre:</strong> compare as formas. Troque pontos por <code>+</code>, aspas duplas por simples, tire os espaços de dentro das aspas, e veja o que muda.</p>
+<pre class="script">&lt;?php
+$nome = "Ana";
+$cidade = "Recife";
+$idade = 29;
+
+echo "Concatenação: " . $nome . " mora em " . $cidade . "\n";
+echo "Interpolação: $nome mora em $cidade\n";
+echo "Daqui a 1 ano: " . ($idade + 1) . " anos\n";
+var_dump(1 . 2);
+var_dump("10" + "5");
+
+$perfil = "Perfil\n";
+$perfil .= "Nome: $nome\n";
+$perfil .= "Cidade: $cidade\n";
+echo $perfil;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught TypeError: Unsupported operand types: string + string</strong>
+<pre class="term">$ php mais2.php
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + string in /home/ana/site/mais2.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/mais2.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> a linha 3 era <code>echo "Olá, " + $nome;</code>. O <code>+</code> tentou <strong>somar</strong> dois textos que não são números.</p>
+<p><strong>Como resolver:</strong> troque o <code>+</code> por ponto: <code>echo "Olá, " . $nome;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Parse error: syntax error, unexpected variable "$nome", expecting "," or ";"</strong>
+<pre class="term">$ php semponto.php
+
+Parse error: syntax error, unexpected variable "$nome", expecting "," or ";" in /home/ana/site/semponto.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> a linha era <code>echo "Olá, " $nome;</code>. Faltou o ponto entre o texto e a variável. O PHP esperava uma vírgula ou o fim da instrução (<code>;</code>) e encontrou uma variável.</p>
+<p><strong>Como resolver:</strong> coloque o engate: <code>echo "Olá, " . $nome;</code>. Esse é o erro mais comum de concatenação; quando a mensagem diz <em>unexpected</em> logo depois de um texto, procure o ponto que falta.</p>
+</div>
+
+<div class="cenario">
+<strong>Warning: Array to string conversion</strong>
+<pre class="term">$ php array.php
+
+Warning: Array to string conversion in /home/ana/site/array.php on line 3
+Lista: Array</pre>
+<p><strong>O que aconteceu:</strong> o código era <code>"Lista: " . $compras</code>, e <code>$compras</code> é um <a href="arrays.html">array</a>, uma lista com vários valores. O PHP não sabe transformar uma lista inteira em texto: mostra a palavra <code>Array</code> e avisa.</p>
+<p><strong>Como resolver:</strong> junte os itens do array com <code>implode</code>, por exemplo <code>"Lista: " . implode(", ", $compras)</code> (veja <a href="funcoes-array.html">Funções de Array</a>), ou mostre um item: <code>$compras[0]</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>As palavras saem grudadas</strong>
+<pre class="term">$ php nomecompleto.php
+Nome completo: AnaSouza</pre>
+<p><strong>O que aconteceu:</strong> não é erro do PHP: o ponto não coloca espaço. O texto saiu exatamente como foi pedido.</p>
+<p><strong>Como resolver:</strong> junte um espaço: <code>$nome . " " . $sobrenome</code>, ou coloque o espaço dentro de um dos textos.</p>
+</div>
+
+<div class="cenario">
+<strong>O número saiu "colado" em vez de somado</strong>
+<pre class="term">$ php numeros.php
+string(2) "12"</pre>
+<p><strong>O que aconteceu:</strong> <code>$a . $b</code> com <code>1</code> e <code>2</code> dá <code>"12"</code>. Era para ser <code>+</code>.</p>
+<p><strong>Como resolver:</strong> use <code>+</code> para somar. Se a soma estiver no meio de um texto, coloque-a entre parênteses: <code>"Soma: " . ($a + $b)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Nome</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>.</code></td><td>Concatenação</td><td><code>"Olá, " . "Ana"</code></td><td><code>"Olá, Ana"</code></td></tr>
+<tr><td><code>.=</code></td><td>Atribuição com concatenação</td><td><code>$t = "a"; $t .= "b";</code></td><td><code>$t</code> vale <code>"ab"</code></td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor juntado com <code>.</code></th><th>Vira o texto</th></tr>
+<tr><td><code>29</code></td><td><code>"29"</code></td></tr>
+<tr><td><code>9.90</code></td><td><code>"9.9"</code></td></tr>
+<tr><td><code>true</code></td><td><code>"1"</code></td></tr>
+<tr><td><code>false</code></td><td><code>""</code> (vazio)</td></tr>
+<tr><td><code>null</code></td><td><code>""</code> (vazio)</td></tr>
+<tr><td>um array</td><td><code>"Array"</code> + <code>Warning: Array to string conversion</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O engate</h3>
+<p>Complete com o operador que junta o texto e a variável:</p>
+<div class="ex-code">echo "Olá, " <input data-answer="." aria-label="operador"> $nome;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Acrescentar no fim</h3>
+<p>Complete para acrescentar <code>"- leite\n"</code> no fim da variável <code>$lista</code>:</p>
+<div class="ex-code">$lista <input data-answer=".=" aria-label="operador"> "- leite\n";</div>
+</div>
+
+<div class="exercise">
+<h3>3. O espaço</h3>
+<p>Complete para o resultado ser <code>"Ana Souza"</code>:</p>
+<div class="ex-code">$completo = $nome . <input data-answer="&quot; &quot;|' '" aria-label="o que vai no meio"> . $sobrenome;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que <code>var_dump(1 . 2);</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>int(3)</code></label>
+<label><input type="radio" name="q4"> <code>string(2) "12"</code></label>
+<label><input type="radio" name="q4"> <code>float(1.2)</code></label>
+<label><input type="radio" name="q4"> <code>Parse error</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece com <code>echo "Olá, " + "Ana";</code> no PHP 8.5?</p>
+<label><input type="radio" name="q5"> Mostra <code>Olá, Ana</code>.</label>
+<label><input type="radio" name="q5"> Mostra <code>0</code>.</label>
+<label><input type="radio" name="q5"> Mostra <code>Olá, Ana</code> com um Warning.</label>
+<label><input type="radio" name="q5"> <code>Fatal error: Uncaught TypeError: Unsupported operand types: string + string</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. <code>$preco = 10; $qtd = 3;</code> Qual linha mostra <code>Total: 30</code>?</p>
+<label><input type="radio" name="q6"> <code>echo "Total: $preco * $qtd";</code></label>
+<label><input type="radio" name="q6"> <code>echo 'Total: ' . '$preco * $qtd';</code></label>
+<label><input type="radio" name="q6"> <code>echo "Total: " . ($preco * $qtd);</code></label>
+<label><input type="radio" name="q6"> <code>echo "Total: " + $preco * $qtd;</code></label>
+</div>
+
+<h3>Missão final: a nota da lojinha</h3>
+<div class="tryphp" data-goal="out:pão: R$ 8,out:leite: R$ 5,out:Total: R$ 13,src:\.=,semerro">
+<p class="try-task"><strong>Missão:</strong> monte a nota com <code>.=</code>. (1) Acrescente uma linha para cada item, no formato <code>pão: R$ 8</code>, usando as variáveis. (2) Acrescente a linha <code>Total: R$ 13</code>, calculando o total com <code>$preco1 + $preco2</code>.</p>
+<pre class="script">&lt;?php
+$item1 = "pão";
+$preco1 = 8;
+$item2 = "leite";
+$preco2 = 5;
+
+$nota = "NOTA DA LOJINHA\n";
+// 1. Acrescente uma linha para cada item, no formato "pão: R$ 8"
+
+// 2. Acrescente a linha do total: "Total: R$ 13"
+
+echo $nota;
+</pre>
+<pre class="solucao">&lt;?php
+$item1 = "pão";
+$preco1 = 8;
+$item2 = "leite";
+$preco2 = 5;
+
+$nota = "NOTA DA LOJINHA\n";
+// 1. Acrescente uma linha para cada item, no formato "pão: R$ 8"
+$nota .= $item1 . ": R$ " . $preco1 . "\n";
+$nota .= $item2 . ": R$ " . $preco2 . "\n";
+// 2. Acrescente a linha do total: "Total: R$ 13"
+$nota .= "Total: R$ " . ($preco1 + $preco2) . "\n";
+
+echo $nota;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O ponto <code>.</code> junta (concatena) textos. Ele não coloca espaço: o espaço vai dentro das aspas.</li>
+  <li>O resultado do ponto é sempre um texto: <code>1 . 2</code> dá <code>"12"</code>, <code>true</code> vira <code>"1"</code>, <code>false</code> e <code>null</code> viram vazio.</li>
+  <li><code>1.2</code> sem espaços é um número decimal. Escreva <code>1 . 2</code> com espaços.</li>
+  <li>No PHP, <code>+</code> é sempre soma: <code>"Ana" + "Bia"</code> é um erro fatal.</li>
+  <li><code>$t .= "x"</code> acrescenta no fim; é o mesmo que <code>$t = $t . "x"</code>. Crie a variável antes.</li>
+  <li>Interpolação (<code>"Olá, $nome"</code>) é mais curta para variáveis; concatenação é necessária para contas, funções e aspas simples.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
