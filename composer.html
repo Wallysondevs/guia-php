@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Composer — init, require, composer.json e composer.lock | Guia PHP</title>
+<meta name="description" content="Composer, o gerenciador de pacotes do PHP: composer init, o composer.json linha por linha, composer require de um pacote real (Monolog), versões com ^, composer.lock, a pasta vendor, install × update, autoload PSR-4 próprio, dump-autoload, scripts e o Packagist, com saídas reais do Composer 2.10.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Composer</span></h1>
+
+<p class="intro">Ninguém escreve tudo do zero. Precisa registrar o que acontece na loja num arquivo de log? Gerar PDF? Enviar e-mail? Alguém já escreveu, testou e publicou esse código. O <strong>Composer</strong> é o programa que baixa essas bibliotecas (os <strong>pacotes</strong>), as dependências delas, e liga tudo ao seu projeto com o autoload. Todo projeto PHP moderno começa com ele.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o Composer faz e o que é o <a href="https://packagist.org">Packagist</a>.</li>
+  <li>A criar um projeto com <code>composer init</code> e ler o <code>composer.json</code> linha por linha.</li>
+  <li>A instalar um pacote com <code>composer require</code> e a entender versões como <code>^3.12</code>.</li>
+  <li>Para que servem o <code>composer.lock</code> e a pasta <code>vendor/</code>.</li>
+  <li>A diferença entre <code>composer install</code> e <code>composer update</code>.</li>
+  <li>O autoload PSR-4 do seu próprio código, <code>dump-autoload</code> e os <strong>scripts</strong>.</li>
+</ul>
+</div>
+
+<div class="warning">
+<strong>O Composer não roda no editor do guia</strong>
+<p>O Composer baixa pacotes da internet, e o editor do guia roda o PHP dentro do navegador, sem acesso à rede. Por isso as sessões desta aula foram feitas no terminal da Ana (com o Composer 2.10 de verdade) e aparecem como saídas. Os "Experimente" desta página treinam o que dá para treinar no navegador: ler e escrever o <code>composer.json</code>. Para repetir os comandos, use o seu próprio computador (veja <a href="instalar-linux.html">Instalar no Linux</a> ou <a href="instalar-windows-mac.html">no Windows e macOS</a>).</p>
+</div>
+
+<hr>
+
+<h2>A ideia: lista de compras, nota fiscal e despensa</h2>
+<p>Pense na despensa da Ana. Ela escreve uma <strong>lista de compras</strong> ("arroz, de preferência da versão 5 kg ou maior"), vai ao mercado e volta com os produtos e a <strong>nota fiscal</strong> (marca, peso e lote exatos de cada item). Os produtos vão para a <strong>despensa</strong>. O Composer funciona igual:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Dia a dia</th><th>Composer</th></tr>
+<tr><td>A lista de compras, escrita por você</td><td><code>composer.json</code>: os pacotes que o projeto precisa e quais versões servem</td></tr>
+<tr><td>O mercado</td><td>O <strong>Packagist</strong> (packagist.org), o catálogo público de pacotes PHP</td></tr>
+<tr><td>A nota fiscal, com as versões exatas</td><td><code>composer.lock</code>: as versões exatas instaladas (gerado pelo Composer)</td></tr>
+<tr><td>A despensa</td><td>A pasta <code>vendor/</code>, onde ficam os pacotes baixados</td></tr>
+<tr><td>O arroz traz junto o saquinho de tempero</td><td>As <strong>dependências</strong> dos pacotes, instaladas automaticamente</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Conferindo o Composer</h2>
+<p>O Composer é um programa de linha de comando (escrito em PHP). Na máquina da Ana ele já está instalado:</p>
+
+<pre class="term">$ composer --version
+Composer version 2.10.3 2026-08-27 13:34:23
+PHP version 8.5.8 (/opt/php/bin/php)
+Run the "diagnose" command to get more detailed diagnostics output.</pre>
+
+<p>A resposta mostra a versão do Composer e qual PHP ele está usando. Se aparecer <code>composer: comando não encontrado</code>, siga as instruções de instalação em getcomposer.org (no Debian e Ubuntu também existe o pacote <code>composer</code>, mas costuma ser mais antigo).</p>
+
+<hr>
+
+<h2>Criando o projeto: <code>composer init</code></h2>
+<p>O <code>composer init</code> cria o <code>composer.json</code>. Sem opções, ele faz perguntas uma a uma. Aqui a Ana passa todas as respostas de uma vez e usa <code>--no-interaction</code> ("sem perguntas"):</p>
+
+<pre class="term">$ mkdir -p lojinha &amp;&amp; cd lojinha
+$ composer init --name=ana/lojinha --description="A lojinha da Ana" --author="Ana Silva &lt;ana@exemplo.com&gt;" --type=project --license=MIT --autoload=src/ --no-interaction
+Writing ./composer.json
+Generating autoload files
+Generated autoload files
+PSR-4 autoloading configured. Use "namespace Ana\Lojinha;" in src/
+Include the Composer autoloader with: require 'vendor/autoload.php';</pre>
+
+<dl class="anatomy">
+  <dt>--name=ana/lojinha</dt><dd>O nome do pacote, sempre no formato <code>fornecedor/projeto</code>, em minúsculas. O "fornecedor" (<em>vendor</em>) é você, a sua empresa ou o seu usuário do GitHub.</dd>
+  <dt>--description, --author, --license</dt><dd>Descrição, autora e licença (MIT é uma licença livre bem simples).</dd>
+  <dt>--type=project</dt><dd>É um projeto (um site, um sistema), e não uma biblioteca para outros usarem (<code>library</code>).</dd>
+  <dt>--autoload=src/</dt><dd>Configura o <a href="autoload.html">autoload PSR-4</a> para a pasta <code>src/</code>.</dd>
+  <dt>--no-interaction</dt><dd>Não pergunta nada; usa o que foi passado e os valores padrão.</dd>
+</dl>
+
+<p>As últimas linhas da saída já dão as duas dicas mais importantes: o namespace do seu código é <code>Ana\Lojinha</code> (veio do nome <code>ana/lojinha</code>), e cada programa deve começar com <code>require 'vendor/autoload.php';</code>. Veja o que foi criado:</p>
+
+<pre class="term">$ find . -type f | sort
+./composer.json
+./vendor/autoload.php
+./vendor/composer/autoload_classmap.php
+./vendor/composer/autoload_namespaces.php
+./vendor/composer/autoload_psr4.php
+./vendor/composer/autoload_real.php
+./vendor/composer/autoload_static.php
+./vendor/composer/ClassLoader.php
+./vendor/composer/LICENSE</pre>
+
+<p>Um <code>composer.json</code>, uma pasta <code>src/</code> vazia e a pasta <code>vendor/</code> com o autoloader (ainda sem nenhum pacote).</p>
+
+<hr>
+
+<h2>O <code>composer.json</code> linha por linha</h2>
+
+<pre class="term">$ cat composer.json
+{
+    "name": "ana/lojinha",
+    "description": "A lojinha da Ana",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Ana\\Lojinha\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Ana Silva",
+            "email": "ana@exemplo.com"
+        }
+    ],
+    "require": {}
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>O que é</th></tr>
+<tr><td><code>"name"</code></td><td>Nome do pacote, <code>fornecedor/projeto</code>. Obrigatório só para bibliotecas publicadas; em projetos, é identificação.</td></tr>
+<tr><td><code>"description"</code></td><td>Uma frase sobre o projeto.</td></tr>
+<tr><td><code>"type"</code></td><td><code>project</code> (um sistema) ou <code>library</code> (o padrão: uma biblioteca).</td></tr>
+<tr><td><code>"license"</code></td><td>A licença do código.</td></tr>
+<tr><td><code>"autoload"</code> → <code>"psr-4"</code></td><td>A regra do autoload: o namespace <code>Ana\Lojinha\</code> mora em <code>src/</code>. Em JSON, a barra invertida é escrita dobrada (<code>\\</code>).</td></tr>
+<tr><td><code>"authors"</code></td><td>Uma lista (<code>[ ]</code>) de autores, cada um um objeto (<code>{ }</code>) com nome e e-mail.</td></tr>
+<tr><td><code>"require"</code></td><td><strong>A lista de compras</strong>: pacote → versões aceitas. Ainda vazia.</td></tr>
+</table>
+</div>
+
+<p>Outras chaves que você vai encontrar: <code>"require-dev"</code> (pacotes só para desenvolvimento, como o <a href="phpunit.html">PHPUnit</a>), <code>"scripts"</code> (comandos com nome, logo abaixo), <code>"config"</code> (configurações do Composer) e <code>"minimum-stability"</code> (aceitar ou não versões de teste). O arquivo é <a href="json.html">JSON</a> puro: aspas duplas sempre, sem vírgula depois do último item, sem comentários.</p>
+
+<div class="tryphp" data-goal="out:psr/log (^3.0),semerro">
+<p class="try-task"><strong>Missão:</strong> este pequeno programa lê o <code>composer.json</code> como o Composer faria e lista as dependências. Abra a aba <code>composer.json</code> e acrescente, em <code>"require"</code>, o pacote <code>"psr/log"</code> na versão <code>"^3.0"</code>. Cuidado com a vírgula entre os itens. A saída deve mostrar <code>psr/log (^3.0)</code>.</p>
+<pre class="script" data-file="ler.php">&lt;?php
+$texto = file_get_contents(__DIR__ . '/composer.json');
+
+if (!json_validate($texto)) {
+    echo "composer.json inválido: ", json_last_error_msg(), "\n";
+    exit(1);
+}
+
+$composer = json_decode($texto, true);
+echo "Projeto: {$composer['name']}\n";
+echo "Dependências:\n";
+foreach ($composer['require'] ?? [] as $pacote =&gt; $versao) {
+    echo "  - $pacote ($versao)\n";
+}
+foreach ($composer['autoload']['psr-4'] ?? [] as $prefixo =&gt; $pasta) {
+    echo "Autoload: $prefixo -&gt; $pasta\n";
+}
+</pre>
+<pre class="script" data-file="composer.json">{
+    "name": "ana/lojinha",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Ana\\Lojinha\\": "src/"
+        }
+    },
+    "require": {
+        "monolog/monolog": "^3.12"
+    }
+}
+</pre>
+<pre class="solucao" data-file="composer.json">{
+    "name": "ana/lojinha",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Ana\\Lojinha\\": "src/"
+        }
+    },
+    "require": {
+        "monolog/monolog": "^3.12",
+        "psr/log": "^3.0"
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Instalando um pacote: <code>composer require</code></h2>
+<p>A Ana quer registrar os pedidos da loja num <strong>log</strong> (um diário de eventos do sistema). O pacote mais usado para isso é o <strong>Monolog</strong>, cujo nome no Packagist é <code>monolog/monolog</code>:</p>
+
+<pre class="term">$ composer require monolog/monolog
+./composer.json has been updated
+Running composer update monolog/monolog
+Loading composer repositories with package information
+Updating dependencies
+Lock file operations: 2 installs, 0 updates, 0 removals
+  - Locking monolog/monolog (3.12.1)
+  - Locking psr/log (3.0.2)
+Writing lock file
+Installing dependencies from lock file (including require-dev)
+Package operations: 2 installs, 0 updates, 0 removals
+  - Downloading psr/log (3.0.2)
+  - Downloading monolog/monolog (3.12.1)
+  - Installing psr/log (3.0.2): Extracting archive
+  - Installing monolog/monolog (3.12.1): Extracting archive
+11 package suggestions were added by new dependencies, use `composer suggest` to see details.
+Generating autoload files
+1 package you are using is looking for funding.
+Use the `composer fund` command to find out more!
+No security vulnerability advisories found.
+Using version ^3.12 for monolog/monolog</pre>
+
+<p>(Algumas barras de progresso foram tiradas da saída.) Lendo de cima para baixo:</p>
+
+<ol class="passo">
+  <li><strong>composer.json has been updated</strong>: o pacote entrou na lista de compras.</li>
+  <li><strong>Loading composer repositories</strong>: o Composer consultou o Packagist.</li>
+  <li><strong>Lock file operations: 2 installs</strong>: pediu um pacote, vieram dois. O <code>psr/log</code> é uma <strong>dependência</strong> do Monolog, instalada automaticamente. <em>Locking</em> = "anotando na nota fiscal" a versão exata (3.12.1 e 3.0.2).</li>
+  <li><strong>Writing lock file</strong>: criou o <code>composer.lock</code>.</li>
+  <li><strong>Downloading / Installing</strong>: baixou e descompactou os pacotes em <code>vendor/</code>.</li>
+  <li><strong>suggestions</strong>, <strong>funding</strong>: avisos informativos (pacotes opcionais que o Monolog sabe usar; autores que aceitam doações). Pode ignorar.</li>
+  <li><strong>No security vulnerability advisories found</strong>: o Composer conferiu se alguma versão instalada tem falha de segurança conhecida. Nenhuma.</li>
+  <li><strong>Using version ^3.12</strong>: como a Ana não disse a versão, ele escolheu <code>^3.12</code> e escreveu no <code>composer.json</code>.</li>
+</ol>
+
+<pre class="term">$ cat composer.json
+{
+    "name": "ana/lojinha",
+    …
+    "require": {
+        "monolog/monolog": "^3.12"
+    }
+}
+$ ls vendor
+autoload.php
+composer
+monolog          « o pacote pedido
+psr              « a dependência dele
+$ du -sh vendor
+1004K	vendor</pre>
+
+<h3>O que quer dizer <code>^3.12</code></h3>
+<p>Os pacotes usam <strong>versionamento semântico</strong>: <code>MAIOR.MENOR.CORREÇÃO</code>. Em <code>3.12.1</code>, o 3 só muda quando algo deixa de ser compatível; o 12 muda quando aparecem recursos novos; o 1, quando corrigem erros. O <code>^</code> (circunflexo) quer dizer "esta versão ou qualquer uma mais nova <strong>que não quebre</strong> o meu código":</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Restrição</th><th>Aceita</th><th>Uso</th></tr>
+<tr><td><code>^3.12</code></td><td><code>3.12.0</code> até antes de <code>4.0.0</code></td><td><strong>O padrão</strong> e o recomendado</td></tr>
+<tr><td><code>~3.12.1</code></td><td><code>3.12.1</code> até antes de <code>3.13.0</code></td><td>Só correções, sem recursos novos</td></tr>
+<tr><td><code>3.12.1</code></td><td>Exatamente essa</td><td>Raro; trava o pacote</td></tr>
+<tr><td><code>&gt;=3.0 &lt;3.5</code></td><td>Um intervalo</td><td>Casos especiais</td></tr>
+<tr><td><code>^2.0 || ^3.0</code></td><td>A série 2 ou a série 3</td><td>Bibliotecas que suportam as duas (o Monolog pede assim o <code>psr/log</code>)</td></tr>
+<tr><td><code>*</code></td><td>Qualquer uma</td><td>Evite: a próxima versão maior pode quebrar tudo</td></tr>
+</table>
+</div>
+
+<p>Para escolher a versão na hora de instalar: <code>composer require monolog/monolog:^3.0</code>.</p>
+
+<hr>
+
+<h2>Usando o pacote</h2>
+<p>A Ana cria a sua primeira classe, no namespace que o <code>composer init</code> sugeriu:</p>
+
+<pre class="file" data-file="src/Pedido.php">&lt;?php
+
+declare(strict_types=1);
+
+namespace Ana\Lojinha;
+
+use Psr\Log\LoggerInterface;
+
+class Pedido
+{
+    public function __construct(private LoggerInterface $log) {}
+
+    public function fechar(string $cliente, float $total): void
+    {
+        $this-&gt;log-&gt;info("Pedido fechado", ['cliente' =&gt; $cliente, 'total' =&gt; $total]);
+    }
+}
+</pre>
+
+<pre class="file" data-file="index.php">&lt;?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Ana\Lojinha\Pedido;
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
+
+$log = new Logger('loja');
+$log-&gt;pushHandler(new StreamHandler('php://stdout'));
+
+$pedido = new Pedido($log);
+$pedido-&gt;fechar('Bruno', 69.8);
+$log-&gt;warning('Estoque baixo', ['produto' =&gt; 'Caneca', 'restam' =&gt; 2]);
+</pre>
+
+<dl class="anatomy">
+  <dt>require __DIR__ . '/vendor/autoload.php';</dt><dd>O único <code>require</code>. A partir dele, as classes do Monolog, do <code>psr/log</code> e as suas (<code>Ana\Lojinha\…</code>) carregam sozinhas.</dd>
+  <dt>use Monolog\Logger;</dt><dd>As classes do pacote têm namespace próprio (veja <a href="namespaces.html">Namespaces</a>). A documentação do pacote diz quais usar.</dd>
+  <dt>new Logger('loja')</dt><dd>Cria o "diário", com o nome <code>loja</code>.</dd>
+  <dt>pushHandler(new StreamHandler('php://stdout'))</dt><dd>Diz <strong>onde</strong> escrever: aqui, na saída do terminal. Num site, seria um arquivo, como <code>__DIR__ . '/logs/loja.log'</code>.</dd>
+  <dt>LoggerInterface</dt><dd>O <code>Pedido</code> não depende do Monolog, e sim da interface padrão de logs (PSR-3, do pacote <code>psr/log</code>). Qualquer biblioteca de log compatível serviria. Veja <a href="psr.html">Padrões PSR</a>.</dd>
+</dl>
+
+<pre class="term">$ php index.php
+[2026-10-16T23:48:58.786901+00:00] loja.INFO: Pedido fechado {"cliente":"Bruno","total":69.8} []
+[2026-10-16T23:48:58.788077+00:00] loja.WARNING: Estoque baixo {"produto":"Caneca","restam":2} []</pre>
+
+<p>Cada linha tem a data e hora, o nome do log, o nível (<code>INFO</code>, <code>WARNING</code>), a mensagem e os dados extras em JSON. Repare no <code>+00:00</code>: o horário está em UTC (no relógio da Ana eram 20:48), porque o PHP da Ana não tem fuso horário configurado. Veja <a href="datas.html">Datas e Horas</a> para ajustar o <code>date.timezone</code>.</p>
+
+<h3>Vendo o que está instalado</h3>
+<pre class="term">$ composer show
+monolog/monolog 3.12.1 Sends your logs to files, sockets, inboxes, database...
+psr/log         3.0.2  Common interface for logging libraries
+$ composer show --tree
+monolog/monolog 3.12.1 Sends your logs to files, sockets, inboxes, databases and various web services
+|--php &gt;=8.1
+`--psr/log ^2.0 || ^3.0
+   `--php &gt;=8.0.0</pre>
+
+<p>O <code>--tree</code> ("árvore") mostra quem depende de quem: o Monolog exige PHP 8.1 ou mais novo e o <code>psr/log</code> na série 2 ou 3.</p>
+
+<hr>
+
+<h2>O <code>composer.lock</code>: a nota fiscal</h2>
+<p>O <code>composer.json</code> diz "Monolog ^3.12" (qualquer 3.x a partir da 3.12). O <code>composer.lock</code> diz exatamente o que foi instalado:</p>
+
+<pre class="term">$ head -c 1200 composer.lock
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "5a51bab10b23f0846aaa577000df49cb",
+    "packages": [
+        {
+            "name": "monolog/monolog",
+            "version": "3.12.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Seldaek/monolog.git",
+                "reference": "d7059e4c691d05ea1222b5124bed0f961be46e15"
+            },
+            …</pre>
+
+<p>Versão exata, de onde baixar, e até a "impressão digital" (<code>reference</code>) do código. O aviso no começo resume: "este arquivo trava as dependências do seu projeto num estado conhecido" e "é gerado automaticamente". <strong>Nunca edite o <code>composer.lock</code> à mão.</strong></p>
+<p>Para que serve? Quando o Bruno, que trabalha com a Ana, baixar o projeto daqui a três meses, o Monolog pode estar na 3.15. Sem o <code>.lock</code>, ele instalaria a 3.15 e a Ana usaria a 3.12: dois computadores com códigos diferentes, e bugs que "só acontecem na máquina dele". Com o <code>.lock</code>, os dois (e o servidor) instalam exatamente a 3.12.1.</p>
+
+<hr>
+
+<h2><code>composer install</code> × <code>composer update</code></h2>
+<p>A pasta <code>vendor/</code> pode ser apagada e recriada a qualquer momento. É o que acontece quando alguém baixa o projeto do GitHub: o <code>vendor/</code> não vai junto. Veja:</p>
+
+<pre class="term">$ rm -rf vendor
+$ php index.php
+
+Warning: require(/home/ana/lojinha/vendor/autoload.php): Failed to open stream: No such file or directory in /home/ana/lojinha/index.php on line 5
+
+Fatal error: Uncaught Error: Failed opening required '/home/ana/lojinha/vendor/autoload.php' (include_path='.:') in /home/ana/lojinha/index.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/lojinha/index.php on line 5
+$ composer install
+Installing dependencies from lock file (including require-dev)
+Verifying lock file contents can be installed on current platform.
+Package operations: 2 installs, 0 updates, 0 removals
+  - Installing psr/log (3.0.2): Extracting archive
+  - Installing monolog/monolog (3.12.1): Extracting archive
+Generating autoload files
+1 package you are using is looking for funding.
+Use the `composer fund` command to find out more!</pre>
+
+<p>A primeira linha diz tudo: <em>"Installing dependencies from lock file"</em>. O <code>install</code> lê o <strong><code>.lock</code></strong> e instala as versões exatas, sem consultar o que há de novo. Já o <code>update</code> volta ao mercado:</p>
+
+<pre class="term">$ composer update
+Loading composer repositories with package information
+Updating dependencies
+Nothing to modify in lock file
+Writing lock file
+Installing dependencies from lock file (including require-dev)
+Nothing to install, update or remove
+Generating autoload files
+1 package you are using is looking for funding.
+Use the `composer fund` command to find out more!
+No security vulnerability advisories found.</pre>
+
+<p>O <code>update</code> leu o <code>composer.json</code>, procurou no Packagist as versões mais novas permitidas pelo <code>^</code> e reescreveu o <code>.lock</code>. Hoje não havia nada mais novo ("Nothing to modify in lock file"); daqui a um mês, ele poderia atualizar o Monolog para 3.13.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>composer install</code></th><th><code>composer update</code></th></tr>
+<tr><td>Lê</td><td>O <code>composer.lock</code> (se existir)</td><td>O <code>composer.json</code></td></tr>
+<tr><td>Consulta o Packagist?</td><td>Não</td><td>Sim, procura versões novas</td></tr>
+<tr><td>Muda o <code>.lock</code>?</td><td>Não</td><td>Sim</td></tr>
+<tr><td>Quando usar</td><td>Ao baixar o projeto; no servidor; sempre que quiser "o que está combinado"</td><td>Quando <strong>decidir</strong> atualizar as bibliotecas, e depois testar</td></tr>
+<tr><td>Atualizar só um pacote</td><td>—</td><td><code>composer update monolog/monolog</code></td></tr>
+</table>
+</div>
+
+<h3>O que vai para o Git</h3>
+<p>Se o projeto usa <a href="https://git-scm.com">Git</a>, a regra é:</p>
+<ul>
+  <li><code>composer.json</code> e <code>composer.lock</code>: <strong>sim</strong>, os dois, sempre.</li>
+  <li><code>vendor/</code>: <strong>não</strong>. Coloque <code>/vendor/</code> no arquivo <code>.gitignore</code>. Quem baixar o projeto roda <code>composer install</code>.</li>
+</ul>
+
+<hr>
+
+<h2>Dependências só de desenvolvimento: <code>--dev</code></h2>
+<p>Algumas ferramentas só servem para quem programa: testes automatizados, verificadores de estilo. Elas não precisam ir para o servidor. Instale com <code>--dev</code>:</p>
+
+<p>Por exemplo, <code>composer require --dev phpunit/phpunit</code>. Elas vão para a seção <code>"require-dev"</code>. No servidor, <code>composer install --no-dev</code> deixa essas de fora. Você vai instalar o PHPUnit de verdade em <a href="phpunit.html">Testes com PHPUnit</a>.</p>
+
+<hr>
+
+<h2>O autoload do seu código e o <code>dump-autoload</code></h2>
+<p>A seção <code>"autoload"</code> do <code>composer.json</code> diz que <code>Ana\Lojinha\</code> mora em <code>src/</code>. Foi por isso que <code>new Pedido(…)</code> funcionou sem <code>require</code>: o autoloader do Composer transformou <code>Ana\Lojinha\Pedido</code> em <code>src/Pedido.php</code>, pela regra PSR-4 explicada em <a href="autoload.html">Autoload e PSR-4</a>.</p>
+
+<ul>
+  <li>Criou uma classe nova dentro de <code>src/</code>? <strong>Nada a fazer</strong>: a regra acha o arquivo.</li>
+  <li>Mudou a seção <code>"autoload"</code> (outro prefixo, outra pasta, uma seção <code>"files"</code>)? Rode <code>composer dump-autoload</code> para gerar o autoloader de novo:</li>
+</ul>
+
+<pre class="term">$ composer dump-autoload
+Generating autoload files
+Generated autoload files</pre>
+
+<hr>
+
+<h2>Scripts: comandos com nome</h2>
+<p>A seção <code>"scripts"</code> dá nomes curtos a comandos que você usa sempre. A Ana acrescentou ao <code>composer.json</code>:</p>
+
+<pre class="file" data-file="composer.json (trecho)">    "scripts": {
+        "loja": "php index.php",
+        "verificar": [
+            "@php -l index.php",
+            "@php -l src/Pedido.php"
+        ]
+    }
+</pre>
+
+<dl class="anatomy">
+  <dt>"loja": "php index.php"</dt><dd>O script <code>loja</code> roda um comando.</dd>
+  <dt>"verificar": [ … ]</dt><dd>Um script pode ter vários comandos, numa lista; rodam em ordem.</dd>
+  <dt>@php</dt><dd>"O mesmo PHP que está rodando o Composer". O <code>-l</code> (de <em>lint</em>) só confere a sintaxe do arquivo, sem executar.</dd>
+</dl>
+
+<pre class="term">$ composer validate
+./composer.json is valid
+$ composer loja
+[2026-10-16T23:49:08.982983+00:00] loja.INFO: Pedido fechado {"cliente":"Bruno","total":69.8} []
+[2026-10-16T23:49:08.983995+00:00] loja.WARNING: Estoque baixo {"produto":"Caneca","restam":2} []
+$ composer verificar
+No syntax errors detected in index.php
+No syntax errors detected in src/Pedido.php
+$ composer run-script --list
+scripts:
+  loja      Runs the loja script as defined in composer.json
+  verificar Runs the verificar script as defined in composer.json </pre>
+
+<p>O <code>composer validate</code> confere se o <code>composer.json</code> está correto; vale rodar depois de editá-lo à mão. Projetos reais costumam ter scripts como <code>"test": "phpunit"</code> e <code>"serve": "php -S localhost:8000 -t public"</code>; o time inteiro passa a usar os mesmos comandos.</p>
+
+<hr>
+
+<h2>Packagist: como escolher um pacote</h2>
+<p>O <strong>packagist.org</strong> é onde o Composer procura os pacotes. No site, você busca pelo que precisa ("pdf", "email", "uuid") e vê, para cada pacote, o nome para o <code>composer require</code>, as versões, as dependências e o número de downloads. Antes de instalar, confira:</p>
+<ul>
+  <li><strong>Downloads e estrelas:</strong> pacotes muito usados têm mais gente achando e corrigindo erros.</li>
+  <li><strong>Última versão:</strong> lançada há meses, não há anos. O <code>composer show monolog/monolog</code> mostra <code>released : 2026-09-29, 2 weeks ago</code>.</li>
+  <li><strong>Versão do PHP exigida</strong> (<code>"php": "&gt;=8.1"</code>) compatível com a sua.</li>
+  <li><strong>Licença</strong> compatível com o seu projeto (MIT, BSD e Apache são as mais tranquilas).</li>
+  <li><strong>Quantas dependências</strong> ele traz. Cada uma é mais código de terceiros no seu projeto.</li>
+</ul>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Failed opening required '…/vendor/autoload.php'</strong>
+<p><strong>O que significa:</strong> a pasta <code>vendor/</code> não existe (projeto recém-baixado, ou alguém a apagou).</p>
+<p><strong>Como consertar:</strong> <code>composer install</code> na pasta do projeto.</p>
+</div>
+
+<div class="cenario">
+<strong>Composer could not find a composer.json file</strong>
+<pre class="term">$ cd ..
+$ composer install
+Composer could not find a composer.json file in /home/ana
+To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage</pre>
+<p><strong>O que significa:</strong> você rodou o comando fora da pasta do projeto. O Composer sempre trabalha na pasta atual.</p>
+<p><strong>Como consertar:</strong> <code>cd lojinha</code> e rode de novo (ou <code>composer init</code>, se o projeto ainda não existir).</p>
+</div>
+
+<div class="cenario">
+<strong>Could not find a matching version of package</strong>
+<pre class="term">$ composer require ana/nao-existe
+
+In PackageDiscoveryTrait.php line 392:
+
+  Could not find a matching version of package ana/nao-existe. Check the pack
+  age spelling, your version constraint and that the package is available in
+  a stability which matches your minimum-stability (stable).
+
+require [--dev] [--dry-run] [--prefer-source] … [--] [&lt;packages&gt;...]</pre>
+<p><strong>O que significa:</strong> "não encontrei uma versão compatível do pacote. Confira a grafia, a restrição de versão e se o pacote existe numa versão estável". Quase sempre é nome errado (<code>monolog</code> em vez de <code>monolog/monolog</code>) ou um pacote que só tem versões de teste.</p>
+<p><strong>Como consertar:</strong> copie o nome exato da página do pacote no Packagist.</p>
+</div>
+
+<div class="cenario">
+<strong>does not contain valid JSON</strong>
+<pre class="term">$ composer install
+
+In JsonFile.php line 398:
+
+  "./composer.json" does not contain valid JSON
+  Parse error on line 4:
+  ...olog": "^3.12",    }}
+  ---------------------^
+  Expected: 'STRING' - It appears you have an extra trailing comma
+
+</pre>
+<p><strong>O que significa:</strong> o <code>composer.json</code> foi editado à mão e ficou com JSON inválido. Aqui, uma vírgula depois do último item (<em>trailing comma</em>), que o PHP aceita em arrays mas o JSON não. A setinha <code>^</code> aponta o lugar.</p>
+<p><strong>Como consertar:</strong> tire a vírgula. Outros erros comuns: aspas simples, comentários, barra invertida simples em <code>"Ana\Lojinha\"</code> (tem que ser <code>\\</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Your requirements could not be resolved to an installable set of packages</strong>
+<pre class="term">$ composer require psr/log:^1.0
+./composer.json has been updated
+Running composer update psr/log
+Loading composer repositories with package information
+Updating dependencies
+Your requirements could not be resolved to an installable set of packages.
+
+  Problem 1
+    - Root composer.json requires psr/log ^1.0, found psr/log[1.0.0, ..., 1.1.4] but these were not loaded, likely because it conflicts with another require.
+  Problem 2
+    - monolog/monolog is locked to version 3.12.1 and an update of this package was not requested.
+    - monolog/monolog 3.12.1 requires psr/log ^2.0 || ^3.0 -&gt; found psr/log[2.0.0, 3.0.0, 3.0.1, 3.0.2] but it conflicts with your root composer.json require (^1.0).
+
+Use the option --with-all-dependencies (-W) to allow upgrades, downgrades and removals for packages currently locked to specific versions.
+
+Installation failed, reverting ./composer.json and ./composer.lock to their original content.</pre>
+<p><strong>O que significa:</strong> um conflito de versões. A Ana pediu o <code>psr/log</code> 1.x, mas o Monolog 3.12.1 exige o 2.x ou 3.x, e não dá para ter as duas versões ao mesmo tempo. "Root composer.json" é o <strong>seu</strong> <code>composer.json</code>. A última linha tranquiliza: nada foi alterado.</p>
+<p><strong>Como consertar:</strong> leia os "Problem" de baixo para cima e escolha versões compatíveis (aqui, simplesmente não pedir o 1.x). O <code>-W</code> deixa o Composer trocar versões de outros pacotes para tentar resolver.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th></tr>
+<tr><td><code>composer init</code></td><td>Cria o <code>composer.json</code> (perguntando, ou com <code>--no-interaction</code>)</td></tr>
+<tr><td><code>composer require pacote</code></td><td>Acrescenta ao <code>require</code> e instala</td></tr>
+<tr><td><code>composer require --dev pacote</code></td><td>Idem, em <code>require-dev</code></td></tr>
+<tr><td><code>composer remove pacote</code></td><td>Tira do <code>composer.json</code> e do <code>vendor/</code></td></tr>
+<tr><td><code>composer install</code></td><td>Instala as versões do <code>composer.lock</code></td></tr>
+<tr><td><code>composer install --no-dev</code></td><td>Idem, sem as dependências de desenvolvimento (servidor)</td></tr>
+<tr><td><code>composer update</code></td><td>Procura versões novas permitidas e reescreve o <code>.lock</code></td></tr>
+<tr><td><code>composer show</code> / <code>show --tree</code></td><td>Lista os pacotes instalados / a árvore de dependências</td></tr>
+<tr><td><code>composer outdated</code></td><td>Mostra o que tem versão nova</td></tr>
+<tr><td><code>composer dump-autoload</code></td><td>Gera o autoloader de novo</td></tr>
+<tr><td><code>composer validate</code></td><td>Confere o <code>composer.json</code></td></tr>
+<tr><td><code>composer NOME</code> / <code>composer run-script NOME</code></td><td>Roda um script da seção <code>"scripts"</code></td></tr>
+<tr><td><code>composer audit</code></td><td>Procura falhas de segurança conhecidas nos pacotes instalados</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Instalar um pacote</h3>
+<p>Complete o comando que instala o pacote <code>monolog/monolog</code>:</p>
+<div class="ex-code">composer <input data-answer="require monolog/monolog" aria-label="subcomando e pacote"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Projeto recém-baixado</h3>
+<p>Você baixou um projeto do GitHub com <code>composer.json</code> e <code>composer.lock</code>, mas sem <code>vendor/</code>. Qual comando cria a pasta com as versões combinadas?</p>
+<div class="ex-code">composer <input data-answer="install" aria-label="subcomando"></div>
+</div>
+
+<div class="exercise">
+<h3>3. A versão</h3>
+<p>Escreva a restrição que aceita a versão <code>2.4</code> e todas as mais novas, até antes da <code>3.0</code>:</p>
+<div class="ex-code">"vendor/pacote": "<input data-answer="^2.4" aria-label="restrição">"</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual destes arquivos ou pastas <strong>não</strong> deve ir para o Git?</p>
+<label><input type="radio" name="q4"> <code>composer.json</code></label>
+<label><input type="radio" name="q4"> <code>vendor/</code></label>
+<label><input type="radio" name="q4"> <code>composer.lock</code></label>
+<label><input type="radio" name="q4"> <code>src/</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Para que serve o <code>composer.lock</code>?</p>
+<label><input type="radio" name="q5"> Impedir que outra pessoa rode o <code>composer</code> ao mesmo tempo</label>
+<label><input type="radio" name="q5"> Guardar a senha do Packagist</label>
+<label><input type="radio" name="q5"> Registrar as versões exatas instaladas, para todos instalarem as mesmas</label>
+<label><input type="radio" name="q5"> Listar os pacotes que você quer, com as versões aceitas</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Você pediu <code>monolog/monolog</code> e o Composer instalou também <code>psr/log</code>. Por quê?</p>
+<label><input type="radio" name="q6"> É uma dependência do Monolog</label>
+<label><input type="radio" name="q6"> Foi um erro; deve ser removido</label>
+<label><input type="radio" name="q6"> O Composer sempre instala o <code>psr/log</code></label>
+<label><input type="radio" name="q6"> Estava no <code>require</code> do seu <code>composer.json</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Projeto: ana/lojinha,out:Autoload: Ana\Lojinha\ -&gt; src/,semerro">
+<p class="try-task"><strong>Missão final:</strong> o Bruno editou o <code>composer.json</code> à mão e o deixou com <strong>três</strong> erros de JSON: uma vírgula sobrando, aspas simples e uma barra invertida que não foi dobrada. Rode para ver <code>Syntax error</code>, abra a aba <code>composer.json</code> e conserte até o programa mostrar o projeto, a dependência e o autoload.</p>
+<pre class="script" data-file="ler.php">&lt;?php
+$texto = file_get_contents(__DIR__ . '/composer.json');
+
+if (!json_validate($texto)) {
+    echo "composer.json inválido: ", json_last_error_msg(), "\n";
+    exit(1);
+}
+
+$composer = json_decode($texto, true);
+echo "Projeto: {$composer['name']}\n";
+foreach ($composer['require'] ?? [] as $pacote =&gt; $versao) {
+    echo "Dependência: $pacote ($versao)\n";
+}
+foreach ($composer['autoload']['psr-4'] ?? [] as $prefixo =&gt; $pasta) {
+    echo "Autoload: $prefixo -&gt; $pasta\n";
+}
+</pre>
+<pre class="script" data-file="composer.json">{
+    "name": 'ana/lojinha',
+    "autoload": {
+        "psr-4": {
+            "Ana\\Lojinha\": "src/"
+        }
+    },
+    "require": {
+        "monolog/monolog": "^3.12",
+    }
+}
+</pre>
+<pre class="solucao" data-file="composer.json">{
+    "name": "ana/lojinha",
+    "autoload": {
+        "psr-4": {
+            "Ana\\Lojinha\\": "src/"
+        }
+    },
+    "require": {
+        "monolog/monolog": "^3.12"
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O Composer baixa pacotes do <strong>Packagist</strong>, com as dependências deles, para a pasta <code>vendor/</code>, e gera o autoload.</li>
+  <li><code>composer.json</code> = o que você quer (<code>"require"</code>, <code>"autoload"</code>, <code>"scripts"</code>); <code>composer.lock</code> = o que foi instalado, versão exata. Os dois vão para o Git; o <code>vendor/</code>, não.</li>
+  <li><code>composer require pacote</code> instala; <code>^3.12</code> aceita atualizações compatíveis até antes da 4.0.</li>
+  <li><code>install</code> segue o <code>.lock</code>; <code>update</code> procura versões novas e muda o <code>.lock</code>.</li>
+  <li>Um único <code>require __DIR__ . '/vendor/autoload.php';</code> carrega os pacotes e o seu código (PSR-4 em <code>src/</code>); <code>dump-autoload</code> quando mudar a seção <code>"autoload"</code>.</li>
+  <li><code>"scripts"</code> dá nomes a comandos: <code>composer loja</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
