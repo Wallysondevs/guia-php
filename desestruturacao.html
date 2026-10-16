@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Desestruturação — list(), [$a, $b] = … e spread ... | Guia PHP</title>
+<meta name="description" content="Desestruturação de arrays no PHP: list() e [$a, $b] = …, com chaves (['nome' =&gt; $n] = …), trocar valores, desestruturar no foreach, pular elementos, arrays aninhados e o spread ... para juntar arrays, com saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Desestruturação (list)</span></h1>
+
+<p class="intro">Muitas vezes você tem um array e quer seus itens em <strong>variáveis separadas</strong>: o dia, o mês e o ano de uma data; o nome e a nota de um aluno. Em vez de escrever uma linha para cada item, o PHP deixa você "desmontar" o array numa linha só. Isso se chama <strong>desestruturação</strong> (<em>destructuring</em>): você desfaz a estrutura do array e espalha os valores em variáveis. No final da aula, você vê o caminho inverso, o <strong>spread</strong> <code>...</code>, que espalha um array dentro de outro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A forma curta <code>[$a, $b] = $array;</code> e a antiga <code>list($a, $b) = $array;</code>.</li>
+  <li>O que acontece com itens a mais ou a menos, e como pular itens.</li>
+  <li>Desestruturar pelas chaves: <code>["nome" =&gt; $nome] = $aluna;</code>.</li>
+  <li>Trocar o valor de duas variáveis numa linha.</li>
+  <li>Desestruturar direto no <code>foreach</code>.</li>
+  <li>Juntar arrays com o spread: <code>[...$a, ...$b]</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: desembalar a compra</h2>
+<p>Pense numa sacola de compras com três itens. Você pode tirar um de cada vez ("pego o primeiro e ponho na geladeira; pego o segundo e ponho no armário…") ou virar a sacola de uma vez sobre a mesa, com cada item caindo num lugar já combinado. A desestruturação é o segundo jeito: você diz de antemão "o primeiro vai para <code>$dia</code>, o segundo para <code>$mes</code>, o terceiro para <code>$ano</code>".</p>
+
+<h2><code>[$a, $b] = …</code> e <code>list()</code></h2>
+
+<pre class="file" data-file="d-basico.php">&lt;?php
+$data = [16, 10, 2026];
+
+// um por um
+$dia = $data[0];
+$mes = $data[1];
+$ano = $data[2];
+echo "$dia/$mes/$ano\n";
+
+// desestruturando
+[$dia, $mes, $ano] = $data;
+echo "$dia/$mes/$ano\n";
+
+// a forma antiga
+list($d, $m, $a) = $data;
+echo "$d/$m/$a\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>[$dia, $mes, $ano]</dt><dd>Do <strong>lado esquerdo</strong> do <code>=</code>, colchetes com variáveis não criam um array: eles dizem "receba os itens nestas variáveis", na ordem.</dd>
+  <dt>=</dt><dd>A atribuição de sempre.</dd>
+  <dt>$data</dt><dd>O array que será desmontado. O item de índice 0 vai para a primeira variável, o 1 para a segunda, e assim por diante.</dd>
+  <dt>list($d, $m, $a)</dt><dd>A mesma coisa, com a palavra <code>list</code> ("lista"). Existe desde sempre; a forma com colchetes chegou no PHP 7.1.</dd>
+</dl>
+
+<pre class="term">$ php d-basico.php
+16/10/2026
+16/10/2026
+16/10/2026</pre>
+
+<p>Os três jeitos dão o mesmo resultado. <code>list()</code> e <code>[ ]</code> são equivalentes; o código moderno usa os colchetes, mas você vai encontrar <code>list()</code> em muito código e tutorial.</p>
+
+<h3>O uso mais comum: com <code>explode</code></h3>
+<p>Desestruturação brilha quando um texto é cortado em partes. A função <code>explode</code> ("explodir") corta um texto num separador e devolve um array (aula <a href="funcoes-string.html">Funções de String</a>):</p>
+
+<pre class="file" data-file="d-explode.php">&lt;?php
+[$dia, $mes, $ano] = explode("/", "16/10/2026");
+var_dump($dia, $mes, $ano);
+[$nome, $email] = explode(";", "Ana;ana@exemplo.com");
+echo "Nome: $nome | E-mail: $email\n";
+</pre>
+
+<pre class="term">$ php d-explode.php
+string(2) "16"
+string(2) "10"             « vieram como texto: o explode sempre devolve strings
+string(4) "2026"
+Nome: Ana | E-mail: ana@exemplo.com</pre>
+
+<h3>Itens a mais e a menos</h3>
+
+<pre class="file" data-file="d-qtd.php">&lt;?php
+[$primeiro, $segundo] = ["Ana", "Bruno", "Carla"];
+echo "$primeiro e $segundo\n";
+[$a, $b, $c] = ["Ana", "Bruno"];
+var_dump($c);
+</pre>
+
+<pre class="term">$ php d-qtd.php
+Ana e Bruno             « a Carla sobrou e foi ignorada, sem aviso
+
+Warning: Undefined array key 2 in /home/ana/site/d-qtd.php on line 4
+NULL                    « faltou item para $c: aviso, e $c fica null</pre>
+
+<p>Itens sobrando: tudo bem. Variáveis sobrando: o mesmo aviso que você já conhece de <a href="arrays.html">Arrays Indexados</a>, porque, por baixo, <code>[$a, $b, $c] = $x</code> é o mesmo que ler <code>$x[0]</code>, <code>$x[1]</code> e <code>$x[2]</code>.</p>
+
+<h3>Pular itens</h3>
+<p>Deixe o lugar vazio entre as vírgulas para ignorar um item:</p>
+
+<pre class="file" data-file="d-pular.php">&lt;?php
+$linha = ["Ana", 29, "Recife", 9.5];
+[$nome, , $cidade] = $linha;       // pula a idade
+echo "$nome mora em $cidade\n";
+[, , , $nota] = $linha;            // pula os três primeiros
+echo "Nota: $nota\n";
+</pre>
+
+<pre class="term">$ php d-pular.php
+Ana mora em Recife
+Nota: 9.5</pre>
+
+<p>Funciona, mas <code>[, , , $nota]</code> é difícil de ler. Quando os itens têm nomes, a próxima forma é bem melhor.</p>
+
+<hr>
+
+<h2>Com chaves: <code>["nome" =&gt; $nome] = …</code></h2>
+<p>Com arrays associativos, você diz <strong>qual chave</strong> vai para qual variável. A ordem deixa de importar, e você pega só o que precisa.</p>
+
+<pre class="file" data-file="d-chaves.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "idade" =&gt; 29, "cidade" =&gt; "Recife", "nota" =&gt; 9.5];
+["nome" =&gt; $nome, "nota" =&gt; $nota] = $aluna;
+echo "$nome tirou $nota\n";
+["cidade" =&gt; $c, "nome" =&gt; $n] = $aluna;
+echo "$n, de $c\n";
+list("idade" =&gt; $idade) = $aluna;
+echo "Idade: $idade\n";
+["email" =&gt; $email] = $aluna;
+var_dump($email);
+</pre>
+
+<dl class="anatomy">
+  <dt>"nome" =&gt; $nome</dt><dd>"O valor da chave <code>"nome"</code> vai para a variável <code>$nome</code>". É a mesma seta da criação do array, mas aqui o lado direito é uma <strong>variável que vai receber</strong> o valor.</dd>
+  <dt>"cidade" =&gt; $c, "nome" =&gt; $n</dt><dd>A ordem é livre, e o nome da variável não precisa ser igual ao da chave.</dd>
+</dl>
+
+<pre class="term">$ php d-chaves.php
+Ana tirou 9.5
+Ana, de Recife
+Idade: 29
+
+Warning: Undefined array key "email" in /home/ana/site/d-chaves.php on line 9
+NULL</pre>
+
+<div class="tryphp">
+<p class="try-task">Pegue outros campos da ficha (a idade, a nota) com a forma de chaves, e experimente trocar dois valores com <code>[$x, $y] = [$y, $x]</code>.</p>
+<pre class="script">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "idade" =&gt; 29, "cidade" =&gt; "Recife", "nota" =&gt; 9.5];
+
+["nome" =&gt; $nome, "cidade" =&gt; $cidade] = $aluna;
+echo "$nome mora em $cidade\n";
+
+$primeiro = "Ana";
+$segundo = "Bruno";
+[$primeiro, $segundo] = [$segundo, $primeiro];
+echo "Agora o primeiro é $primeiro\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Trocar o valor de duas variáveis</h2>
+<p>Um truque clássico. Para trocar o conteúdo de duas variáveis, o jeito tradicional precisa de uma terceira, temporária (como trocar o líquido de dois copos: você precisa de um copo vazio). Com desestruturação, é uma linha:</p>
+
+<pre class="file" data-file="d-troca.php">&lt;?php
+$a = "café";
+$b = "leite";
+[$a, $b] = [$b, $a];
+echo "a = $a, b = $b\n";
+
+// o jeito tradicional, com uma variável temporária
+$x = 1;
+$y = 2;
+$temp = $x;
+$x = $y;
+$y = $temp;
+echo "x = $x, y = $y\n";
+</pre>
+
+<pre class="term">$ php d-troca.php
+a = leite, b = café
+x = 2, y = 1</pre>
+
+<p>Como funciona: o lado direito, <code>[$b, $a]</code>, cria primeiro um array novo com os valores atuais (<code>["leite", "café"]</code>); só depois esse array é desmontado em <code>$a</code> e <code>$b</code>.</p>
+
+<hr>
+
+<h2>No <code>foreach</code></h2>
+<p>A desestruturação também funciona na variável do <a href="foreach.html">foreach</a>. Com a tabela de alunos, o laço fica mais limpo: em vez de <code>$aluno["nome"]</code>, você já recebe <code>$nome</code>.</p>
+
+<pre class="file" data-file="d-foreach.php">&lt;?php
+$alunos = [
+    ["nome" =&gt; "Ana",   "cidade" =&gt; "Recife", "nota" =&gt; 9.5],
+    ["nome" =&gt; "Bruno", "cidade" =&gt; "Olinda", "nota" =&gt; 7.0],
+];
+foreach ($alunos as ["nome" =&gt; $nome, "nota" =&gt; $nota]) {
+    echo "$nome: $nota\n";
+}
+$pontos = [[0, 0], [3, 4], [6, 8]];
+foreach ($pontos as [$x, $y]) {
+    echo "($x, $y)\n";
+}
+$entregas = ["Ana" =&gt; ["Recife", 2], "Bruno" =&gt; ["Olinda", 5]];
+foreach ($entregas as $cliente =&gt; [$cidade, $dias]) {
+    echo "$cliente: $cidade em $dias dias\n";
+}
+</pre>
+
+<pre class="term">$ php d-foreach.php
+Ana: 9.5
+Bruno: 7
+(0, 0)
+(3, 4)
+(6, 8)
+Ana: Recife em 2 dias
+Bruno: Olinda em 5 dias</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Laço</th><th>A cada volta</th></tr>
+<tr><td><code>foreach ($alunos as ["nome" =&gt; $nome, "nota" =&gt; $nota])</code></td><td>Cada ficha é desmontada pelas chaves</td></tr>
+<tr><td><code>foreach ($pontos as [$x, $y])</code></td><td>Cada par <code>[x, y]</code> é desmontado pela posição</td></tr>
+<tr><td><code>foreach ($entregas as $cliente =&gt; [$cidade, $dias])</code></td><td>A chave vai para <code>$cliente</code>, e o valor (um array) é desmontado</td></tr>
+</table>
+</div>
+
+<h3>Arrays dentro de arrays</h3>
+<p>Dá para desmontar vários níveis de uma vez, repetindo o formato do array:</p>
+
+<pre class="file" data-file="d-aninhado.php">&lt;?php
+$pedido = ["Ana", ["café", 2], ["pão", 10]];
+[$cliente, [$produto1, $qtd1], [$produto2, $qtd2]] = $pedido;
+echo "$cliente pediu $qtd1 $produto1 e $qtd2 $produto2\n";
+
+$aluna = ["nome" =&gt; "Ana", "notas" =&gt; [9.0, 8.5, 10.0]];
+["nome" =&gt; $nome, "notas" =&gt; [$n1, $n2]] = $aluna;
+echo "$nome: $n1 e $n2\n";
+</pre>
+
+<pre class="term">$ php d-aninhado.php
+Ana pediu 2 café e 10 pão
+Ana: 9 e 8.5</pre>
+
+<p>Use com moderação: dois níveis ainda se leem bem; mais que isso, prefira desmontar em etapas.</p>
+
+<hr>
+
+<h2>O caminho inverso: o spread <code>...</code></h2>
+<p>A desestruturação tira os itens de dentro de um array. O <strong>spread</strong> (<em>espalhar</em>), escrito com três pontos <code>...</code> antes de um array, faz o contrário: <strong>despeja</strong> os itens de um array dentro de outro que está sendo criado.</p>
+
+<pre class="file" data-file="d-spread.php">&lt;?php
+$manha = ["Ana", "Bruno"];
+$noite = ["Carla", "Diego"];
+$todos = [...$manha, ...$noite];
+print_r($todos);
+$comExtra = ["Zeca", ...$manha, "Elisa"];
+echo implode(", ", $comExtra), "\n";
+
+$padrao  = ["cor" =&gt; "azul", "tamanho" =&gt; "M"];
+$escolha = ["cor" =&gt; "verde"];
+print_r([...$padrao, ...$escolha]);
+print_r([...$padrao, "fonte" =&gt; "Arial", "cor" =&gt; "rosa"]);
+
+$numeros = [5 =&gt; "cinco", 9 =&gt; "nove"];
+print_r([...$numeros]);
+</pre>
+
+<pre class="term">$ php d-spread.php
+Array
+(
+    [0] =&gt; Ana
+    [1] =&gt; Bruno
+    [2] =&gt; Carla
+    [3] =&gt; Diego
+)
+Zeca, Ana, Bruno, Elisa         « o spread pode ficar em qualquer posição
+Array
+(
+    [cor] =&gt; verde              « chave repetida: vence a que vem depois
+    [tamanho] =&gt; M
+)
+Array
+(
+    [cor] =&gt; rosa
+    [tamanho] =&gt; M
+    [fonte] =&gt; Arial
+)
+Array
+(
+    [0] =&gt; cinco                « chaves numéricas são renumeradas
+    [1] =&gt; nove
+)</pre>
+
+<p>O resultado é o mesmo do <code>array_merge</code> (veja <a href="funcoes-array.html">Funções de Array</a>): listas são emendadas e renumeradas, chaves de nome repetidas ficam com o último valor. A vantagem é poder misturar itens soltos e arrays na mesma expressão.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Spread em arrays</th><th>Desde</th></tr>
+<tr><td>Arrays com chaves numéricas (listas)</td><td><span class="versao">PHP 7.4+</span></td></tr>
+<tr><td>Arrays com chaves de nome</td><td><span class="versao">PHP 8.1+</span> (antes, use <code>array_merge</code>)</td></tr>
+</table>
+</div>
+
+<p>Os mesmos três pontos aparecem em funções, para receber ou passar vários argumentos de uma vez (<code>soma(...$numeros)</code>). Isso é assunto de <a href="variadicas.html">Funções Variádicas</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key 2</code> na desestruturação</strong>
+<pre class="term">$ php d-qtd.php
+Ana e Bruno
+
+Warning: Undefined array key 2 in /home/ana/site/d-qtd.php on line 4
+NULL</pre>
+<p><strong>O que aconteceu:</strong> há mais variáveis do lado esquerdo do que itens no array. Acontece muito com <code>explode</code>, quando uma linha do arquivo veio incompleta (<code>"Ana;29"</code> em vez de <code>"Ana;29;Recife"</code>).</p>
+<p><strong>Como resolver:</strong> confira a quantidade com <code>count</code> antes, ou complete o array com valores padrão. Para chaves de nome, o aviso cita a chave: <code>Undefined array key "email"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Cannot mix keyed and unkeyed array entries in assignments</code></strong>
+<pre class="file" data-file="d-misturar.php">&lt;?php
+$aluna = ["nome" =&gt; "Ana", "idade" =&gt; 29];
+["nome" =&gt; $nome, $idade] = $aluna;
+</pre>
+<pre class="term">$ php d-misturar.php
+
+Fatal error: Cannot mix keyed and unkeyed array entries in assignments in /home/ana/site/d-misturar.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que aconteceu:</strong> na mesma desestruturação, uma variável tem chave (<code>"nome" =&gt;</code>) e a outra não. O PHP não aceita misturar as duas formas.</p>
+<p><strong>Como resolver:</strong> escolha uma: <code>["nome" =&gt; $nome, "idade" =&gt; $idade] = $aluna;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Cannot use string as array</code></strong>
+<pre class="file" data-file="d-naoarray.php">&lt;?php
+[$a, $b] = null;
+var_dump($a, $b);
+[$c] = "texto";
+var_dump($c);
+</pre>
+<pre class="term">$ php d-naoarray.php
+NULL
+NULL
+
+Warning: Cannot use string as array in /home/ana/site/d-naoarray.php on line 4
+NULL</pre>
+<p><strong>O que aconteceu:</strong> o lado direito não era um array. Com <code>null</code>, o PHP fica em silêncio e todas as variáveis viram <code>null</code> (perigoso: o erro passa despercebido). Com uma string ou um número, ele avisa.</p>
+<p><strong>Como resolver:</strong> confira de onde vem o valor. Um caso comum é uma função que devolve <code>false</code> ou <code>null</code> quando falha, em vez do array esperado.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Only arrays and Traversables can be unpacked, string given</code></strong>
+<pre class="file" data-file="d-spread-str.php">&lt;?php
+$letras = [...range("a", "c"), ..."xyz"];
+</pre>
+<pre class="term">$ php d-spread-str.php
+
+Fatal error: Uncaught Error: Only arrays and Traversables can be unpacked, string given in /home/ana/site/d-spread-str.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/d-spread-str.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> o spread só "despeja" arrays (e alguns objetos que se comportam como listas, os <em>Traversables</em>). Uma string não é um array de letras no PHP.</p>
+<p><strong>Como resolver:</strong> transforme em array antes: <code>...str_split("xyz")</code> ou <code>...mb_str_split("xyz")</code> para textos com acentos.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th></tr>
+<tr><td>Desmontar pela posição</td><td><code>[$a, $b, $c] = $array;</code></td></tr>
+<tr><td>A mesma coisa, forma antiga</td><td><code>list($a, $b, $c) = $array;</code></td></tr>
+<tr><td>Pular itens</td><td><code>[$a, , $c] = $array;</code></td></tr>
+<tr><td>Desmontar pelas chaves</td><td><code>["nome" =&gt; $n, "nota" =&gt; $x] = $aluna;</code></td></tr>
+<tr><td>Trocar duas variáveis</td><td><code>[$a, $b] = [$b, $a];</code></td></tr>
+<tr><td>Cortar um texto em variáveis</td><td><code>[$d, $m, $a] = explode("/", $data);</code></td></tr>
+<tr><td>No foreach</td><td><code>foreach ($lista as [$x, $y])</code> / <code>foreach ($alunos as ["nome" =&gt; $n])</code></td></tr>
+<tr><td>Vários níveis</td><td><code>[$a, [$b, $c]] = $array;</code></td></tr>
+<tr><td>Juntar arrays (spread)</td><td><code>[...$a, ...$b]</code>, <code>["x", ...$a]</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="out:Bruno (Olinda) tirou 7.0,out:Carla (Caruaru) tirou 8.5,src:\[\$nome,semerro">
+<p class="try-task"><strong>Missão:</strong> cada linha do arquivo de notas da Ana tem o formato <code>nome;nota;cidade</code>. Dentro do <code>foreach</code>, use <code>explode</code> e desestruturação (<code>[$nome, $nota, $cidade] = …</code>) para mostrar uma linha como <code>Bruno (Olinda) tirou 7.0</code> para cada aluno. Repare na ordem dos campos.</p>
+<pre class="script">&lt;?php
+$linhas = ["Ana;9.5;Recife", "Bruno;7.0;Olinda", "Carla;8.5;Caruaru"];
+
+foreach ($linhas as $linha) {
+    $partes = explode(";", $linha);
+    echo $partes[0], "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$linhas = ["Ana;9.5;Recife", "Bruno;7.0;Olinda", "Carla;8.5;Caruaru"];
+
+foreach ($linhas as $linha) {
+    [$nome, $nota, $cidade] = explode(";", $linha);
+    echo "$nome ($cidade) tirou $nota\n";
+}
+</pre>
+</div>
+
+<pre class="term">$ php notas.php
+Ana (Recife) tirou 9.5
+Bruno (Olinda) tirou 7.0        « 7.0, com o zero: veio do texto, não virou número
+Carla (Caruaru) tirou 8.5</pre>
+
+<p>Esse é o começo da leitura de arquivos CSV, que você vai ver por inteiro na aula <a href="csv.html">CSV</a>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Hora e minuto</h3>
+<p>Complete para <code>$hora</code> receber <code>"14"</code> e <code>$minuto</code> receber <code>"30"</code>:</p>
+<div class="ex-code"><input data-answer="[$hora, $minuto]|list($hora, $minuto)" aria-label="variáveis"> = explode(":", "14:30");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Só a cidade</h3>
+<p>Complete para pegar só a chave <code>"cidade"</code> na variável <code>$cidade</code>:</p>
+<div class="ex-code">[<input data-answer="&quot;cidade&quot; =&gt; $cidade|'cidade' =&gt; $cidade" aria-label="chave e variável">] = $aluna;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Trocar</h3>
+<p>Complete para trocar os valores de <code>$x</code> e <code>$y</code>:</p>
+<div class="ex-code">[$x, $y] = <input data-answer="[$y, $x]" aria-label="lado direito">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Depois de <code>[, $b] = ["um", "dois", "três"];</code>, quanto vale <code>$b</code>?</p>
+<label><input type="radio" name="q4"> <code>"um"</code></label>
+<label><input type="radio" name="q4"> <code>"três"</code></label>
+<label><input type="radio" name="q4"> <code>"dois"</code></label>
+<label><input type="radio" name="q4"> Dá erro de sintaxe.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual é o resultado de <code>[...["a", "b"], ...["c"]]</code>?</p>
+<label><input type="radio" name="q5"> <code>["a", "b", "c"]</code></label>
+<label><input type="radio" name="q5"> <code>[["a", "b"], ["c"]]</code></label>
+<label><input type="radio" name="q5"> <code>["c", "b"]</code></label>
+<label><input type="radio" name="q5"> Dá erro: só funciona em funções.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. O que acontece em <code>[$a, $b, $c] = [1, 2];</code>?</p>
+<label><input type="radio" name="q6"> <code>$c</code> recebe <code>0</code>, sem aviso.</label>
+<label><input type="radio" name="q6"> Aparece <code>Warning: Undefined array key 2</code> e <code>$c</code> fica <code>null</code>.</label>
+<label><input type="radio" name="q6"> Um erro fatal: as quantidades não batem.</label>
+<label><input type="radio" name="q6"> <code>$c</code> recebe o array inteiro.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>[$a, $b] = $array;</code> (ou <code>list($a, $b)</code>) põe os itens em variáveis, pela posição.</li>
+  <li>Itens sobrando são ignorados; variáveis sobrando ganham <code>null</code> e um aviso. Vírgulas vazias pulam itens.</li>
+  <li><code>["chave" =&gt; $var] = $array;</code> desmonta pelas chaves, em qualquer ordem. Não misture com a forma sem chaves.</li>
+  <li><code>[$a, $b] = [$b, $a];</code> troca dois valores.</li>
+  <li>No <code>foreach</code>: <code>foreach ($alunos as ["nome" =&gt; $nome])</code>.</li>
+  <li>O spread <code>[...$a, ...$b]</code> junta arrays, como o <code>array_merge</code> (chaves de nome: PHP 8.1+).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
