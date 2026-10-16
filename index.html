@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial PHP — aprenda PHP do zero, como numa escola | Guia PHP</title>
+<meta name="description" content="Curso de PHP do zero ao avançado, em português: cada linha de código explicada parte por parte, editor Experimente que roda o PHP 8.5 de verdade no navegador, missões, projetos e exercícios. Todas as saídas conferidas num PHP real.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="hero">
+<h1>Tutorial PHP</h1>
+<p>Aprenda PHP do zero, como numa escola: cada linha de código é explicada parte por parte, você vê exatamente o que aparece na tela e pratica num editor aqui mesmo no navegador. E não é uma imitação: o editor roda o <strong>PHP 8.5 de verdade</strong>, o mesmo programa que funciona nos servidores. Todas as saídas e mensagens de erro do guia foram conferidas num PHP real. Vale para Linux, Windows e macOS.</p>
+<a class="btn btn-lg" href="introducao.html">Comece pelo Nível 1 &#10095;</a>
+</div>
+
+<div class="pager"></div>
+
+<h2>Experimente agora</h2>
+<p>A caixa abaixo é o editor <strong>Experimente</strong> do guia. Ela tem um programa PHP completo, de duas linhas, pronto para rodar. Clique em <strong>Rodar</strong>. Na primeira vez, o navegador baixa o PHP (alguns segundos); depois, cada execução é instantânea. Nada do que você fizer aqui mexe no seu computador.</p>
+
+<div class="tryphp" data-goal="out:Estou aprendendo PHP!">
+<p class="try-task"><strong>Missão:</strong> clique em <strong>Rodar</strong> e veja o <code>Olá, mundo!</code> aparecer. Depois troque o texto entre as aspas por <code>Estou aprendendo PHP!</code> e rode de novo. Cuidado para não apagar as aspas <code>"</code> nem o <code>;</code> do fim da linha.</p>
+<pre class="script">&lt;?php
+echo "Olá, mundo!";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Estou aprendendo PHP!";
+</pre>
+</div>
+
+<p>O que aconteceu: a primeira linha, <code>&lt;?php</code>, avisa "daqui para frente é código PHP". A segunda linha é a única que <strong>faz</strong> alguma coisa: <code>echo</code> (em inglês, "ecoar") manda o PHP escrever o texto que está entre as aspas. O <code>;</code> no fim termina a instrução, como o ponto final de uma frase. Na aula <a href="primeiro-script.html">Olá, Mundo</a> você vai entender cada pedaço com calma.</p>
+
+<p>Se você apagou uma aspa ou o ponto e vírgula, viu uma mensagem em inglês começando com <code>Parse error</code>. Não se assuste: é o PHP dizendo em que linha ele se perdeu. A aula <a href="erros.html">Lendo Erros do PHP</a> ensina a ler essas mensagens.</p>
+
+<h3>O PHP que faz páginas da web</h3>
+<p>O programa acima escreveu um texto simples, como num terminal. Mas o PHP nasceu para outra coisa: <strong>montar páginas da web</strong>. Na caixa abaixo, o código é tratado como uma página de um site. Repare que ele é quase todo HTML (a linguagem das páginas), com pedacinhos de PHP no meio, entre <code>&lt;?=</code> e <code>?&gt;</code>. Clique em <strong>Rodar</strong> e veja as duas abas: <strong>Resultado</strong> (a página como o navegador mostra) e <strong>Código-fonte HTML</strong> (o que o PHP de fato enviou).</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Bem-vinda\, Bruno!,html:Hoje temos 7 produtos">
+<p class="try-task"><strong>Missão:</strong> faça a página dizer <code>Bem-vinda, Bruno!</code> (troque o nome) e calcule <code>3 + 4</code> no lugar de <code>2 + 3</code>. Depois abra a aba <strong>Código-fonte HTML</strong>: o <code>&lt;?=</code> sumiu, e no lugar dele está só o resultado.</p>
+<pre class="script">&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Lojinha da Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Bem-vinda, &lt;?= "Ana" ?&gt;!&lt;/h1&gt;
+  &lt;p&gt;Hoje temos &lt;?= 2 + 3 ?&gt; produtos na vitrine.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Lojinha da Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Bem-vinda, &lt;?= "Bruno" ?&gt;!&lt;/h1&gt;
+  &lt;p&gt;Hoje temos &lt;?= 3 + 4 ?&gt; produtos na vitrine.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<p>Esse é o truque do PHP: ele <strong>roda no servidor</strong>, calcula o que precisa (aqui, <code>3 + 4</code>) e entrega ao navegador um HTML comum, já pronto. Quem visita o site nunca vê o código PHP, só o resultado. Num site de verdade, no lugar de <code>"Ana"</code> estaria o nome de quem fez login, e no lugar de <code>2 + 3</code>, a contagem dos produtos guardados num banco de dados. A aula <a href="como-funciona.html">Como o PHP Funciona</a> mostra esse caminho passo a passo, e a aula <a href="php-e-html.html">PHP Dentro do HTML</a> ensina a misturar os dois.</p>
+
+<hr>
+
+<h2>O que é este guia</h2>
+<p>O <strong>PHP</strong> é a linguagem que funciona "por trás" da maior parte dos sites da internet: segundo a W3Techs, ela aparece em <strong>69,4%</strong> dos sites cuja linguagem do servidor é conhecida (levantamento de 16 de outubro de 2026). O WordPress, o Moodle, a Wikipédia e incontáveis lojas virtuais são feitos em PHP. Quem aprende PHP consegue:</p>
+<ul>
+  <li>escrever programas que fazem contas, tomam decisões e repetem tarefas;</li>
+  <li>criar páginas que mudam sozinhas: mostram o nome de quem entrou, a lista de produtos do dia, o resultado de uma busca;</li>
+  <li>receber formulários (contato, cadastro, login), guardar dados num banco e mostrá-los de volta, com segurança;</li>
+  <li>entender e modificar sistemas como WordPress e Laravel, e criar APIs que aplicativos de celular consomem.</li>
+</ul>
+<p>O guia é para quem <strong>nunca programou</strong>. Ele começa do zero absoluto (o que é um programa? o que é um servidor?) e vai até o PHP moderno: orientação a objetos, Composer, testes, enums, property hooks e o operador pipe <code>|&gt;</code> do PHP 8.5. A aula <a href="introducao.html">O que é PHP</a> conta a história da linguagem e mostra onde ela é usada.</p>
+
+<hr>
+
+<h2>Como as aulas funcionam</h2>
+<p>Nenhum código aparece "seco". Toda aula segue o mesmo caminho:</p>
+<ol class="passo">
+  <li><strong>A ideia primeiro.</strong> Antes do código, você entende o problema que ele resolve, com uma comparação do dia a dia.</li>
+  <li><strong>Anatomia.</strong> Cada pedaço de uma linha nova é separado e explicado: o que é palavra do PHP, o que é nome escolhido por você, para que serve cada símbolo.</li>
+  <li><strong>A saída real.</strong> Você vê exatamente o que aparece na tela, com etiquetas laranja apontando o que importa. Toda saída foi produzida por um PHP 8.5 de verdade.</li>
+  <li><strong>Experimente.</strong> Pelo menos duas caixas por aula para você mudar o código e rodar, muitas com uma <strong>missão</strong> e um botão para ver a solução. As caixas rodam o PHP real, então os erros que você vir são os mesmos que veria no seu computador.</li>
+  <li><strong>Várias formas de fazer.</strong> Quase sempre há mais de um caminho, e uma tabela "qual usar" mostra quando escolher cada um.</li>
+  <li><strong>Quando dá errado.</strong> O código com erro, a mensagem real do PHP, o que ela quer dizer e como consertar.</li>
+  <li><strong>Exercícios e resumo.</strong> Perguntas com correção na hora e uma lista curta do que levar da aula.</li>
+</ol>
+
+<h3>Exemplo: a anatomia de uma linha</h3>
+<p>Esta é a linha que você rodou lá em cima. Veja como as aulas desmontam uma linha de código:</p>
+
+<pre class="file" data-file="trecho">echo "Olá, mundo!";</pre>
+
+<dl class="anatomy">
+  <dt>echo</dt><dd>Uma <strong>palavra do PHP</strong> (em inglês, "ecoar"): escreve na saída o que vier depois dela. Num terminal, a saída é a tela; num site, é a página que vai para o navegador.</dd>
+  <dt>"Olá, mundo!"</dt><dd>O texto a escrever. As aspas marcam onde o texto começa e termina; elas não aparecem no resultado. Em programação, um texto assim se chama <strong>string</strong>.</dd>
+  <dt>;</dt><dd>O ponto e vírgula termina a instrução, como o ponto final de uma frase. Esquecer o <code>;</code> é o erro número um de quem começa.</dd>
+</dl>
+
+<h3>Exemplo: o terminal</h3>
+<p>Além do editor, as aulas mostram o <strong>terminal</strong> da máquina fictícia do guia: um computador chamado <code>notebook</code>, da usuária <code>ana</code>, com o PHP 8.5 instalado. Ali, o comando <code>php</code> roda um arquivo de código e mostra o que ele escreve:</p>
+
+<pre class="term">$ cd site
+$ cat ola.php                      « mostra o conteúdo do arquivo
+&lt;?php
+echo "Olá, mundo!\n";
+$ php ola.php                      « o PHP lê o arquivo e executa
+Olá, mundo!
+$ echo $?
+0                                  « código de saída 0: terminou sem erro</pre>
+
+<p>O <code>\n</code> dentro das aspas é uma <strong>quebra de linha</strong>: sem ele, o prompt do terminal ficaria grudado no fim do texto. No editor do guia isso não faz diferença, mas no terminal faz; a aula <a href="echo-print.html">echo e print</a> explica.</p>
+
+<p>E o mesmo arquivo pode virar uma página da web. O PHP tem um servidor embutido, o <code>php -S</code>, que transforma uma pasta do seu computador num site de teste. Com ele rodando, o navegador (ou o comando <code>curl</code>, um "navegador de terminal") pede a página e recebe o resultado:</p>
+
+<pre class="term">$ curl localhost:8000/ola.php       « pede a página ao servidor php -S
+Olá, mundo!</pre>
+
+<p>A aula <a href="servidor-embutido.html">O Servidor Embutido</a> mostra cada passo, e a aula <a href="simulador.html">O Editor do Guia</a> ensina a usar as caixas Experimente nos dois modos: o de terminal e o de página web.</p>
+
+<hr>
+
+<h2>Escolha sua trilha</h2>
+<div class="trilhas">
+  <div class="trilha n1">
+    <h3>Nível 1 · Iniciante</h3>
+    <p>Para quem nunca programou.</p>
+    <ul>
+      <li>O que é PHP, como ele funciona, instalar e escolher um editor</li>
+      <li>O primeiro script, <code>echo</code>, PHP dentro do HTML</li>
+      <li>Variáveis, tipos, operadores e textos</li>
+      <li><code>if</code>, <code>match</code>, laços e arrays</li>
+    </ul>
+    <a class="btn" href="introducao.html">Começar &#10095;</a>
+  </div>
+  <div class="trilha n2">
+    <h3>Nível 2 · Intermediário</h3>
+    <p>PHP para a web.</p>
+    <ul>
+      <li>Funções, parâmetros e escopo</li>
+      <li>Formulários, <code>$_GET</code>, <code>$_POST</code> e validação</li>
+      <li>Cookies, sessões, arquivos, JSON e datas</li>
+      <li>Exceções e banco de dados com PDO</li>
+    </ul>
+    <a class="btn" href="funcoes.html">Começar &#10095;</a>
+  </div>
+  <div class="trilha n3">
+    <h3>Nível 3 · Avançado</h3>
+    <p>PHP moderno e profissional.</p>
+    <ul>
+      <li>Orientação a objetos, interfaces, traits e enums</li>
+      <li>Namespaces, autoload e Composer</li>
+      <li>Atributos, operador pipe e as novidades do 8.0 ao 8.5</li>
+      <li>Testes com PHPUnit, senhas, CSRF e APIs</li>
+    </ul>
+    <a class="btn" href="poo.html">Começar &#10095;</a>
+  </div>
+  <div class="trilha proj">
+    <h3>Projetos</h3>
+    <p>Sistemas completos, construídos passo a passo.</p>
+    <ul>
+      <li>Calculadora web e formulário de contato</li>
+      <li>Login com sessão</li>
+      <li>Lista de tarefas com SQLite</li>
+      <li>Mini blog e API REST</li>
+    </ul>
+    <a class="btn" href="projetos.html">Ver projetos &#10095;</a>
+  </div>
+  <div class="trilha ref">
+    <h3>Referência</h3>
+    <p>Consulta rápida para quando você já sabe o que procura.</p>
+    <ul>
+      <li>Funções de string e de array</li>
+      <li>Superglobais (<code>$_GET</code>, <code>$_SERVER</code>…)</li>
+      <li>Mensagens de erro do PHP</li>
+      <li>Glossário e quiz</li>
+    </ul>
+    <a class="btn" href="ref-string.html">Consultar &#10095;</a>
+  </div>
+</div>
+
+<div class="tip">
+<strong>A regra de ouro</strong>
+<p>Ler não basta: digite cada exemplo. Use as caixas Experimente das aulas e, quando tiver o PHP instalado, repita no terminal do seu computador. Para instalar, veja <a href="instalar-linux.html">Instalar no Linux</a> ou <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>. Se ainda não quiser instalar nada, tudo bem: o Nível 1 inteiro pode ser feito só no navegador.</p>
+</div>
+
+<hr>
+
+<h2>Como ler este guia</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Elemento</th><th>O que significa</th></tr>
+<tr><td>Caixa com o nome <code>ola.php</code> no canto</td><td>O conteúdo de um arquivo de código. O nome no canto é o nome do arquivo. Quando aparece <code>trecho</code>, é só um pedaço de programa, não um arquivo inteiro.</td></tr>
+<tr><td><code>ola.php · erro de propósito</code></td><td>Código com erro, mostrado de propósito para você ver a mensagem do PHP. Não copie como exemplo a seguir.</td></tr>
+<tr><td><code>ana@notebook:~$</code></td><td>O prompt do terminal: usuária <code>ana</code>, na máquina <code>notebook</code>, na pasta pessoal (<code>~</code>). O que vem depois é o comando digitado.</td></tr>
+<tr><td><code>php &gt;</code></td><td>O prompt do PHP interativo (<code>php -a</code>): o que vem depois foi digitado dentro do PHP, não no terminal.</td></tr>
+<tr><td>Linhas sem prompt</td><td>A resposta do computador (a saída do programa ou a mensagem de erro).</td></tr>
+<tr><td><span class="t-a">← etiqueta</span></td><td>Uma explicação do guia sobre aquela linha. Não aparece no terminal real.</td></tr>
+<tr><td><span class="versao">PHP 8.4+</span></td><td>O recurso só existe a partir dessa versão do PHP. A aula diz a alternativa para versões mais antigas (veja <a href="versoes.html">Versões do PHP</a>).</td></tr>
+<tr><td><strong>ilustrativo</strong></td><td>Uma tela que não pôde ser produzida na máquina do guia (por exemplo, a instalação no Windows). Ela segue o formato real, mas os detalhes podem variar.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Versão de referência: PHP 8.5</strong>
+<p>As saídas do terminal foram conferidas no <strong>PHP 8.5.8</strong>, num Linux em português do Brasil. O editor do navegador roda o <strong>PHP 8.5.10</strong>, a mesma versão compilada para WebAssembly (o formato que os navegadores executam); as diferenças entre as duas são só correções de falhas e quase nunca mudam uma saída. Quase tudo do Nível 1 funciona igual no PHP 8.2, 8.3 e 8.4; quando um recurso é novo, a aula avisa com o selo de versão. A aula <a href="versoes.html">Versões do PHP</a> explica as versões e até quando cada uma recebe correções.</p>
+</div>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
