@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Heredoc e Nowdoc — textos de várias linhas com &lt;&lt;&lt; | Guia PHP</title>
+<meta name="description" content="Heredoc (&lt;&lt;&lt;EOT, com variáveis) e nowdoc (&lt;&lt;&lt;'EOT', literal) no PHP: anatomia, indentação do fechamento (PHP 7.3+), gerar HTML, SQL e e-mails, e os Parse errors reais de quem está começando.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Heredoc e Nowdoc</span></h1>
+
+<p class="intro">Quando o texto tem várias linhas (um trecho de HTML, uma consulta SQL, um e-mail), escrever tudo com aspas e <code>\n</code> vira uma bagunça. O PHP tem uma forma própria para textos longos: o <strong>heredoc</strong>, que funciona como aspas duplas de várias linhas, e o <strong>nowdoc</strong>, que funciona como aspas simples.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do heredoc: <code>&lt;&lt;&lt;</code>, o identificador e a linha de fechamento.</li>
+  <li>A diferença entre heredoc (<code>&lt;&lt;&lt;EOT</code>, com variáveis) e nowdoc (<code>&lt;&lt;&lt;'EOT'</code>, literal).</li>
+  <li>Como a indentação do fechamento é removida do texto (PHP 7.3+).</li>
+  <li>Usos práticos: HTML, SQL e e-mails.</li>
+  <li>Os <code>Parse error</code> mais comuns e como ler cada um.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O problema: texto longo com aspas</h2>
+<p>A Ana quer mandar um recado de várias linhas para o aluno Bruno. Com aspas duplas, fica assim:</p>
+
+<pre class="file" data-file="recado-aspas.php">&lt;?php
+$aluno = "Bruno";
+echo "Olá, $aluno!\n\nSua nota foi 8.5.\nO \"recado\" da professora: continue assim!\n";
+</pre>
+<pre class="term">$ php recado-aspas.php
+Olá, Bruno!
+
+Sua nota foi 8.5.
+O "recado" da professora: continue assim!</pre>
+
+<p>Funciona, mas é difícil de ler: onde termina uma linha? E cada aspa dupla dentro do texto precisa de <code>\"</code>. O heredoc deixa você escrever o texto <strong>do jeito que ele vai aparecer</strong>.</p>
+
+<hr>
+
+<h2>Heredoc: aspas duplas de várias linhas</h2>
+<p>O nome vem do inglês <em>here document</em>, "documento aqui": o texto está ali, no meio do código. A mesma ideia existe no Bash e em outras linguagens.</p>
+
+<pre class="file" data-file="recado.php">&lt;?php
+$aluno = "Bruno";
+$nota = 8.5;
+echo &lt;&lt;&lt;EOT
+Olá, $aluno!
+
+Sua nota foi $nota.
+O "recado" da professora: continue assim!
+EOT;
+</pre>
+
+<dl class="anatomy">
+  <dt>&lt;&lt;&lt;</dt><dd>Três sinais de "menor que": "começa um heredoc".</dd>
+  <dt>EOT</dt><dd>O <strong>identificador</strong>: uma palavra que você escolhe para marcar o fim. <code>EOT</code> (<em>end of text</em>, "fim do texto") é tradição, mas pode ser <code>TXT</code>, <code>HTML</code>, <code>SQL</code>, <code>FIM</code>… Mesmas regras de um nome de variável: letras, números e <code>_</code>, sem começar com número. Por costume, em maiúsculas. Nada pode vir depois dele na linha.</dd>
+  <dt>As linhas do meio</dt><dd>O texto, exatamente como vai sair. Variáveis são trocadas (como nas aspas duplas) e as aspas, simples ou duplas, são só texto: nada de <code>\"</code>.</dd>
+  <dt>EOT;</dt><dd>A linha de <strong>fechamento</strong>: o mesmo identificador, sozinho no começo da linha (ou só com espaços antes), seguido do <code>;</code> que termina o comando <code>echo</code>.</dd>
+</dl>
+
+<pre class="term">$ php recado.php
+Olá, Bruno!
+
+Sua nota foi 8.5.
+O "recado" da professora: continue assim!</pre>
+
+<p>Repare num detalhe: a última linha do texto <strong>não</strong> termina com quebra de linha. A quebra que vem antes de <code>EOT;</code> não faz parte do texto. Se você quiser uma quebra no fim, deixe uma linha em branco antes do fechamento ou faça <code>echo &lt;&lt;&lt;EOT … EOT, "\n";</code>.</p>
+
+<h3>Tudo o que funciona nas aspas duplas funciona no heredoc</h3>
+<p>Variáveis, chaves, arrays, objetos e sequências de escape, as mesmas regras da aula de <a href="interpolacao.html">Interpolação</a>:</p>
+
+<pre class="file" data-file="heredoc.php">&lt;?php
+$nome = "Ana";
+$aluno = ["nome" =&gt; "Bruno", "nota" =&gt; 8.5];
+echo &lt;&lt;&lt;EOT
+Olá, $nome!
+Aluno: {$aluno['nome']}, nota {$aluno['nota']}.
+Preço: R\$ 10\tfim
+Aspas "duplas" e 'simples' sem escape.
+EOT;
+echo "\n---\n";
+echo &lt;&lt;&lt;'EOT'
+Olá, $nome!
+Preço: R\$ 10\tfim
+EOT;
+echo "\n";
+</pre>
+
+<pre class="term">$ php heredoc.php
+Olá, Ana!
+Aluno: Bruno, nota 8.5.
+Preço: R$ 10	fim                « \$ virou $ e \t virou um tab
+Aspas "duplas" e 'simples' sem escape.
+---
+Olá, $nome!                      « nowdoc: nada é trocado
+Preço: R\$ 10\tfim               « nem os escapes</pre>
+
+<p>A segunda parte já é o <strong>nowdoc</strong>, a próxima seção.</p>
+
+<div class="tryphp" data-goal="out:Olá\, Bruno!,out:Sua nota foi 8.5.,src:&lt;&lt;&lt;">
+<p class="try-task"><strong>Missão:</strong> reescreva o recado usando um heredoc, com as variáveis <code>$aluno</code> e <code>$nota</code>, para a saída ser:<br><code>Olá, Bruno!</code><br><code>Sua nota foi 8.5.</code></p>
+<pre class="script">&lt;?php
+$aluno = "Bruno";
+$nota = 8.5;
+echo "Olá, aluno!\nSua nota foi ...";
+</pre>
+<pre class="solucao">&lt;?php
+$aluno = "Bruno";
+$nota = 8.5;
+echo &lt;&lt;&lt;EOT
+Olá, $aluno!
+Sua nota foi $nota.
+EOT;
+</pre>
+</div>
+
+<hr>
+
+<h2>Nowdoc: aspas simples de várias linhas</h2>
+<p>O nowdoc é escrito igual, mas com o identificador <strong>entre aspas simples</strong>: <code>&lt;&lt;&lt;'EOT'</code>. Dentro dele, <strong>nada</strong> é trocado: nem variáveis, nem <code>\n</code>, nem <code>\$</code>. O texto sai exatamente como está, como nas <a href="strings.html">aspas simples</a>.</p>
+
+<dl class="anatomy">
+  <dt>&lt;&lt;&lt;'EOT'</dt><dd>As aspas simples em volta do identificador transformam o heredoc em nowdoc. Só na abertura: o fechamento continua <code>EOT;</code>, sem aspas.</dd>
+</dl>
+
+<p>O nome é um trocadilho: <em>here</em> doc / <em>now</em> doc. Use quando o texto tem muitos <code>$</code> que devem aparecer literalmente, como um trecho de código PHP ou de JavaScript que você quer mostrar numa página de tutorial:</p>
+
+<pre class="file" data-file="exemplo-codigo.php">&lt;?php
+echo &lt;&lt;&lt;'CODIGO'
+Para mostrar o nome, escreva:
+    echo "Olá, $nome!";
+CODIGO;
+echo "\n";
+</pre>
+<pre class="term">$ php exemplo-codigo.php
+Para mostrar o nome, escreva:
+    echo "Olá, $nome!";</pre>
+
+<p>Com heredoc, o PHP tentaria trocar <code>$nome</code> (e avisaria <code>Undefined variable $nome</code>). Também existe <code>&lt;&lt;&lt;"EOT"</code>, com aspas duplas: é exatamente igual ao heredoc sem aspas, só deixa mais claro que é um heredoc.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Heredoc <code>&lt;&lt;&lt;EOT</code></th><th>Nowdoc <code>&lt;&lt;&lt;'EOT'</code></th></tr>
+<tr><td>Parecido com</td><td>Aspas duplas <code>"…"</code></td><td>Aspas simples <code>'…'</code></td></tr>
+<tr><td>Variáveis (<code>$nome</code>, <code>{$a['x']}</code>)</td><td>Trocadas</td><td>Literais</td></tr>
+<tr><td>Escapes (<code>\n</code>, <code>\t</code>, <code>\$</code>)</td><td>Funcionam</td><td>Literais</td></tr>
+<tr><td>Aspas <code>"</code> e <code>'</code> no texto</td><td>Livres</td><td>Livres</td></tr>
+<tr><td>Uso típico</td><td>HTML, e-mails, mensagens com dados</td><td>Exemplos de código, textos com muitos <code>$</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Indentação do fechamento <span class="versao">PHP 7.3+</span></h2>
+<p>Dentro de uma função ou de um <code>if</code>, o código fica recuado (indentado). Desde o PHP 7.3, o fechamento também pode ser recuado, e o PHP <strong>remove esse recuo de todas as linhas</strong> do texto:</p>
+
+<pre class="file" data-file="recuo.php">&lt;?php
+function recado($nome) {
+    $texto = &lt;&lt;&lt;TXT
+        Olá, $nome!
+          Recuo extra.
+        Até mais.
+        TXT;
+    return $texto;
+}
+echo recado("Ana"), "|\n";
+</pre>
+
+<pre class="term">$ php recuo.php
+Olá, Ana!
+  Recuo extra.          « os 2 espaços A MAIS que o fechamento ficaram
+Até mais.|              « o | mostra onde o texto termina</pre>
+
+<p>O <code>TXT;</code> está recuado 8 espaços. O PHP tirou 8 espaços do começo de <strong>cada</strong> linha. A linha "Recuo extra." tinha 10, então ficaram 2. A regra: <strong>a posição do fechamento define a margem esquerda do texto</strong>.</p>
+
+<p>Funções (<code>function</code>, <code>return</code>) são o assunto de <a href="funcoes.html">Funções</a>; aqui elas só servem para mostrar o código recuado.</p>
+
+<div class="warning">
+<strong>Antes do PHP 7.3</strong>
+<p>O fechamento precisava estar na <strong>coluna 1</strong>, sem nenhum espaço antes, e ser a única coisa na linha (além do <code>;</code>). Em códigos antigos você vai ver heredocs "colados na margem", quebrando a indentação do resto. No PHP 8, recue à vontade.</p>
+</div>
+
+<h3>O fechamento no meio da expressão</h3>
+<p>Também desde o 7.3, o fechamento pode ser seguido de mais código na mesma linha, como uma vírgula ou um parêntese. Assim dá para passar um heredoc direto para uma função:</p>
+
+<pre class="file" data-file="argumento.php">&lt;?php
+$frutas = ["maçã", "uva"];
+$lista = implode(", ", $frutas);
+echo strtoupper(&lt;&lt;&lt;TXT
+    compras: $lista
+    TXT), "\n";
+$total = 3 * 4.5;
+$t = &lt;&lt;&lt;"TXT"
+Total: $total
+TXT;
+echo $t, "\n";
+</pre>
+<pre class="term">$ php argumento.php
+COMPRAS: MAçã, UVA       « o heredoc foi o argumento do strtoupper (sem mb_: veja a aula de mbstring)
+Total: 13.5</pre>
+
+<p>Como na interpolação, contas não são feitas dentro do texto: a Ana calculou <code>$total</code> antes. E o <code>strtoupper</code> deixou o "çã" minúsculo, o problema dos acentos da aula <a href="mbstring.html">Acentos e mbstring</a> (com <code>mb_strtoupper</code> sairia <code>MAÇÃ</code>).</p>
+
+<hr>
+
+<h2>Usos práticos</h2>
+
+<h3>Gerar HTML</h3>
+<p>É o uso mais comum. O HTML fica legível, com as variáveis no lugar:</p>
+
+<pre class="file" data-file="cartao.php">&lt;?php
+$produto = htmlspecialchars("Maçã");
+$preco = "4,50";
+echo &lt;&lt;&lt;HTML
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;$produto&lt;/h2&gt;
+  &lt;p&gt;R$ $preco o quilo&lt;/p&gt;
+&lt;/div&gt;
+HTML;
+</pre>
+<pre class="term">$ php cartao.php
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;Maçã&lt;/h2&gt;
+  &lt;p&gt;R$ 4,50 o quilo&lt;/p&gt;
+&lt;/div&gt;</pre>
+
+<p>No terminal você vê as tags; no navegador, o cartão desenhado. Com <code>htmlspecialchars</code> antes, um nome de produto com <code>&lt;</code> ou <code>&amp;</code> não quebra a página (veja <a href="escapar-saida.html">Escapar a Saída</a>). Para páginas inteiras, a forma mais comum em PHP é outra: sair do PHP com <code>?&gt;</code> e escrever o HTML direto (veja <a href="php-e-html.html">PHP Dentro do HTML</a>). O heredoc brilha em pedaços de HTML montados dentro de uma função.</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> rode e veja o cartão na aba <strong>Resultado</strong>. Troque o produto e o preço, ou acrescente uma linha <code>&lt;p&gt;Estoque: $estoque kg&lt;/p&gt;</code> com uma variável nova.</p>
+<pre class="script">&lt;?php
+$produto = htmlspecialchars("Maçã");
+$preco = "4,50";
+echo &lt;&lt;&lt;HTML
+&lt;div style="border:1px solid #ccc; padding:8px; width:200px"&gt;
+  &lt;h2&gt;$produto&lt;/h2&gt;
+  &lt;p&gt;R$ $preco o quilo&lt;/p&gt;
+&lt;/div&gt;
+HTML;
+</pre>
+</div>
+
+<h3>Consultas SQL</h3>
+<p>Consultas a banco de dados (o assunto do <a href="banco-dados.html">Nível 2</a>) costumam ter várias linhas. O heredoc com recuo deixa tudo alinhado no código:</p>
+
+<pre class="file" data-file="consulta.php">&lt;?php
+$sql = &lt;&lt;&lt;SQL
+    SELECT nome, nota
+    FROM alunos
+    WHERE nota &gt;= 7
+    ORDER BY nome
+    SQL;
+echo $sql, "\n";
+</pre>
+<pre class="term">$ php consulta.php
+SELECT nome, nota
+FROM alunos
+WHERE nota &gt;= 7
+ORDER BY nome</pre>
+
+<div class="warning">
+<strong>Nunca coloque dados do usuário dentro do SQL</strong>
+<p>É tentador escrever <code>WHERE nome = '$nome'</code> num heredoc. Se <code>$nome</code> vier de um formulário, isso abre a porta para o ataque mais famoso da web, a <em>SQL injection</em>. Use o heredoc só para o texto fixo da consulta e passe os valores com <em>prepared statements</em> (veja <a href="prepared-statements.html">Prepared Statements e SQL Injection</a>).</p>
+</div>
+
+<h3>E-mails e mensagens</h3>
+<pre class="file" data-file="email.php">&lt;?php
+$aluno = "Bruno";
+$nota = 8.5;
+$email = &lt;&lt;&lt;EMAIL
+    Olá, $aluno!
+
+    Sua nota final foi $nota.
+    Parabéns pela aprovação!
+
+    Professora Ana
+    EMAIL;
+echo $email, "\n";
+</pre>
+<pre class="term">$ php email.php
+Olá, Bruno!
+
+Sua nota final foi 8.5.
+Parabéns pela aprovação!
+
+Professora Ana</pre>
+
+<p>As linhas em branco do meio fazem parte do texto. Repare que o identificador pode ser qualquer palavra que descreva o conteúdo: <code>HTML</code>, <code>SQL</code>, <code>EMAIL</code>. Alguns editores até colorem o texto conforme o nome (HTML como HTML, SQL como SQL).</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Texto curto, uma linha</td><td>Aspas duplas ou simples</td></tr>
+<tr><td>Texto de várias linhas com variáveis</td><td>Heredoc <code>&lt;&lt;&lt;TXT</code></td></tr>
+<tr><td>Texto de várias linhas sem variáveis, ou com <code>$</code> literais</td><td>Nowdoc <code>&lt;&lt;&lt;'TXT'</code></td></tr>
+<tr><td>Página HTML inteira</td><td>HTML direto com <code>&lt;?= ?&gt;</code> (veja <a href="php-e-html.html">PHP Dentro do HTML</a>)</td></tr>
+<tr><td>Números formatados no meio do texto</td><td>Calcule antes com <a href="number-format.html"><code>number_format</code></a> ou <a href="sprintf.html"><code>sprintf</code></a> e coloque a variável no heredoc</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>Quase todo erro com heredoc é um <code>Parse error</code>: o PHP não consegue nem ler o arquivo, e nada roda. A linha indicada costuma ser <strong>depois</strong> do problema, porque o PHP só percebe que algo está errado mais adiante.</p>
+
+<div class="cenario">
+<strong>Esqueceu o <code>;</code> depois do fechamento</strong>
+<pre class="file" data-file="sem-ponto.php">&lt;?php
+$t = &lt;&lt;&lt;TXT
+Olá
+TXT
+echo $t;
+</pre>
+<pre class="term">$ php sem-ponto.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/php/sem-ponto.php on line 5</pre>
+<p><strong>O que significa:</strong> "token <code>echo</code> inesperado na linha 5". Sem o <code>;</code>, o PHP achou que o comando da linha 2 continuava, e tropeçou no <code>echo</code>.</p>
+<p><strong>Como consertar:</strong> <code>TXT;</code>. O erro aponta a linha 5, mas o problema está na 4.</p>
+</div>
+
+<div class="cenario">
+<strong>O fechamento tem outro nome (ou não existe)</strong>
+<pre class="file" data-file="sem-fim.php">&lt;?php
+$t = &lt;&lt;&lt;TXT
+Olá
+FIM;
+echo $t;
+</pre>
+<pre class="term">$ php sem-fim.php
+
+Parse error: syntax error, unexpected end of file in /home/ana/php/sem-fim.php on line 6</pre>
+<p><strong>O que significa:</strong> "fim de arquivo inesperado". O heredoc foi aberto com <code>TXT</code>, e o PHP procurou uma linha <code>TXT</code> até o fim do arquivo. <code>FIM;</code> e o <code>echo</code> viraram parte do texto. O arquivo tem 5 linhas; a "linha 6" é o fim dele.</p>
+<p><strong>Como consertar:</strong> use o mesmo identificador na abertura e no fechamento (maiúsculas e minúsculas contam).</p>
+</div>
+
+<div class="cenario">
+<strong>Uma linha do texto começa com o identificador</strong>
+<pre class="file" data-file="fim-cedo.php">&lt;?php
+$t = &lt;&lt;&lt;FIM
+Começo
+FIM do texto, só que não
+FIM;
+echo $t;
+</pre>
+<pre class="term">$ php fim-cedo.php
+
+Parse error: syntax error, unexpected token "do" in /home/ana/php/fim-cedo.php on line 4</pre>
+<p><strong>O que significa:</strong> desde o PHP 7.3, o fechamento pode ser seguido de outras coisas na mesma linha. Então a linha <code>FIM do texto…</code> <strong>fechou</strong> o heredoc, e o PHP tentou ler <code>do texto…</code> como código (<code>do</code> é até uma palavra do PHP, do laço <a href="while.html">do-while</a>).</p>
+<p><strong>Como consertar:</strong> escolha um identificador que nunca aparece no começo de uma linha do texto: <code>TXT</code>, <code>EOT</code>, <code>HTML</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Invalid body indentation level</strong>
+<pre class="file" data-file="recuo-errado.php">&lt;?php
+$t = &lt;&lt;&lt;TXT
+    linha 1
+  linha 2
+    TXT;
+echo $t;
+</pre>
+<pre class="term">$ php recuo-errado.php
+
+Parse error: Invalid body indentation level (expecting an indentation level of at least 4) in /home/ana/php/recuo-errado.php on line 4</pre>
+<p><strong>O que significa:</strong> "nível de recuo do corpo inválido (esperava pelo menos 4)". O fechamento está recuado 4 espaços, então o PHP precisa tirar 4 espaços de cada linha. A linha 4 só tem 2.</p>
+<p><strong>Como consertar:</strong> nenhuma linha do texto pode estar mais à esquerda que o fechamento. Recue a linha ou puxe o fechamento para a esquerda.</p>
+</div>
+
+<div class="cenario">
+<strong>Invalid indentation - tabs and spaces cannot be mixed</strong>
+<pre class="term">$ php recuo-misto.php
+
+Parse error: Invalid indentation - tabs and spaces cannot be mixed in /home/ana/php/recuo-misto.php on line 3</pre>
+<p><strong>O que significa:</strong> "recuo inválido: tabs e espaços não podem ser misturados". Uma linha estava recuada com a tecla <kbd>Tab</kbd> e outra com espaços. Na tela parecem iguais, mas para o PHP não são.</p>
+<p><strong>Como consertar:</strong> configure o editor para usar só espaços (o padrão recomendado em PHP é 4 espaços; veja <a href="editores.html">Editores e IDEs</a>) e refaça o recuo.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que é</th></tr>
+<tr><td><code>&lt;&lt;&lt;EOT</code> … <code>EOT;</code></td><td>Heredoc: várias linhas, com variáveis e escapes</td></tr>
+<tr><td><code>&lt;&lt;&lt;"EOT"</code> … <code>EOT;</code></td><td>Heredoc (forma com aspas duplas, igual à anterior)</td></tr>
+<tr><td><code>&lt;&lt;&lt;'EOT'</code> … <code>EOT;</code></td><td>Nowdoc: várias linhas, tudo literal</td></tr>
+<tr><td>Fechamento recuado <span class="versao">7.3+</span></td><td>O recuo do fechamento é removido de todas as linhas</td></tr>
+<tr><td><code>EOT)</code>, <code>EOT,</code> <span class="versao">7.3+</span></td><td>O fechamento pode ser seguido de mais código</td></tr>
+<tr><td>A quebra antes do fechamento</td><td>Não faz parte do texto</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Abrir um heredoc</h3>
+<p>Complete a abertura do heredoc chamado <code>TXT</code>:</p>
+<div class="ex-code">echo <input data-answer="&lt;&lt;&lt;TXT|&lt;&lt;&lt;&quot;TXT&quot;" aria-label="abertura"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Nowdoc</h3>
+<p>Complete a abertura de um <strong>nowdoc</strong> chamado <code>CODIGO</code>:</p>
+<div class="ex-code">echo <input data-answer="&lt;&lt;&lt;'CODIGO'" aria-label="abertura"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>$nome = "Ana";</code>, o que um <strong>nowdoc</strong> com a linha <code>Olá, $nome</code> mostra?</p>
+<label><input type="radio" name="q3"> <code>Olá, Ana</code></label>
+<label><input type="radio" name="q3"> <code>Olá, $nome</code></label>
+<label><input type="radio" name="q3"> <code>Olá, </code> e um aviso</label>
+<label><input type="radio" name="q3"> Parse error</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O fechamento <code>TXT;</code> está recuado 4 espaços e uma linha do texto tem 6 espaços no começo. Quantos espaços sobram nessa linha na saída?</p>
+<label><input type="radio" name="q4"> 0</label>
+<label><input type="radio" name="q4"> 6</label>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> Dá Parse error</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O PHP mostrou <code>Parse error: syntax error, unexpected end of file</code> num arquivo com heredoc. Qual a causa mais provável?</p>
+<label><input type="radio" name="q5"> O fechamento não foi encontrado (nome diferente da abertura).</label>
+<label><input type="radio" name="q5"> Uma variável não existe.</label>
+<label><input type="radio" name="q5"> O texto tem aspas duplas.</label>
+<label><input type="radio" name="q5"> O texto tem linhas em branco.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="html:Uva,html:R$ 7\,90,src:&lt;&lt;&lt;">
+<p class="try-task"><strong>Missão final:</strong> o cartão abaixo mostra as palavras "produto" e "preco" em vez dos valores. Troque a fruta para <code>"Uva"</code>, o preço para <code>"7,90"</code> e faça o heredoc usar as variáveis, para a página mostrar <code>Uva</code> e <code>R$ 7,90 o quilo</code>.</p>
+<pre class="script">&lt;?php
+$produto = htmlspecialchars("Maçã");
+$preco = "4,50";
+echo &lt;&lt;&lt;HTML
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;produto&lt;/h2&gt;
+  &lt;p&gt;R$ preco o quilo&lt;/p&gt;
+&lt;/div&gt;
+HTML;
+</pre>
+<pre class="solucao">&lt;?php
+$produto = htmlspecialchars("Uva");
+$preco = "7,90";
+echo &lt;&lt;&lt;HTML
+&lt;div class="cartao"&gt;
+  &lt;h2&gt;$produto&lt;/h2&gt;
+  &lt;p&gt;R$ $preco o quilo&lt;/p&gt;
+&lt;/div&gt;
+HTML;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Heredoc: <code>&lt;&lt;&lt;EOT</code>, o texto em várias linhas, e <code>EOT;</code>. Funciona como aspas duplas: variáveis e escapes são trocados, aspas são texto comum.</li>
+  <li>Nowdoc: <code>&lt;&lt;&lt;'EOT'</code>. Funciona como aspas simples: tudo literal.</li>
+  <li>O identificador é qualquer nome (<code>TXT</code>, <code>HTML</code>, <code>SQL</code>); o fechamento tem que ser igual.</li>
+  <li>Desde o PHP 7.3, o fechamento pode ser recuado (o recuo sai de todas as linhas) e pode ser seguido de mais código (<code>TXT)</code>).</li>
+  <li>A quebra de linha antes do fechamento não entra no texto.</li>
+  <li>Ótimo para HTML, SQL (sem dados do usuário dentro!) e e-mails.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
