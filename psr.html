@@ -272,13 +272,15 @@ FOUND 5 ERRORS AND 1 WARNING AFFECTING 4 LINES
 
 Time: 51ms; Memory: 6MB</pre>
 
+<p>Todos os espaços, chaves e linhas em branco foram arrumados. Sobraram os 6 problemas de <strong>nomes e visibilidade</strong>, que são decisões suas.</p>
+
 <p>E o <code>Carrinho.php</code> do exemplo da seção anterior, escrito no padrão, passa sem nenhuma reclamação (só a linha do tempo gasto aparece):</p>
 
 <pre class="term">$ vendor/bin/phpcs --standard=PSR12 Carrinho.php &amp;&amp; echo "sem problemas"
 Time: 59ms; Memory: 6MB
 sem problemas</pre>
 
-<p>Todos os espaços, chaves e linhas em branco foram arrumados. Sobraram os 6 problemas de <strong>nomes e visibilidade</strong>, que são decisões suas. Esse é exatamente o trabalho da missão abaixo.</p>
+<p>Os nomes e a visibilidade que sobraram no <code>consertado.php</code> são exatamente o trabalho da missão abaixo.</p>
 
 <div class="tryphp" data-goal="src:class CarrinhoDeCompras,src:public const TAXA,src:public function adicionarItem,src:public function calcularTotal,out:Total: 52.5,semerro">
 <p class="try-task"><strong>Missão:</strong> termine o trabalho que o <code>phpcbf</code> não pode fazer. Renomeie a classe para <code>CarrinhoDeCompras</code> (PascalCase), os métodos para <code>adicionarItem</code> e <code>calcularTotal</code> (camelCase), a constante para <code>TAXA</code>, e declare <code>public</code> na constante e no método que está sem visibilidade. Lembre de atualizar também as linhas que <strong>usam</strong> esses nomes. A saída deve continuar <code>Total: 52.5</code>.</p>
