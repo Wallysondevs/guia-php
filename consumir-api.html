@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Consumir APIs — file_get_contents, cURL, timeouts e erros | Guia PHP</title>
+<meta name="description" content="Como o PHP chama uma API: file_get_contents com URL, stream_context_create (método, cabeçalhos, corpo, timeout, ignore_errors), as funções curl_*, tempo limite, conexão recusada, códigos de status e o JSON da resposta com json_decode e JSON_THROW_ON_ERROR, com saídas reais contra uma API local.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Consumir APIs</span></h1>
+
+<p class="intro">Na aula anterior, a Ana <a href="api-json.html">criou uma API JSON</a> e a testou com o <code>curl</code> do terminal. Agora é a vez do outro lado: o <strong>seu programa PHP</strong> fazendo o papel do cliente, pedindo dados a uma API e usando a resposta. É assim que um site consulta um CEP, calcula o frete nos Correios, confere um pagamento ou mostra a previsão do tempo. "Consumir" uma API é só isto: mandar uma requisição HTTP e ler o JSON que volta.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Buscar uma URL com <code>file_get_contents</code> e transformar o JSON em array com <code>json_decode</code>.</li>
+  <li>Configurar a requisição com <code>stream_context_create</code>: método, cabeçalhos, corpo, tempo limite.</li>
+  <li>Fazer o mesmo com as funções <code>curl_*</code>, o jeito mais completo.</li>
+  <li>Ler o código de status (200, 201, 404…) e tratar cada caso.</li>
+  <li>Lidar com o que dá errado: API desligada, resposta lenta, JSON inválido.</li>
+</ul>
+</div>
+
+<div class="warning"><strong>O editor do guia não acessa a rede.</strong> O PHP das caixas "Experimente" roda dentro do seu navegador, sem permissão para abrir conexões, então <code>file_get_contents("http://…")</code> e <code>curl_exec</code> não funcionam nelas. Todas as saídas de requisições desta aula vieram do computador da Ana, com a API rodando de verdade no <a href="servidor-embutido.html">servidor embutido</a>. Nas caixas, você vai treinar a outra metade do trabalho: ler e tratar a resposta.</div>
+
+<hr>
+
+<h2>A ideia: pedir por telefone</h2>
+<p>Pense na Ana ligando para uma papelaria para saber o preço de uma caneta. Ela precisa saber <strong>o número</strong> (a URL), dizer <strong>o que quer</strong> (o método: "quero consultar" = <code>GET</code>, "quero fazer um pedido" = <code>POST</code>), às vezes dar <strong>detalhes</strong> (o corpo, em JSON), e então <strong>ouvir a resposta</strong>. Às vezes ninguém atende (a API está fora do ar). Às vezes atendem e dizem "esse produto não existe" (404). Às vezes a pessoa demora tanto que a Ana desliga (tempo limite). Um bom cliente de API prevê os três casos.</p>
+
+<h3>Preparando: a API da lojinha ligada</h3>
+<p>Para ter algo de verdade para consumir, a Ana deixou a API da aula anterior rodando num terminal, na pasta <code>~/api</code>:</p>
+
+<pre class="term">$ cd ~/api
+$ php -S localhost:8000 index.php
+[Fri Oct 16 20:54:58 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>Esse terminal fica ocupado com o servidor. Os programas clientes rodam num <strong>segundo terminal</strong>, na pasta <code>~/cliente</code>. Lembrete do que a API sabe fazer: <code>GET /produtos</code> (lista), <code>GET /produtos/2</code> (um produto), <code>POST /produtos</code> (cria um produto a partir de um JSON com <code>nome</code> e <code>preco</code>).</p>
+
+<hr>
+
+<h2>1. O jeito mais simples: <code>file_get_contents</code> com uma URL</h2>
+<p>Você conhece o <code>file_get_contents</code> da aula <a href="arquivos.html">Ler e Escrever Arquivos</a>: ele lê um arquivo inteiro e devolve o texto. O detalhe é que ele também aceita uma <strong>URL</strong>. Nesse caso, o PHP faz uma requisição <code>GET</code> e devolve o corpo da resposta.</p>
+
+<pre class="file" data-file="listar.php">&lt;?php
+
+declare(strict_types=1);
+
+$resposta = file_get_contents('http://localhost:8000/produtos');
+$produtos = json_decode($resposta, true);
+
+foreach ($produtos as $produto) {
+    echo "{$produto['id']}. {$produto['nome']}: R$ ", number_format($produto['preco'], 2, ',', '.'), "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>file_get_contents('http://localhost:8000/produtos')</dt><dd>Faz <code>GET /produtos</code> e devolve o corpo da resposta como <strong>texto</strong> (uma <code>string</code>).</dd>
+  <dt>json_decode($resposta, true)</dt><dd>Transforma o texto JSON em dados do PHP. O <code>true</code> pede arrays associativos (sem ele, viriam objetos <code>stdClass</code>). Veja <a href="json.html">JSON</a>.</dd>
+  <dt>foreach</dt><dd>A partir daqui é PHP comum: uma lista de arrays.</dd>
+</dl>
+
+<pre class="term">$ php listar.php
+1. Caderno: R$ 25,50
+2. Caneta azul: R$ 3,90</pre>
+
+<p>Repare que são <strong>dois passos</strong>: buscar o texto e decodificar. Para ver a diferença, este programa mostra o que chega em cada etapa:</p>
+
+<pre class="file" data-file="cru.php">&lt;?php
+$resposta = file_get_contents('http://localhost:8000/produtos/2');
+var_dump($resposta);
+var_dump(json_decode($resposta, true));
+</pre>
+
+<pre class="term">$ php cru.php
+string(61) "{
+    "id": 2,
+    "nome": "Caneta azul",
+    "preco": 3.9
+}
+"
+array(3) {
+  ["id"]=&gt;
+  int(2)
+  ["nome"]=&gt;
+  string(11) "Caneta azul"
+  ["preco"]=&gt;
+  float(3.9)
+}</pre>
+
+<p>A resposta é uma <code>string</code> de 61 caracteres, igual ao que o <code>curl</code> mostrava. Só depois do <code>json_decode</code> ela vira um array, com <code>id</code> como <code>int</code> e <code>preco</code> como <code>float</code>: o JSON guarda os tipos dos números.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> a variável <code>$resposta</code> tem exatamente o texto que a API devolveu para <code>GET /produtos</code>. Rode, depois acrescente um terceiro produto no texto JSON (por exemplo, <code>{"id":3,"nome":"Borracha","preco":1.5}</code>, sem esquecer a vírgula) e rode de novo. Tente também apagar uma aspa do JSON para ver o que acontece quando a resposta vem quebrada.</p>
+<pre class="script">&lt;?php
+// O texto abaixo é exatamente o que a API devolveu para GET /produtos
+// (o editor do guia não acessa a rede, então copiamos a resposta).
+$resposta = '[{"id":1,"nome":"Caderno","preco":25.5},{"id":2,"nome":"Caneta azul","preco":3.9}]';
+
+$produtos = json_decode($resposta, true);
+
+foreach ($produtos as $produto) {
+    echo "{$produto['id']}. {$produto['nome']}: R$ ", number_format($produto['preco'], 2, ',', '.'), "\n";
+}
+</pre>
+</div>
+
+<h3>Quando a API responde com erro</h3>
+<p>E se o produto não existir? A API responde <code>404</code> com um JSON explicando. Mas veja o que o <code>file_get_contents</code> faz:</p>
+
+<pre class="file" data-file="nao-existe.php">&lt;?php
+$resposta = file_get_contents('http://localhost:8000/produtos/9');
+var_dump($resposta);
+</pre>
+
+<pre class="term">$ php nao-existe.php
+
+Warning: file_get_contents(http://localhost:8000/produtos/9): Failed to open stream: HTTP request failed! HTTP/1.1 404 Not Found
+ in /home/ana/cliente/nao-existe.php on line 2
+bool(false)</pre>
+
+<p>Por padrão, qualquer status de erro (4xx ou 5xx) vira um <code>Warning</code> ("falhou ao abrir o fluxo: a requisição HTTP falhou! 404 Não Encontrado") e a função devolve <code>false</code>. O JSON <code>{"erro": "Produto 9 não encontrado"}</code> que a API mandou foi jogado fora. (A quebra de linha antes de <code>in /home/…</code> é real: a mensagem inclui o fim de linha da primeira linha da resposta HTTP.)</p>
+
+<h3>Configurando a requisição: <code>stream_context_create</code></h3>
+<p>Para mudar o comportamento, você passa um <strong>contexto</strong>: um array de opções para o "fluxo" HTTP. Ele é o 3º argumento do <code>file_get_contents</code> (o 2º é sempre <code>false</code> nesse uso).</p>
+
+<pre class="file" data-file="contexto.php">&lt;?php
+
+declare(strict_types=1);
+
+$contexto = stream_context_create([
+    'http' =&gt; [
+        'timeout' =&gt; 5,
+        'ignore_errors' =&gt; true,
+    ],
+]);
+
+$resposta = file_get_contents('http://localhost:8000/produtos/9', false, $contexto);
+$cabecalhos = http_get_last_response_headers();
+
+echo $cabecalhos[0], "\n";
+var_dump(json_decode($resposta, true));
+</pre>
+
+<dl class="anatomy">
+  <dt>stream_context_create([...])</dt><dd>Cria o contexto. A chave <code>'http'</code> guarda as opções para URLs <code>http://</code> e <code>https://</code>.</dd>
+  <dt>'timeout' =&gt; 5</dt><dd>Desiste se a API ficar 5 segundos sem mandar dados. <strong>Sempre</strong> defina: o padrão (<code>default_socket_timeout</code>) é 60 segundos, tempo demais para um visitante esperando a página.</dd>
+  <dt>'ignore_errors' =&gt; true</dt><dd>"Ignore os erros": devolve o corpo mesmo com status 4xx/5xx, sem <code>Warning</code>. Agora quem decide o que fazer é o seu código.</dd>
+  <dt>http_get_last_response_headers()</dt><dd><span class="versao">PHP 8.4+</span> Devolve os cabeçalhos da última resposta, um por posição. A posição <code>0</code> é a linha de status. Em versões antigas, usava-se a variável mágica <code>$http_response_header</code>, que no PHP 8.5 está obsoleta (veja os erros no fim da aula).</dd>
+</dl>
+
+<pre class="term">$ php contexto.php
+HTTP/1.1 404 Not Found
+array(1) {
+  ["erro"]=&gt;
+  string(25) "Produto 9 não encontrado"
+}</pre>
+
+<p>Agora o programa sabe o status (404) e tem a mensagem de erro da API para mostrar ao usuário.</p>
+
+<h3>Enviando dados: POST com JSON</h3>
+<p>O mesmo contexto define o método, os cabeçalhos e o corpo da requisição:</p>
+
+<pre class="file" data-file="post-fgc.php">&lt;?php
+
+declare(strict_types=1);
+
+$novo = ['nome' =&gt; 'Régua 30 cm', 'preco' =&gt; 4.5];
+
+$contexto = stream_context_create([
+    'http' =&gt; [
+        'method' =&gt; 'POST',
+        'header' =&gt; "Content-Type: application/json\r\nAccept: application/json\r\n",
+        'content' =&gt; json_encode($novo),
+        'timeout' =&gt; 5,
+        'ignore_errors' =&gt; true,
+    ],
+]);
+
+$resposta = file_get_contents('http://localhost:8000/produtos', false, $contexto);
+
+echo http_get_last_response_headers()[0], "\n";
+echo $resposta;
+</pre>
+
+<dl class="anatomy">
+  <dt>'method' =&gt; 'POST'</dt><dd>O método HTTP (padrão: <code>GET</code>).</dd>
+  <dt>'header' =&gt; "…\r\n…\r\n"</dt><dd>Os cabeçalhos num texto só, cada um terminado em <code>\r\n</code> (por isso aspas duplas). <code>Content-Type</code> diz que o corpo é JSON; <code>Accept</code> diz que queremos JSON de volta.</dd>
+  <dt>'content' =&gt; json_encode($novo)</dt><dd>O corpo da requisição: o array convertido em texto JSON. É o que a API lê com <code>php://input</code>.</dd>
+</dl>
+
+<pre class="term">$ php post-fgc.php
+HTTP/1.1 201 Created
+{
+    "id": 3,
+    "nome": "Régua 30 cm",
+    "preco": 4.5
+}</pre>
+
+<p>Status <code>201 Created</code> ("criado") e o produto novo, já com o <code>id</code> que a API escolheu.</p>
+
+<hr>
+
+<h2>2. O jeito completo: as funções <code>curl_*</code></h2>
+<p>A extensão <strong>cURL</strong> ("client URL") é a mesma biblioteca do comando <code>curl</code> que você usou no terminal, agora dentro do PHP. Ela tem mais opções que o <code>file_get_contents</code> (tempo limite de conexão separado, mensagens de erro detalhadas, o status num número inteiro) e é o que quase todo projeto usa, diretamente ou por baixo de bibliotecas.</p>
+<p>O roteiro é sempre o mesmo: <strong>iniciar</strong>, <strong>configurar</strong>, <strong>executar</strong>, <strong>ler as informações</strong>.</p>
+
+<pre class="file" data-file="curl-get.php">&lt;?php
+
+declare(strict_types=1);
+
+$ch = curl_init('http://localhost:8000/produtos/2');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+$resposta = curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+
+echo "Status: $status\n";
+$produto = json_decode($resposta, true);
+echo "{$produto['nome']} custa R$ {$produto['preco']}\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$ch = curl_init(URL)</code></td><td>Cria uma requisição (um objeto <code>CurlHandle</code>; <code>$ch</code> é o nome tradicional, de "curl handle", "alça").</td></tr>
+<tr><td><code>CURLOPT_RETURNTRANSFER, true</code></td><td>"Devolva a resposta" em vez de imprimi-la na tela. Você quase sempre quer isto.</td></tr>
+<tr><td><code>CURLOPT_TIMEOUT, 5</code></td><td>Tempo máximo da requisição inteira, em segundos.</td></tr>
+<tr><td><code>curl_exec($ch)</code></td><td>Executa. Devolve o corpo (texto) ou <code>false</code> se não conseguiu falar com o servidor.</td></tr>
+<tr><td><code>curl_getinfo($ch, CURLINFO_RESPONSE_CODE)</code></td><td>O código de status, como <code>int</code> (<code>200</code>, <code>404</code>…).</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php curl-get.php
+Status: 200
+Caneta azul custa R$ 3.9</pre>
+
+<p>(O preço saiu <code>3.9</code> porque foi interpolado direto; para <code>3,90</code>, use <code>number_format</code> como no <code>listar.php</code>.)</p>
+
+<h3>POST com cURL e <code>curl_setopt_array</code></h3>
+<p>Com muitas opções, <code>curl_setopt_array</code> configura tudo de uma vez. Este cliente também trata os três casos: sem conexão, criado e recusado.</p>
+
+<pre class="file" data-file="curl-post.php">&lt;?php
+
+declare(strict_types=1);
+
+$novo = ['nome' =&gt; 'Apontador', 'preco' =&gt; 2.75];
+
+$ch = curl_init('http://localhost:8000/produtos');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER =&gt; true,
+    CURLOPT_POST =&gt; true,
+    CURLOPT_POSTFIELDS =&gt; json_encode($novo),
+    CURLOPT_HTTPHEADER =&gt; ['Content-Type: application/json', 'Accept: application/json'],
+    CURLOPT_CONNECTTIMEOUT =&gt; 3,
+    CURLOPT_TIMEOUT =&gt; 5,
+]);
+
+$resposta = curl_exec($ch);
+
+if ($resposta === false) {
+    echo 'Falha na conexão: ', curl_error($ch), ' (código ', curl_errno($ch), ")\n";
+    exit(1);
+}
+
+$status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+$dados = json_decode($resposta, true);
+
+if ($status === 201) {
+    echo "Criado: produto {$dados['id']} ({$dados['nome']})\n";
+} else {
+    echo "A API respondeu $status: {$dados['erro']}\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>CURLOPT_POST =&gt; true</dt><dd>Usa o método <code>POST</code>. (Para outros, como <code>PUT</code> e <code>DELETE</code>: <code>CURLOPT_CUSTOMREQUEST =&gt; 'DELETE'</code>.)</dd>
+  <dt>CURLOPT_POSTFIELDS</dt><dd>O corpo. Com um <strong>texto</strong> (o JSON), ele vai exatamente assim. Com um <strong>array</strong>, o cURL enviaria como formulário, que a nossa API não aceita.</dd>
+  <dt>CURLOPT_HTTPHEADER</dt><dd>Os cabeçalhos, agora como uma lista, um por item (sem <code>\r\n</code>).</dd>
+  <dt>CURLOPT_CONNECTTIMEOUT =&gt; 3</dt><dd>Tempo máximo só para <strong>conectar</strong>. Se o servidor nem atender em 3 segundos, desiste.</dd>
+  <dt>$resposta === false</dt><dd>Não houve resposta nenhuma (servidor fora do ar, nome errado, tempo esgotado). <code>curl_error</code> explica em texto; <code>curl_errno</code> dá o número do erro.</dd>
+  <dt>$status === 201</dt><dd>Houve resposta: agora o status diz se deu certo. Um 404 ou 400 <strong>não</strong> faz o <code>curl_exec</code> devolver <code>false</code>.</dd>
+</dl>
+
+<pre class="term">$ php curl-post.php
+Criado: produto 4 (Apontador)</pre>
+
+<p>E se a Ana esquecer o preço (<code>$novo = ['nome' =&gt; 'Apontador'];</code>)? A API recusa com <code>400</code>, e o cliente mostra a mensagem dela:</p>
+
+<pre class="term">$ php curl-post-400.php
+A API respondeu 400: Envie um JSON com "nome" e "preco"</pre>
+
+<hr>
+
+<h2>3. Quando ninguém atende: conexão e tempo limite</h2>
+
+<h3>A API está desligada</h3>
+<p>A Ana desligou o servidor (<kbd>Ctrl</kbd>+<kbd>C</kbd> no primeiro terminal) e rodou os dois clientes:</p>
+
+<pre class="term">$ php curl-post.php
+Falha na conexão: Failed to connect to localhost port 8000 after 0 ms: Could not connect to server (código 7)
+$ php listar.php
+
+Warning: file_get_contents(http://localhost:8000/produtos): Failed to open stream: Connection refused in /home/ana/cliente/listar.php on line 5
+
+Fatal error: Uncaught TypeError: json_decode(): Argument #1 ($json) must be of type string, false given in /home/ana/cliente/listar.php:6
+Stack trace:
+#0 /home/ana/cliente/listar.php(6): json_decode(false, true)
+#1 {main}
+  thrown in /home/ana/cliente/listar.php on line 6</pre>
+
+<p>O <code>curl-post.php</code> conferiu o <code>false</code> e mostrou uma mensagem clara ("falhou ao conectar em localhost porta 8000"). O <code>listar.php</code> não conferiu: o <code>file_get_contents</code> avisou "Connection refused" (conexão recusada) e devolveu <code>false</code>, o <code>false</code> foi parar no <code>json_decode</code>, e os tipos estritos derrubaram o programa. <strong>Regra:</strong> toda requisição pode falhar; confira o resultado antes de usar.</p>
+
+<h3>A API está lenta</h3>
+<p>Para testar, a Ana acrescentou à API uma rota que demora de propósito:</p>
+
+<pre class="file" data-file="index.php (trecho acrescentado à API)">// rota de teste: demora 3 segundos para responder
+if ($caminho === '/lenta') {
+    sleep(3);
+    responder(200, ['ok' =&gt; true]);
+}
+</pre>
+
+<p>E um cliente que só espera 1 segundo:</p>
+
+<pre class="file" data-file="lenta-curl.php">&lt;?php
+
+declare(strict_types=1);
+
+$ch = curl_init('http://localhost:8000/lenta');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+
+$resposta = curl_exec($ch);
+
+if ($resposta === false) {
+    echo 'Erro ', curl_errno($ch), ': ', curl_error($ch), "\n";
+    exit(1);
+}
+echo $resposta;
+</pre>
+
+<pre class="term">$ php lenta-curl.php
+Erro 28: Operation timed out after 1001 milliseconds with 0 bytes received</pre>
+
+<p>"A operação esgotou o tempo depois de 1001 milissegundos, com 0 bytes recebidos." Sem o <code>CURLOPT_TIMEOUT</code>, o cURL esperaria <strong>para sempre</strong>, e a página do visitante ficaria carregando até o PHP desistir. Com o <code>file_get_contents</code>, a opção é o <code>'timeout'</code> do contexto, e a mensagem é menos detalhada:</p>
+
+<pre class="file" data-file="lenta-fgc.php">&lt;?php
+$contexto = stream_context_create(['http' =&gt; ['timeout' =&gt; 1]]);
+$resposta = file_get_contents('http://localhost:8000/lenta', false, $contexto);
+var_dump($resposta);
+</pre>
+
+<pre class="term">$ php lenta-fgc.php
+
+Warning: file_get_contents(http://localhost:8000/lenta): Failed to open stream: HTTP request failed! in /home/ana/cliente/lenta-fgc.php on line 3
+bool(false)</pre>
+
+<h3>Os erros de cURL mais comuns</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th><code>curl_errno</code></th><th>Constante</th><th>Significa</th></tr>
+<tr><td>6</td><td><code>CURLE_COULDNT_RESOLVE_HOST</code></td><td>O nome do site não existe (erro de digitação, sem internet).</td></tr>
+<tr><td>7</td><td><code>CURLE_COULDNT_CONNECT</code></td><td>Ninguém atendeu: servidor desligado ou porta errada.</td></tr>
+<tr><td>28</td><td><code>CURLE_OPERATION_TIMEDOUT</code></td><td>Tempo limite esgotado.</td></tr>
+<tr><td>35</td><td><code>CURLE_SSL_CONNECT_ERROR</code></td><td>Falha ao negociar o HTTPS.</td></tr>
+<tr><td>60</td><td><code>CURLE_PEER_FAILED_VERIFICATION</code></td><td>O certificado HTTPS do site não é confiável. <strong>Não</strong> "resolva" desligando a verificação (<code>CURLOPT_SSL_VERIFYPEER =&gt; false</code>): isso abre a porta para alguém se passar pelo site.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>4. O JSON da resposta: confie, mas confira</h2>
+<p>Mesmo com status 200, a resposta pode não ser JSON: uma API com defeito pode mandar um <code>Warning</code> em HTML antes do JSON (você viu isso acontecer na <a href="api-json.html">aula anterior</a>), ou uma página de manutenção. O <code>json_decode</code> devolve <code>null</code> nesses casos, em silêncio. Com a opção <code>JSON_THROW_ON_ERROR</code>, ele lança uma <code>JsonException</code>, que você trata com <a href="excecoes.html">try/catch</a>:</p>
+
+<pre class="file" data-file="json-throw.php">&lt;?php
+
+declare(strict_types=1);
+
+$resposta = '&lt;br /&gt;&lt;b&gt;Warning&lt;/b&gt;: ... {"id":null}';
+
+try {
+    $dados = json_decode($resposta, true, flags: JSON_THROW_ON_ERROR);
+} catch (JsonException $e) {
+    echo 'A resposta não é JSON válido: ', $e-&gt;getMessage(), "\n";
+}
+
+var_dump(json_decode($resposta, true));
+echo json_last_error_msg(), "\n";
+</pre>
+
+<pre class="term">$ php json-throw.php
+A resposta não é JSON válido: Syntax error
+NULL
+Syntax error</pre>
+
+<p>A primeira linha veio do <code>catch</code>. As duas últimas mostram o jeito antigo: <code>json_decode</code> devolve <code>NULL</code> e você precisa lembrar de perguntar a <code>json_last_error_msg()</code> o que houve ("erro de sintaxe"). O <code>flags:</code> é um <a href="parametros.html">argumento nomeado</a>, para não ter que escrever o 3º argumento (a profundidade, <code>512</code>).</p>
+
+<hr>
+
+<h2>Juntando tudo: uma função para falar com a API</h2>
+<p>Em vez de repetir o roteiro do cURL em todo lugar, a Ana criou uma função que faz a requisição, confere a conexão, decodifica o JSON com segurança e devolve o status junto com os dados:</p>
+
+<pre class="file" data-file="loja-cliente.php">&lt;?php
+
+declare(strict_types=1);
+
+const API = 'http://localhost:8000';
+
+/**
+ * Faz uma requisição e devolve [código de status, dados decodificados].
+ * Lança RuntimeException se não conseguir falar com a API.
+ */
+function pedirJson(string $metodo, string $caminho, ?array $corpo = null): array
+{
+    $ch = curl_init(API . $caminho);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST =&gt; $metodo,
+        CURLOPT_RETURNTRANSFER =&gt; true,
+        CURLOPT_HTTPHEADER =&gt; ['Accept: application/json', 'Content-Type: application/json'],
+        CURLOPT_CONNECTTIMEOUT =&gt; 3,
+        CURLOPT_TIMEOUT =&gt; 10,
+    ]);
+    if ($corpo !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($corpo));
+    }
+
+    $resposta = curl_exec($ch);
+    if ($resposta === false) {
+        throw new RuntimeException('Sem resposta da API: ' . curl_error($ch));
+    }
+
+    $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $dados = json_decode($resposta, true, flags: JSON_THROW_ON_ERROR);
+
+    return [$status, $dados];
+}
+
+try {
+    [$status, $produto] = pedirJson('GET', '/produtos/2');
+    echo "$status → {$produto['nome']}\n";
+
+    [$status, $erro] = pedirJson('GET', '/produtos/99');
+    echo "$status → {$erro['erro']}\n";
+
+    [$status, $novo] = pedirJson('POST', '/produtos', ['nome' =&gt; 'Cola', 'preco' =&gt; 6.2]);
+    echo "$status → criado com id {$novo['id']}\n";
+} catch (RuntimeException | JsonException $e) {
+    echo $e-&gt;getMessage(), "\n";
+    exit(1);
+}
+</pre>
+
+<p>Com a API ligada (e a lista de volta aos dois produtos iniciais):</p>
+
+<pre class="term">$ php loja-cliente.php
+200 → Caneta azul
+404 → Produto 99 não encontrado
+201 → criado com id 3</pre>
+
+<p>Com a API desligada:</p>
+
+<pre class="term">$ php loja-cliente.php
+Sem resposta da API: Failed to connect to localhost port 8000 after 0 ms: Could not connect to server</pre>
+
+<dl class="anatomy">
+  <dt>CURLOPT_CUSTOMREQUEST =&gt; $metodo</dt><dd>Um só lugar para qualquer método: <code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code>.</dd>
+  <dt>?array $corpo = null</dt><dd>O corpo é opcional: <code>GET</code> não tem corpo.</dd>
+  <dt>throw new RuntimeException(...)</dt><dd>Falha de conexão vira uma <a href="excecoes.html">exceção</a>: quem chama decide o que mostrar.</dd>
+  <dt>[$status, $produto] = …</dt><dd><a href="desestruturacao.html">Desestruturação</a>: pega as duas posições do array devolvido.</dd>
+  <dt>catch (RuntimeException | JsonException $e)</dt><dd>Pega os dois tipos de problema: sem conexão e resposta que não é JSON.</dd>
+</dl>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>Bom para</th><th>Cuidado</th></tr>
+<tr><td><code>file_get_contents</code> + contexto</td><td>Um <code>GET</code> rápido, um script pequeno, sem depender de extensões.</td><td>Precisa de <code>allow_url_fopen=On</code>. Erros viram <code>Warning</code> se você esquecer <code>ignore_errors</code>. Mensagens de erro pouco detalhadas.</td></tr>
+<tr><td><code>curl_*</code></td><td>O dia a dia: qualquer método, tempo de conexão separado, status em <code>int</code>, erros detalhados.</td><td>Precisa da extensão <code>curl</code> (vem em quase toda instalação). Mais linhas para escrever.</td></tr>
+<tr><td>Bibliotecas (Guzzle, Symfony HttpClient)</td><td>Projetos grandes: várias requisições ao mesmo tempo, novas tentativas automáticas, testes.</td><td>Instaladas com o <a href="composer.html">Composer</a>. Por baixo, usam cURL ou fluxos do PHP: o que você aprendeu aqui continua valendo.</td></tr>
+</table>
+</div>
+
+<p>Para uma API pública de verdade, nada muda além da URL (com <code>https://</code>) e, em geral, de uma <strong>chave de acesso</strong> enviada num cabeçalho, como <code>Authorization: Bearer SUA-CHAVE</code>. Guarde a chave fora do código (num arquivo de configuração fora da pasta pública ou numa variável de ambiente lida com <code>getenv</code>), nunca no repositório.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Failed to open stream: HTTP request failed! HTTP/1.1 404 Not Found"</strong>
+<p>Você viu esse acima. <strong>O que significa:</strong> o servidor respondeu, mas com status de erro, e o <code>file_get_contents</code> sem <code>ignore_errors</code> trata isso como falha e devolve <code>false</code>.</p>
+<p><strong>Como consertar:</strong> use um contexto com <code>'ignore_errors' =&gt; true</code> e leia o status em <code>http_get_last_response_headers()[0]</code>, ou troque por cURL.</p>
+</div>
+
+<div class="cenario">
+<strong>"json_decode(): Argument #1 ($json) must be of type string, false given"</strong>
+<p><strong>O que significa:</strong> a requisição falhou (conexão recusada, tempo esgotado, status de erro) e devolveu <code>false</code>, mas o código passou esse <code>false</code> adiante como se fosse o texto da resposta.</p>
+<p><strong>Como consertar:</strong> confira <code>if ($resposta === false)</code> logo depois do <code>file_get_contents</code> ou do <code>curl_exec</code>, como no <code>curl-post.php</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"http:// wrapper is disabled in the server configuration by allow_url_fopen=0"</strong>
+<pre class="term">$ php -d allow_url_fopen=0 listar.php
+
+Warning: file_get_contents(): http:// wrapper is disabled in the server configuration by allow_url_fopen=0 in /home/ana/cliente/listar.php on line 5
+
+Warning: file_get_contents(http://localhost:8000/produtos): Failed to open stream: no suitable wrapper could be found in /home/ana/cliente/listar.php on line 5
+
+Fatal error: Uncaught TypeError: json_decode(): Argument #1 ($json) must be of type string, false given in /home/ana/cliente/listar.php:6
+Stack trace:
+#0 /home/ana/cliente/listar.php(6): json_decode(false, true)
+#1 {main}
+  thrown in /home/ana/cliente/listar.php on line 6</pre>
+<p><strong>O que significa:</strong> alguns servidores de hospedagem desligam a opção <code>allow_url_fopen</code> ("permitir abrir URLs como arquivos"), e então o <code>file_get_contents</code> só aceita arquivos locais. (Aqui a Ana simulou isso com <code>-d</code>.)</p>
+<p><strong>Como consertar:</strong> use cURL, que não depende dessa opção. Ou, se o servidor for seu, ligue-a no <code>php.ini</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Deprecated: Function curl_close() is deprecated since 8.5"</strong>
+<pre class="term">$ php fechar.php
+{
+    "id": 1,
+    "nome": "Caderno",
+    "preco": 25.5
+}
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /home/ana/cliente/fechar.php on line 5</pre>
+<p><strong>O que significa:</strong> tutoriais antigos terminam com <code>curl_close($ch);</code>. Desde o PHP 8.0 a requisição é um objeto que se fecha sozinho quando não é mais usado, então a função não faz nada, e no 8.5 ela ganhou um aviso de obsoleta ("será removida no futuro").</p>
+<p><strong>Como consertar:</strong> apague a linha do <code>curl_close</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"The predefined locally scoped $http_response_header variable is deprecated"</strong>
+<pre class="term">$ php velho.php
+
+Deprecated: The predefined locally scoped $http_response_header variable is deprecated, call http_get_last_response_headers() instead in /home/ana/cliente/velho.php on line 3
+HTTP/1.1 200 OK</pre>
+<p><strong>O que significa:</strong> o código usa a variável <code>$http_response_header</code>, que o PHP criava "magicamente" depois de um <code>file_get_contents</code> com URL. Ela ainda funciona (a linha <code>HTTP/1.1 200 OK</code> saiu), mas está obsoleta no PHP 8.5.</p>
+<p><strong>Como consertar:</strong> troque por <code>http_get_last_response_headers()</code>, como a própria mensagem sugere.</p>
+</div>
+
+<div class="cenario">
+<strong>A página do site fica carregando "para sempre"</strong>
+<p><strong>O que significa:</strong> a API que o seu PHP chama está lenta ou travada, e a requisição não tem tempo limite (ou tem um muito alto). O visitante espera junto.</p>
+<p><strong>Como consertar:</strong> defina sempre <code>CURLOPT_CONNECTTIMEOUT</code> e <code>CURLOPT_TIMEOUT</code> (ou <code>'timeout'</code> no contexto) com poucos segundos e trate o erro 28 mostrando uma mensagem amigável ("serviço indisponível, tente de novo").</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função / opção</th><th>Para quê</th></tr>
+<tr><td><code>file_get_contents($url, false, $ctx)</code></td><td>Faz a requisição e devolve o corpo (ou <code>false</code>)</td></tr>
+<tr><td><code>stream_context_create(['http' =&gt; [...]])</code></td><td>Opções: <code>method</code>, <code>header</code>, <code>content</code>, <code>timeout</code>, <code>ignore_errors</code></td></tr>
+<tr><td><code>http_get_last_response_headers()</code></td><td>Cabeçalhos da última resposta (<code>[0]</code> = status) <span class="versao">PHP 8.4+</span></td></tr>
+<tr><td><code>curl_init($url)</code></td><td>Cria a requisição</td></tr>
+<tr><td><code>curl_setopt($ch, OPÇÃO, valor)</code> / <code>curl_setopt_array</code></td><td>Configura uma / várias opções</td></tr>
+<tr><td><code>CURLOPT_RETURNTRANSFER</code></td><td>Devolver a resposta em vez de imprimir</td></tr>
+<tr><td><code>CURLOPT_POST</code> / <code>CURLOPT_CUSTOMREQUEST</code></td><td>Método POST / qualquer método</td></tr>
+<tr><td><code>CURLOPT_POSTFIELDS</code></td><td>Corpo da requisição</td></tr>
+<tr><td><code>CURLOPT_HTTPHEADER</code></td><td>Lista de cabeçalhos</td></tr>
+<tr><td><code>CURLOPT_CONNECTTIMEOUT</code> / <code>CURLOPT_TIMEOUT</code></td><td>Tempo máximo para conectar / para tudo (segundos)</td></tr>
+<tr><td><code>curl_exec($ch)</code></td><td>Executa; corpo ou <code>false</code></td></tr>
+<tr><td><code>curl_getinfo($ch, CURLINFO_RESPONSE_CODE)</code></td><td>Código de status (<code>int</code>)</td></tr>
+<tr><td><code>curl_error($ch)</code> / <code>curl_errno($ch)</code></td><td>Mensagem / número do erro de conexão</td></tr>
+<tr><td><code>json_decode($txt, true, flags: JSON_THROW_ON_ERROR)</code></td><td>JSON → array, com exceção se for inválido</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Devolver em vez de imprimir</h3>
+<p>Complete a opção que faz o <code>curl_exec</code> devolver a resposta como texto:</p>
+<div class="ex-code">curl_setopt($ch, <input data-answer="CURLOPT_RETURNTRANSFER" aria-label="opção">, true);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O status da resposta</h3>
+<p>Complete para obter o código de status da requisição cURL:</p>
+<div class="ex-code">$status = curl_getinfo($ch, <input data-answer="CURLINFO_RESPONSE_CODE|CURLINFO_HTTP_CODE" aria-label="constante">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Não jogar fora o corpo do erro</h3>
+<p>Complete a opção do contexto que faz o <code>file_get_contents</code> devolver o corpo mesmo com status 404:</p>
+<div class="ex-code">'<input data-answer="ignore_errors" aria-label="opção">' =&gt; true,</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A API respondeu <code>404 Not Found</code>. O que o <code>curl_exec</code> devolve?</p>
+<label><input type="radio" name="q4"> <code>false</code></label>
+<label><input type="radio" name="q4"> O corpo da resposta (o JSON de erro); o 404 aparece no <code>curl_getinfo</code></label>
+<label><input type="radio" name="q4"> <code>null</code></label>
+<label><input type="radio" name="q4"> O número 404</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Por que definir um tempo limite em toda requisição?</p>
+<label><input type="radio" name="q5"> Para a API responder mais rápido.</label>
+<label><input type="radio" name="q5"> Porque sem ele o PHP não consegue fazer POST.</label>
+<label><input type="radio" name="q5"> Para a sua página não ficar presa esperando uma API lenta ou travada.</label>
+<label><input type="radio" name="q5"> Porque o <code>json_decode</code> exige.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O que <code>json_decode('&lt;br /&gt;&lt;b&gt;Warning&lt;/b&gt;', true)</code> devolve?</p>
+<label><input type="radio" name="q6"> <code>null</code> (e <code>json_last_error_msg()</code> diz <code>Syntax error</code>)</label>
+<label><input type="radio" name="q6"> Um array vazio</label>
+<label><input type="radio" name="q6"> <code>false</code></label>
+<label><input type="radio" name="q6"> O mesmo texto</label>
+</div>
+
+<div class="tryphp" data-goal="out:Produto: Caneta azul,out:Erro 404: Produto 9 não encontrado,out:Resposta inválida,semerro">
+<p class="try-task"><strong>Missão final:</strong> a função <code>mensagem</code> recebe o status e o corpo de uma resposta da API (como viriam do <code>curl_getinfo</code> e do <code>curl_exec</code>) e deve devolver: <code>Produto: NOME</code> quando o status for 200; <code>Erro STATUS: MENSAGEM</code> (usando a chave <code>erro</code> do JSON) para outros status; e <code>Resposta inválida</code> se o corpo não for JSON. Rode primeiro para ver os avisos que a versão ingênua produz. Dica: <code>JSON_THROW_ON_ERROR</code> e <code>catch (JsonException)</code>.</p>
+<pre class="script">&lt;?php
+
+declare(strict_types=1);
+
+function mensagem(int $status, string $corpo): string
+{
+    $dados = json_decode($corpo, true);
+    return 'Produto: ' . $dados['nome'];
+}
+
+echo mensagem(200, '{"id":2,"nome":"Caneta azul","preco":3.9}'), "\n";
+echo mensagem(404, '{"erro":"Produto 9 não encontrado"}'), "\n";
+echo mensagem(200, '&lt;br /&gt;&lt;b&gt;Warning&lt;/b&gt;: Undefined array key'), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+
+declare(strict_types=1);
+
+function mensagem(int $status, string $corpo): string
+{
+    try {
+        $dados = json_decode($corpo, true, flags: JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        return 'Resposta inválida';
+    }
+
+    if ($status !== 200) {
+        return "Erro $status: {$dados['erro']}";
+    }
+    return 'Produto: ' . $dados['nome'];
+}
+
+echo mensagem(200, '{"id":2,"nome":"Caneta azul","preco":3.9}'), "\n";
+echo mensagem(404, '{"erro":"Produto 9 não encontrado"}'), "\n";
+echo mensagem(200, '&lt;br /&gt;&lt;b&gt;Warning&lt;/b&gt;: Undefined array key'), "\n";
+</pre>
+</div>
+
+<p>Rodando a versão ingênua no computador da Ana, os avisos são estes (no editor, o nome do arquivo muda):</p>
+
+<pre class="term">$ php mensagem.php
+Produto: Caneta azul
+
+Warning: Undefined array key "nome" in /home/ana/cliente/mensagem.php on line 8
+Produto:
+
+Warning: Trying to access array offset on null in /home/ana/cliente/mensagem.php on line 8
+Produto: </pre>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Consumir uma API = mandar uma requisição HTTP e decodificar o JSON da resposta com <code>json_decode($texto, true)</code>.</li>
+  <li><code>file_get_contents($url)</code> faz um GET simples. Com <code>stream_context_create</code> você define método, cabeçalhos, corpo, <code>timeout</code> e <code>ignore_errors</code>.</li>
+  <li>cURL: <code>curl_init</code> → <code>curl_setopt</code>/<code>curl_setopt_array</code> → <code>curl_exec</code> → <code>curl_getinfo</code>. Não precisa (e não deve, no 8.5) chamar <code>curl_close</code>.</li>
+  <li><code>false</code> = não houve resposta (conexão, nome, tempo). Status 4xx/5xx = houve resposta, com erro. Trate os dois.</li>
+  <li>Sempre um tempo limite. Sempre confira o resultado antes de usar. Use <code>JSON_THROW_ON_ERROR</code> para não engolir JSON inválido.</li>
+  <li>O editor do guia não acessa a rede: treine o tratamento das respostas nele e as requisições no seu computador, com a sua própria API no <code>php -S</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
