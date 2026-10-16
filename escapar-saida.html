@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Escapar a Saída (XSS) — htmlspecialchars e urlencode | Guia PHP</title>
+<meta name="description" content="O ataque XSS mostrado na prática, por que ele acontece e como o htmlspecialchars o impede: flags e charset, quando escapar (na saída, sempre), escapar dentro de atributos e em URLs com urlencode, o perigo do javascript: e a regra de ouro.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Escapar a Saída (XSS)</span></h1>
+
+<p class="intro">Toda vez que o seu PHP escreve na página algo que veio do visitante (um nome, um comentário, um termo de busca), existe um risco: e se o "nome" for, na verdade, um pedaço de HTML ou de JavaScript? O navegador não sabe a diferença e executa. Esse ataque se chama <strong>XSS</strong>, e é um dos mais comuns da web. A defesa é uma função de uma linha, <code>htmlspecialchars</code>, usada <strong>sempre</strong>. Nesta aula você vê o ataque acontecer e aprende a fechar a porta.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é XSS, vendo o ataque funcionar numa página de verdade.</li>
+  <li>O que é "escapar" um texto, e o que o <code>htmlspecialchars</code> troca.</li>
+  <li>As opções (<em>flags</em>) e o <em>charset</em> do <code>htmlspecialchars</code>.</li>
+  <li>Quando escapar: na <strong>saída</strong>, sempre, e não na entrada.</li>
+  <li>Como escapar dentro de atributos (<code>value="…"</code>) e dentro de URLs (<code>urlencode</code>).</li>
+  <li>Os casos em que o <code>htmlspecialchars</code> sozinho não basta (<code>javascript:</code>).</li>
+  <li>A regra de ouro, que vale para o resto da sua vida de programador.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o mural da escola</h2>
+<p>Imagine o mural de recados de uma escola. A secretária recebe bilhetes e cola no mural. Um dia, alguém entrega um bilhete que diz: <em>"Aviso da diretoria: as aulas de amanhã estão canceladas. Assinado: a Diretora"</em>. A secretária cola sem pensar, e no dia seguinte ninguém aparece.</p>
+<p>O problema não é o bilhete: é que ele foi colado de um jeito que parece oficial. Se a secretária colasse todo bilhete dentro de um envelope transparente com a etiqueta <strong>"recado de aluno"</strong>, o mesmo texto não enganaria ninguém: todo mundo leria, mas como recado.</p>
+<p>No PHP, a página é o mural, o texto do visitante é o bilhete, e o <code>htmlspecialchars</code> é o envelope transparente: o texto continua aparecendo, letra por letra, mas o navegador o trata como <strong>texto</strong>, nunca como uma ordem (HTML ou JavaScript).</p>
+
+<hr>
+
+<h2>O ataque, na prática</h2>
+<p>A Ana fez uma página de boas-vindas que repete o nome recebido no endereço:</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+echo "&lt;p&gt;Olá, " . $nome . "!&lt;/p&gt;\n";
+</pre>
+
+<p>Com um nome normal, tudo certo:</p>
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=Ana"
+&lt;p&gt;Olá, Ana!&lt;/p&gt;</pre>
+
+<p>Agora alguém manda, como "nome", um pedaço de HTML: <code>&lt;b style="color:red"&gt;hackeado&lt;/b&gt;</code> (no endereço, codificado com <code>%</code>, como você viu em <a href="formularios.html">Formulários HTML</a>):</p>
+
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=%3Cb+style%3D%22color%3Ared%22%3Ehackeado%3C%2Fb%3E"
+&lt;p&gt;Olá, &lt;b style="color:red"&gt;hackeado&lt;/b&gt;!&lt;/p&gt;</pre>
+
+<p>O PHP colou o texto do jeito que veio, e as tags foram parar dentro da página. O navegador não tem como saber que aquilo era "o nome": para ele, é HTML como qualquer outro, e mostra <strong style="color:#c00">hackeado</strong> em vermelho e negrito. Parece brincadeira, mas o atacante acabou de <strong>mudar a sua página</strong>. E se ele pode colocar uma tag <code>&lt;b&gt;</code>, pode colocar uma tag <code>&lt;script&gt;</code>:</p>
+
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=%3Cscript%3Ealert(1)%3C%2Fscript%3E"
+&lt;p&gt;Olá, &lt;script&gt;alert(1)&lt;/script&gt;!&lt;/p&gt;</pre>
+
+<p>Esse <code>&lt;script&gt;</code> roda no navegador de quem abrir o endereço. O <code>alert(1)</code> só mostra uma janelinha, e é o "teste" clássico de quem procura essa falha. Um atacante de verdade colocaria ali um código que lê os cookies da vítima (inclusive o da sessão de login, veja <a href="sessoes.html">Sessões</a>) e envia para ele, ou que troca o formulário de login por um falso. Basta mandar o link para a vítima, ou, pior, salvar o "nome" num banco de dados e deixar ele aparecer para todo mundo que abrir a página (um comentário de blog, por exemplo).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Significado</th></tr>
+<tr><td><strong>XSS</strong></td><td><em>Cross-Site Scripting</em> ("script entre sites"): fazer o site de outra pessoa rodar um código seu no navegador dos visitantes.</td></tr>
+<tr><td>XSS refletido</td><td>O ataque vem no próprio pedido (no link) e "volta refletido" na resposta. O caso do <code>ola.php</code>.</td></tr>
+<tr><td>XSS armazenado</td><td>O ataque é salvo (comentário, nome de perfil) e aparece para todos que abrem a página. O mais perigoso.</td></tr>
+<tr><td><strong>Escapar</strong></td><td>Trocar os caracteres especiais de uma linguagem por uma forma "inofensiva" que mostra o mesmo caractere sem o poder especial (a mesma ideia do <code>\</code> antes de uma aspa, em <a href="strings.html">Strings</a>).</td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=%3Cb+style%3D%22color%3Ared%22%3Ehackeado%3C%2Fb%3E">
+<p class="try-task">A página vulnerável, aberta com o "nome" malicioso. Rode e veja na aba <strong>Resultado</strong>: o <strong>hackeado</strong> vermelho foi o visitante que colocou. Depois, digite no formulário outras tags (<code>&lt;i&gt;oi&lt;/i&gt;</code>, <code>&lt;h1&gt;GRANDE&lt;/h1&gt;</code>) e veja a página obedecer. Na aba <strong>Código-fonte HTML</strong>, as tags estão lá, cruas.</p>
+<pre class="script">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+echo "&lt;p&gt;Olá, " . $nome . "!&lt;/p&gt;";
+?&gt;
+&lt;form&gt;
+  Nome: &lt;input name="nome"&gt; &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>A defesa: <code>htmlspecialchars</code></h2>
+<p>A função <code>htmlspecialchars</code> ("caracteres especiais do HTML") troca os cinco caracteres que têm poder no HTML pelas suas <strong>entidades</strong>, que são a forma de escrever o caractere <strong>como texto</strong>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caractere</th><th>Vira</th><th>Por que é perigoso</th></tr>
+<tr><td><code>&lt;</code></td><td><code>&amp;lt;</code></td><td>Abre uma tag (<em>less than</em>, menor que)</td></tr>
+<tr><td><code>&gt;</code></td><td><code>&amp;gt;</code></td><td>Fecha uma tag (<em>greater than</em>, maior que)</td></tr>
+<tr><td><code>&amp;</code></td><td><code>&amp;amp;</code></td><td>Começa uma entidade (<em>ampersand</em>, o "e comercial")</td></tr>
+<tr><td><code>"</code></td><td><code>&amp;quot;</code></td><td>Fecha um atributo entre aspas duplas (<em>quote</em>)</td></tr>
+<tr><td><code>'</code></td><td><code>&amp;#039;</code></td><td>Fecha um atributo entre aspas simples</td></tr>
+</table>
+</div>
+
+<p>O navegador <strong>mostra</strong> <code>&amp;lt;</code> como <code>&lt;</code>, mas sem abrir tag nenhuma. A página corrigida:</p>
+
+<pre class="file" data-file="ola2.php">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+echo "&lt;p&gt;Olá, " . htmlspecialchars($nome) . "!&lt;/p&gt;\n";
+</pre>
+
+<pre class="term">$ curl -s "localhost:8000/ola2.php?nome=%3Cb+style%3D%22color%3Ared%22%3Ehackeado%3C%2Fb%3E"
+&lt;p&gt;Olá, &amp;lt;b style=&amp;quot;color:red&amp;quot;&amp;gt;hackeado&amp;lt;/b&amp;gt;!&lt;/p&gt;
+$ curl -s "localhost:8000/ola2.php?nome=%3Cscript%3Ealert(1)%3C%2Fscript%3E"
+&lt;p&gt;Olá, &amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;!&lt;/p&gt;</pre>
+
+<p>No navegador, a pessoa vê literalmente <code>Olá, &lt;b style="color:red"&gt;hackeado&lt;/b&gt;!</code>, em preto, com os sinais de menor e maior aparecendo. O "nome" esquisito é mostrado, mas não manda em nada. E com nomes normais, nada muda: <code>Ana</code> continua <code>Ana</code>, e acentos continuam acentos.</p>
+
+<h3>Anatomia completa</h3>
+<pre class="file" data-file="assinatura">htmlspecialchars(string $string, int $flags = ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401, ?string $encoding = null, bool $double_encode = true): string</pre>
+<dl class="anatomy">
+  <dt>$string</dt><dd>O texto que vai ser escapado.</dd>
+  <dt>$flags</dt><dd>Opções (<em>flags</em> = bandeirinhas), combinadas com <code>|</code>. O padrão, desde o PHP 8.1, já é o que você quer: escapar os dois tipos de aspas e substituir texto inválido. Por isso, no PHP 8, <code>htmlspecialchars($texto)</code> sozinho basta.</dd>
+  <dt>$encoding</dt><dd>A codificação (<em>charset</em>) do texto. <code>null</code> usa a configuração <code>default_charset</code> do PHP, que é <code>UTF-8</code>. Só mude se o seu site não for UTF-8 (raro hoje).</dd>
+  <dt>$double_encode</dt><dd>Com <code>true</code> (o padrão), um <code>&amp;amp;</code> que já estava no texto é escapado de novo. Deixe assim: o texto do visitante deve aparecer exatamente como ele digitou.</dd>
+</dl>
+
+<h3>As flags na prática</h3>
+<pre class="file" data-file="hsc.php">&lt;?php
+echo htmlspecialchars('&lt;b&gt;Tom &amp; Jerry&lt;/b&gt; disse "oi" e \'tchau\''), "\n";
+echo htmlspecialchars('&lt;b&gt;Tom &amp; Jerry&lt;/b&gt; disse "oi" e \'tchau\'', ENT_NOQUOTES), "\n";
+echo htmlspecialchars('Café com pão'), "\n";
+echo htmlentities('Café com pão'), "\n";
+</pre>
+<pre class="term">$ php hsc.php
+&amp;lt;b&amp;gt;Tom &amp;amp; Jerry&amp;lt;/b&amp;gt; disse &amp;quot;oi&amp;quot; e &amp;#039;tchau&amp;#039;    « padrão: escapa tudo
+&amp;lt;b&amp;gt;Tom &amp;amp; Jerry&amp;lt;/b&amp;gt; disse "oi" e 'tchau'                « ENT_NOQUOTES: deixa as aspas
+Café com pão                                                       « acentos ficam como estão
+Caf&amp;eacute; com p&amp;atilde;o                                           « htmlentities: troca até os acentos</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Flag</th><th>O que faz</th></tr>
+<tr><td><code>ENT_QUOTES</code></td><td>Escapa <code>"</code> e <code>'</code>. <strong>Está no padrão</strong>; essencial para atributos.</td></tr>
+<tr><td><code>ENT_COMPAT</code></td><td>Escapa só <code>"</code>. Era o padrão antes do PHP 8.1: código antigo com <code>value='…'</code> (aspas simples) ficava vulnerável.</td></tr>
+<tr><td><code>ENT_NOQUOTES</code></td><td>Não escapa aspas. Evite.</td></tr>
+<tr><td><code>ENT_SUBSTITUTE</code></td><td>Texto com bytes inválidos (fora do UTF-8) tem o pedaço ruim trocado por <code>�</code>, em vez de devolver vazio. <strong>Está no padrão.</strong></td></tr>
+<tr><td><code>ENT_HTML5</code></td><td>Usa entidades do HTML5 (<code>'</code> vira <code>&amp;apos;</code>). Opcional.</td></tr>
+</table>
+</div>
+
+<p>O <code>ENT_SUBSTITUTE</code> faz diferença quando chega um texto num formato de letras antigo. Aqui, o "é" de "Café" está no formato ISO-8859-1, inválido em UTF-8:</p>
+<pre class="file" data-file="invalido.php">&lt;?php
+$texto = "Caf\xE9";               // "Café" num formato antigo (ISO-8859-1), inválido em UTF-8
+var_dump(htmlspecialchars($texto));
+var_dump(htmlspecialchars($texto, ENT_QUOTES));
+</pre>
+<pre class="term">$ php invalido.php
+string(6) "Caf�"      « padrão: o byte inválido virou �
+string(0) ""          « sem ENT_SUBSTITUTE: o texto inteiro sumiu</pre>
+
+<p>Por isso, se você vir em tutoriais <code>htmlspecialchars($x, ENT_QUOTES, 'UTF-8')</code>, saiba que é a forma "por extenso" de antes do PHP 8.1. Funciona, mas perde o <code>ENT_SUBSTITUTE</code>; no PHP 8.5, prefira o padrão: <code>htmlspecialchars($x)</code>.</p>
+
+<p><code>htmlentities</code> é a prima que troca <strong>todo</strong> caractere que tem entidade, inclusive acentos. Com páginas em UTF-8 isso é desnecessário (e deixa o código-fonte ilegível). Use <code>htmlspecialchars</code>.</p>
+
+<hr>
+
+<h2>Quando escapar: na saída, sempre</h2>
+<p>Uma dúvida comum: "não seria melhor limpar o nome assim que ele chega, e guardar já escapado?" Não. A regra é: <strong>guarde o dado como ele é; escape no momento de escrever na página</strong>. Três motivos:</p>
+<ol>
+  <li><strong>O jeito de escapar depende de onde o dado vai.</strong> No HTML, <code>htmlspecialchars</code>; numa URL, <code>urlencode</code>; num arquivo CSV ou num e-mail de texto, nada. Escapando na entrada, você só acerta um desses.</li>
+  <li><strong>Escapar duas vezes estraga o texto.</strong> <code>Tom &amp; Jerry</code> vira <code>Tom &amp;amp; Jerry</code> no banco, e na tela aparece <code>Tom &amp;amp; Jerry</code> literalmente.</li>
+  <li><strong>Dados vêm de muitos lugares</strong> (banco de dados, arquivos, outras APIs), não só de formulários. Se a regra é "escapar ao escrever", você nunca precisa lembrar de onde cada um veio.</li>
+</ol>
+
+<div class="tip"><strong>Na prática:</strong> todo <code>&lt;?= $variavel ?&gt;</code> que mostra texto na página vira <code>&lt;?= htmlspecialchars($variavel) ?&gt;</code>. Sem exceção para "esse dado é confiável": o nome que veio do banco foi digitado por alguém um dia.</div>
+
+<p>Como o nome é longo, muitos projetos criam uma função curta para isso (funções em <a href="funcoes.html">Funções</a>):</p>
+<pre class="file" data-file="funcoes.php">&lt;?php
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+</pre>
+<p>E na página: <code>&lt;p&gt;Olá, &lt;?= e($nome) ?&gt;!&lt;/p&gt;</code>. Os sistemas de templates dos frameworks (Twig, Blade, do Laravel) fazem isso sozinhos em todo <code>{{ variavel }}</code>.</p>
+
+<hr>
+
+<h2>Escapar em atributos</h2>
+<p>Dentro de um atributo, como o <code>value</code> de um campo (que você usou em <a href="validacao.html">Validar Dados</a> para manter o que foi digitado), o perigo é a <strong>aspa</strong>. Veja uma busca que devolve o termo no campo, sem e com escape:</p>
+
+<pre class="file" data-file="atributo.php">&lt;?php
+$busca = $_GET['busca'] ?? '';
+?&gt;
+&lt;input name="busca" value="&lt;?= $busca ?&gt;"&gt;
+&lt;input name="busca" value="&lt;?= htmlspecialchars($busca) ?&gt;"&gt;
+</pre>
+
+<pre class="term">$ curl -s "localhost:8000/atributo.php?busca=bolo"
+&lt;input name="busca" value="bolo"&gt;
+&lt;input name="busca" value="bolo"&gt;
+$ curl -s "localhost:8000/atributo.php?busca=%22+autofocus+onfocus%3D%22alert(1)"
+&lt;input name="busca" value="" autofocus onfocus="alert(1)"&gt;         « sem escape: a aspa fechou o value
+&lt;input name="busca" value="&amp;quot; autofocus onfocus=&amp;quot;alert(1)"&gt;  « com escape: tudo dentro do value</pre>
+
+<p>Na primeira linha, a aspa do "termo de busca" fechou o <code>value</code> antes da hora, e o resto virou <strong>novos atributos</strong>: <code>autofocus</code> (o campo recebe o cursor ao abrir a página) e <code>onfocus="alert(1)"</code> (rode este JavaScript ao receber o cursor). O ataque funciona sem nenhum <code>&lt;</code> ou <code>&gt;</code>. Na segunda linha, o <code>&amp;quot;</code> é só uma aspa desenhada, dentro do valor.</p>
+
+<div class="warning"><strong>Sempre coloque aspas nos atributos.</strong> <code>value=&lt;?= htmlspecialchars($x) ?&gt;</code> (sem aspas) continua vulnerável: um simples espaço no valor já começa um atributo novo, e o <code>htmlspecialchars</code> não escapa espaços. Escreva <code>value="&lt;?= htmlspecialchars($x) ?&gt;"</code>.</div>
+
+<hr>
+
+<h2>Escapar em URLs: <code>urlencode</code></h2>
+<p>Quando um dado vai <strong>dentro de um endereço</strong>, como o termo de uma busca num link, o problema são os caracteres que têm significado na URL: <code>&amp;</code>, <code>=</code>, <code>?</code>, <code>#</code>, espaço. A função <code>urlencode</code> codifica um valor no formato que você viu em <a href="formularios.html">Formulários HTML</a>:</p>
+
+<pre class="file" data-file="url.php">&lt;?php
+$q = 'bolo &amp; café';
+echo urlencode($q), "\n";
+echo rawurlencode($q), "\n";
+echo '&lt;a href="busca.php?q=' . urlencode($q) . '&amp;amp;pagina=2"&gt;Buscar&lt;/a&gt;', "\n";
+echo '&lt;a href="' . htmlspecialchars('busca.php?' . http_build_query(['q' =&gt; $q, 'pagina' =&gt; 2])) . '"&gt;Buscar&lt;/a&gt;', "\n";
+</pre>
+
+<pre class="term">$ php url.php
+bolo+%26+caf%C3%A9
+bolo%20%26%20caf%C3%A9
+&lt;a href="busca.php?q=bolo+%26+caf%C3%A9&amp;amp;pagina=2"&gt;Buscar&lt;/a&gt;
+&lt;a href="busca.php?q=bolo+%26+caf%C3%A9&amp;amp;pagina=2"&gt;Buscar&lt;/a&gt;</pre>
+
+<dl class="anatomy">
+  <dt>urlencode($q)</dt><dd>Codifica um <strong>valor</strong> de parâmetro: espaço vira <code>+</code>, <code>&amp;</code> vira <code>%26</code>, acentos viram <code>%C3%A9</code>. Sem isso, o <code>&amp;</code> de "bolo &amp; café" cortaria a busca em "bolo ", e "café" viraria um parâmetro sem nome.</dd>
+  <dt>rawurlencode($q)</dt><dd>O mesmo, mas espaço vira <code>%20</code>. Use para pedaços do <strong>caminho</strong> (<code>/fotos/minhas%20ferias.jpg</code>).</dd>
+  <dt>&amp;amp;pagina=2</dt><dd>Dentro do HTML, o <code>&amp;</code> que separa os parâmetros também é escrito <code>&amp;amp;</code>. O navegador lê <code>&amp;</code>.</dd>
+  <dt>htmlspecialchars(… http_build_query(…))</dt><dd>A forma mais tranquila: monte a query string inteira com <code>http_build_query</code> (que já codifica cada valor, veja <a href="get-post.html">$_GET e $_POST</a>) e escape o endereço todo para o HTML.</dd>
+</dl>
+
+<h3>O caso que nenhuma função resolve: <code>javascript:</code></h3>
+<p>Se o visitante escolhe o endereço <strong>inteiro</strong> de um link (o campo "seu site" de um perfil), o <code>htmlspecialchars</code> não basta:</p>
+<pre class="file" data-file="js.php">&lt;?php
+$site = $_GET['site'] ?? '';
+echo '&lt;a href="' . htmlspecialchars($site) . '"&gt;Meu site&lt;/a&gt;', "\n";
+</pre>
+<pre class="term">$ curl -s "localhost:8000/js.php?site=javascript:alert(1)"
+&lt;a href="javascript:alert(1)"&gt;Meu site&lt;/a&gt;</pre>
+<p>Não havia nada para escapar: <code>javascript:alert(1)</code> não tem <code>&lt;</code>, aspas nem <code>&amp;</code>. Mas um link <code>javascript:</code> roda código quando clicado. A defesa aqui é <strong>validar</strong> (veja <a href="validacao.html">Validar Dados</a>): aceite só endereços que comecem com <code>https://</code> ou <code>http://</code>, por exemplo com <code>str_starts_with($site, 'https://')</code>, e só então escape.</p>
+
+<hr>
+
+<h2>Cada lugar, sua forma de escapar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde o dado vai</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Texto no HTML</td><td><code>htmlspecialchars</code></td><td><code>&lt;p&gt;&lt;?= htmlspecialchars($nome) ?&gt;&lt;/p&gt;</code></td></tr>
+<tr><td>Atributo HTML</td><td><code>htmlspecialchars</code> + aspas no atributo</td><td><code>value="&lt;?= htmlspecialchars($v) ?&gt;"</code></td></tr>
+<tr><td>Valor de parâmetro numa URL</td><td><code>urlencode</code> (ou <code>http_build_query</code>)</td><td><code>?q=&lt;?= urlencode($q) ?&gt;</code></td></tr>
+<tr><td>URL inteira vinda do visitante</td><td>validar o começo (<code>https://</code>) + <code>htmlspecialchars</code></td><td><code>href="&lt;?= htmlspecialchars($site) ?&gt;"</code></td></tr>
+<tr><td>Dentro de <code>&lt;script&gt;</code></td><td><code>json_encode</code> com <code>JSON_HEX_TAG</code></td><td><code>const nome = &lt;?= json_encode($nome, JSON_HEX_TAG) ?&gt;;</code> (veja <a href="json.html">JSON</a>)</td></tr>
+<tr><td>SQL</td><td>Prepared statements, nunca escape manual</td><td>veja <a href="prepared-statements.html">Prepared Statements</a></td></tr>
+</table>
+</div>
+
+<h3>E o <code>strip_tags</code>?</h3>
+<p>A função <code>strip_tags</code> ("arrancar as tags") apaga tudo o que parece tag. Parece uma defesa, mas muda o que a pessoa escreveu, e às vezes estraga texto inocente:</p>
+<pre class="file" data-file="strip.php">&lt;?php
+echo strip_tags('&lt;b style="color:red"&gt;hackeado&lt;/b&gt;'), "\n";
+echo strip_tags('5 &lt; 7 e 8 &gt; 3'), "\n";
+echo htmlspecialchars('5 &lt; 7 e 8 &gt; 3'), "\n";
+</pre>
+<pre class="term">$ php strip.php
+hackeado                « a tag foi apagada (e o texto da pessoa, alterado)
+5 &lt; 7 e 8 &gt; 3           « aqui deixou passar os sinais soltos
+5 &amp;lt; 7 e 8 &amp;gt; 3     « htmlspecialchars: mostra igualzinho, sem risco</pre>
+<p>E <code>strip_tags</code> não protege atributos (o ataque do <code>onfocus</code> não tem tag nenhuma). Para mostrar texto, a resposta é sempre <code>htmlspecialchars</code>.</p>
+
+<hr>
+
+<h2>A regra de ouro</h2>
+<div class="note"><strong>Filtre na entrada, escape na saída.</strong>
+<ul>
+  <li><strong>Entrada:</strong> confira se o dado faz sentido (<a href="validacao.html">Validar Dados</a>) e recuse o que não faz.</li>
+  <li><strong>Saída:</strong> todo dado que vai para a página passa pelo escape do lugar onde ele vai: <code>htmlspecialchars</code> no HTML, <code>urlencode</code> na URL.</li>
+  <li><strong>Sem exceções</strong> para dados "confiáveis": o banco, os arquivos e os cookies também guardam o que alguém digitou.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Apareceu <code>&amp;amp;</code>, <code>&amp;quot;</code> ou <code>&amp;lt;</code> na tela</strong>
+<p><strong>O que aconteceu:</strong> o texto foi escapado <strong>duas vezes</strong>. Por exemplo: <code>htmlspecialchars</code> antes de salvar no banco, e de novo ao mostrar. <code>Tom &amp; Jerry</code> → <code>Tom &amp;amp; Jerry</code> → <code>Tom &amp;amp;amp; Jerry</code>, e a pessoa vê <code>Tom &amp;amp; Jerry</code>.</p>
+<p><strong>Como resolver:</strong> escape uma vez só, na saída. Guarde no banco o texto original.</p>
+</div>
+
+<div class="cenario">
+<strong>O nome sumiu da página (ficou vazio)</strong>
+<pre class="term">$ php invalido.php
+string(6) "Caf�"
+string(0) ""</pre>
+<p><strong>O que aconteceu:</strong> o texto tinha bytes que não são UTF-8 válido, e o <code>htmlspecialchars</code> foi chamado com flags que não incluem <code>ENT_SUBSTITUTE</code> (como <code>ENT_QUOTES</code> sozinho). Nesse caso, ele devolve texto vazio.</p>
+<p><strong>Como resolver:</strong> use o padrão do PHP 8 (<code>htmlspecialchars($x)</code>), ou inclua a flag: <code>ENT_QUOTES | ENT_SUBSTITUTE</code>. E descubra de onde veio o texto no formato antigo (um CSV exportado de um programa velho, por exemplo; veja <a href="mbstring.html">Acentos e mbstring</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>As tags que eu queria (negrito do meu próprio texto) aparecem como texto</strong>
+<p><strong>O que aconteceu:</strong> você escapou um HTML que <strong>você</strong> escreveu, como <code>htmlspecialchars("&lt;b&gt;Promoção&lt;/b&gt;")</code>. O escape não sabe quem escreveu; ele só desliga tags.</p>
+<p><strong>Como resolver:</strong> escape só a parte que veio de fora: <code>"&lt;b&gt;" . htmlspecialchars($produto) . "&lt;/b&gt;"</code>. Se o visitante precisa formatar texto (negrito, links), use um formato próprio para isso, como Markdown, com uma biblioteca que gere HTML seguro.</p>
+</div>
+
+<div class="cenario">
+<strong><code>htmlspecialchars(): Argument #1 ($string) must be of type string, array given</code></strong>
+<p><strong>O que aconteceu:</strong> chegou um array (<code>?nome[]=x</code>) onde você esperava texto, igual ao caso do <code>trim</code> em <a href="validacao.html">Validar Dados</a>. O erro é fatal (<code>TypeError</code>).</p>
+<p><strong>Como resolver:</strong> confira o tipo ao ler o campo (<code>is_string</code>) antes de chegar na saída.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Para quê</th><th>Exemplo de saída</th></tr>
+<tr><td><code>htmlspecialchars($s)</code></td><td>Texto e atributos no HTML</td><td><code>&lt;b&gt;</code> → <code>&amp;lt;b&amp;gt;</code></td></tr>
+<tr><td><code>htmlentities($s)</code></td><td>Como a anterior, mas troca também acentos (desnecessário em UTF-8)</td><td><code>é</code> → <code>&amp;eacute;</code></td></tr>
+<tr><td><code>urlencode($s)</code></td><td>Valor de parâmetro de URL</td><td><code>bolo &amp; café</code> → <code>bolo+%26+caf%C3%A9</code></td></tr>
+<tr><td><code>rawurlencode($s)</code></td><td>Pedaço do caminho de uma URL</td><td>espaço → <code>%20</code></td></tr>
+<tr><td><code>http_build_query($a)</code></td><td>Query string inteira</td><td><code>q=bolo+%26+caf%C3%A9&amp;pagina=2</code></td></tr>
+<tr><td><code>json_encode($v, JSON_HEX_TAG)</code></td><td>Valor dentro de <code>&lt;script&gt;</code></td><td><code>Ana&lt;/script&gt;</code> → <code>"Ana\u003C\/script\u003E"</code></td></tr>
+<tr><td><code>strip_tags($s)</code></td><td>Apagar tags (não é defesa contra XSS)</td><td><code>&lt;b&gt;oi&lt;/b&gt;</code> → <code>oi</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Mostrar com segurança</h3>
+<p>Complete para mostrar o comentário sem risco de XSS:</p>
+<div class="ex-code">&lt;p&gt;&lt;?= <input data-answer="htmlspecialchars($comentario)|htmlspecialchars($comentario, ENT_QUOTES)" aria-label="expressão"> ?&gt;&lt;/p&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Link de busca</h3>
+<p>Complete com a função que codifica o termo dentro da URL:</p>
+<div class="ex-code">&lt;a href="busca.php?q=&lt;?= <input data-answer="urlencode" aria-label="função">($termo) ?&gt;"&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>3. A entidade da aspa</h3>
+<p>Em que o <code>htmlspecialchars</code> transforma a aspa dupla <code>"</code>?</p>
+<div class="ex-code"><input data-answer="&amp;quot;" aria-label="entidade"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quando você deve aplicar o <code>htmlspecialchars</code>?</p>
+<label><input type="radio" name="q4"> Ao receber o formulário, antes de salvar no banco.</label>
+<label><input type="radio" name="q4"> Ao escrever o dado na página (na saída).</label>
+<label><input type="radio" name="q4"> Só em dados que vieram de <code>$_GET</code>.</label>
+<label><input type="radio" name="q4"> Só quando o texto tem <code>&lt;script&gt;</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. <code>value=&lt;?= htmlspecialchars($x) ?&gt;</code> (sem aspas em volta) é seguro?</p>
+<label><input type="radio" name="q5"> Sim, o <code>htmlspecialchars</code> resolve tudo.</label>
+<label><input type="radio" name="q5"> Sim, desde que o site use HTTPS.</label>
+<label><input type="radio" name="q5"> Só no PHP 8.1 ou mais novo.</label>
+<label><input type="radio" name="q5"> Não: um espaço no valor começa um atributo novo. Use aspas.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O campo "seu site" recebeu <code>javascript:alert(1)</code>. O que protege o link?</p>
+<label><input type="radio" name="q6"> Validar que o endereço começa com <code>https://</code> ou <code>http://</code>, e então escapar.</label>
+<label><input type="radio" name="q6"> Só <code>htmlspecialchars</code>.</label>
+<label><input type="radio" name="q6"> Só <code>urlencode</code>.</label>
+<label><input type="radio" name="q6"> <code>strip_tags</code>.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=%3Cb+style%3D%22color%3Ared%22%3Ehackeado%3C%2Fb%3E" data-goal="out:&amp;lt;b style=&amp;quot;color:red&amp;quot;&amp;gt;hackeado,html:&lt;b style=&quot;color:red&quot;&gt;hackeado&lt;/b&gt;">
+<p class="try-task"><strong>Missão:</strong> feche a porta do XSS. A página foi aberta com o nome malicioso. Use <code>htmlspecialchars</code> para que, na aba <strong>Resultado</strong>, apareça o texto <code>&lt;b style="color:red"&gt;hackeado&lt;/b&gt;</code> com os sinais de menor e maior, em preto, e não uma palavra vermelha.</p>
+<pre class="script">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+echo "&lt;p&gt;Olá, " . $nome . "!&lt;/p&gt;";
+?&gt;
+&lt;form&gt;
+  Nome: &lt;input name="nome"&gt; &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+echo "&lt;p&gt;Olá, " . htmlspecialchars($nome) . "!&lt;/p&gt;";
+?&gt;
+&lt;form&gt;
+  Nome: &lt;input name="nome"&gt; &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?q=bolo+%26+caf%C3%A9" data-goal="out:value=&quot;bolo &amp;amp; café&quot;,out:?q=bolo+%26+caf%C3%A9">
+<p class="try-task"><strong>Missão:</strong> a busca da padaria foi aberta procurando <code>bolo &amp; café</code>. Hoje, o campo e o link "Página 2" estão quebrados: o link perde o "café" (repare no endereço dele). Escape o termo no <code>value</code> com <code>htmlspecialchars</code> e no link com <code>urlencode</code>.</p>
+<pre class="script">&lt;?php
+$q = $_GET['q'] ?? '';
+?&gt;
+&lt;form&gt;
+  Buscar: &lt;input name="q" value="&lt;?= $q ?&gt;"&gt; &lt;button&gt;Buscar&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Você buscou: &lt;?= htmlspecialchars($q) ?&gt;&lt;/p&gt;
+&lt;a href="?q=&lt;?= $q ?&gt;&amp;amp;pagina=2"&gt;Página 2&lt;/a&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$q = $_GET['q'] ?? '';
+?&gt;
+&lt;form&gt;
+  Buscar: &lt;input name="q" value="&lt;?= htmlspecialchars($q) ?&gt;"&gt; &lt;button&gt;Buscar&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Você buscou: &lt;?= htmlspecialchars($q) ?&gt;&lt;/p&gt;
+&lt;a href="?q=&lt;?= urlencode($q) ?&gt;&amp;amp;pagina=2"&gt;Página 2&lt;/a&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>XSS</strong>: texto do visitante escrito na página sem escape vira HTML/JavaScript que roda no navegador de outras pessoas.</li>
+  <li><code>htmlspecialchars</code> troca <code>&lt; &gt; &amp; " '</code> por entidades: o texto aparece igual, mas sem poder.</li>
+  <li>No PHP 8.1+, o padrão (<code>ENT_QUOTES | ENT_SUBSTITUTE</code>, UTF-8) é o certo: <code>htmlspecialchars($x)</code> basta.</li>
+  <li>Escape <strong>na saída</strong>, uma vez, conforme o lugar: HTML → <code>htmlspecialchars</code>; parâmetro de URL → <code>urlencode</code>.</li>
+  <li>Atributos sempre entre aspas. URLs inteiras do visitante: valide o começo (<code>https://</code>) antes.</li>
+  <li><code>strip_tags</code> e <code>htmlentities</code> não são a ferramenta para isso.</li>
+  <li>Regra de ouro: <strong>filtre na entrada, escape na saída</strong>, sem exceções.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
