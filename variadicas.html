@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções Variádicas — quantos argumentos quiser com ... | Guia PHP</title>
+<meta name="description" content="Funções variádicas em PHP: o parâmetro ...$numeros, parâmetros fixos antes dele, tipos, o antigo func_get_args, o spread na chamada soma(...$lista), argumentos nomeados extras e os erros reais (Only the last parameter can be variadic, Cannot use positional argument after argument unpacking).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções Variádicas</span></h1>
+
+<p class="intro">Até agora, cada função que você criou recebia um número fixo de argumentos: dois para <code>soma($a, $b)</code>, um para <code>saudar($nome)</code>. Mas e uma função que soma <strong>quantos números você quiser</strong>? Ou que recebe uma lista de compras de qualquer tamanho? Para isso existem as funções <strong>variádicas</strong> (de "variável" + "ádica", que aceita um número variável de argumentos), escritas com três pontinhos: <code>...</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como criar uma função que aceita qualquer quantidade de argumentos: <code>function soma(...$numeros)</code>.</li>
+  <li>Como misturar parâmetros fixos com o variádico, e como dar um tipo a ele.</li>
+  <li>O jeito antigo, <code>func_get_args()</code>, e por que hoje se usa o <code>...</code>.</li>
+  <li>O <strong>spread</strong> ("espalhar"): passar um array inteiro como argumentos separados, <code>soma(...$lista)</code>.</li>
+  <li>Como a função variádica recebe <strong>argumentos nomeados</strong> extras.</li>
+  <li>Os erros reais que aparecem quando os pontinhos estão no lugar errado.</li>
+</ul>
+</div>
+
+<p>Você precisa já conhecer <a href="funcoes.html">funções</a>, <a href="parametros.html">parâmetros (padrão e nomeados)</a> e <a href="arrays.html">arrays</a>. Os exemplos rodam na máquina da Ana, na pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: a comanda do garçom</h2>
+<p>Pense na comanda de um restaurante. O garçom anota o número da mesa (sempre <strong>um</strong>) e depois os pedidos: pode ser um prato, podem ser sete, pode ser nenhum ainda. A comanda não tem "espaço para exatamente 3 pedidos"; ela tem uma área "pedidos" onde cabe <strong>quantos vierem</strong>.</p>
+<p>Uma função variádica é assim: alguns parâmetros fixos (a mesa) e, no fim, um parâmetro que <strong>junta todo o resto num array</strong> (os pedidos).</p>
+
+<h3>O problema: funções com número fixo de argumentos</h3>
+<p>Veja o que acontece com uma função comum que soma dois números quando você passa mais, ou menos, do que ela espera:</p>
+
+<pre class="file" data-file="dois.php">&lt;?php
+function soma($a, $b)
+{
+    return $a + $b;
+}
+
+echo soma(2, 3), "\n";
+echo soma(10, 20, 30, 40), "\n";
+echo soma(7), "\n";
+</pre>
+
+<pre class="term">$ php dois.php
+5
+30                       « o 30 e o 40 foram ignorados em silêncio!
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function soma(), 1 passed in /home/ana/site/dois.php on line 9 and exactly 2 expected in /home/ana/site/dois.php:2
+Stack trace:
+#0 /home/ana/site/dois.php(9): soma(7)
+#1 {main}
+  thrown in /home/ana/site/dois.php on line 2</pre>
+
+<p>Dois problemas. Com <strong>argumentos a mais</strong>, o PHP não reclama: só usa os dois primeiros e joga o resto fora, e o resultado sai errado (30 em vez de 100). Com <strong>argumentos a menos</strong>, ele para com <code>Too few arguments</code> ("argumentos de menos"). A solução não é criar <code>soma3</code>, <code>soma4</code>, <code>soma5</code>… é a função variádica.</p>
+
+<hr>
+
+<h2>O parâmetro variádico: <code>...$numeros</code></h2>
+
+<pre class="file" data-file="soma.php">&lt;?php
+function soma(...$numeros)
+{
+    $total = 0;
+    foreach ($numeros as $n) {
+        $total += $n;
+    }
+    return $total;
+}
+
+echo soma(2, 3), "\n";
+echo soma(10, 20, 30, 40), "\n";
+echo soma(7), "\n";
+echo soma(), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>...</dt><dd>Três pontos, colados no nome do parâmetro. Querem dizer: "junte aqui <strong>todos</strong> os argumentos que sobrarem".</dd>
+  <dt>$numeros</dt><dd>Dentro da função, é um <strong>array comum</strong> com os argumentos, na ordem em que vieram: <code>[10, 20, 30, 40]</code>.</dd>
+  <dt>foreach ($numeros as $n)</dt><dd>Percorre esse array, como qualquer outro (veja <a href="foreach.html">foreach</a>).</dd>
+  <dt>soma()</dt><dd>Sem nenhum argumento: <code>$numeros</code> é um array vazio, o <code>foreach</code> não dá nenhuma volta e o total fica 0. Não é erro.</dd>
+</dl>
+
+<pre class="term">$ php soma.php
+5
+100
+7
+0</pre>
+
+<p>Para ter certeza de que <code>$numeros</code> é mesmo um array, olhe dentro dele com <a href="var-dump.html">var_dump</a>:</p>
+
+<pre class="file" data-file="dentro.php">&lt;?php
+function mostra(...$numeros)
+{
+    var_dump($numeros);
+}
+
+mostra(10, 20, 30);
+mostra();
+</pre>
+
+<pre class="term">$ php dentro.php
+array(3) {
+  [0]=&gt;
+  int(10)
+  [1]=&gt;
+  int(20)
+  [2]=&gt;
+  int(30)
+}
+array(0) {            « sem argumentos: array vazio, nunca null
+}</pre>
+
+<p>Como é um array, tudo o que você sabe de arrays vale: <code>count($numeros)</code> diz quantos vieram, <code>$numeros[0]</code> é o primeiro, <code>array_sum($numeros)</code> soma todos de uma vez.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e depois chame <code>soma</code> com outros números. Troque o <code>foreach</code> inteiro por <code>return array_sum($numeros);</code> e veja que o resultado é o mesmo. Acrescente <code>echo count($numeros), " números\n";</code> no começo da função.</p>
+<pre class="script">&lt;?php
+function soma(...$numeros)
+{
+    $total = 0;
+    foreach ($numeros as $n) {
+        $total += $n;
+    }
+    return $total;
+}
+
+echo soma(2, 3), "\n";
+echo soma(10, 20, 30, 40), "\n";
+echo soma(), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Parâmetros fixos + variádico (e com tipo)</h2>
+<p>Na comanda, a mesa vem primeiro e os pedidos depois. Na função, os parâmetros fixos vêm primeiro e o variádico <strong>sempre por último</strong>. A Ana quer a média de um aluno com quantas notas ele tiver:</p>
+
+<pre class="file" data-file="media.php">&lt;?php
+function media(string $aluno, float ...$notas): string
+{
+    $quantas = count($notas);
+    if ($quantas === 0) {
+        return "$aluno: sem notas";
+    }
+    $media = array_sum($notas) / $quantas;
+    $palavra = $quantas === 1 ? "nota" : "notas";
+    return "$aluno: $quantas $palavra, média " . number_format($media, 1, ",", ".");
+}
+
+echo media("Ana", 9.5, 8, 10), "\n";
+echo media("Bruno", 7), "\n";
+echo media("Carla"), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>string $aluno</dt><dd>Parâmetro fixo: o primeiro argumento vai sempre para cá.</dd>
+  <dt>float ...$notas</dt><dd>O variádico, com tipo. O tipo vale para <strong>cada</strong> argumento, não para o array: cada nota precisa ser um número. Os inteiros <code>8</code> e <code>10</code> viram <code>8.0</code> e <code>10.0</code>.</dd>
+  <dt>: string</dt><dd>A função devolve um texto (veja <a href="tipos-retorno.html">Tipos e Retorno</a>).</dd>
+  <dt>media("Carla")</dt><dd>Só o fixo. <code>$notas</code> fica vazio e o <code>if</code> trata esse caso.</dd>
+</dl>
+
+<pre class="term">$ php media.php
+Ana: 3 notas, média 9,2
+Bruno: 1 nota, média 7,0
+Carla: sem notas</pre>
+
+<p>Com o tipo declarado, o PHP confere cada argumento. Um texto no meio dos números para o programa, e a mensagem diz exatamente <strong>qual</strong> argumento estava errado:</p>
+
+<pre class="file" data-file="tipo.php">&lt;?php
+function soma(int ...$numeros): int
+{
+    return array_sum($numeros);
+}
+
+echo soma(1, 2, 3), "\n";
+echo soma(1, "dois", 3), "\n";
+</pre>
+
+<pre class="term">$ php tipo.php
+6
+
+Fatal error: Uncaught TypeError: soma(): Argument #2 must be of type int, string given, called in /home/ana/site/tipo.php on line 8 and defined in /home/ana/site/tipo.php:2
+Stack trace:
+#0 /home/ana/site/tipo.php(8): soma(1, 'dois', 3)
+#1 {main}
+  thrown in /home/ana/site/tipo.php on line 2</pre>
+
+<p>"O argumento nº 2 precisa ser do tipo int, foi dado um string". O <code>Argument #2</code> é a posição na chamada: <code>"dois"</code> é o segundo.</p>
+
+<hr>
+
+<h2>O jeito antigo: <code>func_get_args()</code></h2>
+<p>Os três pontinhos chegaram no PHP 5.6 (2014). Antes disso, a única forma era declarar a função <strong>sem parâmetros</strong> e, lá dentro, pedir a lista do que veio com <code>func_get_args()</code> ("função: pegar os argumentos"). Você ainda vai encontrar isso em código antigo:</p>
+
+<pre class="file" data-file="antigo.php">&lt;?php
+function soma()
+{
+    $total = 0;
+    foreach (func_get_args() as $n) {
+        $total += $n;
+    }
+    return $total;
+}
+
+echo soma(2, 3), "\n";
+echo soma(10, 20, 30, 40), "\n";
+</pre>
+
+<pre class="term">$ php antigo.php
+5
+100</pre>
+
+<p>Funciona, mas olhe a primeira linha: <code>function soma()</code>. Quem lê (ou o editor de código) acha que a função <strong>não recebe nada</strong>. Também não dá para declarar tipos. Existe ainda <code>func_num_args()</code>, que devolve só a quantidade.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>...$numeros</code></th><th><code>func_get_args()</code></th></tr>
+<tr><td>A assinatura mostra que aceita vários?</td><td>Sim</td><td>Não: parece não receber nada</td></tr>
+<tr><td>Aceita tipo (<code>int ...$n</code>)</td><td>Sim</td><td>Não</td></tr>
+<tr><td>Recebe argumentos nomeados extras</td><td>Sim (com as chaves)</td><td>Não</td></tr>
+<tr><td>Quando usar</td><td><strong>Sempre</strong>, em código novo</td><td>Só para entender código antigo</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Spread: espalhar um array na chamada</h2>
+<p>Agora o caminho inverso. A Ana já tem os preços das compras <strong>num array</strong> e quer passá-los para <code>soma</code>. Se passar o array direto, a função recebe <strong>um</strong> argumento (o array inteiro), e não três números. Os mesmos três pontos, escritos <strong>na chamada</strong>, "espalham" o array: cada elemento vira um argumento separado. Esse uso se chama <em>spread</em> ("espalhar") ou <em>argument unpacking</em> ("desempacotar argumentos").</p>
+
+<pre class="file" data-file="espalhar.php">&lt;?php
+function soma(int ...$numeros): int
+{
+    return array_sum($numeros);
+}
+
+$compras = [12, 5, 30];
+echo soma($compras[0], $compras[1], $compras[2]), "\n";
+echo soma(...$compras), "\n";
+echo soma(...$compras, ...[100, 200]), "\n";
+echo soma(1, 2, ...$compras), "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th>É o mesmo que</th></tr>
+<tr><td><code>soma($compras[0], $compras[1], $compras[2])</code></td><td>Escrever um por um. Funciona, mas só se você souber o tamanho do array.</td></tr>
+<tr><td><code>soma(...$compras)</code></td><td><code>soma(12, 5, 30)</code></td></tr>
+<tr><td><code>soma(...$compras, ...[100, 200])</code></td><td><code>soma(12, 5, 30, 100, 200)</code>: dá para espalhar mais de um array.</td></tr>
+<tr><td><code>soma(1, 2, ...$compras)</code></td><td><code>soma(1, 2, 12, 5, 30)</code>: argumentos comuns <strong>antes</strong> do spread.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php espalhar.php
+47
+47
+347
+50</pre>
+
+<div class="note">
+<strong>Mesmos pontinhos, papéis opostos</strong>
+<p>Na <strong>declaração</strong> (<code>function soma(...$numeros)</code>), os <code>...</code> <strong>juntam</strong> vários argumentos num array. Na <strong>chamada</strong> (<code>soma(...$compras)</code>), eles <strong>espalham</strong> um array em vários argumentos. Os mesmos três pontos também espalham um array dentro de outro: <code>[...$frutas, ...$verduras]</code> (veja <a href="funcoes-array.html">Funções de Array</a>).</p>
+</div>
+
+<h3>Spread em funções com parâmetros fixos</h3>
+<p>O spread não é só para funções variádicas. Ele serve para qualquer função: cada elemento do array ocupa um parâmetro, na ordem. E, desde o PHP 8.1, um array com <strong>chaves de texto</strong> é espalhado como <a href="parametros.html">argumentos nomeados</a>: cada chave vai para o parâmetro de mesmo nome, em qualquer ordem <span class="versao">PHP 8.1+</span>.</p>
+
+<pre class="file" data-file="fixos.php">&lt;?php
+function apresentar(string $nome, int $idade, string $cidade): string
+{
+    return "$nome, $idade anos, de $cidade";
+}
+
+$ana = ["Ana", 29, "Recife"];
+echo apresentar(...$ana), "\n";
+
+$bruno = ["cidade" =&gt; "Curitiba", "nome" =&gt; "Bruno", "idade" =&gt; 34];
+echo apresentar(...$bruno), "\n";
+
+$carla = ["Carla", 22];
+echo apresentar(...$carla), "\n";
+</pre>
+
+<pre class="term">$ php fixos.php
+Ana, 29 anos, de Recife
+Bruno, 34 anos, de Curitiba          « as chaves acharam os parâmetros, fora de ordem
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function apresentar(), 2 passed in /home/ana/site/fixos.php on line 14 and exactly 3 expected in /home/ana/site/fixos.php:2
+Stack trace:
+#0 /home/ana/site/fixos.php(14): apresentar('Carla', 22)
+#1 {main}
+  thrown in /home/ana/site/fixos.php on line 2</pre>
+
+<p>O array da Carla tem só dois elementos, e a função precisa de três. O spread não inventa valores: é como se você tivesse escrito <code>apresentar('Carla', 22)</code>, e o stack trace mostra exatamente isso.</p>
+
+<div class="tryphp" data-goal="out:Total: R$ 82,src:\.\.\.\$compras,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana tem os preços num array e a chamada está passando o array inteiro, o que dá erro. Rode, leia a mensagem e corrija a chamada usando o <strong>spread</strong>, para aparecer <code>Total: R$ 82</code>.</p>
+<pre class="script">&lt;?php
+function soma(int ...$numeros): int
+{
+    return array_sum($numeros);
+}
+
+$compras = [12, 5, 30, 35];
+echo "Total: R$ ", soma($compras), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function soma(int ...$numeros): int
+{
+    return array_sum($numeros);
+}
+
+$compras = [12, 5, 30, 35];
+echo "Total: R$ ", soma(...$compras), "\n";
+</pre>
+</div>
+
+<p>Rodando a versão sem spread, o PHP real mostra (repare no <code>soma(Array)</code>: um único argumento, o array):</p>
+
+<pre class="term">$ php sem-spread.php
+Total: R$          « o echo já tinha começado a escrever quando o erro aconteceu
+Fatal error: Uncaught TypeError: soma(): Argument #1 must be of type int, array given, called in /home/ana/site/sem-spread.php on line 8 and defined in /home/ana/site/sem-spread.php:2
+Stack trace:
+#0 /home/ana/site/sem-spread.php(8): soma(Array)
+#1 {main}
+  thrown in /home/ana/site/sem-spread.php on line 2</pre>
+
+<hr>
+
+<h2>Variádicas e argumentos nomeados</h2>
+<p>Desde o PHP 8.0 você pode chamar funções com <a href="parametros.html">argumentos nomeados</a> (<code>nome: valor</code>) <span class="versao">PHP 8.0+</span>. Se a função tem um parâmetro variádico, os argumentos nomeados que <strong>não correspondem</strong> a nenhum parâmetro fixo vão para dentro dele, <strong>com o nome como chave</strong>:</p>
+
+<pre class="file" data-file="nomeados.php">&lt;?php
+function etiqueta(string $texto, string ...$opcoes): string
+{
+    print_r($opcoes);
+    return $texto;
+}
+
+etiqueta("Promoção", "negrito", "grande");
+etiqueta("Promoção", cor: "vermelho", tamanho: "grande");
+</pre>
+
+<pre class="term">$ php nomeados.php
+Array
+(
+    [0] =&gt; negrito          « argumentos por posição: chaves 0, 1…
+    [1] =&gt; grande
+)
+Array
+(
+    [cor] =&gt; vermelho       « argumentos nomeados: a chave é o nome
+    [tamanho] =&gt; grande
+)</pre>
+
+<p>Isso permite funções que aceitam "opções" livres. A Ana usa assim para montar etiquetas HTML para os produtos da lojinha (com <code>htmlspecialchars</code> em tudo o que vai para o HTML; veja <a href="escapar-saida.html">Escapar a Saída</a>):</p>
+
+<pre class="file" data-file="nomeados2.php">&lt;?php
+function etiqueta(string $texto, string ...$opcoes): string
+{
+    $html = "&lt;span";
+    foreach ($opcoes as $nome =&gt; $valor) {
+        $html .= " data-$nome=\"" . htmlspecialchars($valor) . "\"";
+    }
+    return $html . "&gt;" . htmlspecialchars($texto) . "&lt;/span&gt;";
+}
+
+echo etiqueta("Bolo de cenoura", cor: "laranja", preco: "25"), "\n";
+echo etiqueta(texto: "Pudim", cor: "amarelo"), "\n";
+echo etiqueta("Torta", "salgada"), "\n";
+</pre>
+
+<pre class="term">$ php nomeados2.php
+&lt;span data-cor="laranja" data-preco="25"&gt;Bolo de cenoura&lt;/span&gt;
+&lt;span data-cor="amarelo"&gt;Pudim&lt;/span&gt;          « texto: foi para o parâmetro fixo $texto
+&lt;span data-0="salgada"&gt;Torta&lt;/span&gt;           « sem nome, a chave foi 0</pre>
+
+<p>Repare na segunda chamada: <code>texto:</code> é o nome de um parâmetro fixo, então foi para <code>$texto</code>, não para <code>$opcoes</code>. E na terceira: um argumento por posição a mais virou a chave <code>0</code>, o que gerou o atributo estranho <code>data-0</code>. Se a sua função espera opções nomeadas, documente isso (ou confira as chaves dentro dela).</p>
+
+<hr>
+
+<h2>Funções do próprio PHP que são variádicas</h2>
+<p>Você já usou funções variádicas sem saber. Várias funções prontas do PHP aceitam quantos argumentos você quiser, e com o spread elas trabalham direto com arrays:</p>
+
+<pre class="file" data-file="prontas.php">&lt;?php
+$notas = [7.5, 9.5, 6, 8];
+echo max(7.5, 9.5, 6, 8), "\n";
+echo max(...$notas), "\n";
+echo min(...$notas), "\n";
+printf("%s tem %d anos e mora em %s\n", "Ana", 29, "Recife");
+$lista = ["pão"];
+array_push($lista, "leite", "café", "ovos");
+echo implode(", ", $lista), "\n";
+</pre>
+
+<pre class="term">$ php prontas.php
+9.5
+9.5
+6
+Ana tem 29 anos e mora em Recife
+pão, leite, café, ovos</pre>
+
+<p><code>max</code> e <code>min</code> também aceitam um array direto (<code>max($notas)</code>), mas <code>printf</code> (<a href="sprintf.html">printf e sprintf</a>) e <code>array_push</code> são variádicas de verdade: depois do primeiro argumento, vem "quantos você quiser".</p>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th></tr>
+<tr><td>Uma função que aceite qualquer quantidade de valores do mesmo tipo</td><td><code>function f(int ...$valores)</code></td></tr>
+<tr><td>Alguns valores obrigatórios e depois "quantos vierem"</td><td><code>function f(string $fixo, float ...$resto)</code></td></tr>
+<tr><td>Passar um array que você já tem para uma função que espera argumentos separados</td><td>Spread: <code>f(...$array)</code></td></tr>
+<tr><td>Opções livres com nome</td><td>Variádico + argumentos nomeados: <code>f("x", cor: "azul")</code></td></tr>
+<tr><td>A quantidade é sempre a mesma (2, 3…)</td><td>Parâmetros comuns. Não use variádico só porque pode.</td></tr>
+<tr><td>A função recebe <strong>uma lista</strong> que já nasce como array (linhas de um arquivo, resultados do banco)</td><td>Um parâmetro <code>array $itens</code> comum costuma ser mais claro</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Only the last parameter can be variadic</code></strong>
+<pre class="file" data-file="ultimo.php">&lt;?php
+function media(float ...$notas, string $aluno): string
+{
+    return $aluno;
+}
+</pre>
+<pre class="term">$ php ultimo.php
+
+Fatal error: Only the last parameter can be variadic in /home/ana/site/ultimo.php on line 2
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "só o último parâmetro pode ser variádico". O variádico junta <strong>tudo o que sobrar</strong>; se viesse antes, nunca sobraria nada para <code>$aluno</code>. Repare que o erro aparece antes de rodar qualquer linha: o PHP recusa o arquivo inteiro.</p>
+<p><strong>Como consertar:</strong> mova o variádico para o fim: <code>function media(string $aluno, float ...$notas)</code>. Também só pode existir <strong>um</strong> variádico por função.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Variadic parameter cannot have a default value</code></strong>
+<pre class="file" data-file="padrao.php">&lt;?php
+function soma(int ...$numeros = [0]): int
+{
+    return array_sum($numeros);
+}
+</pre>
+<pre class="term">$ php padrao.php
+
+Fatal error: Variadic parameter cannot have a default value in /home/ana/site/padrao.php on line 2
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "parâmetro variádico não pode ter valor padrão". Ele já tem um: sem argumentos, vale <code>[]</code>.</p>
+<p><strong>Como consertar:</strong> tire o <code>= [0]</code> e trate o array vazio dentro da função, se precisar (<code>if ($numeros === []) …</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Argument #1 must be of type int, array given</code>: faltou o spread</strong>
+<pre class="term">$ php sem-spread.php
+Total: R$ 
+Fatal error: Uncaught TypeError: soma(): Argument #1 must be of type int, array given, called in /home/ana/site/sem-spread.php on line 8 and defined in /home/ana/site/sem-spread.php:2
+…</pre>
+<p><strong>O que aconteceu:</strong> <code>soma($compras)</code> passa o array como <strong>um</strong> argumento. Sem o tipo <code>int</code>, o erro só apareceria lá dentro, na conta: <code>$numeros</code> seria <code>[[12, 5, 30, 35]]</code> (um array dentro de outro) e o <code>$total += $n</code> pararia com <code>Unsupported operand types: int + array</code> ("tipos de operando não suportados: int + array"), uma mensagem bem menos clara.</p>
+<p><strong>Como consertar:</strong> <code>soma(...$compras)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Cannot use positional argument after argument unpacking</code></strong>
+<pre class="file" data-file="espalhar-erro.php">&lt;?php
+function soma(int ...$numeros): int
+{
+    return array_sum($numeros);
+}
+
+$compras = [12, 5, 30];
+echo soma(...$compras, 100), "\n";
+</pre>
+<pre class="term">$ php espalhar-erro.php
+
+Fatal error: Cannot use positional argument after argument unpacking in /home/ana/site/espalhar-erro.php on line 8
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "não é possível usar argumento por posição depois de um desempacotamento". Depois de um <code>...$array</code>, só podem vir outros <code>...$array</code> (ou argumentos nomeados).</p>
+<p><strong>Como consertar:</strong> coloque o valor solto antes (<code>soma(100, ...$compras)</code>) ou dentro de um array espalhado (<code>soma(...$compras, ...[100])</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Cannot use positional argument after named argument</code></strong>
+<pre class="term">$ php nomeados3.php     « com a linha echo etiqueta(cor: "amarelo", "Pudim");
+
+Fatal error: Cannot use positional argument after named argument in /home/ana/site/nomeados3.php on line 13
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> depois do primeiro argumento com nome, todos os seguintes também precisam ter nome. Por posição, o PHP não saberia onde encaixar <code>"Pudim"</code>.</p>
+<p><strong>Como consertar:</strong> argumentos por posição primeiro, nomeados depois: <code>etiqueta("Pudim", cor: "amarelo")</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Named parameter $texto overwrites previous argument</code></strong>
+<pre class="term">$ php sobrescreve.php      « echo etiqueta("Pudim", texto: "Bolo");
+
+Fatal error: Uncaught Error: Named parameter $texto overwrites previous argument in /home/ana/site/sobrescreve.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/sobrescreve.php on line 6</pre>
+<p><strong>O que significa:</strong> "o parâmetro nomeado $texto sobrescreve um argumento anterior". <code>"Pudim"</code> já ocupou <code>$texto</code> por posição, e <code>texto:</code> tentou ocupá-lo de novo. Um nome de parâmetro fixo nunca vai para o variádico.</p>
+<p><strong>Como consertar:</strong> use nomes de opções diferentes dos nomes dos parâmetros fixos.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>function f(...$xs)</code></td><td>Junta todos os argumentos num array</td><td><code>f(1, 2, 3)</code> → <code>$xs = [1, 2, 3]</code></td></tr>
+<tr><td><code>function f($a, ...$xs)</code></td><td>Fixos primeiro; o variádico pega o resto</td><td><code>f(1, 2, 3)</code> → <code>$a = 1</code>, <code>$xs = [2, 3]</code></td></tr>
+<tr><td><code>function f(int ...$xs)</code></td><td>Tipo conferido em cada argumento</td><td><code>f(1, "a")</code> → <code>TypeError</code></td></tr>
+<tr><td><code>f(...$array)</code></td><td>Spread: cada elemento vira um argumento</td><td><code>f(...[1, 2])</code> = <code>f(1, 2)</code></td></tr>
+<tr><td><code>f(...["a" =&gt; 1])</code></td><td>Chaves de texto viram argumentos nomeados <span class="versao">PHP 8.1+</span></td><td>= <code>f(a: 1)</code></td></tr>
+<tr><td><code>f("x", cor: "azul")</code></td><td>Nomeados extras entram no variádico com a chave</td><td><code>$xs = ["cor" =&gt; "azul"]</code></td></tr>
+<tr><td><code>func_get_args()</code></td><td>(Antigo) array com todos os argumentos recebidos</td><td>dentro da função</td></tr>
+<tr><td><code>func_num_args()</code></td><td>(Antigo) quantos argumentos vieram</td><td>dentro da função</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar</h3>
+<p>Complete para a função aceitar quantos nomes quiser:</p>
+<div class="ex-code">function saudar(<input data-answer="...$nomes|string ...$nomes" aria-label="parâmetro">) { foreach ($nomes as $n) echo "Oi, $n!\n"; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Espalhar</h3>
+<p>O array <code>$turma</code> tem os nomes. Complete a chamada para passar cada nome como um argumento:</p>
+<div class="ex-code">saudar(<input data-answer="...$turma" aria-label="argumento">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Quantos vieram?</h3>
+<p>Dentro de <code>function soma(...$numeros)</code>, complete para mostrar quantos números foram passados:</p>
+<div class="ex-code">echo <input data-answer="count($numeros)|sizeof($numeros)|func_num_args()" aria-label="expressão">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>function f($a, ...$resto)</code>, o que vale <code>$resto</code> em <code>f(5)</code>?</p>
+<label><input type="radio" name="q4"> <code>null</code></label>
+<label><input type="radio" name="q4"> <code>[]</code> (array vazio)</label>
+<label><input type="radio" name="q4"> <code>[5]</code></label>
+<label><input type="radio" name="q4"> Dá erro: <code>Too few arguments</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual destas declarações é válida?</p>
+<label><input type="radio" name="q5"> <code>function f(...$a, $b)</code></label>
+<label><input type="radio" name="q5"> <code>function f(...$a = [])</code></label>
+<label><input type="radio" name="q5"> <code>function f(string $b, int ...$a)</code></label>
+<label><input type="radio" name="q5"> <code>function f(...$a, ...$b)</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Uma função comum <code>soma($a, $b)</code> é chamada com <code>soma(1, 2, 3)</code>. O que acontece?</p>
+<label><input type="radio" name="q6"> Devolve 3: o terceiro argumento é ignorado, sem aviso.</label>
+<label><input type="radio" name="q6"> Devolve 6.</label>
+<label><input type="radio" name="q6"> <code>Fatal error: Too many arguments</code>.</label>
+<label><input type="radio" name="q6"> Aparece um <code>Warning</code> e devolve 6.</label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:Ana vai comprar 3 itens: pão\, leite\, café,src:\.\.\.\s*\$itens,src:\.\.\.\$compras,semerro">
+<p class="try-task"><strong>Missão:</strong> faça duas mudanças. (1) Transforme o parâmetro <code>$item</code> num variádico <code>...$itens</code>, conte os itens com <code>count</code> e junte-os com <code>implode(", ", $itens)</code> (que cola os elementos de um array com <code>", "</code> entre eles). (2) Na chamada, passe o array <code>$compras</code> inteiro com spread. A saída deve ser <code>Ana vai comprar 3 itens: pão, leite, café</code>.</p>
+<pre class="script">&lt;?php
+function lista(string $quem, string $item): string
+{
+    $quantos = 1;
+    return "$quem vai comprar $quantos itens: " . $item;
+}
+
+$compras = ["pão", "leite", "café"];
+echo lista("Ana", $compras[0]), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function lista(string $quem, string ...$itens): string
+{
+    $quantos = count($itens);
+    return "$quem vai comprar $quantos itens: " . implode(", ", $itens);
+}
+
+$compras = ["pão", "leite", "café"];
+echo lista("Ana", ...$compras), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma função comum ignora em silêncio os argumentos a mais e para com <code>Too few arguments</code> quando faltam.</li>
+  <li><code>function f(...$xs)</code> junta todos os argumentos num <strong>array</strong> (vazio se não vier nenhum).</li>
+  <li>O variádico vem sempre <strong>por último</strong>, é um só e não tem valor padrão. Pode ter tipo: <code>int ...$xs</code> confere cada argumento.</li>
+  <li><code>func_get_args()</code> é o jeito antigo; em código novo, use <code>...</code>.</li>
+  <li>Na chamada, <code>f(...$array)</code> espalha o array em argumentos. Chaves de texto viram argumentos nomeados (8.1+). Depois de um spread, nada de argumento por posição.</li>
+  <li>Argumentos nomeados que não são de nenhum parâmetro fixo entram no variádico com o nome como chave.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
