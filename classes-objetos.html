@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Classes e Objetos — class, new, -&gt; e instanceof | Guia PHP</title>
+<meta name="description" content="Como declarar uma classe em PHP, criar objetos com new, acessar propriedades e métodos com -&gt;, ver um objeto com var_dump, entender que objetos são passados por identificador, usar instanceof e o new sem parênteses do PHP 8.4, com saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Classes e Objetos</span></h1>
+
+<p class="intro">Na aula <a href="poo.html">O que é POO</a> você viu a ideia: a <strong>classe</strong> é o molde, o <strong>objeto</strong> é a coisa feita com ele. Agora é hora de escrever: declarar uma classe, criar objetos com <code>new</code>, mexer neles com a seta <code>-&gt;</code>, olhar por dentro com <code>var_dump</code> e entender uma regra que confunde muita gente: o que acontece quando você copia um objeto para outra variável.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A sintaxe de <code>class</code> e as regras para dar nome a uma classe.</li>
+  <li>Criar objetos com <code>new</code> e usar a seta <code>-&gt;</code>.</li>
+  <li>Criar vários objetos e guardá-los num array.</li>
+  <li>Ler o <code>var_dump</code> de um objeto (o que é aquele <code>#1</code>).</li>
+  <li>Por que <code>$outra = $caneca</code> <strong>não</strong> cria um segundo produto (objetos são passados por identificador).</li>
+  <li>Comparar objetos (<code>==</code> e <code>===</code>), conferir o tipo com <code>instanceof</code> e <code>::class</code>.</li>
+  <li>O <code>new</code> sem parênteses extras do PHP 8.4: <code>new Produto()-&gt;metodo()</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Declarar uma classe</h2>
+<p>Uma classe começa com a palavra <code>class</code> (classe), o nome e um par de chaves. Tudo o que pertence à classe fica entre as chaves:</p>
+
+<pre class="file" data-file="primeira.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+
+echo $caneca-&gt;nome . " custa R$ " . $caneca-&gt;preco . "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>class</dt><dd>Palavra-chave que declara uma classe ("vou descrever um molde").</dd>
+  <dt>Produto</dt><dd>O nome da classe. Por convenção, começa com letra <strong>maiúscula</strong> e cada palavra nova também: <code>Produto</code>, <code>ItemDoPedido</code>, <code>CarrinhoDeCompras</code> (esse estilo se chama <em>PascalCase</em>).</dd>
+  <dt>{ … }</dt><dd>O corpo da classe. Por convenção (padrão <a href="psr.html">PSR-12</a>), a chave de abrir fica na linha de baixo.</dd>
+  <dt>public string $nome = "";</dt><dd>Uma <strong>propriedade</strong>: <code>public</code> (pública, pode ser usada de fora), do tipo <code>string</code>, chamada <code>$nome</code>, começando vazia. Os detalhes estão em <a href="propriedades-metodos.html">Propriedades e Métodos</a>.</dd>
+  <dt>new Produto()</dt><dd>Cria um objeto novo a partir do molde (<em>instancia</em> a classe). O resultado vai para a variável <code>$caneca</code>.</dd>
+  <dt>$caneca-&gt;nome = "Caneca";</dt><dd>A <strong>seta</strong> <code>-&gt;</code> (um hífen e um sinal de maior) entra no objeto e acessa a propriedade <code>nome</code>. Repare: <strong>sem</strong> o <code>$</code> antes de <code>nome</code>.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/loja">$ php primeira.php
+Caneca custa R$ 25.9</pre>
+
+<p>O <code>echo</code> de um número com casas decimais mostra <code>25.9</code>, com ponto e sem o zero final. Para mostrar <code>25,90</code>, use <code>number_format</code> (veja <a href="number-format.html">Formatar Números</a>); vamos fazer isso daqui a pouco.</p>
+
+<h3>Regras para o nome da classe</h3>
+<ul>
+  <li>Letras, números e <code>_</code>; não pode começar com número. Acentos funcionam, mas evite (<code>Preço</code> funciona; <code>Preco</code> é o costume).</li>
+  <li>Não pode ser uma palavra reservada do PHP (<code>class</code>, <code>function</code>, <code>list</code>, <code>array</code>…).</li>
+  <li>Os nomes de classe <strong>não diferenciam maiúsculas de minúsculas</strong>: <code>new produto()</code> também cria um <code>Produto</code>. Mesmo assim, escreva sempre igual à declaração: com o <a href="autoload.html">autoload</a>, o nome vira nome de arquivo, e aí a diferença importa.</li>
+  <li>Costume: <strong>uma classe por arquivo</strong>, com o arquivo chamado igual à classe (<code>Produto.php</code>). Nesta aula deixamos tudo num arquivo só para facilitar; você vai separar em <a href="include-require.html">include e require</a> e <a href="autoload.html">Autoload</a>.</li>
+  <li>Uma classe só pode ser declarada <strong>uma vez</strong>. Declarar duas vezes dá <code>Fatal error: Cannot redeclare class Produto</code> (veja <a href="#erros">Quando dá errado</a>).</li>
+</ul>
+
+<hr>
+
+<h2>Vários objetos do mesmo molde</h2>
+<p>Cada <code>new</code> cria um objeto <strong>novo e independente</strong>. Vamos criar três e olhar dentro de cada um com <code>var_dump</code> (que você conheceu em <a href="var-dump.html">var_dump e print_r</a>):</p>
+
+<pre class="file" data-file="varios.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+
+$camiseta = new Produto();
+$camiseta-&gt;nome = "Camiseta";
+$camiseta-&gt;preco = 49.90;
+
+$vazio = new Produto();
+
+var_dump($caneca);
+var_dump($camiseta);
+var_dump($vazio);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php varios.php
+object(Produto)#1 (2) {
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["preco"]=&gt;
+  float(25.9)
+}
+object(Produto)#2 (2) {
+  ["nome"]=&gt;
+  string(8) "Camiseta"
+  ["preco"]=&gt;
+  float(49.9)
+}
+object(Produto)#3 (2) {
+  ["nome"]=&gt;
+  string(0) ""
+  ["preco"]=&gt;
+  float(0)          « o 0 que a Ana escreveu virou 0.0, porque a propriedade é float
+}</pre>
+
+<h3>Lendo o <code>var_dump</code> de um objeto</h3>
+<dl class="anatomy">
+  <dt>object(Produto)</dt><dd>É um objeto, e a classe dele é <code>Produto</code>.</dd>
+  <dt>#1</dt><dd>O <strong>identificador</strong> do objeto: um número que o PHP dá a cada objeto criado, como a senha de atendimento num banco. A caneca é o objeto 1, a camiseta o 2, o vazio o 3. Guarde esse número: ele explica a próxima seção.</dd>
+  <dt>(2)</dt><dd>Quantas propriedades o objeto tem.</dd>
+  <dt>["nome"]=&gt; string(6) "Caneca"</dt><dd>Cada propriedade, com o tipo e o valor, igual ao <code>var_dump</code> de um array.</dd>
+</dl>
+
+<p>O <code>$vazio</code> mostra uma coisa importante: os valores escritos na classe (<code>= ""</code>, <code>= 0</code>) são os <strong>valores iniciais</strong> de todo objeto novo. O molde já vem "pré-preenchido".</p>
+
+<h3>Objetos num array</h3>
+<p>Como objetos são valores, você pode guardá-los num array e percorrer com <a href="foreach.html"><code>foreach</code></a>. Esse é o jeito mais comum de trabalhar com "muitos produtos":</p>
+
+<pre class="file" data-file="lista.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$produtos = [];
+foreach (["Caneca" =&gt; 25.90, "Camiseta" =&gt; 49.90, "Adesivo" =&gt; 3.50] as $nome =&gt; $preco) {
+    $p = new Produto();
+    $p-&gt;nome = $nome;
+    $p-&gt;preco = $preco;
+    $produtos[] = $p;
+}
+
+$total = 0;
+foreach ($produtos as $produto) {
+    echo "- {$produto-&gt;nome}: R$ " . number_format($produto-&gt;preco, 2, ",", ".") . "\n";
+    $total += $produto-&gt;preco;
+}
+echo "Total: R$ " . number_format($total, 2, ",", ".") . "\n";
+echo count($produtos) . " produtos\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php lista.php
+- Caneca: R$ 25,90
+- Camiseta: R$ 49,90
+- Adesivo: R$ 3,50
+Total: R$ 79,30
+3 produtos</pre>
+
+<p>Dois detalhes novos: <code>$produtos[] = $p;</code> põe o objeto no fim do array, e <code>"{$produto-&gt;nome}"</code> mostra uma propriedade dentro de uma string com aspas duplas. As chaves <code>{ }</code> são recomendadas em volta de <code>$objeto-&gt;propriedade</code> na <a href="interpolacao.html">interpolação</a>; com métodos (<code>{$produto-&gt;descricao()}</code>) elas são obrigatórias.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e confira o total. Depois acrescente um produto (<code>"Chaveiro" =&gt; 12.00</code>) na lista do primeiro <code>foreach</code> e rode de novo: o total e a contagem se atualizam sozinhos. Tente também um <code>var_dump($produtos);</code> no final para ver os objetos <code>#1</code>, <code>#2</code>… dentro do array.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$produtos = [];
+foreach (["Caneca" =&gt; 25.90, "Camiseta" =&gt; 49.90, "Adesivo" =&gt; 3.50] as $nome =&gt; $preco) {
+    $p = new Produto();
+    $p-&gt;nome = $nome;
+    $p-&gt;preco = $preco;
+    $produtos[] = $p;
+}
+
+$total = 0;
+foreach ($produtos as $produto) {
+    echo "- {$produto-&gt;nome}: R$ " . number_format($produto-&gt;preco, 2, ",", ".") . "\n";
+    $total += $produto-&gt;preco;
+}
+echo "Total: R$ " . number_format($total, 2, ",", ".") . "\n";
+echo count($produtos) . " produtos\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Objetos são passados por "identificador"</h2>
+<p>Com arrays, <code>$b = $a</code> faz uma <strong>cópia</strong>: mexer em <code>$b</code> não muda <code>$a</code>. Com objetos é diferente, e esta é a regra que mais surpreende quem vem dos arrays. Veja:</p>
+
+<pre class="file" data-file="identificador.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+
+$outra = $caneca;          // NÃO cria um segundo produto
+$outra-&gt;preco = 19.90;
+
+echo "caneca: " . $caneca-&gt;preco . "\n";
+echo "outra:  " . $outra-&gt;preco . "\n";
+var_dump($caneca, $outra);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php identificador.php
+caneca: 19.9              « mudou a $outra, e a $caneca mudou junto!
+outra:  19.9
+object(Produto)#1 (2) {   « o mesmo #1 nas duas
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["preco"]=&gt;
+  float(19.9)
+}
+object(Produto)#1 (2) {
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["preco"]=&gt;
+  float(19.9)
+}</pre>
+
+<p>O <code>var_dump</code> entrega o segredo: as duas variáveis mostram o <strong>mesmo objeto <code>#1</code></strong>. A variável <code>$caneca</code> não guarda o objeto em si; ela guarda o <strong>identificador</strong> dele, como uma etiqueta com o número da senha. <code>$outra = $caneca</code> copia a etiqueta, não o produto. Existe uma caneca só, com duas etiquetas apontando para ela.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Array</th><th>Objeto</th></tr>
+<tr><td><code>$b = $a;</code></td><td>Copia o array inteiro</td><td>Copia só o identificador: as duas variáveis usam o mesmo objeto</td></tr>
+<tr><td>Mudar <code>$b</code> muda <code>$a</code>?</td><td>Não</td><td><strong>Sim</strong> (é o mesmo objeto)</td></tr>
+<tr><td>Passar para uma função</td><td>A função recebe uma cópia</td><td>A função mexe no objeto original</td></tr>
+<tr><td>Quero uma cópia de verdade</td><td>Já é cópia</td><td>Use <code>clone</code> (veja <a href="readonly-hooks.html">readonly e Property Hooks</a>)</td></tr>
+</table>
+</div>
+
+<h3>O mesmo vale para funções</h3>
+<p>Quando você passa um objeto para uma função, ela recebe o identificador e mexe no objeto <strong>original</strong>. Compare com um array:</p>
+
+<pre class="file" data-file="funcao.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+function aplicarDesconto(Produto $produto, float $percentual): void
+{
+    $produto-&gt;preco = $produto-&gt;preco * (1 - $percentual / 100);
+}
+
+function aplicarDescontoArray(array $produto, float $percentual): void
+{
+    $produto["preco"] = $produto["preco"] * (1 - $percentual / 100);
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 20.00;
+aplicarDesconto($caneca, 10);
+echo "Objeto: " . $caneca-&gt;preco . "\n";
+
+$xicara = ["nome" =&gt; "Xícara", "preco" =&gt; 20.00];
+aplicarDescontoArray($xicara, 10);
+echo "Array:  " . $xicara["preco"] . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php funcao.php
+Objeto: 18                « a função mudou a caneca de verdade
+Array:  20                « a função mudou só a cópia dela</pre>
+
+<p>Repare no parâmetro <code>Produto $produto</code>: o nome de uma classe pode ser usado como <strong>tipo</strong>, igual a <code>int</code> ou <code>array</code> (veja <a href="tipos-retorno.html">Tipos e Retorno</a>). Se alguém passar outra coisa, o PHP recusa com um <code>TypeError</code>.</p>
+
+<h3>Identificador não é referência</h3>
+<p>Se você já viu o <code>&amp;</code> (referência), pode achar que é a mesma coisa. Não é. A etiqueta pode ser trocada por outra sem afetar a primeira:</p>
+
+<pre class="file" data-file="nao-referencia.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+}
+
+$a = new Produto();
+$a-&gt;nome = "Caneca";
+
+$b = $a;                 // $b guarda o mesmo identificador (#1)
+$b = new Produto();      // agora $b aponta para um objeto novo (#2)
+$b-&gt;nome = "Camiseta";
+
+echo $a-&gt;nome . "\n";
+echo $b-&gt;nome . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php nao-referencia.php
+Caneca                    « $a continua com o objeto #1, intacto
+Camiseta</pre>
+
+<p>Resumindo: <strong>mexer dentro</strong> do objeto (<code>$b-&gt;nome = …</code>) afeta todos que têm a mesma etiqueta; <strong>trocar a etiqueta</strong> (<code>$b = new Produto()</code>) só muda aquela variável.</p>
+
+<div class="tryphp" data-goal="out:Camiseta: R$ 39.92,src:clone">
+<p class="try-task"><strong>Missão:</strong> a Ana quer criar a "camiseta em promoção" a partir da camiseta normal, mas o código abaixo estraga o preço da original. Rode e veja. Depois troque <code>$promo = $camiseta;</code> por <code>$promo = clone $camiseta;</code> (<code>clone</code> = "faça uma cópia do objeto") e rode de novo: a original deve continuar <code>Camiseta: R$ 49.9</code> e a promoção deve sair <code>Camiseta: R$ 39.92</code>.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$camiseta = new Produto();
+$camiseta-&gt;nome = "Camiseta";
+$camiseta-&gt;preco = 49.90;
+
+$promo = $camiseta;
+$promo-&gt;preco = $promo-&gt;preco * 0.8;
+
+echo "{$camiseta-&gt;nome}: R$ {$camiseta-&gt;preco}\n";
+echo "{$promo-&gt;nome}: R$ {$promo-&gt;preco}\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$camiseta = new Produto();
+$camiseta-&gt;nome = "Camiseta";
+$camiseta-&gt;preco = 49.90;
+
+$promo = clone $camiseta;
+$promo-&gt;preco = $promo-&gt;preco * 0.8;
+
+echo "{$camiseta-&gt;nome}: R$ {$camiseta-&gt;preco}\n";
+echo "{$promo-&gt;nome}: R$ {$promo-&gt;preco}\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Comparar objetos: <code>==</code> e <code>===</code></h2>
+<p>Os dois operadores de <a href="operadores-comparacao.html">comparação</a> têm um sentido especial com objetos:</p>
+
+<pre class="file" data-file="comparar.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+}
+
+$a = new Produto();
+$a-&gt;nome = "Caneca";
+$b = new Produto();
+$b-&gt;nome = "Caneca";
+$c = $a;
+
+var_dump($a == $b);
+var_dump($a === $b);
+var_dump($a === $c);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php comparar.php
+bool(true)        « == : mesma classe e mesmos valores
+bool(false)       « === : são objetos diferentes (#1 e #2)
+bool(true)        « === : $c é o mesmo objeto que $a</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Com objetos, é verdade quando…</th></tr>
+<tr><td><code>==</code></td><td>Os dois são da <strong>mesma classe</strong> e todas as propriedades têm valores iguais ("parecidos").</td></tr>
+<tr><td><code>===</code></td><td>Os dois são <strong>o mesmo objeto</strong> (o mesmo <code>#número</code>). "É a mesma caneca", não "é uma caneca igual".</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>De que classe é este objeto? <code>instanceof</code> e <code>::class</code></h2>
+<p>O operador <code>instanceof</code> ("é instância de") responde <code>true</code> ou <code>false</code>: este valor é um objeto desta classe?</p>
+
+<pre class="file" data-file="instanceof.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+}
+class Cliente
+{
+    public string $nome = "";
+}
+
+$caneca = new Produto();
+$ana = new Cliente();
+$lista = ["nome" =&gt; "Caneca"];
+
+var_dump($caneca instanceof Produto);
+var_dump($ana instanceof Produto);
+var_dump($lista instanceof Produto);
+
+echo get_class($caneca) . "\n";
+echo $ana::class . "\n";
+echo Produto::class . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php instanceof.php
+bool(true)        « a caneca é um Produto
+bool(false)       « a Ana é uma Cliente, não um Produto (mesmo tendo $nome)
+bool(false)       « um array nunca é instância de classe nenhuma
+Produto
+Cliente
+Produto</pre>
+
+<dl class="anatomy">
+  <dt>$x instanceof Produto</dt><dd><code>true</code> se <code>$x</code> é um objeto da classe <code>Produto</code> (ou de uma classe filha dela, como você vai ver em <a href="heranca.html">Herança</a>). Nunca dá erro: com um número, texto ou array, simplesmente dá <code>false</code>.</dd>
+  <dt>get_class($obj)</dt><dd>Função que devolve o nome da classe do objeto, como texto.</dd>
+  <dt>$obj::class</dt><dd>O mesmo que <code>get_class</code>, numa escrita mais curta (PHP 8.0+).</dd>
+  <dt>Produto::class</dt><dd>O nome da classe como texto, sem precisar de objeto. Útil para não digitar o nome entre aspas (o editor confere se a classe existe).</dd>
+</dl>
+
+<p>Na prática, <code>instanceof</code> aparece antes de usar algo que pode ou não ser um objeto: <code>if ($item instanceof Produto) { … }</code>.</p>
+
+<hr>
+
+<h2><code>new</code> sem parênteses extras <span class="versao">PHP 8.4+</span></h2>
+<p>Às vezes você quer criar um objeto só para chamar um método dele, uma vez. Antes do PHP 8.4, era obrigatório pôr o <code>new</code> entre parênteses. Do 8.4 em diante, não precisa mais:</p>
+
+<pre class="file" data-file="sem-parenteses.php">&lt;?php
+class Saudacao
+{
+    public string $loja = "Lojinha da Ana";
+
+    public function ola(): string
+    {
+        return "Bem-vindo à {$this-&gt;loja}!";
+    }
+}
+
+echo (new Saudacao())-&gt;ola() . "\n";   // jeito antigo (funciona em qualquer PHP 8)
+echo new Saudacao()-&gt;ola() . "\n";     // PHP 8.4+: sem os parênteses extras
+echo new Saudacao()-&gt;loja . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php sem-parenteses.php
+Bem-vindo à Lojinha da Ana!
+Bem-vindo à Lojinha da Ana!
+Lojinha da Ana</pre>
+
+<p>A regra do 8.4 tem uma condição: os parênteses <strong>depois do nome da classe</strong> são obrigatórios. <code>new Saudacao()-&gt;ola()</code> funciona; <code>new Saudacao-&gt;ola()</code> não (veja o erro em <a href="#erros">Quando dá errado</a>). Se o seu código precisa rodar em PHP 8.3 ou mais antigo, use a forma com parênteses em volta: <code>(new Saudacao())-&gt;ola()</code>.</p>
+
+<hr>
+
+<h2>Outras formas de criar objetos</h2>
+
+<pre class="file" data-file="outras.php">&lt;?php
+$p = new stdClass();
+$p-&gt;nome = "Caneca";
+$p-&gt;preco = 25.90;
+var_dump($p);
+
+$q = (object) ["nome" =&gt; "Camiseta", "preco" =&gt; 49.90];
+echo $q-&gt;nome . "\n";
+
+class Produto { public string $nome = "Adesivo"; }
+$classe = "Produto";
+$r = new $classe();
+echo $r-&gt;nome . "\n";
+$s = new produto();
+echo get_class($s) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php outras.php
+object(stdClass)#1 (2) {
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["preco"]=&gt;
+  float(25.9)
+}
+Camiseta
+Adesivo
+Produto           « new produto() criou um Produto: nome de classe ignora maiúsculas</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que é</th><th>Quando usar</th></tr>
+<tr><td><code>new Produto()</code></td><td>Objeto de uma classe que você declarou</td><td><strong>Quase sempre.</strong> O formato e os tipos são garantidos.</td></tr>
+<tr><td><code>new stdClass()</code></td><td>Objeto "genérico" do PHP, sem propriedades fixas (aceita qualquer uma)</td><td>Raramente: é um array com setas. Você vai encontrá-lo ao ler <a href="json.html">JSON</a> com <code>json_decode</code> sem o <code>true</code>.</td></tr>
+<tr><td><code>(object) [ … ]</code></td><td>Converte um array associativo num <code>stdClass</code></td><td>Para dados rápidos, sem regras. Prefira uma classe.</td></tr>
+<tr><td><code>new $classe()</code></td><td>O nome da classe vem de uma variável</td><td>Código que escolhe a classe na hora (frameworks, fábricas). Cuidado: nunca use texto vindo do usuário.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Class "…" not found</strong>
+<pre class="file" data-file="nao-existe.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+}
+$caneca = new Produtto();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php nao-existe.php
+
+Fatal error: Uncaught Error: Class "Produtto" not found in /home/ana/loja/nao-existe.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/nao-existe.php on line 6</pre>
+<p><strong>O que significa:</strong> "classe <code>Produtto</code> não encontrada". O nome está errado (dois <code>t</code>), ou a classe está em outro arquivo que não foi incluído.</p>
+<p><strong>Como consertar:</strong> confira a grafia. Se a classe mora em outro arquivo, inclua-o com <a href="include-require.html"><code>require</code></a> (ou configure o <a href="autoload.html">autoload</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Call to a member function … on null</strong>
+<pre class="file" data-file="nulo.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public function descricao(): string { return $this-&gt;nome; }
+}
+$caneca = null;
+echo $caneca-&gt;descricao();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php nulo.php
+
+Fatal error: Uncaught Error: Call to a member function descricao() on null in /home/ana/loja/nulo.php:8
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/nulo.php on line 8</pre>
+<p><strong>O que significa:</strong> "chamada do método <code>descricao()</code> em <code>null</code>". A variável não tem objeto nenhum: ela é <a href="null.html"><code>null</code></a>. Acontece muito quando uma função de busca não acha nada e devolve <code>null</code>, ou quando você esqueceu o <code>new</code>.</p>
+<p><strong>Como consertar:</strong> garanta que a variável recebeu um objeto. Se ela pode mesmo ser <code>null</code>, confira antes (<code>if ($caneca !== null)</code>) ou use o operador nullsafe <code>?-&gt;</code>: <code>$caneca?-&gt;descricao()</code> devolve <code>null</code> em vez de dar erro (veja <a href="null-coalescing.html">?? e ?-&gt;</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Usar ponto em vez de seta</strong>
+<pre class="file" data-file="ponto.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+}
+$caneca = new Produto();
+echo $caneca.nome;
+</pre>
+<pre class="term" data-cwd="~/loja">$ php ponto.php
+
+Fatal error: Uncaught Error: Undefined constant "nome" in /home/ana/loja/ponto.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/ponto.php on line 7</pre>
+<p><strong>O que significa:</strong> quem vem do JavaScript ou do Java escreve <code>objeto.propriedade</code>. No PHP, o ponto é a <a href="operadores-string.html">concatenação</a>: o PHP leu "junte <code>$caneca</code> com a constante <code>nome</code>", e essa constante não existe.</p>
+<p><strong>Como consertar:</strong> no PHP, é a seta: <code>$caneca-&gt;nome</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um <code>$</code> a mais depois da seta</strong>
+<pre class="file" data-file="cifrao.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+}
+$caneca = new Produto();
+echo $caneca-&gt;$nome;
+</pre>
+<pre class="term" data-cwd="~/loja">$ php cifrao.php
+
+Warning: Undefined variable $nome in /home/ana/loja/cifrao.php on line 7
+
+Warning: Undefined property: Produto::$ in /home/ana/loja/cifrao.php on line 7</pre>
+<p><strong>O que significa:</strong> com <code>$</code> depois da seta, o PHP entende "use o <strong>valor</strong> da variável <code>$nome</code> como nome da propriedade". Como não existe variável <code>$nome</code>, vem o primeiro aviso; o nome da propriedade fica vazio, e vem o segundo (<code>Produto::$</code>, sem nome nenhum).</p>
+<p><strong>Como consertar:</strong> depois da seta, sem <code>$</code>: <code>$caneca-&gt;nome</code>. (O <code>$</code> só aparece na <strong>declaração</strong>, dentro da classe: <code>public string $nome</code>.)</p>
+</div>
+
+<div class="cenario">
+<strong>Object of class … could not be converted to string</strong>
+<pre class="file" data-file="echo-obj.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+}
+$caneca = new Produto();
+echo $caneca;
+</pre>
+<pre class="term" data-cwd="~/loja">$ php echo-obj.php
+
+Fatal error: Uncaught Error: Object of class Produto could not be converted to string in /home/ana/loja/echo-obj.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/echo-obj.php on line 7</pre>
+<p><strong>O que significa:</strong> o <code>echo</code> só sabe mostrar texto e números. Um objeto inteiro não "vira texto" sozinho.</p>
+<p><strong>Como consertar:</strong> mostre uma propriedade (<code>echo $caneca-&gt;nome;</code>), use <code>var_dump($caneca)</code> para depurar, ou ensine o objeto a virar texto com o método <code>__toString</code> (veja <a href="metodos-magicos.html">Métodos Mágicos</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>new</code> sem parênteses e sem os parênteses da classe</strong>
+<pre class="file" data-file="a.php">&lt;?php
+class Produto { public function nome(): string { return "Caneca"; } }
+echo new Produto()-&gt;nome(), "\n";
+echo new Produto-&gt;nome(), "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php a.php
+
+Parse error: syntax error, unexpected token "-&gt;", expecting "," or ";" in /home/ana/loja/a.php on line 4</pre>
+<p><strong>O que significa:</strong> um erro de sintaxe (<code>Parse error</code>) impede o arquivo inteiro de rodar, por isso nem a linha 3, que está certa, apareceu. Sem os <code>()</code> depois de <code>Produto</code>, o PHP não aceita a seta logo em seguida.</p>
+<p><strong>Como consertar:</strong> <code>new Produto()-&gt;nome()</code> (PHP 8.4+) ou <code>(new Produto())-&gt;nome()</code> (qualquer versão).</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot redeclare class</strong>
+<pre class="file" data-file="dois-iguais.php">&lt;?php
+class Produto {}
+class Produto {}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php dois-iguais.php
+
+Fatal error: Cannot redeclare class Produto (previously declared in /home/ana/loja/dois-iguais.php:2) in /home/ana/loja/dois-iguais.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "não é possível declarar de novo a classe <code>Produto</code> (já declarada na linha 2)". Na vida real, isso costuma acontecer quando o mesmo arquivo de classe é incluído duas vezes com <code>require</code>.</p>
+<p><strong>Como consertar:</strong> declare cada classe uma vez só e inclua o arquivo com <code>require_once</code> (veja <a href="include-require.html">include e require</a>) ou use o <a href="autoload.html">autoload</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>class Nome { }</code></td><td>Declara uma classe</td><td><code>class Produto { }</code></td></tr>
+<tr><td><code>new Nome()</code></td><td>Cria um objeto</td><td><code>$c = new Produto();</code></td></tr>
+<tr><td><code>$obj-&gt;prop</code></td><td>Lê/altera uma propriedade</td><td><code>$c-&gt;preco = 9.9;</code></td></tr>
+<tr><td><code>$obj-&gt;metodo()</code></td><td>Chama um método</td><td><code>$c-&gt;descricao()</code></td></tr>
+<tr><td><code>new Nome()-&gt;metodo()</code> <span class="versao">PHP 8.4+</span></td><td>Cria e já usa</td><td><code>new Saudacao()-&gt;ola()</code></td></tr>
+<tr><td><code>$a = $b</code> (objetos)</td><td>As duas variáveis passam a usar o mesmo objeto</td><td>-</td></tr>
+<tr><td><code>clone $obj</code></td><td>Cria uma cópia independente</td><td><code>$promo = clone $camiseta;</code></td></tr>
+<tr><td><code>==</code> / <code>===</code></td><td>Mesmos valores / mesmo objeto</td><td><code>$a === $c</code></td></tr>
+<tr><td><code>instanceof</code></td><td>É objeto desta classe?</td><td><code>$c instanceof Produto</code></td></tr>
+<tr><td><code>get_class($obj)</code>, <code>$obj::class</code></td><td>Nome da classe do objeto</td><td><code>"Produto"</code></td></tr>
+<tr><td><code>Nome::class</code></td><td>Nome da classe como texto</td><td><code>Produto::class</code></td></tr>
+<tr><td><code>var_dump($obj)</code></td><td>Mostra classe, <code>#id</code> e propriedades</td><td><code>object(Produto)#1 (2) {…}</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:Ana mora em Recife,out:Bruno mora em Natal,out:2 clientes,src:class Cliente,src:new Cliente">
+<p class="try-task"><strong>Missão:</strong> a lojinha agora guarda clientes. Declare uma classe <code>Cliente</code> com as propriedades <code>nome</code> e <code>cidade</code> (texto, começando vazias). Crie dois clientes: Ana, de Recife, e Bruno, de Natal. Guarde os dois no array <code>$clientes</code> e use o <code>foreach</code> que já está pronto. A saída deve ser <code>Ana mora em Recife</code>, <code>Bruno mora em Natal</code> e <code>2 clientes</code>.</p>
+<pre class="script">&lt;?php
+// declare a classe Cliente aqui
+
+
+// crie os dois clientes e coloque no array
+$clientes = [];
+
+
+foreach ($clientes as $cliente) {
+    echo "{$cliente-&gt;nome} mora em {$cliente-&gt;cidade}\n";
+}
+echo count($clientes) . " clientes\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Cliente
+{
+    public string $nome = "";
+    public string $cidade = "";
+}
+
+$ana = new Cliente();
+$ana-&gt;nome = "Ana";
+$ana-&gt;cidade = "Recife";
+
+$bruno = new Cliente();
+$bruno-&gt;nome = "Bruno";
+$bruno-&gt;cidade = "Natal";
+
+$clientes = [$ana, $bruno];
+
+foreach ($clientes as $cliente) {
+    echo "{$cliente-&gt;nome} mora em {$cliente-&gt;cidade}\n";
+}
+echo count($clientes) . " clientes\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Nome da classe</h3>
+<p>Seguindo a convenção, complete com o nome da classe para "item do pedido":</p>
+<div class="ex-code">class <input data-answer="ItemDoPedido|ItemPedido" aria-label="nome da classe"> { }</div>
+</div>
+
+<div class="exercise">
+<h3>2. A seta</h3>
+<p>Complete para mudar o preço do objeto <code>$caneca</code> para 19.90:</p>
+<div class="ex-code">$caneca<input data-answer="-&gt;preco = 19.90|-&gt;preco = 19.9|-&gt;preco=19.90|-&gt;preco=19.9" aria-label="atribuição">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Cópia de verdade</h3>
+<p>Complete para <code>$copia</code> ser um objeto <strong>independente</strong> de <code>$caneca</code>:</p>
+<div class="ex-code">$copia = <input data-answer="clone $caneca" aria-label="cópia">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Depois de <code>$b = $a; $b-&gt;nome = "X";</code> (onde <code>$a</code> é um objeto), quanto vale <code>$a-&gt;nome</code>?</p>
+<label><input type="radio" name="q4"> O valor antigo: <code>$b</code> é uma cópia</label>
+<label><input type="radio" name="q4"> <code>"X"</code>: as duas variáveis usam o mesmo objeto</label>
+<label><input type="radio" name="q4"> Dá erro</label>
+<label><input type="radio" name="q4"> <code>null</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. <code>$a</code> e <code>$b</code> foram criados com dois <code>new Produto()</code> e têm os mesmos valores. O que <code>var_dump($a == $b, $a === $b)</code> mostra?</p>
+<label><input type="radio" name="q5"> <code>true</code> e <code>true</code></label>
+<label><input type="radio" name="q5"> <code>false</code> e <code>false</code></label>
+<label><input type="radio" name="q5"> <code>true</code> e <code>false</code></label>
+<label><input type="radio" name="q5"> <code>false</code> e <code>true</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual linha funciona no PHP 8.5?</p>
+<label><input type="radio" name="q6"> <code>echo new Produto-&gt;nome();</code></label>
+<label><input type="radio" name="q6"> <code>echo Produto-&gt;nome();</code></label>
+<label><input type="radio" name="q6"> <code>echo $caneca.nome();</code></label>
+<label><input type="radio" name="q6"> <code>echo new Produto()-&gt;nome();</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. O que <code>["nome" =&gt; "Caneca"] instanceof Produto</code> devolve?</p>
+<label><input type="radio" name="q7"> <code>false</code></label>
+<label><input type="radio" name="q7"> <code>true</code>, porque tem a chave <code>nome</code></label>
+<label><input type="radio" name="q7"> Um erro</label>
+<label><input type="radio" name="q7"> <code>null</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>class Produto { … }</code> declara o molde; nomes em <em>PascalCase</em>, uma classe por arquivo.</li>
+  <li><code>new Produto()</code> cria um objeto; cada <code>new</code> é um objeto novo, com número próprio (<code>#1</code>, <code>#2</code>… no <code>var_dump</code>).</li>
+  <li>A seta <code>-&gt;</code> acessa propriedades e métodos, <strong>sem</strong> <code>$</code> depois dela. O ponto é concatenação.</li>
+  <li>Variáveis guardam o <strong>identificador</strong> do objeto: <code>$b = $a</code> e passar para funções compartilham o mesmo objeto. Para copiar, <code>clone</code>.</li>
+  <li><code>==</code> compara valores; <code>===</code> pergunta "é o mesmo objeto?".</li>
+  <li><code>instanceof</code> confere a classe; <code>::class</code> e <code>get_class</code> dão o nome dela.</li>
+  <li>No PHP 8.4+, <code>new Produto()-&gt;metodo()</code> dispensa os parênteses em volta.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
