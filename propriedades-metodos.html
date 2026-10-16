@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Propriedades e Métodos — tipos, $this e propriedades dinâmicas | Guia PHP</title>
+<meta name="description" content="Propriedades tipadas e métodos em PHP: declarar, dar valor inicial, o estado uninitialized e o erro must not be accessed before initialization, $this, métodos que chamam métodos, e o Deprecated das propriedades dinâmicas do PHP 8.2, com saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Propriedades e Métodos</span></h1>
+
+<p class="intro">Uma classe tem duas partes: o que o objeto <strong>sabe</strong> (as <strong>propriedades</strong>, os dados) e o que ele <strong>faz</strong> (os <strong>métodos</strong>, as ações). Nesta aula você vai declarar propriedades com tipo, entender o que acontece com uma propriedade que ainda não recebeu valor, escrever métodos que usam <code>$this</code> e conhecer o aviso que o PHP 8.2 passou a dar quando você inventa uma propriedade na hora.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Declarar propriedades com tipo (<code>string</code>, <code>int</code>, <code>float</code>, <code>bool</code>, <code>array</code>, <code>?string</code>) e valor inicial.</li>
+  <li>O estado "não inicializada" e o erro <code>Typed property … must not be accessed before initialization</code>.</li>
+  <li>Como o PHP converte (ou recusa) valores do tipo errado.</li>
+  <li>Escrever métodos com parâmetros e retorno, e usar <code>$this</code>.</li>
+  <li>Um método chamando outro, e métodos encadeados (<code>-&gt;a()-&gt;b()</code>).</li>
+  <li>Propriedades dinâmicas e o <code>Deprecated</code> do PHP 8.2.</li>
+</ul>
+</div>
+
+<p>Você já sabe criar objetos com <code>new</code> e usar a seta <code>-&gt;</code> (<a href="classes-objetos.html">Classes e Objetos</a>). Aqui, todos os exemplos usam a classe <code>Produto</code> da lojinha da Ana.</p>
+
+<hr>
+
+<h2>A ideia: a ficha e o que se faz com ela</h2>
+<p>Pense na ficha de um produto na lojinha. Ela tem <strong>campos</strong> (nome, preço, estoque): são as propriedades. E a Ana tem um <strong>procedimento</strong> para cada coisa que faz com o produto (vender, conferir o estoque, mostrar o preço formatado): são os métodos. Um método é só uma <a href="funcoes.html">função</a> que mora dentro da classe e trabalha com os campos <strong>daquela</strong> ficha.</p>
+
+<hr>
+
+<h2>Propriedades</h2>
+<p>Uma propriedade é declarada dentro da classe, fora de qualquer método:</p>
+
+<dl class="anatomy">
+  <dt>public</dt><dd>A <strong>visibilidade</strong>: quem pode mexer nela. <code>public</code> (pública) = qualquer código. As outras opções estão em <a href="visibilidade.html">Visibilidade</a>.</dd>
+  <dt>float</dt><dd>O <strong>tipo</strong>: que tipo de valor ela aceita. Opcional, mas recomendado.</dd>
+  <dt>$preco</dt><dd>O nome, com <code>$</code> (como uma variável). Na hora de usar, o <code>$</code> some: <code>$caneca-&gt;preco</code>.</dd>
+  <dt>= 25.90</dt><dd>O <strong>valor inicial</strong> que todo objeto novo recebe. Opcional. Precisa ser um valor fixo (número, texto, array, <code>null</code>, constante); não pode chamar função.</dd>
+</dl>
+
+<p>Os tipos são os mesmos que você usa em <a href="tipos-retorno.html">parâmetros e retornos</a>:</p>
+
+<pre class="file" data-file="tipos.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+    public float $preco = 25.90;
+    public int $estoque = 10;
+    public bool $ativo = true;
+    public array $tags = ["cozinha", "presente"];
+    public ?string $descricao = null;
+    public $antiga;
+}
+
+$caneca = new Produto();
+var_dump($caneca);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tipos.php
+object(Produto)#1 (7) {
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["preco"]=&gt;
+  float(25.9)
+  ["estoque"]=&gt;
+  int(10)
+  ["ativo"]=&gt;
+  bool(true)
+  ["tags"]=&gt;
+  array(2) {
+    [0]=&gt;
+    string(7) "cozinha"
+    [1]=&gt;
+    string(8) "presente"
+  }
+  ["descricao"]=&gt;
+  NULL
+  ["antiga"]=&gt;
+  NULL
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Aceita</th></tr>
+<tr><td><code>public string $nome</code></td><td>Texto</td></tr>
+<tr><td><code>public int $estoque</code></td><td>Número inteiro</td></tr>
+<tr><td><code>public float $preco</code></td><td>Número com casas decimais (e inteiros, que viram <code>float</code>)</td></tr>
+<tr><td><code>public bool $ativo</code></td><td><code>true</code> ou <code>false</code></td></tr>
+<tr><td><code>public array $tags</code></td><td>Um array</td></tr>
+<tr><td><code>public ?string $descricao</code></td><td>Texto <strong>ou</strong> <code>null</code> (o <code>?</code> quer dizer "pode ser nulo")</td></tr>
+<tr><td><code>public Cliente $dono</code></td><td>Um objeto da classe <code>Cliente</code></td></tr>
+<tr><td><code>public $antiga</code></td><td>Qualquer coisa (sem tipo). Começa com <code>null</code>. Estilo antigo: prefira sempre declarar o tipo.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>E o <code>var</code>?</strong>
+<p>Em código muito antigo (do PHP 4), você vai ver <code>var $nome;</code>. É o mesmo que <code>public $nome;</code>. Funciona até hoje, mas ninguém usa mais em código novo.</p>
+</div>
+
+<h3>Propriedade sem valor inicial: "não inicializada"</h3>
+<p>Uma propriedade <strong>com tipo</strong> e <strong>sem</strong> valor inicial começa num estado especial: <strong>não inicializada</strong> (<em>uninitialized</em>). Ela não vale <code>null</code>, nem <code>""</code>, nem <code>0</code>: ela simplesmente ainda não tem valor. Ler essa propriedade antes de dar um valor a ela é um erro:</p>
+
+<pre class="file" data-file="sem-inicial.php">&lt;?php
+class Produto
+{
+    public string $nome;
+    public float $preco;
+}
+
+$caneca = new Produto();
+var_dump($caneca);
+$caneca-&gt;nome = "Caneca";
+echo $caneca-&gt;nome . "\n";
+echo $caneca-&gt;preco . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php sem-inicial.php
+object(Produto)#1 (0) {          « (0): nenhuma propriedade tem valor ainda
+  ["nome"]=&gt;
+  uninitialized(string)
+  ["preco"]=&gt;
+  uninitialized(float)
+}
+Caneca                           « o nome recebeu valor na linha 10: pode ser lido
+
+Fatal error: Uncaught Error: Typed property Produto::$preco must not be accessed before initialization in /home/ana/loja/sem-inicial.php:12
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/sem-inicial.php on line 12</pre>
+
+<p>A mensagem diz: "a propriedade tipada <code>Produto::$preco</code> não pode ser acessada antes da inicialização". Ninguém deu um preço à caneca, e o PHP prefere parar a inventar um valor.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Declaração</th><th>Valor no objeto novo</th><th>Ler antes de atribuir</th></tr>
+<tr><td><code>public float $preco = 0;</code></td><td><code>0.0</code></td><td>Funciona: dá <code>0.0</code></td></tr>
+<tr><td><code>public ?float $preco = null;</code></td><td><code>null</code></td><td>Funciona: dá <code>null</code></td></tr>
+<tr><td><code>public float $preco;</code></td><td><em>não inicializada</em></td><td><strong>Erro</strong> (<code>must not be accessed before initialization</code>)</td></tr>
+<tr><td><code>public $preco;</code> (sem tipo)</td><td><code>null</code></td><td>Funciona: dá <code>null</code></td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Se existe um valor inicial que faz sentido (estoque <code>0</code>, lista vazia <code>[]</code>), declare-o. Se não existe (todo produto <strong>precisa</strong> de um nome de verdade), deixe sem valor inicial e preencha no <strong>construtor</strong>, que é o assunto da próxima aula (<a href="construtores.html">Construtores</a>). Evite usar <code>null</code> só para fugir do erro: aí você terá que conferir <code>null</code> em todo lugar.</p>
+
+<h3>O tipo errado: convertido ou recusado</h3>
+<p>Quando você atribui um valor de outro tipo, o PHP tenta converter, se a conversão for "segura". Se não for, ele recusa:</p>
+
+<pre class="file" data-file="coercao.php">&lt;?php
+class Produto
+{
+    public float $preco = 0;
+    public int $estoque = 0;
+}
+
+$p = new Produto();
+$p-&gt;preco = 10;
+$p-&gt;estoque = "7";
+var_dump($p-&gt;preco, $p-&gt;estoque);
+$p-&gt;estoque = 7.5;
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php coercao.php
+float(10)        « o inteiro 10 virou 10.0: sem problema
+int(7)           « o texto "7" virou o número 7
+
+Deprecated: Implicit conversion from float 7.5 to int loses precision in /home/ana/loja/coercao.php on line 12</pre>
+
+<p>O <code>7.5</code> num <code>int</code> perderia o <code>.5</code>: o PHP guarda <code>7</code> e avisa (<code>Deprecated</code>: em versões futuras isso vai virar erro). E um texto que não é número, como <code>"barato"</code>, é sempre recusado com <code>TypeError</code> (você viu em <a href="poo.html">O que é POO</a>).</p>
+
+<p>Se você quer que o PHP <strong>não converta nada</strong>, ligue o modo estrito na primeira linha do arquivo. Aí só o inteiro → <code>float</code> continua aceito:</p>
+
+<pre class="file" data-file="estrito.php">&lt;?php
+declare(strict_types=1);
+
+class Produto
+{
+    public float $preco = 0;
+    public int $estoque = 0;
+}
+
+$p = new Produto();
+$p-&gt;preco = 10;
+var_dump($p-&gt;preco);
+$p-&gt;estoque = "7";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php estrito.php
+float(10)
+
+Fatal error: Uncaught TypeError: Cannot assign string to property Produto::$estoque of type int in /home/ana/loja/estrito.php:13
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/estrito.php on line 13</pre>
+
+<p>O <code>declare(strict_types=1)</code> vale para o arquivo onde está escrito. Muitos projetos profissionais o usam em todos os arquivos (veja <a href="tipos-retorno.html">Tipos e Retorno</a>).</p>
+
+<hr>
+
+<h2>Métodos</h2>
+<p>Um método é declarado como uma função, só que dentro da classe e com a visibilidade na frente:</p>
+
+<pre class="file" data-file="metodos.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+    public int $estoque = 0;
+
+    public function temEstoque(int $quantidade): bool
+    {
+        return $this-&gt;estoque &gt;= $quantidade;
+    }
+
+    public function vender(int $quantidade): float
+    {
+        if (!$this-&gt;temEstoque($quantidade)) {
+            echo "Sem estoque: pediram {$quantidade}, há {$this-&gt;estoque}\n";
+            return 0;
+        }
+        $this-&gt;estoque -= $quantidade;
+        return $quantidade * $this-&gt;preco;
+    }
+
+    public function precoFormatado(): string
+    {
+        return "R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+$caneca-&gt;estoque = 5;
+
+echo $caneca-&gt;nome . " custa " . $caneca-&gt;precoFormatado() . "\n";
+$valor = $caneca-&gt;vender(3);
+echo "Venda de R$ " . number_format($valor, 2, ",", ".") . "; restam {$caneca-&gt;estoque}\n";
+$caneca-&gt;vender(4);
+var_dump($caneca-&gt;temEstoque(2));
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php metodos.php
+Caneca custa R$ 25,90
+Venda de R$ 77,70; restam 2
+Sem estoque: pediram 4, há 2
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>public function</dt><dd>Declara um método público (que pode ser chamado de fora da classe).</dd>
+  <dt>temEstoque(int $quantidade)</dt><dd>Nome e parâmetros, como numa função. Por convenção, nomes de método começam com letra minúscula, e cada palavra nova com maiúscula (<em>camelCase</em>): <code>temEstoque</code>, <code>precoFormatado</code>.</dd>
+  <dt>: bool</dt><dd>O tipo de retorno. <code>: void</code> quer dizer "não devolve nada".</dd>
+  <dt>$this-&gt;estoque</dt><dd>A propriedade <code>estoque</code> do objeto que chamou o método.</dd>
+  <dt>$this-&gt;temEstoque($quantidade)</dt><dd>Dentro de <code>vender</code>, o objeto chama <strong>outro método dele mesmo</strong>. Assim a regra "tem estoque?" fica escrita num lugar só.</dd>
+</dl>
+
+<p>Repare que os métodos fazem dois tipos de trabalho: <code>temEstoque</code> e <code>precoFormatado</code> só <strong>consultam</strong> o objeto; <code>vender</code> <strong>muda</strong> o objeto (diminui o estoque) e ainda devolve o valor da venda.</p>
+
+<h3><code>$this</code>: "este objeto"</h3>
+<p>O método é escrito uma vez só, na classe. Então como ele sabe de qual produto está falando? Pelo <code>$this</code> ("este"). Quando você escreve <code>$caneca-&gt;vender(3)</code>, durante aquela chamada <code>$this</code> é a <code>$caneca</code>. Quando escreve <code>$camiseta-&gt;vender(1)</code>, <code>$this</code> é a <code>$camiseta</code>:</p>
+
+<pre class="file" data-file="this.php">&lt;?php
+class Produto
+{
+    public string $nome = "";
+
+    public function quemSouEu(): string
+    {
+        return "Eu sou a {$this-&gt;nome}";
+    }
+}
+
+$a = new Produto();
+$a-&gt;nome = "Caneca";
+$b = new Produto();
+$b-&gt;nome = "Camiseta";
+
+echo $a-&gt;quemSouEu() . "\n";
+echo $b-&gt;quemSouEu() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php this.php
+Eu sou a Caneca
+Eu sou a Camiseta</pre>
+
+<p>O mesmo método, a mesma linha de código, dois resultados: cada chamada recebe o seu próprio <code>$this</code>. É como a frase "eu sou a Ana" escrita num crachá-modelo: cada pessoa que usa o crachá diz o próprio nome.</p>
+
+<div class="tryphp" data-goal="out:Caneca custa R$ 25\,90,out:Total: R$ 129\,50,src:function total">
+<p class="try-task"><strong>Missão:</strong> acrescente na classe um método <code>total(int $quantidade): float</code> que devolve <code>$quantidade</code> vezes o preço do produto (use <code>$this-&gt;preco</code>). A última linha já usa o método: a saída deve terminar com <code>Total: R$ 129,50</code>.</p>
+<pre class="script">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+
+    public function precoFormatado(): string
+    {
+        return "R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+
+    // escreva o método total aqui
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+
+echo $caneca-&gt;nome . " custa " . $caneca-&gt;precoFormatado() . "\n";
+echo "Total: R$ " . number_format($caneca-&gt;total(5), 2, ",", ".") . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Produto
+{
+    public string $nome = "";
+    public float $preco = 0;
+
+    public function precoFormatado(): string
+    {
+        return "R$ " . number_format($this-&gt;preco, 2, ",", ".");
+    }
+
+    public function total(int $quantidade): float
+    {
+        return $quantidade * $this-&gt;preco;
+    }
+}
+
+$caneca = new Produto();
+$caneca-&gt;nome = "Caneca";
+$caneca-&gt;preco = 25.90;
+
+echo $caneca-&gt;nome . " custa " . $caneca-&gt;precoFormatado() . "\n";
+echo "Total: R$ " . number_format($caneca-&gt;total(5), 2, ",", ".") . "\n";
+</pre>
+</div>
+
+<h3>Métodos encadeados</h3>
+<p>Se um método devolve o próprio objeto (<code>return $this;</code>), você pode chamar outro método logo em seguida, numa linha só. Esse estilo se chama <strong>interface fluente</strong>:</p>
+
+<pre class="file" data-file="fluente.php">&lt;?php
+class Carrinho
+{
+    public array $itens = [];
+
+    public function adicionar(string $item): Carrinho
+    {
+        $this-&gt;itens[] = $item;
+        return $this;
+    }
+}
+
+$c = new Carrinho();
+$c-&gt;adicionar("Caneca")-&gt;adicionar("Camiseta")-&gt;adicionar("Adesivo");
+echo implode(", ", $c-&gt;itens) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php fluente.php
+Caneca, Camiseta, Adesivo</pre>
+
+<p>O tipo de retorno <code>: Carrinho</code> diz "este método devolve um <code>Carrinho</code>". Cada <code>-&gt;adicionar(…)</code> devolve o mesmo carrinho, e o próximo <code>-&gt;adicionar(…)</code> é chamado nele. Você vai ver muito isso em bibliotecas (por exemplo, para montar consultas ao banco).</p>
+
+<h3>Propriedade e método com o mesmo nome</h3>
+<p>Uma propriedade e um método podem ter o mesmo nome; o que decide é o parêntese:</p>
+
+<pre class="file" data-file="propfunc.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+    public function nome(): string { return strtoupper($this-&gt;nome); }
+}
+$c = new Produto();
+echo $c-&gt;nome . " / " . $c-&gt;nome() . "\n";
+echo $c-&gt;nome();
+echo "\n";
+echo $c-&gt;preco();
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php propfunc.php
+Caneca / CANECA       « $c-&gt;nome é a propriedade; $c-&gt;nome() é o método
+CANECA
+
+Fatal error: Uncaught Error: Call to undefined method Produto::preco() in /home/ana/loja/propfunc.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/propfunc.php on line 11</pre>
+
+<p>Com parênteses, o PHP procura um <strong>método</strong>. Não existe método <code>preco()</code>, então vem o erro <code>Call to undefined method</code> ("chamada de método indefinido").</p>
+
+<hr>
+
+<h2>Propriedades dinâmicas e o aviso do PHP 8.2 <span class="versao">PHP 8.2+</span></h2>
+<p>Uma <strong>propriedade dinâmica</strong> é uma propriedade que não foi declarada na classe e foi criada na hora, só por receber um valor. Até o PHP 8.1, isso acontecia em silêncio. Do 8.2 em diante, o PHP avisa:</p>
+
+<pre class="file" data-file="dinamica.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+}
+
+$caneca = new Produto();
+$caneca-&gt;cor = "azul";
+echo $caneca-&gt;cor . "\n";
+var_dump($caneca);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php dinamica.php
+
+Deprecated: Creation of dynamic property Produto::$cor is deprecated in /home/ana/loja/dinamica.php on line 8
+azul
+object(Produto)#1 (2) {
+  ["nome"]=&gt;
+  string(6) "Caneca"
+  ["cor"]=&gt;
+  string(4) "azul"
+}</pre>
+
+<p>O programa continuou (a cor foi criada e mostrada), mas com um <code>Deprecated</code>: "a criação da propriedade dinâmica <code>Produto::$cor</code> está obsoleta". Obsoleta quer dizer que um dia (o plano é o PHP 9) isso vai virar <strong>erro</strong>. O motivo: na enorme maioria das vezes, uma propriedade dinâmica é um <strong>erro de digitação</strong> (<code>$caneca-&gt;preço</code> em vez de <code>$caneca-&gt;preco</code>) que antes passava despercebido.</p>
+
+<p><strong>Como resolver</strong>, do melhor para o pior:</p>
+<ol>
+  <li><strong>Declare a propriedade na classe</strong>: <code>public string $cor = "";</code>. É o certo em 99% dos casos.</li>
+  <li>Se você precisa mesmo de "chaves livres", use um array: <code>public array $extras = [];</code> e <code>$caneca-&gt;extras["cor"] = "azul";</code>.</li>
+  <li>Se a classe é antiga e você não pode mudá-la agora, marque-a com o atributo <code>#[\AllowDynamicProperties]</code> ("permitir propriedades dinâmicas"):</li>
+</ol>
+
+<pre class="file" data-file="permitir.php">&lt;?php
+#[\AllowDynamicProperties]
+class Produto
+{
+    public string $nome = "Caneca";
+}
+
+$caneca = new Produto();
+$caneca-&gt;cor = "azul";
+echo $caneca-&gt;cor . "\n";
+
+$generico = new stdClass();
+$generico-&gt;qualquer = "coisa";
+echo $generico-&gt;qualquer . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php permitir.php
+azul
+coisa</pre>
+
+<p>Sem aviso. Repare também no <code>stdClass</code>, o objeto genérico do PHP: ele aceita propriedades dinâmicas sempre, sem atributo nenhum, porque existe justamente para isso. (Atributos como <code>#[\AllowDynamicProperties]</code> têm uma aula própria: <a href="atributos.html">Atributos</a>.)</p>
+
+<hr>
+
+<h2>Formas de dar valor às propriedades</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>Valor inicial na declaração</td><td><code>public int $estoque = 0;</code></td><td>Quando existe um valor "padrão" que serve para todo objeto novo.</td></tr>
+<tr><td>Atribuir de fora, depois do <code>new</code></td><td><code>$caneca-&gt;nome = "Caneca";</code></td><td>Para experimentar e em objetos simples. Fica fácil esquecer uma propriedade.</td></tr>
+<tr><td>Um método que muda o objeto</td><td><code>$caneca-&gt;vender(3);</code></td><td>Quando a mudança tem regras (não vender sem estoque). O melhor para dados importantes.</td></tr>
+<tr><td>No construtor, na hora do <code>new</code></td><td><code>new Produto("Caneca", 25.90)</code></td><td><strong>O mais usado</strong> para dados obrigatórios. É a próxima aula: <a href="construtores.html">Construtores</a>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Esquecer o <code>$this-&gt;</code></strong>
+<pre class="file" data-file="sem-this.php">&lt;?php
+class Produto
+{
+    public float $preco = 25.90;
+
+    public function total(int $quantidade): float
+    {
+        return $preco * $quantidade;
+    }
+}
+
+$caneca = new Produto();
+echo $caneca-&gt;total(2) . "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-this.php
+
+Warning: Undefined variable $preco in /home/ana/loja/sem-this.php on line 8
+0</pre>
+<p><strong>O que significa:</strong> dentro do método, <code>$preco</code> é uma <strong>variável local</strong> (que não existe), e não a propriedade. O PHP avisa <code>Undefined variable $preco</code>, trata o valor como <code>null</code> e a conta dá <code>0</code>. O programa nem para: o erro vira um resultado errado.</p>
+<p><strong>Como consertar:</strong> dentro de um método, propriedades são <strong>sempre</strong> <code>$this-&gt;nome</code>: <code>return $this-&gt;preco * $quantidade;</code>. (Quem vem do Java estranha: lá o <code>this</code> é opcional; no PHP, não.)</p>
+</div>
+
+<div class="cenario">
+<strong>Using $this when not in object context</strong>
+<pre class="file" data-file="this-fora.php">&lt;?php
+class Produto
+{
+    public string $nome = "Caneca";
+}
+echo $this-&gt;nome;
+</pre>
+<pre class="term" data-cwd="~/loja">$ php this-fora.php
+
+Fatal error: Uncaught Error: Using $this when not in object context in /home/ana/loja/this-fora.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/this-fora.php on line 6</pre>
+<p><strong>O que significa:</strong> "usando <code>$this</code> fora do contexto de um objeto". O <code>$this</code> só existe <strong>dentro de um método</strong>, durante uma chamada. Fora da classe, não há "este objeto".</p>
+<p><strong>Como consertar:</strong> fora da classe, use a variável do objeto: <code>$caneca-&gt;nome</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Call to undefined method</strong>
+<pre class="file" data-file="metodo-errado.php">&lt;?php
+class Produto
+{
+    public function vender(int $quantidade): void {}
+}
+$caneca = new Produto();
+$caneca-&gt;vendr(3);
+</pre>
+<pre class="term" data-cwd="~/loja">$ php metodo-errado.php
+
+Fatal error: Uncaught Error: Call to undefined method Produto::vendr() in /home/ana/loja/metodo-errado.php:7
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/metodo-errado.php on line 7</pre>
+<p><strong>O que significa:</strong> o método <code>vendr</code> não existe na classe <code>Produto</code> (faltou o <code>e</code>).</p>
+<p><strong>Como consertar:</strong> confira o nome na classe. Nomes de método, como os de classe, não diferenciam maiúsculas e minúsculas (<code>VENDER()</code> funcionaria), mas escreva sempre igual à declaração.</p>
+</div>
+
+<div class="cenario">
+<strong>Return value must be of type …, none returned</strong>
+<pre class="file" data-file="sem-retorno.php">&lt;?php
+class Produto
+{
+    public float $preco = 25.90;
+    public function precoComDesconto(): float
+    {
+        $novo = $this-&gt;preco * 0.9;
+    }
+}
+$c = new Produto();
+echo $c-&gt;precoComDesconto();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-retorno.php
+
+Fatal error: Uncaught TypeError: Produto::precoComDesconto(): Return value must be of type float, none returned in /home/ana/loja/sem-retorno.php:8
+Stack trace:
+#0 /home/ana/loja/sem-retorno.php(11): Produto-&gt;precoComDesconto()
+#1 {main}
+  thrown in /home/ana/loja/sem-retorno.php on line 8</pre>
+<p><strong>O que significa:</strong> o método prometeu devolver um <code>float</code>, mas terminou sem <code>return</code> ("nenhum retornado"). Repare no <code>Stack trace</code>: a linha <code>#0</code> mostra de onde o método foi chamado (linha 11), útil quando o erro está dentro de um método.</p>
+<p><strong>Como consertar:</strong> devolva o valor: <code>return $this-&gt;preco * 0.9;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Typed property … must not be accessed before initialization</strong>
+<p>Você já viu este erro acima: uma propriedade com tipo e sem valor inicial foi lida antes de receber valor. Dê um valor inicial na declaração, atribua antes de ler, ou (o melhor) receba o valor no <a href="construtores.html">construtor</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>public tipo $nome = valor;</code></td><td>Declara uma propriedade com tipo e valor inicial</td></tr>
+<tr><td><code>public ?tipo $nome = null;</code></td><td>Propriedade que aceita <code>null</code></td></tr>
+<tr><td><code>public tipo $nome;</code></td><td>Começa "não inicializada"; ler antes de atribuir é erro</td></tr>
+<tr><td><code>public function nome(params): tipo { … }</code></td><td>Declara um método</td></tr>
+<tr><td><code>$this-&gt;prop</code> / <code>$this-&gt;metodo()</code></td><td>Dentro de um método: usa o objeto atual</td></tr>
+<tr><td><code>return $this;</code></td><td>Permite encadear chamadas</td></tr>
+<tr><td><code>declare(strict_types=1);</code></td><td>Desliga as conversões automáticas de tipo no arquivo</td></tr>
+<tr><td><code>#[\AllowDynamicProperties]</code></td><td>Permite propriedades dinâmicas numa classe, sem aviso</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:3 itens,out:Total: R$ 79\,30,src:function adicionar,src:function total,semerro">
+<p class="try-task"><strong>Missão:</strong> complete a classe <code>Carrinho</code>. Ela já tem a propriedade <code>$itens</code> (um array de preços, começando vazio). Escreva os métodos <code>adicionar(float $preco): void</code> (põe o preço no fim de <code>$this-&gt;itens</code>), <code>quantidade(): int</code> (devolve <code>count</code> dos itens) e <code>total(): float</code> (devolve <code>array_sum</code> dos itens). A saída deve ser <code>3 itens</code> e <code>Total: R$ 79,30</code>, sem nenhum aviso.</p>
+<pre class="script">&lt;?php
+class Carrinho
+{
+    public array $itens = [];
+
+    // escreva os métodos aqui
+}
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(25.90);
+$carrinho-&gt;adicionar(49.90);
+$carrinho-&gt;adicionar(3.50);
+
+echo $carrinho-&gt;quantidade() . " itens\n";
+echo "Total: R$ " . number_format($carrinho-&gt;total(), 2, ",", ".") . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Carrinho
+{
+    public array $itens = [];
+
+    public function adicionar(float $preco): void
+    {
+        $this-&gt;itens[] = $preco;
+    }
+
+    public function quantidade(): int
+    {
+        return count($this-&gt;itens);
+    }
+
+    public function total(): float
+    {
+        return array_sum($this-&gt;itens);
+    }
+}
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(25.90);
+$carrinho-&gt;adicionar(49.90);
+$carrinho-&gt;adicionar(3.50);
+
+echo $carrinho-&gt;quantidade() . " itens\n";
+echo "Total: R$ " . number_format($carrinho-&gt;total(), 2, ",", ".") . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Propriedade que aceita nulo</h3>
+<p>Complete para a propriedade <code>$descricao</code> aceitar texto ou <code>null</code>, começando com <code>null</code>:</p>
+<div class="ex-code">public <input data-answer="?string" aria-label="tipo"> $descricao = null;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Dentro do método</h3>
+<p>Complete o método para devolver o estoque <strong>deste</strong> produto:</p>
+<div class="ex-code">return <input data-answer="$this-&gt;estoque" aria-label="propriedade">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Encadear</h3>
+<p>Complete a última linha do método <code>adicionar</code> para permitir <code>$c-&gt;adicionar("a")-&gt;adicionar("b")</code>:</p>
+<div class="ex-code">return <input data-answer="$this" aria-label="retorno">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. A classe tem <code>public int $estoque;</code> (sem valor inicial). O que acontece com <code>echo $p-&gt;estoque;</code> logo depois do <code>new</code>?</p>
+<label><input type="radio" name="q4"> Mostra <code>0</code></label>
+<label><input type="radio" name="q4"> Mostra nada (é <code>null</code>)</label>
+<label><input type="radio" name="q4"> <code>Error: Typed property Produto::$estoque must not be accessed before initialization</code></label>
+<label><input type="radio" name="q4"> Um <code>Warning</code>, e o programa continua</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. No PHP 8.5, o que acontece com <code>$caneca-&gt;cor = "azul";</code> se a classe não declara <code>$cor</code> (e não tem <code>#[\AllowDynamicProperties]</code>)?</p>
+<label><input type="radio" name="q5"> Erro fatal; o programa para</label>
+<label><input type="radio" name="q5"> A propriedade é criada, com um aviso <code>Deprecated</code></label>
+<label><input type="radio" name="q5"> Nada acontece, em silêncio</label>
+<label><input type="radio" name="q5"> A propriedade é criada só no <code>stdClass</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Dentro de um método, a Ana escreveu <code>return $preco * 2;</code> em vez de <code>$this-&gt;preco</code>. O que acontece?</p>
+<label><input type="radio" name="q6"> <code>Warning: Undefined variable $preco</code> e o resultado sai errado (0)</label>
+<label><input type="radio" name="q6"> Funciona: o PHP entende que é a propriedade</label>
+<label><input type="radio" name="q6"> <code>Parse error</code></label>
+<label><input type="radio" name="q6"> <code>Using $this when not in object context</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Qual é a convenção de nomes para métodos no PHP?</p>
+<label><input type="radio" name="q7"> <code>PrecoFormatado</code></label>
+<label><input type="radio" name="q7"> <code>preco_formatado</code></label>
+<label><input type="radio" name="q7"> <code>PRECO_FORMATADO</code></label>
+<label><input type="radio" name="q7"> <code>precoFormatado</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Propriedades</strong> guardam os dados: <code>public tipo $nome = valor;</code>. Declare sempre o tipo.</li>
+  <li>Propriedade tipada sem valor inicial fica <strong>não inicializada</strong>: lê-la antes de atribuir dá <code>Error: Typed property … must not be accessed before initialization</code>.</li>
+  <li>O PHP converte tipos "seguros" (<code>"7"</code> → <code>7</code>); com <code>declare(strict_types=1)</code>, recusa.</li>
+  <li><strong>Métodos</strong> são funções da classe: <code>public function nome(): tipo</code>, em <em>camelCase</em>.</li>
+  <li><code>$this</code> é o objeto que chamou o método. Propriedades, dentro do método, são sempre <code>$this-&gt;prop</code>.</li>
+  <li><code>return $this;</code> permite encadear chamadas.</li>
+  <li>Propriedade não declarada criada na hora = <strong>propriedade dinâmica</strong>: <code>Deprecated</code> desde o 8.2. Declare a propriedade (ou, em último caso, <code>#[\AllowDynamicProperties]</code>).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
