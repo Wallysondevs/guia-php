@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP na Linha de Comando — php, -r, $argv, STDIN e exit | Guia PHP</title>
+<meta name="description" content="Use o PHP no terminal: rodar arquivos com php arquivo.php, uma linha com php -r, o modo interativo php -a, argumentos com $argv e $argc, ler o teclado com fgets(STDIN), códigos de saída com exit e echo $?, e scripts executáveis com shebang e chmod +x.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP na <span class="hl">Linha de Comando</span></h1>
+
+<p class="intro">O PHP ficou famoso por gerar páginas web, mas ele também é um programa comum de terminal. Com o comando <code>php</code> você roda arquivos, testa uma linha de código, recebe informações de quem chamou o programa e devolve um "deu certo" ou "deu errado" para o terminal. Nesta aula você vai usar o PHP como se usa qualquer comando do Linux.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>As três formas de rodar código: <code>php arquivo.php</code>, <code>php -r</code> e <code>php -a</code>.</li>
+  <li>Como o programa recebe informações na hora de rodar: <code>$argv</code> e <code>$argc</code>.</li>
+  <li>Como perguntar algo e ler o que a pessoa digitou: <code>fgets(STDIN)</code> e <code>readline</code>.</li>
+  <li>Como terminar o programa com um código de saída (<code>exit</code>) e conferir com <code>echo $?</code>.</li>
+  <li>Como transformar um arquivo PHP num comando, com <code>#!/usr/bin/env php</code> e <code>chmod +x</code>.</li>
+</ul>
+</div>
+
+<p>Os exemplos rodam no terminal da Ana, numa pasta chamada <code>cli</code>. Se você ainda não instalou o PHP, veja <a href="instalar-linux.html">Instalar no Linux</a>; as missões rodam direto no editor do guia.</p>
+
+<hr>
+
+<h2>A ideia: o mesmo cozinheiro, duas portas</h2>
+<p>Imagine um restaurante. O cozinheiro (o PHP) pode receber pedidos pela <strong>janela do salão</strong>, onde os clientes são os navegadores e a resposta é uma página web. Mas ele também atende pela <strong>porta da cozinha</strong>, onde quem pede é você, digitando no terminal, e a resposta é texto na tela. A comida é a mesma; muda quem pede e como a resposta é entregue.</p>
+<p>A porta da cozinha se chama <strong>CLI</strong> (<em>command line interface</em>, "interface de linha de comando"). É por ela que rodam os scripts de manutenção, as tarefas agendadas, o <a href="composer.html">Composer</a>, os testes, e também cada exemplo desta parte do guia. A janela do salão você conhece em <a href="servidor-embutido.html">O Servidor Embutido</a> e em <a href="php-e-html.html">PHP Dentro do HTML</a>.</p>
+
+<hr>
+
+<h2>1. <code>php arquivo.php</code>: rodar um arquivo</h2>
+<p>É o jeito que você já usou em <a href="primeiro-script.html">Olá, Mundo</a>: o comando <code>php</code> seguido do nome do arquivo.</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+echo "Olá, mundo!\n";
+</pre>
+
+<pre class="term">$ php ola.php
+Olá, mundo!</pre>
+
+<dl class="anatomy">
+  <dt>php</dt><dd>O programa PHP, que fica numa pasta do sistema (aqui, <code>/opt/php/bin/php</code>).</dd>
+  <dt>ola.php</dt><dd>O arquivo a rodar. O PHP lê o arquivo, executa e mostra a saída no terminal. Quando o programa acaba, o prompt <code>$</code> volta.</dd>
+</dl>
+
+<p>O arquivo pode estar em outra pasta: <code>php projetos/ola.php</code> ou <code>php /home/ana/cli/ola.php</code>. Se o nome estiver errado, o PHP avisa:</p>
+
+<pre class="term">$ php olaa.php
+Could not open input file: olaa.php</pre>
+
+<p><em>Could not open input file</em> = "não consegui abrir o arquivo de entrada". Confira o nome e a pasta onde você está (<code>ls</code> e <code>pwd</code>).</p>
+
+<hr>
+
+<h2>2. <code>php -r</code>: rodar uma linha, sem arquivo</h2>
+<p>Para testar uma coisa rápida, criar um arquivo dá trabalho. A opção <code>-r</code> (de <em>run</em>, "rodar") executa o código escrito ali mesmo, na linha de comando:</p>
+
+<pre class="term">$ php -r 'echo 10 / 3, PHP_EOL;'
+3.3333333333333
+$ php -r 'echo strtoupper("ana"), "\n";'
+ANA
+$ php -r 'echo PHP_VERSION, "\n";'
+8.5.8</pre>
+
+<dl class="anatomy">
+  <dt>-r</dt><dd>"Rode o código que vem a seguir."</dd>
+  <dt>'echo 10 / 3, PHP_EOL;'</dt><dd>O código, entre <strong>aspas simples</strong>. Sem <code>&lt;?php</code>: no <code>-r</code>, tudo já é código PHP. O <code>PHP_EOL</code> é a quebra de linha (veja <a href="echo-print.html">echo e print</a>).</dd>
+</dl>
+
+<p>Duas armadilhas. A primeira: se você colocar <code>&lt;?php</code>, o PHP reclama, porque no <code>-r</code> ele não espera essa marca:</p>
+
+<pre class="term">$ php -r '&lt;?php echo 1;'
+
+Parse error: syntax error, unexpected token "&lt;", expecting end of file in Command line code on line 1</pre>
+
+<p>Repare no lugar do erro: em vez de um arquivo, <code>Command line code</code> ("código da linha de comando"). Para ler mensagens de erro, veja <a href="erros.html">Lendo Erros do PHP</a>.</p>
+
+<p>A segunda armadilha é usar <strong>aspas duplas</strong> por fora. O terminal (o Bash) troca tudo que começa com <code>$</code> pelo valor de uma variável <strong>dele</strong>, antes de o PHP ver o código. Como o Bash não tem variável <code>$nome</code>, ela vira nada:</p>
+
+<pre class="term">$ php -r "$nome = 'Ana'; echo $nome;"
+
+Parse error: syntax error, unexpected token "=", expecting end of file in Command line code on line 1</pre>
+
+<p>O PHP recebeu <code> = 'Ana'; echo ;</code>, sem as variáveis. A regra: <strong>no <code>php -r</code>, aspas simples por fora, aspas duplas por dentro</strong>.</p>
+
+<pre class="term">$ php -r '$nome = "Ana"; echo $nome;'
+Anaana@notebook:~/cli$                « sem quebra de linha, o prompt grudou na saída</pre>
+
+<p>Viu o <code>Anaana@notebook</code>? O <code>echo</code> não pulou linha, então o prompt do terminal apareceu colado no <code>Ana</code>. Não é erro: é só o próximo <code>$</code> do terminal. Por isso os exemplos terminam com <code>"\n"</code> ou <code>PHP_EOL</code>.</p>
+
+<hr>
+
+<h2>3. <code>php -a</code>: o modo interativo</h2>
+<p>A opção <code>-a</code> (de <em>interactive</em>) abre uma "conversa" com o PHP: você digita uma instrução, aperta <kbd>Enter</kbd>, e ele executa na hora, sem arquivo. É ótimo para experimentar uma função.</p>
+
+<p>O modo interativo precisa da extensão <strong>readline</strong> (a que permite editar a linha e usar as setas). O PHP instalado pelo <code>apt</code> no Debian e no Ubuntu já vem com ela: o <code>php -a</code> abre um prompt <code>php &gt;</code>, onde cada instrução termina com <code>;</code>, como num arquivo, e você sai com <code>exit</code> ou <kbd>Ctrl</kbd>+<kbd>D</kbd>. O PHP do computador da Ana foi montado sem essa extensão, e quando ela falta o PHP diz exatamente isso:</p>
+
+<pre class="term">$ php -a
+Interactive shell (-a) requires the readline extension.
+$ echo $?
+1</pre>
+
+<p>Tradução: "o modo interativo (<code>-a</code>) precisa da extensão readline". Se aparecer no seu computador, instale o pacote da readline da sua versão do PHP (no Debian e no Ubuntu, <code>sudo apt install php-readline</code>) ou use as alternativas: <code>php -r</code> para uma linha, um arquivo para várias, e o editor do guia, onde você muda o código e clica em Rodar quantas vezes quiser.</p>
+
+<div class="tip">
+<strong>Qual usar?</strong>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th></tr>
+<tr><td>Um programa de verdade, para guardar e rodar de novo</td><td><code>php arquivo.php</code></td></tr>
+<tr><td>Uma conta ou uma função, uma vez só</td><td><code>php -r '…'</code></td></tr>
+<tr><td>Experimentar várias linhas seguidas, vendo cada resultado</td><td><code>php -a</code> (com readline) ou o editor do guia</td></tr>
+</table>
+</div>
+</div>
+
+<hr>
+
+<h2>4. <code>$argv</code> e <code>$argc</code>: o que veio depois do nome do arquivo</h2>
+<p>Comandos do Linux recebem informações na própria linha: em <code>mkdir fotos</code>, <code>fotos</code> é um <strong>argumento</strong>. Seus programas PHP também podem receber argumentos. Tudo o que você escreve depois do nome do arquivo chega ao programa em duas variáveis prontas:</p>
+
+<pre class="file" data-file="args.php">&lt;?php
+echo "Quantidade de itens: $argc\n";
+echo "Item 0: $argv[0]\n";
+echo "Item 1: $argv[1]\n";
+echo "Item 2: $argv[2]\n";
+</pre>
+
+<pre class="term">$ php args.php Ana 29
+Quantidade de itens: 3
+Item 0: args.php
+Item 1: Ana
+Item 2: 29</pre>
+
+<dl class="anatomy">
+  <dt>$argv</dt><dd><em>argument values</em>, "os valores dos argumentos". Um <a href="arrays.html">array</a>, uma lista numerada a partir do zero. A posição <code>0</code> é o nome do arquivo; os argumentos de verdade começam na <code>1</code>.</dd>
+  <dt>$argc</dt><dd><em>argument count</em>, "a contagem de argumentos": quantos itens o <code>$argv</code> tem, <strong>contando o nome do arquivo</strong>. Por isso deu <code>3</code> para dois argumentos.</dd>
+  <dt>$argv[1]</dt><dd>O item da posição 1: <code>Ana</code>. Os colchetes escolhem a posição.</dd>
+</dl>
+
+<p>Quem separa os argumentos é o terminal, nos espaços. Para mandar um argumento com espaço dentro, use aspas. Para ver o array inteiro, o <code>print_r</code> ajuda (ele é explicado em <a href="var-dump.html">var_dump e print_r</a>):</p>
+
+<pre class="file" data-file="ver-args.php">&lt;?php
+print_r($argv);
+</pre>
+
+<pre class="term">$ php ver-args.php "Ana Souza" 29 --cor=azul
+Array
+(
+    [0] =&gt; ver-args.php
+    [1] =&gt; Ana Souza
+    [2] =&gt; 29
+    [3] =&gt; --cor=azul
+)</pre>
+
+<p>Repare: <code>"Ana Souza"</code> chegou como <strong>um</strong> argumento (as aspas sumiram, foram só para o terminal); o <code>29</code> chegou como texto, não como número; e <code>--cor=azul</code> chegou como está: o PHP não interpreta nada, quem decide o que cada argumento significa é o seu programa.</p>
+
+<h3>E se a pessoa não mandar o argumento?</h3>
+<pre class="file" data-file="saudacao.php">&lt;?php
+$nome = $argv[1];
+echo "Olá, $nome!\n";
+</pre>
+
+<pre class="term">$ php saudacao.php Ana
+Olá, Ana!
+$ php saudacao.php
+
+Warning: Undefined array key 1 in /home/ana/cli/saudacao.php on line 2
+Olá, !</pre>
+
+<p>Sem argumento, não existe a posição <code>1</code> no array, e o PHP avisa: "chave de array não definida: 1". O jeito curto de dar um valor padrão é o operador <code>??</code> ("se não existir, use isto"), que você vai estudar em <a href="null-coalescing.html">?? e ?-&gt;</a>:</p>
+
+<pre class="file" data-file="saudacao2.php">&lt;?php
+$nome = $argv[1] ?? "visitante";
+echo "Olá, $nome!\n";
+</pre>
+
+<pre class="term">$ php saudacao2.php
+Olá, visitante!</pre>
+
+<div class="tryphp" data-args="Ana 29" data-goal="out:Olá\, Ana! Você tem 29 anos.,src:\$argv\[2\]">
+<p class="try-task"><strong>Missão:</strong> esta caixa roda o programa como <code>php main.php Ana 29</code>. Complete a segunda linha para usar o <strong>segundo</strong> argumento (a idade) e mostrar <code>Olá, Ana! Você tem 29 anos.</code></p>
+<pre class="script">&lt;?php
+$nome = $argv[1];
+$idade = "?";
+echo "Olá, $nome! Você tem $idade anos.\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = $argv[1];
+$idade = $argv[2];
+echo "Olá, $nome! Você tem $idade anos.\n";
+</pre>
+</div>
+
+<div class="note">
+<strong><code>$argv</code> só existe no terminal</strong>
+<p>Numa página web não há "linha de comando", então <code>$argv</code> não serve. Lá, as informações chegam pelo endereço e por formulários, em <code>$_GET</code> e <code>$_POST</code> (veja <a href="get-post.html">$_GET e $_POST</a>).</p>
+</div>
+
+<hr>
+
+<h2>5. <code>STDIN</code>: perguntar e ler o que a pessoa digitou</h2>
+<p>Argumentos são decididos <strong>antes</strong> de o programa rodar. Às vezes você quer perguntar <strong>durante</strong>: "Qual é o seu nome?", e esperar a resposta. O teclado chega ao programa por um canal chamado <code>STDIN</code> (<em>standard input</em>, "entrada padrão"). A função <code>fgets</code> lê uma linha dele:</p>
+
+<pre class="file" data-file="nome.php">&lt;?php
+echo "Qual é o seu nome? ";
+$nome = trim(fgets(STDIN));
+echo "Olá, $nome!\n";
+</pre>
+
+<pre class="term">$ php nome.php
+Qual é o seu nome? Ana                « o programa para e espera; a Ana digitou Ana e Enter
+Olá, Ana!</pre>
+
+<dl class="anatomy">
+  <dt>echo "Qual é o seu nome? ";</dt><dd>A pergunta, <strong>sem</strong> <code>\n</code>, para o cursor ficar na mesma linha.</dd>
+  <dt>STDIN</dt><dd>Uma constante que o PHP cria sozinho no terminal: o canal de entrada (normalmente, o teclado).</dd>
+  <dt>fgets(STDIN)</dt><dd><em>file get string</em>, "pegar um texto do arquivo": lê <strong>uma linha</strong> do canal, até o <kbd>Enter</kbd>. O programa fica parado esperando.</dd>
+  <dt>trim(…)</dt><dd>"Aparar": tira espaços e quebras de linha das pontas. Precisa dele porque o <kbd>Enter</kbd> que você apertou vem junto com o texto.</dd>
+</dl>
+
+<p>Veja o que acontece sem o <code>trim</code>. Aqui o <code>echo Bruno |</code> manda o texto <code>Bruno</code> (com o Enter) para a entrada do programa, como se alguém tivesse digitado:</p>
+
+<pre class="term">$ echo Bruno | php nome-sem-trim.php
+Qual é o seu nome? Olá, Bruno
+!                                     « o Enter do "Bruno" veio junto e quebrou a frase
+$ echo Bruno | php nome.php
+Qual é o seu nome? Olá, Bruno!</pre>
+
+<p>(O <code>Bruno</code> não aparece depois da pergunta porque ninguém digitou: ele veio pelo cano <code>|</code>. Quando você digita, o terminal mostra as letras.)</p>
+
+<h3>A outra forma: <code>readline</code></h3>
+<p>A função <code>readline</code> faz a pergunta e lê a resposta numa linha só, já sem o <kbd>Enter</kbd> no final:</p>
+
+<pre class="file" data-file="nome-readline.php">&lt;?php
+$nome = readline("Qual é o seu nome? ");
+echo "Olá, $nome!\n";
+</pre>
+
+<p>É mais curta, mas depende da mesma extensão readline do <code>php -a</code>. No PHP do apt ela existe; no PHP da Ana, não:</p>
+
+<pre class="term">$ echo Bruno | php nome-readline.php
+
+Fatal error: Uncaught Error: Call to undefined function readline() in /home/ana/cli/nome-readline.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/cli/nome-readline.php on line 2</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Vantagem</th><th>Cuidado</th></tr>
+<tr><td><code>trim(fgets(STDIN))</code></td><td>Funciona em qualquer PHP de terminal</td><td>Precisa do <code>trim</code> e de um <code>echo</code> antes para a pergunta</td></tr>
+<tr><td><code>readline("pergunta")</code></td><td>Mais curta; permite usar as setas para corrigir o que digitou</td><td>Só existe com a extensão readline</td></tr>
+</table>
+</div>
+
+<p>Na dúvida, use <code>trim(fgets(STDIN))</code>. E lembre: o que chega do teclado é sempre <strong>texto</strong>, mesmo que a pessoa digite <code>29</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</p>
+
+<div class="tryphp" data-stdin="Bruno\n" data-goal="out:Olá\, Bruno!,semerro,src:fgets">
+<p class="try-task"><strong>Missão:</strong> esta caixa digita <code>Bruno</code> para o programa. Clique em <strong>Rodar</strong>: a exclamação caiu na linha de baixo. Conserte para sair <code>Olá, Bruno!</code> numa linha só, ainda lendo com <code>fgets</code>.</p>
+<pre class="script">&lt;?php
+echo "Qual é o seu nome? ";
+$nome = fgets(STDIN);
+echo "Olá, $nome!\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Qual é o seu nome? ";
+$nome = trim(fgets(STDIN));
+echo "Olá, $nome!\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>6. <code>exit</code>: terminar e dizer como foi</h2>
+<p>Todo programa de terminal, ao terminar, entrega um número para o sistema: o <strong>código de saída</strong>. <code>0</code> quer dizer "deu tudo certo"; qualquer outro número (de 1 a 255) quer dizer "algo deu errado", e cada programa escolhe o que cada número significa. O terminal guarda o código do último comando na variável <code>$?</code>:</p>
+
+<pre class="term">$ php ola.php
+Olá, mundo!
+$ echo $?
+0</pre>
+
+<p>Um programa PHP que chega ao fim normalmente sai com <code>0</code>. Com um erro fatal, sai com <code>255</code> (veja <a href="erros.html">Lendo Erros</a>). E você pode escolher o código, e parar o programa onde quiser, com <code>exit</code>:</p>
+
+<pre class="file" data-file="sair.php">&lt;?php
+echo "Conferindo o estoque...\n";
+exit(3);
+echo "Esta linha nunca aparece\n";
+</pre>
+
+<pre class="term">$ php sair.php
+Conferindo o estoque...
+$ echo $?
+3</pre>
+
+<dl class="anatomy">
+  <dt>exit(3);</dt><dd>"Termine o programa agora, com o código 3." O que vem depois não roda.</dd>
+  <dt>echo $?</dt><dd>Comando do terminal (não do PHP): mostra o código de saída do último comando. Tem que ser o comando <strong>logo depois</strong>, porque cada comando novo troca o valor.</dd>
+</dl>
+
+<p>Se você passar um <strong>texto</strong> em vez de um número, o <code>exit</code> mostra o texto e sai com <code>0</code>:</p>
+
+<pre class="file" data-file="sair2.php">&lt;?php
+exit("Arquivo de estoque não encontrado.\n");
+</pre>
+
+<pre class="term">$ php sair2.php
+Arquivo de estoque não encontrado.
+$ echo $?
+0</pre>
+
+<p>Cuidado: a mensagem é de erro, mas o código diz "deu certo". Para avisar um problema de verdade, mostre a mensagem e depois use <code>exit</code> com um número diferente de zero. Você também vai ver <code>die(…)</code> em códigos por aí: é outro nome para o mesmo <code>exit</code>.</p>
+
+<h3>Para que serve o código de saída?</h3>
+<p>Para outros programas saberem se o seu deu certo. No terminal, <code>&amp;&amp;</code> roda o segundo comando só se o primeiro saiu com <code>0</code>:</p>
+
+<pre class="term">$ php ola.php &amp;&amp; echo "deu certo"
+Olá, mundo!
+deu certo
+$ php sair.php &amp;&amp; echo "deu certo"
+Conferindo o estoque...               « saiu com 3: o "deu certo" não rodou</pre>
+
+<p>É assim que scripts de instalação, tarefas agendadas e ferramentas de teste decidem se continuam ou param.</p>
+
+<h3>Mensagens de erro vão para <code>STDERR</code></h3>
+<p>Assim como existe a entrada padrão, existem duas saídas: <code>STDOUT</code> (a normal, para onde vai o <code>echo</code>) e <code>STDERR</code> (a de erros). Mandar as mensagens de erro pela segunda permite separar o resultado dos avisos. Este programa exige um argumento:</p>
+
+<pre class="file" data-file="estoque.php">&lt;?php
+$arquivo = $argv[1] ?? "";
+if ($arquivo === "") {
+    fwrite(STDERR, "Uso: php estoque.php ARQUIVO\n");
+    exit(1);
+}
+echo "Lendo $arquivo...\n";
+</pre>
+
+<p>O <code>if</code> ("se") testa uma condição; você vai aprendê-lo em <a href="if-else.html">if, elseif, else</a>. Aqui: se o nome do arquivo veio vazio, escreva o modo de usar em <code>STDERR</code> (<code>fwrite</code> = "escrever") e saia com <code>1</code>.</p>
+
+<pre class="term">$ php estoque.php
+Uso: php estoque.php ARQUIVO
+$ echo $?
+1
+$ php estoque.php 2&gt;/dev/null          « 2&gt;/dev/null joga fora só a saída de erros
+$ php estoque.php produtos.csv
+Lendo produtos.csv...
+$ echo $?
+0</pre>
+
+<hr>
+
+<h2>7. Shebang: o arquivo PHP vira um comando</h2>
+<p>Até aqui você sempre escreveu <code>php</code> antes do arquivo. Com duas mudanças, o arquivo roda sozinho, como <code>ls</code> ou <code>mkdir</code>. A primeira é uma linha especial no topo, o <strong>shebang</strong> (o nome vem de <code>#</code>, "sharp", e <code>!</code>, "bang"):</p>
+
+<pre class="file" data-file="oi">#!/usr/bin/env php
+&lt;?php
+echo "Oi! Eu sou um programa PHP.\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>#!</dt><dd>Avisa o Linux: "para rodar este arquivo, use o programa que vem a seguir". Tem que ser os <strong>dois primeiros caracteres</strong> do arquivo, na linha 1.</dd>
+  <dt>/usr/bin/env php</dt><dd>"Procure o <code>php</code> nas pastas de programas e use-o." Assim o arquivo funciona onde quer que o PHP esteja instalado.</dd>
+  <dt>&lt;?php</dt><dd>Continua necessário, na linha 2.</dd>
+</dl>
+
+<p>O nome do arquivo não precisa terminar em <code>.php</code>: um comando chamado <code>oi</code> é mais agradável de digitar. A segunda mudança é dar <strong>permissão de execução</strong> ao arquivo:</p>
+
+<pre class="term">$ ./oi
+bash: ./oi: Permissão negada
+$ ls -l oi
+-rw-rw-r-- 1 ana ana 63 out 16 20:50 oi
+$ chmod +x oi
+$ ls -l oi
+-rwxrwxr-x 1 ana ana 63 out 16 20:50 oi
+$ ./oi
+Oi! Eu sou um programa PHP.</pre>
+
+<dl class="anatomy">
+  <dt>./oi</dt><dd>"Rode o arquivo <code>oi</code> desta pasta" (<code>./</code> = a pasta atual). Na primeira vez, o Linux negou: o arquivo não tinha permissão de execução.</dd>
+  <dt>chmod +x oi</dt><dd>"Mude a permissão (<em>change mode</em>): acrescente (<code>+</code>) a execução (<code>x</code>)." Repare nos <code>x</code> que apareceram no <code>ls -l</code>.</dd>
+</dl>
+
+<p>E a linha do shebang não aparece na saída: quando o PHP roda um arquivo que começa com <code>#!</code>, ele pula essa primeira linha. Por isso o mesmo arquivo também funciona do jeito de sempre:</p>
+
+<pre class="term">$ php oi
+Oi! Eu sou um programa PHP.</pre>
+
+<div class="note">
+<strong>E no Windows?</strong>
+<p>O Windows não usa shebang nem <code>chmod</code>: lá você sempre roda com <code>php arquivo.php</code>. Todo o resto desta aula (<code>-r</code>, <code>$argv</code>, <code>STDIN</code>, <code>exit</code>) funciona igual. Veja <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Could not open input file"</strong>
+<pre class="term">$ php olaa.php
+Could not open input file: olaa.php</pre>
+<p><strong>O que significa:</strong> "não consegui abrir o arquivo de entrada". O nome está errado ou você está em outra pasta.</p>
+<p><strong>Como consertar:</strong> <code>ls</code> mostra os arquivos da pasta atual; <code>pwd</code> mostra onde você está. Use a tecla <kbd>Tab</kbd> para completar o nome.</p>
+</div>
+
+<div class="cenario">
+<strong><code>php -r</code> com aspas duplas: "unexpected token "=""</strong>
+<pre class="term">$ php -r "$nome = 'Ana'; echo $nome;"
+
+Parse error: syntax error, unexpected token "=", expecting end of file in Command line code on line 1</pre>
+<p><strong>O que significa:</strong> o terminal trocou <code>$nome</code> por nada antes de o PHP ver o código.</p>
+<p><strong>Como consertar:</strong> aspas simples por fora: <code>php -r '$nome = "Ana"; echo $nome;'</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Undefined array key 1" ao usar <code>$argv</code></strong>
+<pre class="term">$ php saudacao.php
+
+Warning: Undefined array key 1 in /home/ana/cli/saudacao.php on line 2
+Olá, !</pre>
+<p><strong>O que significa:</strong> o programa esperava um argumento que não foi passado.</p>
+<p><strong>Como consertar:</strong> passe o argumento (<code>php saudacao.php Ana</code>) ou dê um valor padrão: <code>$argv[1] ?? "visitante"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A resposta digitada "quebra" a frase</strong>
+<pre class="term">$ echo Bruno | php nome-sem-trim.php
+Qual é o seu nome? Olá, Bruno
+!</pre>
+<p><strong>O que significa:</strong> o <code>fgets</code> devolve a linha <strong>com</strong> o Enter no final.</p>
+<p><strong>Como consertar:</strong> <code>trim(fgets(STDIN))</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Interactive shell (-a) requires the readline extension" ou "Call to undefined function readline()"</strong>
+<pre class="term">$ php -a
+Interactive shell (-a) requires the readline extension.</pre>
+<p><strong>O que significa:</strong> esse PHP não tem a extensão readline.</p>
+<p><strong>Como consertar:</strong> instale a extensão (no Debian e no Ubuntu, <code>sudo apt install php-readline</code>) ou troque <code>readline("…")</code> por <code>echo "…";</code> + <code>trim(fgets(STDIN))</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Permissão negada" ao rodar <code>./arquivo</code></strong>
+<pre class="term">$ ./oi
+bash: ./oi: Permissão negada</pre>
+<p><strong>O que significa:</strong> o arquivo não tem permissão de execução.</p>
+<p><strong>Como consertar:</strong> <code>chmod +x oi</code>. Confira também se o <code>#!/usr/bin/env php</code> está na <strong>primeira</strong> linha, sem espaço nem linha em branco antes.</p>
+</div>
+
+<div class="tryphp" data-goal="exit:2,out:Estoque vazio,src:exit">
+<p class="try-task"><strong>Missão final:</strong> o programa da lojinha confere o estoque. Quando ele está zerado, deve mostrar <code>Estoque vazio!</code> e terminar com o código de saída <strong>2</strong>, sem chegar à linha da venda. Complete a linha marcada.</p>
+<pre class="script">&lt;?php
+$estoque = 0;
+if ($estoque === 0) {
+    echo "Estoque vazio!\n";
+    // termine aqui, com o código 2
+}
+echo "Venda registrada.\n";
+</pre>
+<pre class="solucao">&lt;?php
+$estoque = 0;
+if ($estoque === 0) {
+    echo "Estoque vazio!\n";
+    exit(2);
+}
+echo "Venda registrada.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando ou recurso</th><th>O que faz</th><th>Exemplo</th></tr>
+<tr><td><code>php arquivo.php</code></td><td>Roda um arquivo</td><td><code>php ola.php</code></td></tr>
+<tr><td><code>php -r '…'</code></td><td>Roda código direto (sem <code>&lt;?php</code>; aspas simples por fora)</td><td><code>php -r 'echo 2 ** 10, "\n";'</code></td></tr>
+<tr><td><code>php -a</code></td><td>Modo interativo (precisa da readline)</td><td><code>php -a</code></td></tr>
+<tr><td><code>php -l arquivo.php</code></td><td>Confere a sintaxe sem rodar (veja <a href="erros.html">Erros</a>)</td><td><code>php -l ola.php</code></td></tr>
+<tr><td><code>php -S localhost:8000</code></td><td>Servidor web de teste (veja <a href="servidor-embutido.html">php -S</a>)</td><td></td></tr>
+<tr><td><code>php -v</code> / <code>php -m</code></td><td>Mostra a versão / as extensões instaladas</td><td><code>php -m</code></td></tr>
+<tr><td><code>$argv</code></td><td>Array: <code>[0]</code> = arquivo, <code>[1]</code> em diante = argumentos (sempre texto)</td><td><code>$argv[1] ?? "padrão"</code></td></tr>
+<tr><td><code>$argc</code></td><td>Quantos itens o <code>$argv</code> tem (inclui o arquivo)</td><td><code>php a.php x y</code> → <code>3</code></td></tr>
+<tr><td><code>trim(fgets(STDIN))</code></td><td>Lê uma linha digitada, sem o Enter</td><td><code>$nome = trim(fgets(STDIN));</code></td></tr>
+<tr><td><code>readline("…")</code></td><td>Pergunta e lê (precisa da readline)</td><td><code>$nome = readline("Nome: ");</code></td></tr>
+<tr><td><code>exit(N)</code> / <code>die(N)</code></td><td>Termina com o código N (0 = certo)</td><td><code>exit(1);</code></td></tr>
+<tr><td><code>exit("texto")</code></td><td>Mostra o texto e termina com código 0</td><td></td></tr>
+<tr><td><code>fwrite(STDERR, "…")</code></td><td>Escreve na saída de erros</td><td></td></tr>
+<tr><td><code>echo $?</code></td><td>(Terminal) código de saída do último comando</td><td></td></tr>
+<tr><td><code>#!/usr/bin/env php</code> + <code>chmod +x</code></td><td>Arquivo PHP executável como comando</td><td><code>./oi</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Uma linha só</h3>
+<p>Complete para o PHP mostrar o resultado de <code>7 * 6</code> sem criar arquivo:</p>
+<div class="ex-code">php <input data-answer="-r 'echo 7 * 6;'|-r 'echo 7*6;'|-r 'echo 7 * 6, PHP_EOL;'|-r 'echo 7 * 6, &quot;\n&quot;;'" aria-label="opção e código"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O segundo argumento</h3>
+<p>Em <code>php nota.php Ana 9</code>, complete para pegar o <code>9</code>:</p>
+<div class="ex-code">$nota = <input data-answer="$argv[2];|$argv[2]" aria-label="variável">  </div>
+</div>
+
+<div class="exercise">
+<h3>3. Executável</h3>
+<p>Complete o comando que dá permissão de execução ao arquivo <code>relatorio</code>:</p>
+<div class="ex-code"><input data-answer="chmod +x relatorio|chmod u+x relatorio" aria-label="comando"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Quanto vale <code>$argc</code> em <code>php compras.php pão leite café</code>?</p>
+<label><input type="radio" name="q4"> 2</label>
+<label><input type="radio" name="q4"> 3</label>
+<label><input type="radio" name="q4"> 4</label>
+<label><input type="radio" name="q4"> 5</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Por que se usa <code>trim</code> em <code>trim(fgets(STDIN))</code>?</p>
+<label><input type="radio" name="q5"> Para transformar o texto em número.</label>
+<label><input type="radio" name="q5"> Para tirar o Enter (quebra de linha) que vem no fim do que foi digitado.</label>
+<label><input type="radio" name="q5"> Para o programa esperar a pessoa digitar.</label>
+<label><input type="radio" name="q5"> Porque o <code>fgets</code> não funciona sem ele.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Um programa termina com <code>exit(1);</code>. O que o <code>echo $?</code> logo depois mostra, e o que isso quer dizer?</p>
+<label><input type="radio" name="q6"> <code>0</code>: deu certo.</label>
+<label><input type="radio" name="q6"> <code>255</code>: erro fatal.</label>
+<label><input type="radio" name="q6"> Nada: o <code>exit</code> apaga o código.</label>
+<label><input type="radio" name="q6"> <code>1</code>: algo deu errado (qualquer código diferente de zero).</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Qual destes comandos funciona como esperado?</p>
+<label><input type="radio" name="q7"> <code>php -r '$x = 5; echo $x * 2, "\n";'</code></label>
+<label><input type="radio" name="q7"> <code>php -r "$x = 5; echo $x * 2;"</code></label>
+<label><input type="radio" name="q7"> <code>php -r '&lt;?php echo 10;'</code></label>
+<label><input type="radio" name="q7"> <code>php -a 'echo 10;'</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>php arquivo.php</code> roda um arquivo; <code>php -r '…'</code> roda uma linha (sem <code>&lt;?php</code>, aspas simples por fora); <code>php -a</code> abre o modo interativo, se houver a extensão readline.</li>
+  <li><code>$argv</code> é a lista do que veio na linha de comando: <code>[0]</code> é o arquivo, os argumentos começam no <code>[1]</code>, e tudo chega como texto. <code>$argc</code> conta os itens.</li>
+  <li>Para ler o teclado: <code>trim(fgets(STDIN))</code>. <code>readline("…")</code> é mais curto, mas depende da extensão.</li>
+  <li><code>exit(N)</code> termina o programa com o código N; <code>0</code> = certo, outro número = problema. No terminal, <code>echo $?</code> mostra o código.</li>
+  <li>Mensagens de erro vão para <code>STDERR</code> com <code>fwrite(STDERR, "…")</code>.</li>
+  <li><code>#!/usr/bin/env php</code> na linha 1 + <code>chmod +x</code> transformam o arquivo num comando: <code>./oi</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
