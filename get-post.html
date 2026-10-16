@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP $_GET e $_POST — ler o que o formulário enviou | Guia PHP</title>
+<meta name="description" content="Como o PHP lê os dados de um formulário: os arrays $_GET e $_POST, por que evitar $_REQUEST, como saber se o formulário foi enviado com REQUEST_METHOD, o aviso Undefined array key e o operador ??, checkboxes com name=&quot;frutas[]&quot; e links montados com http_build_query.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">$_GET e $_POST</span></h1>
+
+<p class="intro">Na aula anterior, você montou formulários e viu que o navegador envia pares <code>nome=valor</code>. Agora é a vez do PHP: onde esses valores aparecem, como ler cada um, como saber se o formulário foi mesmo enviado e o que fazer quando um campo não veio. São dois arrays, <code>$_GET</code> e <code>$_POST</code>, que você vai usar em praticamente toda página PHP que escrever.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são <code>$_GET</code> e <code>$_POST</code> e de onde vem o conteúdo deles.</li>
+  <li>Como ler um endereço como <code>?nome=Ana&amp;idade=29</code>.</li>
+  <li>Por que tudo chega como <strong>texto</strong>.</li>
+  <li>Como saber se o formulário foi enviado: <code>$_SERVER['REQUEST_METHOD'] === 'POST'</code>.</li>
+  <li>O aviso <code>Undefined array key</code> e como evitá-lo com <code>??</code> e <code>isset</code>.</li>
+  <li>Como receber várias checkboxes de uma vez com <code>name="frutas[]"</code>.</li>
+  <li>O que é <code>$_REQUEST</code> e por que é melhor não usar.</li>
+  <li>Como montar links com dados usando <code>http_build_query</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: duas caixas de correio</h2>
+<p>Imagine que a casa do PHP tem duas caixas de correio na porta. Tudo o que chega <strong>escrito no envelope</strong> (no endereço) vai para a caixa <code>$_GET</code>. Tudo o que chega <strong>dentro do envelope</strong> (no corpo de um POST) vai para a caixa <code>$_POST</code>. Antes de a primeira linha do seu programa rodar, o PHP já abriu a correspondência, separou cada par <code>nome=valor</code> e arrumou tudo nas caixas.</p>
+
+<p>Essas "caixas" são <strong>arrays associativos</strong> (vistos em <a href="arrays-associativos.html">Arrays Associativos</a>): o <code>name</code> do campo é a chave, e o que o visitante digitou é o valor.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Array</th><th>Recebe os dados de</th><th>Exemplo de pedido</th></tr>
+<tr><td><code>$_GET</code></td><td>O endereço, depois do <code>?</code> (a <em>query string</em>, "texto de consulta")</td><td><code>GET /busca.php?q=bolo</code></td></tr>
+<tr><td><code>$_POST</code></td><td>O corpo de um pedido POST (formulário com <code>method="post"</code>)</td><td><code>POST /cadastro.php</code> + corpo <code>nome=Ana</code></td></tr>
+</table>
+</div>
+
+<p>Elas são <strong>superglobais</strong>: existem sozinhas, em qualquer lugar do código, inclusive dentro de funções, sem precisar de <code>global</code> (veja <a href="escopo.html">Escopo</a>). O nome com <code>$_</code> e letras maiúsculas é a marca das superglobais; a lista completa está em <a href="superglobais.html">$_SERVER e Outras Superglobais</a>.</p>
+
+<hr>
+
+<h2><code>$_GET</code>: os dados do endereço</h2>
+<p>Você nem precisa de formulário para usar <code>$_GET</code>: basta escrever o endereço. Este programa mostra o conteúdo das duas caixas com <code>var_dump</code>:</p>
+
+<pre class="file" data-file="dump.php">&lt;?php
+echo "GET: ";  var_dump($_GET);
+echo "POST: "; var_dump($_POST);
+</pre>
+
+<p>A Ana pediu <code>dump.php?nome=Ana&amp;idade=29</code>:</p>
+
+<pre class="term">$ curl -s "localhost:8000/dump.php?nome=Ana&amp;idade=29"
+GET: array(2) {
+  ["nome"]=&gt;
+  string(3) "Ana"
+  ["idade"]=&gt;
+  string(2) "29"          « "29" com aspas: é texto, não número
+}
+POST: array(0) {        « nada veio no corpo
+}</pre>
+
+<h3>Anatomia do endereço</h3>
+<dl class="anatomy">
+  <dt>localhost:8000</dt><dd>O servidor (a máquina e a porta).</dd>
+  <dt>/dump.php</dt><dd>O programa que vai rodar.</dd>
+  <dt>?</dt><dd>Separa o caminho dos dados. Tudo depois dele é a <em>query string</em>.</dd>
+  <dt>nome=Ana</dt><dd>Primeiro par: vira <code>$_GET['nome']</code> com o valor <code>"Ana"</code>.</dd>
+  <dt>&amp;</dt><dd>Separa um par do outro.</dd>
+  <dt>idade=29</dt><dd>Segundo par: <code>$_GET['idade']</code> vale <code>"29"</code>.</dd>
+</dl>
+
+<p>Para usar um valor, leia a chave como em qualquer array:</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$nome = $_GET['nome'];
+echo "Olá, $nome!\n";
+</pre>
+
+<pre class="term">$ curl -s "localhost:8000/ola.php?nome=Ana"
+Olá, Ana!</pre>
+
+<div class="warning"><strong>Tudo é texto.</strong> Repare no <code>string(2) "29"</code>. O protocolo da web só transporta texto, então o PHP entrega <strong>strings</strong>, mesmo que o campo seja <code>type="number"</code>. Se precisar fazer conta, converta (<code>(int) $_GET['idade']</code>, de <a href="conversao-tipos.html">Conversão de Tipos</a>) e, melhor ainda, <strong>confira</strong> se é mesmo um número (<a href="validacao.html">Validar Dados</a>).</div>
+
+<hr>
+
+<h2><code>$_POST</code>: os dados do corpo</h2>
+<p>O mesmo programa, agora recebendo os dados por POST (o <code>-d</code> do <code>curl</code> faz um POST, como um formulário com <code>method="post"</code>):</p>
+
+<pre class="term">$ curl -s localhost:8000/dump.php -d "nome=Ana&amp;idade=29"
+GET: array(0) {
+}
+POST: array(2) {
+  ["nome"]=&gt;
+  string(3) "Ana"
+  ["idade"]=&gt;
+  string(2) "29"
+}</pre>
+
+<p>As mesmas chaves, os mesmos valores, só que na outra caixa. As duas caixas podem ter coisas <strong>ao mesmo tempo</strong>: um formulário POST cujo <code>action</code> tem um <code>?</code>, como <code>&lt;form method="post" action="editar.php?id=5"&gt;</code>:</p>
+
+<pre class="term">$ curl -s "localhost:8000/dump.php?id=5" -d "nome=Ana"
+GET: array(1) {
+  ["id"]=&gt;
+  string(1) "5"            « do endereço
+}
+POST: array(1) {
+  ["nome"]=&gt;
+  string(3) "Ana"          « do corpo
+}</pre>
+
+<p>Isso é comum em páginas de edição: o <code>id</code> do que está sendo editado vai no endereço, e os campos alterados, no corpo.</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=Ana&amp;idade=29">
+<p class="try-task">A página foi aberta com <code>?nome=Ana&amp;idade=29</code> no endereço. Rode e veja o <code>var_dump</code> na aba <strong>Resultado</strong>. Depois use os dois formulários: o primeiro envia por GET (o endereço muda), o segundo por POST.</p>
+<pre class="script">&lt;form method="get"&gt;
+  GET: &lt;input name="nome" value="Bia"&gt; &lt;button&gt;Enviar por GET&lt;/button&gt;
+&lt;/form&gt;
+&lt;form method="post"&gt;
+  POST: &lt;input name="nome" value="Caio"&gt; &lt;button&gt;Enviar por POST&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;h3&gt;$_GET&lt;/h3&gt;
+&lt;pre&gt;&lt;?php var_dump($_GET); ?&gt;&lt;/pre&gt;
+&lt;h3&gt;$_POST&lt;/h3&gt;
+&lt;pre&gt;&lt;?php var_dump($_POST); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Foi enviado? <code>REQUEST_METHOD</code></h2>
+<p>Quando uma página mostra e processa o próprio formulário (como na aula <a href="formularios.html">Formulários HTML</a>), o PHP precisa saber em qual das duas situações está:</p>
+<ol>
+  <li><strong>Primeira visita:</strong> a pessoa só abriu a página. Mostre o formulário vazio.</li>
+  <li><strong>Envio:</strong> a pessoa clicou em <em>Enviar</em>. Processe os dados.</li>
+</ol>
+
+<p>Para formulários POST, a forma mais segura de perguntar é olhar o <strong>método</strong> do pedido. Abrir uma página (digitar o endereço, clicar num link) é sempre GET; só o envio do formulário é POST. O PHP guarda o método em <code>$_SERVER['REQUEST_METHOD']</code>:</p>
+
+<pre class="file" data-file="metodo.php">&lt;?php
+echo "Método: ", $_SERVER['REQUEST_METHOD'], "\n";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    echo "O formulário foi enviado.\n";
+} else {
+    echo "Primeira visita: mostrar o formulário.\n";
+}
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/metodo.php
+Método: GET
+Primeira visita: mostrar o formulário.
+$ curl -s -d "x=1" localhost:8000/metodo.php
+Método: POST
+O formulário foi enviado.</pre>
+
+<dl class="anatomy">
+  <dt>$_SERVER</dt><dd>Outra superglobal: informações sobre o pedido e o servidor (veja <a href="superglobais.html">$_SERVER e Outras Superglobais</a>).</dd>
+  <dt>['REQUEST_METHOD']</dt><dd>"Método do pedido": <code>'GET'</code> ou <code>'POST'</code> (sempre em maiúsculas).</dd>
+  <dt>=== 'POST'</dt><dd>Comparação estrita (de <a href="operadores-comparacao.html">Comparação</a>): exatamente o texto <code>POST</code>.</dd>
+</dl>
+
+<h3>Por que não <code>if ($_POST)</code> ou <code>isset($_POST['enviar'])</code>?</h3>
+<p>Você vai encontrar essas formas na internet. Elas funcionam quase sempre, mas têm furos:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Problema</th></tr>
+<tr><td><code>if ($_POST)</code></td><td>Um POST sem nenhum campo preenchível (só checkboxes desmarcadas, por exemplo) chega com <code>$_POST</code> vazio, e o envio passa despercebido.</td></tr>
+<tr><td><code>if (isset($_POST['enviar']))</code></td><td>Depende de o botão ter <code>name="enviar"</code>. Se alguém renomear o botão, ou se o formulário for enviado por JavaScript (que não inclui botão nenhum), o envio passa despercebido.</td></tr>
+<tr><td><code>if ($_SERVER['REQUEST_METHOD'] === 'POST')</code></td><td>Nenhum: responde exatamente "este pedido é um envio POST?". <strong>Use esta.</strong></td></tr>
+</table>
+</div>
+
+<p>Para formulários <strong>GET</strong> (uma busca, por exemplo), o método é GET nas duas situações, então a pergunta é sobre o campo: "chegou um <code>q</code>?" (<code>isset($_GET['q'])</code>), como você vê a seguir.</p>
+
+<hr>
+
+<h2>Campo ausente: <code>Undefined array key</code></h2>
+<p>O que acontece se a Ana abrir <code>ola.php</code> sem o <code>?nome=…</code> no endereço? A chave <code>'nome'</code> não existe no <code>$_GET</code>:</p>
+
+<pre class="term">$ curl -s localhost:8000/ola.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "nome" in &lt;b&gt;/home/ana/site/ola.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+Olá, !</pre>
+
+<p>No navegador, isso aparece assim: uma linha em negrito <strong>Warning</strong>: Undefined array key "nome" in <strong>/home/ana/site/ola.php</strong> on line <strong>2</strong>, e depois "Olá, !". O PHP não parou (um <em>Warning</em> é um aviso, não um erro fatal; veja <a href="erros.html">Lendo Erros do PHP</a>): a variável ficou com <code>null</code>, que vira texto vazio no <code>echo</code>.</p>
+
+<p>Rodando o mesmo arquivo direto no terminal (onde <code>$_GET</code> está sempre vazio), o aviso sai sem as tags HTML:</p>
+
+<pre class="term">$ php ola.php
+
+Warning: Undefined array key "nome" in /home/ana/site/ola.php on line 2
+Olá, !</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte da mensagem</th><th>Significa</th></tr>
+<tr><td><code>Warning</code></td><td>Aviso: algo está errado, mas o programa continua.</td></tr>
+<tr><td><code>Undefined array key "nome"</code></td><td>"Chave de array não definida": você leu <code>['nome']</code>, mas essa chave não existe.</td></tr>
+<tr><td><code>in /home/ana/site/ola.php on line 2</code></td><td>Arquivo e linha da leitura.</td></tr>
+</table>
+</div>
+
+<p>Num formulário, campo ausente é <strong>normal</strong>: primeira visita, checkbox desmarcada, alguém abrindo o endereço sem os dados. O seu código precisa esperar por isso. Há três ferramentas:</p>
+
+<h3>1. <code>??</code>: "use isto, ou então aquilo"</h3>
+<p>O operador <code>??</code> (de <a href="null-coalescing.html">?? e ?-&gt;</a>) devolve o valor da esquerda se ele existir e não for <code>null</code>; senão, devolve o da direita. Sem aviso nenhum:</p>
+
+<pre class="file" data-file="ola2.php">&lt;?php
+$nome = $_GET['nome'] ?? '';
+echo "Olá, $nome!\n";
+</pre>
+<pre class="term">$ curl -s localhost:8000/ola2.php
+Olá, !          « sem o Warning: nome ficou com '' (texto vazio)</pre>
+
+<p>O valor da direita pode ser qualquer coisa útil: <code>$_GET['nome'] ?? 'visitante'</code>, <code>$_POST['frutas'] ?? []</code> (um array vazio), <code>$_GET['pagina'] ?? 1</code>. Este é o jeito mais comum de ler um campo: <strong>sempre com <code>?? valor_padrão</code></strong>.</p>
+
+<h3>2. <code>isset</code>: "chegou?"</h3>
+<p><code>isset($_GET['nome'])</code> responde <code>true</code> se a chave existe (e não é <code>null</code>). Útil quando a pergunta é "veio ou não veio?", como numa checkbox:</p>
+<pre class="file" data-file="trecho.php">if (isset($_POST['entrega'])) {
+    echo "Vamos entregar no seu endereço.";
+}</pre>
+
+<h3>3. <code>empty</code>: "chegou vazio?"</h3>
+<p><code>empty($_GET['nome'])</code> é <code>true</code> se a chave não existe <strong>ou</strong> se o valor é "vazio" (<code>''</code>, <code>'0'</code>, <code>0</code>, <code>null</code>, <code>[]</code>). Também não gera aviso. Cuidado com o <code>'0'</code>: veja a tabela.</p>
+
+<pre class="file" data-file="vazio.php">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+echo "Olá, $nome!\n";
+var_dump(isset($_GET['nome']), empty($_GET['nome']));
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Endereço</th><th><code>$_GET['nome'] ?? 'visitante'</code></th><th><code>isset</code></th><th><code>empty</code></th></tr>
+<tr><td><code>vazio.php</code></td><td><code>visitante</code></td><td><code>false</code></td><td><code>true</code></td></tr>
+<tr><td><code>vazio.php?nome=</code></td><td>(texto vazio)</td><td><code>true</code></td><td><code>true</code></td></tr>
+<tr><td><code>vazio.php?nome=0</code></td><td><code>0</code></td><td><code>true</code></td><td><code>true</code> (!)</td></tr>
+<tr><td><code>vazio.php?nome=Ana</code></td><td><code>Ana</code></td><td><code>true</code></td><td><code>false</code></td></tr>
+</table>
+</div>
+
+<p>Saídas reais das quatro chamadas:</p>
+<pre class="term">$ curl -s localhost:8000/vazio.php
+Olá, visitante!
+bool(false)
+bool(true)
+$ curl -s "localhost:8000/vazio.php?nome="
+Olá, !
+bool(true)
+bool(true)
+$ curl -s "localhost:8000/vazio.php?nome=0"
+Olá, 0!
+bool(true)
+bool(true)
+$ curl -s "localhost:8000/vazio.php?nome=Ana"
+Olá, Ana!
+bool(true)
+bool(false)</pre>
+
+<p>Duas lições: o <code>??</code> só usa o padrão quando o campo <strong>não veio</strong>; um campo que veio vazio (<code>?nome=</code>, um <code>&lt;input&gt;</code> deixado em branco) continua vazio. E o <code>empty</code> acha que <code>"0"</code> é vazio, o que é errado para "quantidade: 0" ou "nota: 0". Para conferir campos de verdade, a aula <a href="validacao.html">Validar Dados</a> usa <code>trim</code> e comparações explícitas.</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php" data-goal="semerro,html:Olá\, visitante!">
+<p class="try-task"><strong>Missão:</strong> a página foi aberta sem nada no endereço, e o PHP reclama de <code>Undefined array key</code>. Use <code>??</code> para que, sem nome, apareça <code>Olá, visitante!</code>, sem aviso nenhum. Depois envie o formulário com o seu nome.</p>
+<pre class="script">&lt;?php
+$nome = $_GET['nome'];
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;form&gt;
+  &lt;input name="nome"&gt; &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = $_GET['nome'] ?? 'visitante';
+?&gt;
+&lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;form&gt;
+  &lt;input name="nome"&gt; &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Várias checkboxes: <code>name="frutas[]"</code></h2>
+<p>A Ana quer um formulário de salada de frutas, onde a pessoa marca quantas frutas quiser. Se todas as checkboxes tiverem <code>name="fruta"</code>, só a última marcada sobrevive (cada chave existe uma vez só, como você viu em <a href="formularios.html">Formulários HTML</a>). A solução é colocar <code>[]</code> no fim do nome:</p>
+
+<pre class="file" data-file="salada.html">&lt;form method="post" action="frutas.php"&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="uva"&gt; Uva&lt;/label&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="pera"&gt; Pera&lt;/label&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="manga"&gt; Manga&lt;/label&gt;
+  &lt;button&gt;Montar salada&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+
+<p>Os colchetes dizem ao PHP: "junte todos os valores com este nome num <strong>array</strong>". Marcando uva e pera, o navegador envia <code>frutas[]=uva&amp;frutas[]=pera</code> (com os colchetes codificados como <code>%5B%5D</code>), e o PHP monta uma lista:</p>
+
+<pre class="file" data-file="frutas.php">&lt;?php
+$frutas = $_POST['frutas'] ?? [];
+var_dump($frutas);
+foreach ($frutas as $fruta) {
+    echo "- $fruta\n";
+}
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/frutas.php -d "frutas%5B%5D=uva&amp;frutas%5B%5D=pera"
+array(2) {
+  [0]=&gt;
+  string(3) "uva"
+  [1]=&gt;
+  string(4) "pera"
+}
+- uva
+- pera
+$ curl -s localhost:8000/frutas.php -d ""
+array(0) {          « nenhuma marcada: "frutas" não veio, e o ?? [] deu um array vazio
+}</pre>
+
+<dl class="anatomy">
+  <dt>name="frutas[]"</dt><dd>Os colchetes vazios fazem cada valor marcado entrar no fim de uma lista, como <code>$frutas[] = 'uva'</code> (de <a href="arrays.html">Arrays Indexados</a>).</dd>
+  <dt>?? []</dt><dd>Nenhuma marcada = nada enviado. Com o array vazio como padrão, o <code>foreach</code> simplesmente não repete, sem aviso.</dd>
+</dl>
+
+<p>Funciona com qualquer campo, não só checkbox: <code>&lt;select name="cores[]" multiple&gt;</code> (lista com várias escolhas) ou vários <code>&lt;input name="telefones[]"&gt;</code>. Também dá para dar nomes às chaves: <code>name="endereco[rua]"</code> e <code>name="endereco[cidade]"</code> chegam como <code>$_POST['endereco']['rua']</code> e <code>$_POST['endereco']['cidade']</code>.</p>
+
+<hr>
+
+<h2><code>$_REQUEST</code>: a caixa misturada (evite)</h2>
+<p>Existe uma terceira superglobal, <code>$_REQUEST</code>, que junta <code>$_GET</code>, <code>$_POST</code> e, conforme a configuração, os cookies (<a href="cookies.html">Cookies</a>). Parece prático: "não importa de onde veio". O problema é justamente esse. Veja o que acontece quando o mesmo nome chega pelos três caminhos:</p>
+
+<pre class="file" data-file="req.php">&lt;?php
+var_dump($_REQUEST);
+</pre>
+
+<pre class="term">$ curl -s "localhost:8000/req.php?nome=Get" -d "nome=Post" -b "nome=Cookie"
+array(1) {
+  ["nome"]=&gt;
+  string(6) "Cookie"        « o cookie venceu os outros dois
+}
+$ curl -s "localhost:8000/req.php?nome=Get" -d "nome=Post"
+array(1) {
+  ["nome"]=&gt;
+  string(4) "Post"          « sem cookie, o POST venceu o GET
+}</pre>
+
+<p>Quem "vence" depende de duas configurações do <code>php.ini</code> (<code>request_order</code> e <code>variables_order</code>), que mudam de servidor para servidor. No laboratório da Ana, o PHP sem <code>php.ini</code> põe até o cookie na mistura; muitos servidores deixam só GET e POST. Ou seja: o mesmo código pode se comportar diferente em outra máquina, e um cookie esquecido pode "trocar" um campo do formulário sem você perceber.</p>
+
+<div class="tip"><strong>Regra:</strong> leia sempre da caixa certa. Formulário POST → <code>$_POST</code>. Endereço e formulário GET → <code>$_GET</code>. Cookie → <code>$_COOKIE</code>. Assim o código diz claramente de onde espera cada dado.</div>
+
+<hr>
+
+<h2>Montar links com dados: <code>http_build_query</code></h2>
+<p>O caminho inverso também aparece muito: o PHP precisa <strong>escrever</strong> um endereço com dados, como o link "Próxima página" de uma busca. Concatenar à mão (<code>"?busca=" . $busca . "&amp;pagina=2"</code>) quebra quando o texto tem espaço, acento ou <code>&amp;</code>. A função <code>http_build_query</code> ("construir a consulta HTTP") recebe um array e devolve a query string já codificada:</p>
+
+<pre class="file" data-file="link.php">&lt;?php
+$filtros = ['busca' =&gt; 'bolo de cenoura', 'pagina' =&gt; 2];
+echo http_build_query($filtros), "\n";
+echo '&lt;a href="?' . http_build_query($filtros) . '"&gt;Próxima página&lt;/a&gt;', "\n";
+echo http_build_query(['frutas' =&gt; ['uva', 'pera']]), "\n";
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/link.php
+busca=bolo+de+cenoura&amp;pagina=2
+&lt;a href="?busca=bolo+de+cenoura&amp;pagina=2"&gt;Próxima página&lt;/a&gt;
+frutas%5B0%5D=uva&amp;frutas%5B1%5D=pera</pre>
+
+<p>A última linha mostra que até arrays viram o formato com colchetes (<code>frutas[0]=uva</code>, codificado), que o PHP do outro lado transforma de volta em array. Para um valor sozinho, existe a irmã <code>urlencode</code>, vista em <a href="escapar-saida.html">Escapar a Saída</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key "nome"</code></strong>
+<pre class="term">$ curl -s localhost:8000/ola.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "nome" in &lt;b&gt;/home/ana/site/ola.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+Olá, !</pre>
+<p><strong>O que aconteceu:</strong> o código leu <code>$_GET['nome']</code>, mas o campo não veio. As causas mais comuns: primeira visita (nada foi enviado ainda); o formulário usa POST e o código lê <code>$_GET</code> (ou o contrário); o <code>name</code> no HTML é diferente da chave no PHP (<code>name="Nome"</code> × <code>$_GET['nome']</code>: maiúsculas contam); checkbox desmarcada.</p>
+<p><strong>Como resolver:</strong> confira método e nome; e leia sempre com um padrão: <code>$_GET['nome'] ?? ''</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>foreach() argument must be of type array|object, string given</code></strong>
+<pre class="term">$ curl -s localhost:8000/frutas.php -d "frutas=uva"
+string(3) "uva"
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  foreach() argument must be of type array|object, string given in &lt;b&gt;/home/ana/site/frutas.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> o <code>foreach</code> esperava um array (as frutas marcadas), mas chegou uma string. Ou o HTML está com <code>name="frutas"</code> (sem os colchetes), ou alguém mandou o pedido "na mão", sem o seu formulário. Lembre: qualquer pessoa pode enviar qualquer coisa para o seu PHP.</p>
+<p><strong>Como resolver:</strong> no HTML, <code>name="frutas[]"</code>. No PHP, confira o tipo antes de usar: <code>$frutas = $_POST['frutas'] ?? [];</code> seguido de <code>if (!is_array($frutas)) { $frutas = []; }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A conta deu errado: <code>Unsupported operand types</code> ou <code>A non-numeric value</code></strong>
+<pre class="file" data-file="conta.php">&lt;?php
+$a = "29" + "1";
+var_dump($a);
+$b = "vinte" + 1;
+var_dump($b);
+</pre>
+<pre class="term">$ php conta.php
+int(30)
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + int in /home/ana/site/conta.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/conta.php on line 4</pre>
+<p>E com <code>$b = "29 anos" + 1;</code>:</p>
+<pre class="term">$ php conta2.php
+
+Warning: A non-numeric value encountered in /home/ana/site/conta2.php on line 2
+int(30)</pre>
+<p><strong>O que aconteceu:</strong> os valores do formulário chegam como texto. Numa conta, o PHP converte sozinho um texto que é número (<code>"29"</code>). Um texto que não é número para o programa (<code>TypeError</code>, um erro fatal); um texto que só <strong>começa</strong> com número gera um aviso e usa o começo (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). Num formulário, basta alguém digitar "vinte" no campo de idade.</p>
+<p><strong>Como resolver:</strong> confira antes de usar, com <code>filter_var($_POST['idade'], FILTER_VALIDATE_INT)</code>, explicado em <a href="validacao.html">Validar Dados</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>O texto apareceu com tags funcionando (ou a página "quebrou")</strong>
+<p><strong>O que aconteceu:</strong> o valor de <code>$_GET</code>/<code>$_POST</code> foi escrito com <code>echo</code> direto, e alguém digitou HTML no campo. Isso é a porta para um ataque chamado XSS.</p>
+<p><strong>Como resolver:</strong> todo dado do visitante que vai para a página passa por <code>htmlspecialchars</code>. A aula inteira sobre isso é <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>$_GET['x']</code></td><td>Valor de <code>x</code> vindo do endereço (<code>?x=…</code>)</td></tr>
+<tr><td><code>$_POST['x']</code></td><td>Valor de <code>x</code> vindo do corpo de um POST</td></tr>
+<tr><td><code>$_GET['x'] ?? 'padrão'</code></td><td>O valor, ou <code>'padrão'</code> se não veio (sem aviso)</td></tr>
+<tr><td><code>isset($_POST['x'])</code></td><td><code>true</code> se <code>x</code> veio</td></tr>
+<tr><td><code>empty($_POST['x'])</code></td><td><code>true</code> se não veio ou veio vazio (inclusive <code>"0"</code>)</td></tr>
+<tr><td><code>$_SERVER['REQUEST_METHOD'] === 'POST'</code></td><td>O pedido é um envio POST?</td></tr>
+<tr><td><code>name="x[]"</code> no HTML</td><td>Vários valores viram um array em <code>$_POST['x']</code></td></tr>
+<tr><td><code>name="x[chave]"</code> no HTML</td><td>Vira <code>$_POST['x']['chave']</code></td></tr>
+<tr><td><code>http_build_query($array)</code></td><td>Monta <code>a=1&amp;b=2</code> codificado</td></tr>
+<tr><td><code>$_REQUEST</code></td><td>Mistura GET, POST (e talvez cookies). Evite.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ler sem aviso</h3>
+<p>Complete para ler o campo <code>cidade</code> do POST, com <code>'Recife'</code> como padrão:</p>
+<div class="ex-code">$cidade = $_POST['cidade'] <input data-answer="?? 'Recife'|?? &quot;Recife&quot;" aria-label="padrão">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Foi enviado?</h3>
+<p>Complete a pergunta "o formulário POST foi enviado?":</p>
+<div class="ex-code">if ($_SERVER['<input data-answer="REQUEST_METHOD" aria-label="chave">'] === 'POST')</div>
+</div>
+
+<div class="exercise">
+<h3>3. Várias cores</h3>
+<p>Complete o <code>name</code> para que várias checkboxes de cor cheguem como array em <code>$_POST['cores']</code>:</p>
+<div class="ex-code">&lt;input type="checkbox" name="<input data-answer="cores[]" aria-label="nome">" value="azul"&gt;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O endereço é <code>produto.php?id=7&amp;cor=azul</code>. O que <code>var_dump($_GET['id'])</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>int(7)</code></label>
+<label><input type="radio" name="q4"> <code>string(1) "7"</code></label>
+<label><input type="radio" name="q4"> <code>NULL</code></label>
+<label><input type="radio" name="q4"> <code>Warning: Undefined array key "id"</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. A pessoa deixou o campo <code>&lt;input name="apelido"&gt;</code> em branco e enviou. Quanto vale <code>$_POST['apelido'] ?? 'sem apelido'</code>?</p>
+<label><input type="radio" name="q5"> <code>'sem apelido'</code></label>
+<label><input type="radio" name="q5"> <code>null</code></label>
+<label><input type="radio" name="q5"> Dá um Warning.</label>
+<label><input type="radio" name="q5"> <code>''</code> (texto vazio): o campo veio, só que vazio.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Por que evitar <code>$_REQUEST</code>?</p>
+<label><input type="radio" name="q6"> Ele é mais lento que <code>$_POST</code>.</label>
+<label><input type="radio" name="q6"> Ele foi removido no PHP 8.</label>
+<label><input type="radio" name="q6"> Mistura dados de vários lugares, e quem vence depende da configuração do servidor.</label>
+<label><input type="radio" name="q6"> Ele só funciona com GET.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="frutas%5B%5D=uva&amp;frutas%5B%5D=manga" data-goal="semerro,html:Você escolheu 2 frutas,html:uva,src:REQUEST_METHOD">
+<p class="try-task"><strong>Missão:</strong> a salada de frutas da Ana. A página já foi aberta com um envio POST (uva e manga marcadas). Complete o PHP: só quando o método for <code>POST</code>, leia <code>$_POST['frutas']</code> (com <code>?? []</code>), mostre <code>Você escolheu N frutas</code> (use <code>count</code>) e a lista com <code>foreach</code>. Depois marque outras frutas na aba <strong>Resultado</strong> e envie.</p>
+<pre class="script">&lt;form method="post"&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="uva"&gt; Uva&lt;/label&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="pera"&gt; Pera&lt;/label&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="manga"&gt; Manga&lt;/label&gt;
+  &lt;button&gt;Montar salada&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php
+// seu código aqui
+</pre>
+<pre class="solucao">&lt;form method="post"&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="uva"&gt; Uva&lt;/label&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="pera"&gt; Pera&lt;/label&gt;
+  &lt;label&gt;&lt;input type="checkbox" name="frutas[]" value="manga"&gt; Manga&lt;/label&gt;
+  &lt;button&gt;Montar salada&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $frutas = $_POST['frutas'] ?? [];
+    echo "&lt;p&gt;Você escolheu " . count($frutas) . " frutas:&lt;/p&gt;";
+    echo "&lt;ul&gt;";
+    foreach ($frutas as $fruta) {
+        echo "&lt;li&gt;" . htmlspecialchars($fruta) . "&lt;/li&gt;";
+    }
+    echo "&lt;/ul&gt;";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>$_GET</code> guarda os dados do endereço (<code>?nome=Ana&amp;idade=29</code>); <code>$_POST</code>, os do corpo de um POST. São arrays associativos superglobais.</li>
+  <li>Tudo chega como <strong>string</strong>, mesmo números.</li>
+  <li>Para saber se um formulário POST foi enviado: <code>$_SERVER['REQUEST_METHOD'] === 'POST'</code>.</li>
+  <li>Campo que não veio gera <code>Warning: Undefined array key</code>. Leia sempre com <code>?? padrão</code>; use <code>isset</code> para "veio?".</li>
+  <li><code>??</code> só troca o que não veio; campo vazio continua vazio. <code>empty</code> considera <code>"0"</code> vazio.</li>
+  <li><code>name="frutas[]"</code> junta vários valores num array.</li>
+  <li>Evite <code>$_REQUEST</code>: leia da caixa certa.</li>
+  <li><code>http_build_query</code> monta links com dados, já codificados.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
