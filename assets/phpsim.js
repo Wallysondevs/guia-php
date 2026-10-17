@@ -177,7 +177,7 @@
   var geracao = 0; // muda quando o worker é encerrado (os sites do modo web somem)
   var dono = null; // caixa que está rodando um programa (modo cli)
 
-  function mb(bytes) { return (bytes / 1048576).toFixed(1).replace(".", ","); }
+  function mb(bytes) { return (bytes / 1e6).toFixed(1).replace(".", ","); }
   PhpSim.tamanhoDownload = function () { return mb(PHP_GZ_BYTES) + " MB"; };
 
   function carregarPHP(progresso) {
@@ -421,7 +421,7 @@
       };
       Terminal.prototype.fechar = function () {
         var cl = this.classe(true);
-        if (this.n < MAX_LINHAS) { this.desenhar(true); if (this.linha && !this.linha.innerHTML) this.linha.innerHTML = "&nbsp;"; }
+        if (this.n < MAX_LINHAS) this.desenhar(true);
         else {
           this.omitidas++;
           this.cauda.push({ segs: this.segs, cl: cl });
@@ -439,7 +439,7 @@
             out.appendChild(el("div", null, c.segs.map(function (x) {
               var k = x.t === "err" ? "sim-err" : x.t === "eco" ? "sim-digitado" : c.cl;
               return k ? '<span class="' + k + '">' + escHtml(x.s) + "</span>" : escHtml(x.s);
-            }).join("") || "&nbsp;"));
+            }).join("")));
           });
         }
       };
@@ -532,8 +532,8 @@
             } else if (m.ev === "eco") { s.term.escrever("eco", m.texto); rolar(); }
             else if (m.ev === "espera") { s.gasto += Date.now() - s.desde; pedirEntrada(s); }
             else if (m.ev === "fim") finalizar(s, m.exit);
-            else if (m.ev === "limite") { encerrarWorker(); finalizar(s, null, "(o programa escreveu mais de 2 MB; o editor o interrompeu)"); }
-            else if (m.ev === "falha") { encerrarWorker(); finalizar(s, null, "(o PHP do navegador falhou: " + m.msg + ")"); }
+            else if (m.ev === "limite") { s.motivo = "(o programa escreveu mais de 2 MB; o editor o interrompeu)"; encerrarWorker(); }
+            else if (m.ev === "falha") { s.motivo = "(o PHP do navegador falhou: " + m.msg + ")"; encerrarWorker(); }
             else if (m.ev === "morto") finalizar(s, null, s.motivo || "(o PHP foi reiniciado)");
           };
           s.id = enviar({ op: "cli", arquivos: arqs, principal: arqs[0].nome, args: args, stdin: stdin }, s.ouvinte);

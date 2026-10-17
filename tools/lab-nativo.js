@@ -7,7 +7,13 @@ const path = require("path");
 const fs = require("fs");
 
 const LAB = path.join(os.homedir(), "guia-php-lab/lab");
-const NOME = "phpsim-testes"; // pasta pessoal própria no laboratório
+// Pasta pessoal própria e ÚNICA por execução (vários autores rodam ao mesmo
+// tempo); apagada quando o processo termina.
+const NOME = "tm-" + process.pid + "-" + Math.random().toString(36).slice(2, 8);
+const PASTA = path.join(os.homedir(), "guia-php-lab/homes", NOME);
+let usada = false;
+process.on("exit", () => { if (usada) { try { fs.rmSync(PASTA, { recursive: true, force: true }); } catch (e) { /* ok */ } } });
+for (const sinal of ["SIGINT", "SIGTERM"]) process.on(sinal, () => process.exit(130));
 
 function b64(s) { return Buffer.from(s, "utf8").toString("base64"); }
 function q(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
@@ -16,6 +22,7 @@ function escreverArquivos(arquivos) {
 }
 function rodarLab(script, rede) {
   if (!fs.existsSync(LAB)) throw new Error("laboratório não encontrado em " + LAB);
+  usada = true;
   const r = spawnSync("timeout", ["60", LAB, "-n", NOME].concat(rede ? ["-N"] : []).concat(["--", "bash", "-s"]), { input: script, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   if (r.error) throw r.error;
   return r.stdout + (r.stderr || "");

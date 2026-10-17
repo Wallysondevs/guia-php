@@ -50,8 +50,8 @@ async function rodarCli(arquivos, opts) {
     entrada: entradaFn,
     aoSaida(t, b) {
       if (estourou) return;
+      if (total + b.length > LIMITE_SAIDA) { estourou = true; b = b.subarray(0, Math.max(0, LIMITE_SAIDA - total)); }
       total += b.length;
-      if (total > LIMITE_SAIDA) { estourou = true; return; }
       const s = dec[t].decode(b, { stream: true });
       saida += s; if (t === "err") err += s;
       const u = eventos[eventos.length - 1];

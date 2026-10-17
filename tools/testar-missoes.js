@@ -157,7 +157,7 @@ async function main() {
           const fSol = Sim.checarMeta(meta, ctx(sol, solucao));
           const erros = [];
           if (!fIni.length) erros.push("o código inicial JÁ cumpre a meta (a missão começa resolvida)");
-          if (fSol.length) erros.push("a solução NÃO cumpre: " + fSol.join(" | "));
+          if (fSol.length) erros.push("a solução NÃO cumpre: " + fSol.join(" | ") + (web ? "\n      (o testador só faz a primeira requisição — data-url/data-post; uma missão de vários cliques não dá para conferir aqui)" : ""));
           if (sol.leuSemEntrada) avisos.push("a solução lê STDIN mas a caixa não tem data-stdin (no navegador o leitor digita; aqui recebeu fim de arquivo)");
           if (sol.estourou) avisos.push("a solução escreve mais de 2 MB (o editor interrompe)");
           if (erros.length) {

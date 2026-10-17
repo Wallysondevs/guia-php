@@ -38,6 +38,10 @@ export const INI_COMUM = {
   post_max_size: "8M",
   "session.save_path": "",
   "opcache.enable_cli": "0",
+  // Sem rede no navegador: abrir conexões derruba o PHP em WebAssembly (trap
+  // "unreachable"). Desligadas, elas dão as mensagens normais do PHP.
+  allow_url_fopen: "0",
+  disable_functions: "fsockopen,pfsockopen,stream_socket_client,stream_socket_server,curl_exec,curl_multi_exec",
 };
 export const INI_CLI = { html_errors: "0" };
 export const INI_WEB = { html_errors: "1" };

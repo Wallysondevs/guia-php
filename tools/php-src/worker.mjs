@@ -79,8 +79,13 @@ function despejar() {
 }
 function aoSaida(t, b) {
   if (estourou) return;
+  if (totalBytes + b.length > LIMITE_SAIDA) {
+    estourou = true;
+    const resto = LIMITE_SAIDA - totalBytes;
+    if (resto > 0) pendente.push({ t, b: b.subarray(0, resto) });
+    despejar(); postMessage({ ev: "limite", id: idAtual }); return;
+  }
   totalBytes += b.length;
-  if (totalBytes > LIMITE_SAIDA) { estourou = true; despejar(); postMessage({ ev: "limite", id: idAtual }); return; }
   pendente.push({ t, b }); pendenteBytes += b.length;
   if (pendenteBytes > 32768) despejar();
   else if (!agendado) { agendado = true; setTimeout(despejar, 0); }
