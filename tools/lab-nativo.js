@@ -41,6 +41,7 @@ function rodarCli(arquivos, opts) {
   return { saida: m[1], exit: +m[2], versao: m[3] || "8.5.8" };
 }
 
+const CABECALHO_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 function rodarWeb(arquivos, opts) {
   opts = opts || {};
   const caminho = opts.url || "/" + (arquivos[0].nome === "index.php" ? "" : arquivos[0].nome);
@@ -48,7 +49,7 @@ function rodarWeb(arquivos, opts) {
   const script = [LIMPAR, "mkdir -p site && cd site", escreverArquivos(arquivos),
     "php -S localhost:8000 >/tmp/srv.log 2>&1 & SRV=$!",
     "for i in $(seq 1 30); do curl -s -o /dev/null localhost:8000/ && break; sleep 0.1; done",
-    "curl -s -L -o /tmp/corpo -w '%{http_code}' " + post + " " + q("http://localhost:8000" + (caminho.startsWith("/") ? caminho : "/" + caminho)) + " > /tmp/status",
+    "curl -s -L -c /tmp/cookies -b /tmp/cookies -A " + q(CABECALHO_UA) + " -o /tmp/corpo -w '%{http_code}' " + post + " " + q("http://localhost:8000" + (caminho.startsWith("/") ? caminho : "/" + caminho)) + " > /tmp/status",
     "kill $SRV 2>/dev/null; wait $SRV 2>/dev/null", "echo @@STATUS@@$(cat /tmp/status)", "echo @@CORPO@@", "cat /tmp/corpo", "echo", "echo @@FIM@@", "php -r 'echo PHP_VERSION;'"].join("\n");
   const s = rodarLab(script, true); // -N: localhost próprio (a porta 8000 não briga com os autores)
   const m = /@@STATUS@@(\d*)\n@@CORPO@@\n([\s\S]*)\n@@FIM@@\n?([\d.]*)/.exec(s);

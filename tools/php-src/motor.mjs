@@ -13,17 +13,74 @@ export const HOME = "/home/ana";
 export const DOCROOT = "/home/ana/site";
 export const URL_BASE = "http://localhost:8000";
 
-// Variáveis de ambiente da máquina da Ana (nada da máquina real).
+// Variáveis de ambiente da máquina da Ana (as mesmas do laboratório; nada da máquina real).
 export const AMBIENTE = {
-  USER: "ana",
-  LOGNAME: "ana",
-  HOME: HOME,
-  PWD: HOME,
-  PATH: "/usr/local/bin:/usr/bin:/bin",
   SHELL: "/bin/bash",
+  LANGUAGE: "pt_BR:pt:en",
+  EDITOR: "nano",
+  PWD: HOME,
+  LOGNAME: "ana",
+  TZ: "America/Sao_Paulo",
+  HOME: HOME,
   LANG: "pt_BR.UTF-8",
-  _: "/usr/bin/php",
+  TERM: "xterm-256color",
+  USER: "ana",
+  SHLVL: "1",
+  PATH: "/opt/php/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+  _: "/opt/php/bin/php",
 };
+// O carregador do php-wasm acrescenta ":/internal/shared/bin" ao PATH; este
+// objeto ignora a mudança (o PATH fica igual ao da Ana).
+function ambienteFixo() {
+  const e = Object.assign({}, AMBIENTE);
+  Object.defineProperty(e, "PATH", { enumerable: true, configurable: false, get: () => AMBIENTE.PATH, set: () => {} });
+  return e;
+}
+
+// Cabeçalhos que um navegador manda (o editor do navegador troca o User-Agent pelo do leitor).
+export const CABECALHOS_NAVEGADOR = {
+  "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language": "pt-BR,pt;q=0.9,en;q=0.8",
+};
+
+// Modo web: o php-wasm monta um $_SERVER diferente do "php -S" (SERVER_PORT 80,
+// HTTPS, variáveis de ambiente…). Este arquivo, rodado antes da página
+// (auto_prepend_file), deixa o $_SERVER igual ao do php -S localhost:8000.
+const SERVIDOR_PHP = "/internal/guia/servidor.php";
+const SERVIDOR_FONTE = `<?php
+(function () {
+    $s = $_SERVER;
+    $n = [
+        'DOCUMENT_ROOT' => $s['DOCUMENT_ROOT'] ?? '${DOCROOT}',
+        'REMOTE_ADDR' => '127.0.0.1',
+        'REMOTE_PORT' => (string) mt_rand(40000, 60999),
+        'SERVER_SOFTWARE' => 'PHP/' . PHP_VERSION . ' (Development Server)',
+        'SERVER_PROTOCOL' => 'HTTP/1.1',
+        'SERVER_NAME' => 'localhost',
+        'SERVER_PORT' => '8000',
+    ];
+    foreach (['REQUEST_URI', 'REQUEST_METHOD', 'SCRIPT_NAME', 'SCRIPT_FILENAME', 'PATH_INFO', 'PHP_SELF', 'QUERY_STRING'] as $k) {
+        if (isset($s[$k]) && $s[$k] !== '') $n[$k] = $s[$k];
+    }
+    if (isset($n['PATH_INFO'], $n['SCRIPT_NAME'])) $n['PHP_SELF'] = $n['SCRIPT_NAME'] . $n['PATH_INFO'];
+    $n['HTTP_HOST'] = 'localhost:8000';
+    $h = [];
+    foreach ($s as $k => $v) {
+        if (str_starts_with($k, 'HTTP_') && $k !== 'HTTP_HOST' && $v !== '') $h[$k] = $v;
+    }
+    $ordem = ['HTTP_USER_AGENT', 'HTTP_ACCEPT', 'HTTP_ACCEPT_LANGUAGE', 'HTTP_REFERER', 'HTTP_COOKIE'];
+    uksort($h, fn($a, $b) => ((array_search($a, $ordem) === false ? 99 : array_search($a, $ordem)) <=> (array_search($b, $ordem) === false ? 99 : array_search($b, $ordem))) ?: strcmp($a, $b));
+    $n += $h;
+    foreach (['CONTENT_LENGTH', 'CONTENT_TYPE'] as $k) {
+        if (isset($s[$k]) && $s[$k] !== '') { $n[$k] = $s[$k]; $n['HTTP_' . $k] = $s[$k]; }
+    }
+    $n['REQUEST_TIME_FLOAT'] = $s['REQUEST_TIME_FLOAT'] ?? microtime(true);
+    $n['REQUEST_TIME'] = $s['REQUEST_TIME'] ?? time();
+    $_SERVER = $n;
+    putenv('USE_ZEND_ALLOC');
+})();
+`;
 
 // php.ini: o php-wasm traz um php.ini próprio; estes valores deixam o PHP do
 // navegador igual ao PHP 8.5.8 do laboratório (que roda sem php.ini).
@@ -69,7 +126,7 @@ export function criarMotor(deps) {
   async function novoPHP(entrada) {
     let falhou;
     const id = await U.loadPHPRuntime(loader, {
-      ENV: Object.assign({}, AMBIENTE), // cópia: o carregador do PHP altera o objeto
+      ENV: ambienteFixo(), // cópia: o carregador do PHP altera o objeto
       // Leitura de STDIN parada à espera do leitor: o PHP fica "dormindo"
       // (Asyncify) até a entrada chegar. Ver construir-php.mjs.
       fdReadTimeoutMs: 24 * 3600 * 1000,
@@ -127,7 +184,7 @@ export function criarMotor(deps) {
     await U.setPhpIniEntries(php, Object.assign({}, INI_COMUM, INI_CLI, opts.iniExtra || {}));
     php.chdir(HOME);
     ligarSaida(php, opts.aoSaida);
-    const r = await php.cli(["php", opts.principal].concat(opts.args || []), { cwd: HOME, env: Object.assign({}, AMBIENTE) });
+    const r = await php.cli(["php", opts.principal].concat(opts.args || []), { cwd: HOME, env: ambienteFixo() });
     // os fluxos ficam vazios (a saída foi interceptada); é só esvaziá-los
     r.stdout.cancel && r.stdout.cancel().catch(() => {});
     r.stderr.cancel && r.stderr.cancel().catch(() => {});
@@ -139,7 +196,9 @@ export function criarMotor(deps) {
     const php = await novoPHP(() => null);
     await php.setSapiName("cli-server");
     escreverArquivos(php, DOCROOT, arquivos);
-    await U.setPhpIniEntries(php, Object.assign({}, INI_COMUM, INI_WEB, iniExtra || {}));
+    php.mkdirTree("/internal/guia");
+    php.writeFile(SERVIDOR_PHP, SERVIDOR_FONTE);
+    await U.setPhpIniEntries(php, Object.assign({}, INI_COMUM, INI_WEB, { auto_prepend_file: SERVIDOR_PHP }, iniExtra || {}));
     php.chdir(DOCROOT);
     const enc = new TextEncoder();
     const handler = new U.PHPRequestHandler({
@@ -155,13 +214,16 @@ export function criarMotor(deps) {
       php,
       /** req: { method, url, headers, body (Uint8Array) } */
       async pedir(req) {
-        const r = await handler.request({
-          method: req.method || "GET",
-          url: req.url || "/",
-          headers: req.headers || {},
-          body: req.body,
-        });
-        return { status: r.httpStatusCode, headers: r.headers, body: r.bytes, errors: r.errors || "", exit: r.exitCode };
+        const cab = Object.assign({}, CABECALHOS_NAVEGADOR, req.headers || {});
+        if (req.body && req.body.length !== undefined) cab["content-length"] = String(req.body.length);
+        // requestStreamed: o request() do php-wasm troca o status por 500 em
+        // qualquer erro fatal; o php -S só faz isso se o erro NÃO foi mostrado
+        // (display_errors desligado).
+        const st = await handler.requestStreamed({ method: req.method || "GET", url: req.url || "/", headers: cab, body: req.body });
+        const r = await U.PHPResponse.fromStreamedResponse(st);
+        let status = r.httpStatusCode;
+        if (status === 200 && r.exitCode !== 0 && !/Fatal error|Parse error/.test(r.text)) status = 500;
+        return { status, headers: r.headers, body: r.bytes, errors: r.errors || "", exit: r.exitCode };
       },
       lerArquivo(caminho) { return php.readFileAsBuffer(caminho); },
     };

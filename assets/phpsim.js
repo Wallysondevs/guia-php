@@ -421,7 +421,7 @@
       };
       Terminal.prototype.fechar = function () {
         var cl = this.classe(true);
-        if (this.n < MAX_LINHAS) this.desenhar(true);
+        if (this.n < MAX_LINHAS) { this.desenhar(true); if (this.linha && !this.linha.innerHTML) this.linha.innerHTML = "<br>"; }
         else {
           this.omitidas++;
           this.cauda.push({ segs: this.segs, cl: cl });
@@ -439,7 +439,7 @@
             out.appendChild(el("div", null, c.segs.map(function (x) {
               var k = x.t === "err" ? "sim-err" : x.t === "eco" ? "sim-digitado" : c.cl;
               return k ? '<span class="' + k + '">' + escHtml(x.s) + "</span>" : escHtml(x.s);
-            }).join("")));
+            }).join("") || "<br>"));
           });
         }
       };
@@ -568,7 +568,7 @@
         return new Promise(function (ok, falha) {
           function tentar(recriar) {
             var feito = function () {
-              var id = enviar({ op: "pedir", caixa: idCaixa, req: { method: req.method, url: caminhoDe(req.url), headers: req.headers || {}, body: req.body } }, function (m) {
+              var id = enviar({ op: "pedir", caixa: idCaixa, req: { method: req.method, url: caminhoDe(req.url), headers: Object.assign({ "user-agent": navigator.userAgent }, req.headers || {}), body: req.body } }, function (m) {
                 esquecer(id);
                 if (m.ev === "resp" && m.semSite && !recriar) { tentar(true); return; }
                 if (m.ev === "resp" && !m.semSite) ok(m);

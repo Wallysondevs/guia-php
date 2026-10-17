@@ -186,7 +186,7 @@ async function main() {
       if (avisos.length) { nAvisos++; linha = (linha || "") + (linha ? "\n" : "") + "  ! " + rot + "\n" + avisos.map((x) => "      " + x).join("\n"); }
       if (linha) saidaPag.push(linha);
     }
-    console.log((falhasPag ? "✗ " : "✓ ") + path.basename(arq) + " — " + lista.length + " caixa" + (lista.length > 1 ? "s" : ""));
+    console.log((falhasPag ? "✗ " : saidaPag.some((l) => /^\s*! /m.test(l)) ? "! " : "✓ ") + path.basename(arq) + " — " + lista.length + " caixa" + (lista.length > 1 ? "s" : ""));
     saidaPag.forEach((l) => console.log(l));
   }
   try { fs.writeFileSync(CACHE, JSON.stringify({ versao: versaoMotor, itens: Object.assign({}, nativo || verboso ? cache : {}, novoCache) })); } catch (e) { /* ok */ }
