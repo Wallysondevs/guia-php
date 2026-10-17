@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Banco de Dados — tabelas, linhas, chave primária e SQL básico | Guia PHP</title>
+<meta name="description" content="O que é um banco de dados relacional, para quem nunca usou um: tabelas, linhas, colunas e chave primária, e o SQL básico (CREATE TABLE, INSERT, SELECT, UPDATE, DELETE) rodando de verdade com PHP e SQLite, com as mensagens reais de erro e uma comparação entre SQLite, MySQL e PostgreSQL.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Banco de Dados: o Básico</span></h1>
+
+<p class="intro">Até aqui, os programas da lojinha da Ana guardavam os produtos em <a href="arrays-associativos.html">arrays</a>, que somem quando o programa termina, ou em arquivos <a href="csv.html">CSV</a> e <a href="json.html">JSON</a>, que funcionam, mas ficam difíceis quando a loja cresce. Os sites de verdade guardam os dados num <strong>banco de dados</strong>. Nesta aula você vai entender o que é um banco relacional (tabelas, linhas, colunas, chave primária) e aprender a língua que se fala com ele, o <strong>SQL</strong>, rodando cada comando de verdade.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que usar um banco de dados em vez de arrays e arquivos.</li>
+  <li>O que são <strong>tabela</strong>, <strong>linha</strong>, <strong>coluna</strong> e <strong>chave primária</strong>.</li>
+  <li>Os cinco comandos básicos do SQL: <code>CREATE TABLE</code>, <code>INSERT</code>, <code>SELECT</code>, <code>UPDATE</code> e <code>DELETE</code>.</li>
+  <li>Como filtrar (<code>WHERE</code>), ordenar (<code>ORDER BY</code>), limitar (<code>LIMIT</code>) e contar (<code>COUNT</code>, <code>SUM</code>).</li>
+  <li>As diferenças entre SQLite, MySQL e PostgreSQL.</li>
+  <li>O que significam os erros mais comuns: <code>no such column</code>, <code>UNIQUE constraint failed</code>, <code>NOT NULL constraint failed</code>…</li>
+</ul>
+</div>
+
+<p>Os exemplos foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/loja</code>, usando o <strong>SQLite</strong>, um banco que já vem dentro do PHP (e dentro do editor do guia).</p>
+
+<hr>
+
+<h2>Por que um banco de dados?</h2>
+<p>A lojinha da Ana começou com uma lista de produtos num array. Funciona, até ela perceber os problemas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde guardar</th><th>Problema</th></tr>
+<tr><td>Variáveis e arrays</td><td>Somem quando o programa (ou a página) termina.</td></tr>
+<tr><td>Arquivo CSV ou JSON</td><td>Para achar um produto, o programa lê o arquivo <strong>inteiro</strong>. Para mudar um preço, reescreve o arquivo inteiro. Se dois clientes compram ao mesmo tempo, um pode apagar a gravação do outro.</td></tr>
+<tr><td><strong>Banco de dados</strong></td><td>Guarda de forma permanente, acha um registro entre milhões rapidamente, muda só o que precisa, aguenta vários acessos ao mesmo tempo e confere regras ("todo produto tem preço").</td></tr>
+</table>
+</div>
+
+<p>Um banco de dados é um programa especializado em <strong>guardar e encontrar dados</strong>. O seu programa PHP não mexe nos arquivos do banco: ele faz <strong>pedidos</strong> ("guarde este produto", "quais produtos custam menos de 10 reais?") e o banco cuida do resto.</p>
+
+<hr>
+
+<h2>A ideia: uma planilha bem organizada</h2>
+<p>Se você já usou uma planilha (Excel, LibreOffice Calc, Google Planilhas), já conhece a ideia de um banco <strong>relacional</strong>. A lista de produtos da Ana, num banco, é uma <strong>tabela</strong>:</p>
+
+<figure>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>id</th><th>nome</th><th>preco</th><th>estoque</th></tr>
+<tr><td>1</td><td>Caderno</td><td>15.90</td><td>30</td></tr>
+<tr><td>2</td><td>Caneta azul</td><td>2.50</td><td>100</td></tr>
+<tr><td>3</td><td>Mochila</td><td>89.90</td><td>5</td></tr>
+</table>
+</div>
+<figcaption>A tabela <code>produtos</code>: 4 colunas e 3 linhas.</figcaption>
+</figure>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Na planilha</th><th>No exemplo</th></tr>
+<tr><td><strong>Banco de dados</strong></td><td>O arquivo inteiro, com várias abas</td><td>A loja da Ana (produtos, clientes, vendas…)</td></tr>
+<tr><td><strong>Tabela</strong></td><td>Uma aba</td><td><code>produtos</code></td></tr>
+<tr><td><strong>Coluna</strong> (ou campo)</td><td>Uma coluna, com um título</td><td><code>nome</code>, <code>preco</code></td></tr>
+<tr><td><strong>Linha</strong> (ou registro)</td><td>Uma linha</td><td>O Caderno, com todos os seus dados</td></tr>
+<tr><td><strong>Chave primária</strong></td><td>Um número que não se repete</td><td><code>id</code></td></tr>
+</table>
+</div>
+
+<p>A diferença para a planilha: o banco é <strong>rigoroso</strong>. Cada coluna tem um <strong>tipo</strong> (texto, número…) e regras (pode ficar vazia? tem valor padrão?), e cada tabela tem uma chave primária. Essas regras evitam a bagunça que toda planilha compartilhada acaba tendo.</p>
+
+<h3>Chave primária: o número que identifica a linha</h3>
+<p>Por que um <code>id</code>, se o produto já tem nome? Porque nomes se repetem e mudam: a Ana pode ter duas "Caneta azul" de marcas diferentes, ou renomear "Caderno" para "Caderno 96 folhas". A <strong>chave primária</strong> (<em>primary key</em>) é uma coluna cujo valor:</p>
+<ul>
+  <li><strong>nunca se repete</strong> na tabela (o banco recusa um id repetido);</li>
+  <li><strong>nunca muda</strong> depois de criado;</li>
+  <li>é escolhido pelo próprio banco, em sequência (1, 2, 3…), na forma mais comum.</li>
+</ul>
+<p>É como o número do RG, ou da matrícula na escola: duas Anas na mesma turma têm números diferentes.</p>
+
+<h3>"Relacional"?</h3>
+<p>O nome vem de <em>relação</em>, o termo matemático para tabela. E as tabelas se <strong>relacionam</strong>: uma tabela <code>vendas</code> pode guardar só o <code>id</code> do produto vendido (o número 3) em vez de repetir "Mochila, 89.90…" em cada venda. Esse id "emprestado" de outra tabela se chama <strong>chave estrangeira</strong>. Você vai usar isso nos <a href="projetos.html">projetos</a>; nesta aula, uma tabela basta.</p>
+
+<div class="note">
+<strong>E os bancos "não relacionais"?</strong>
+<p>Existem bancos que não usam tabelas, como o MongoDB (guarda documentos parecidos com JSON) e o Redis (guarda pares chave-valor na memória). Eles são chamados de <strong>NoSQL</strong> e têm usos específicos. Para a grande maioria dos sites em PHP, o banco relacional é a escolha certa, e é o que este guia ensina.</p>
+</div>
+
+<hr>
+
+<h2>SQL: a língua dos bancos</h2>
+<p><strong>SQL</strong> (<em>Structured Query Language</em>, "linguagem de consulta estruturada"; diz-se "ésse-quê-éle" ou, em inglês, "síquel") é a língua que todos os bancos relacionais entendem. Ela é diferente do PHP: em vez de dizer <strong>como</strong> fazer, passo a passo, você diz <strong>o que</strong> quer, e o banco descobre como:</p>
+
+<pre class="file" data-file="exemplo.sql">SELECT nome, preco FROM produtos WHERE preco &lt; 10 ORDER BY preco;
+</pre>
+<p>Lido em voz alta: "<strong>selecione</strong> nome e preço <strong>da</strong> tabela produtos <strong>onde</strong> o preço for menor que 10, <strong>ordenado pelo</strong> preço". Algumas regras da escrita:</p>
+<ul>
+  <li>As palavras do SQL (<code>SELECT</code>, <code>FROM</code>, <code>WHERE</code>) funcionam em maiúsculas ou minúsculas. O costume é escrevê-las em <strong>MAIÚSCULAS</strong>, para destacar dos nomes de tabelas e colunas.</li>
+  <li>Textos vão entre <strong>aspas simples</strong>: <code>'Caderno'</code>. Números, sem aspas: <code>15.90</code> (com <strong>ponto</strong>, nunca vírgula).</li>
+  <li>Um comando pode ocupar várias linhas. O <code>;</code> no fim separa comandos; quando o PHP manda um comando por vez, ele é opcional.</li>
+</ul>
+
+<h3>Como vamos rodar o SQL</h3>
+<p>Para você se concentrar no SQL, a Ana escreveu um pequeno "console": o arquivo <code>console.php</code> abre o banco (o arquivo <code>loja.db</code>) e cria a função <code>sql()</code>, que roda um comando e mostra o resultado como tabela. <strong>Você não precisa entender o que está dentro dele agora</strong>: a próxima aula, <a href="pdo.html">Conectar com PDO</a>, explica cada linha.</p>
+
+<pre class="file" data-file="console.php">&lt;?php
+// Um "console" de SQL: roda um comando e mostra o resultado como uma tabela.
+// (Como ele funciona por dentro é assunto da próxima aula, sobre PDO.)
+$pdo = new PDO("sqlite:" . __DIR__ . "/loja.db");
+
+function sql(string $comando): void
+{
+    global $pdo;
+    echo "sql&gt; $comando\n";
+    $stmt = $pdo-&gt;query($comando);
+
+    if ($stmt-&gt;columnCount() === 0) {           // não era um SELECT
+        if (preg_match('/^\s*(INSERT|UPDATE|DELETE)/i', $comando)) {
+            echo "OK, ", $stmt-&gt;rowCount(), " linha(s) afetada(s)\n\n";
+        } else {
+            echo "OK\n\n";
+        }
+        return;
+    }
+    $linhas = $stmt-&gt;fetchAll(PDO::FETCH_ASSOC);
+    if (count($linhas) === 0) {
+        echo "(nenhuma linha)\n\n";
+        return;
+    }
+    $colunas = array_keys($linhas[0]);
+    $largura = [];
+    foreach ($colunas as $c) {
+        $largura[$c] = mb_strlen($c);
+        foreach ($linhas as $l) {
+            $largura[$c] = max($largura[$c], mb_strlen($l[$c] ?? "NULL"));
+        }
+    }
+    $celulas = fn($valores) =&gt; rtrim(implode(" | ", array_map(
+        fn($c) =&gt; mb_str_pad($valores[$c] ?? "NULL", $largura[$c]), $colunas)));
+    echo $celulas(array_combine($colunas, $colunas)), "\n";
+    echo implode("-+-", array_map(fn($c) =&gt; str_repeat("-", $largura[$c]), $colunas)), "\n";
+    foreach ($linhas as $l) {
+        echo $celulas($l), "\n";
+    }
+    echo "(", count($linhas), " linha(s))\n\n";
+}
+</pre>
+
+<p>Cada programa desta aula começa com <code>require "console.php";</code> (veja <a href="include-require.html">include e require</a>) e chama <code>sql("…")</code> com um comando. O console mostra o comando depois de <code>sql&gt;</code> e, embaixo, a resposta do banco.</p>
+
+<hr>
+
+<h2>1. Criar a tabela: <code>CREATE TABLE</code></h2>
+
+<pre class="file" data-file="criar.php">&lt;?php
+require "console.php";
+
+sql("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php criar.php
+sql&gt; CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)
+OK
+
+$ ls -l loja.db
+-rw-r--r-- 1 ana ana 8192 out 16 21:07 loja.db      « o banco inteiro mora neste arquivo</pre>
+
+<dl class="anatomy">
+  <dt>CREATE TABLE produtos ( … )</dt><dd>"Crie a tabela <code>produtos</code> com as colunas…". Cada coluna é <strong>nome</strong>, <strong>tipo</strong> e <strong>regras</strong>, separadas por vírgula.</dd>
+  <dt>id INTEGER PRIMARY KEY</dt><dd>A coluna <code>id</code> é um número inteiro e é a chave primária. No SQLite, essa combinação faz o banco numerar sozinho (1, 2, 3…) quando você não informa o id.</dd>
+  <dt>nome TEXT NOT NULL</dt><dd>Texto, <strong>obrigatório</strong>. <code>NULL</code> é o "vazio" do banco (como o <a href="null.html"><code>null</code></a> do PHP); <code>NOT NULL</code> proíbe deixar vazio.</dd>
+  <dt>preco REAL NOT NULL</dt><dd>Número com casas decimais (<em>real</em>), obrigatório.</dd>
+  <dt>estoque INTEGER NOT NULL DEFAULT 0</dt><dd>Inteiro, obrigatório, mas com <strong>valor padrão</strong> 0: se você não informar, vale 0.</dd>
+</dl>
+
+<h3>Os tipos do SQLite</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Guarda</th><th>Exemplo</th><th>No PHP vira</th></tr>
+<tr><td><code>INTEGER</code></td><td>Número inteiro</td><td><code>30</code>, <code>-2</code></td><td><code>int</code></td></tr>
+<tr><td><code>REAL</code></td><td>Número com casas</td><td><code>15.90</code></td><td><code>float</code></td></tr>
+<tr><td><code>TEXT</code></td><td>Texto</td><td><code>'Caderno'</code></td><td><code>string</code></td></tr>
+<tr><td><code>BLOB</code></td><td>Dados binários (o conteúdo de um arquivo)</td><td>uma imagem</td><td><code>string</code></td></tr>
+<tr><td><code>NULL</code></td><td>Ausência de valor</td><td><code>NULL</code></td><td><code>null</code></td></tr>
+</table>
+</div>
+<p>Datas, no SQLite, costumam ser guardadas como texto no formato <code>'2026-10-16 14:30:00'</code> (veja <a href="datas.html">Datas e Horas</a>). Outros bancos têm mais tipos (<code>VARCHAR</code>, <code>DECIMAL</code>, <code>DATE</code>); você vai vê-los em <a href="mysql.html">MySQL e MariaDB</a>.</p>
+
+<hr>
+
+<h2>2. Inserir linhas: <code>INSERT</code></h2>
+
+<pre class="file" data-file="inserir.php">&lt;?php
+require "console.php";
+
+sql("INSERT INTO produtos (nome, preco, estoque) VALUES ('Caderno', 15.90, 30)");
+sql("INSERT INTO produtos (nome, preco, estoque) VALUES ('Caneta azul', 2.50, 100)");
+sql("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200),
+    ('Estojo', 9.90, 12)");
+sql("INSERT INTO produtos (nome, preco) VALUES ('Borracha', 0.90)");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php inserir.php
+sql&gt; INSERT INTO produtos (nome, preco, estoque) VALUES ('Caderno', 15.90, 30)
+OK, 1 linha(s) afetada(s)
+
+sql&gt; INSERT INTO produtos (nome, preco, estoque) VALUES ('Caneta azul', 2.50, 100)
+OK, 1 linha(s) afetada(s)
+
+sql&gt; INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200),
+    ('Estojo', 9.90, 12)
+OK, 3 linha(s) afetada(s)
+
+sql&gt; INSERT INTO produtos (nome, preco) VALUES ('Borracha', 0.90)
+OK, 1 linha(s) afetada(s)</pre>
+
+<dl class="anatomy">
+  <dt>INSERT INTO produtos</dt><dd>"Insira na tabela <code>produtos</code>…"</dd>
+  <dt>(nome, preco, estoque)</dt><dd>…nestas colunas, nesta ordem. O <code>id</code> ficou de fora: o banco escolhe.</dd>
+  <dt>VALUES ('Caderno', 15.90, 30)</dt><dd>…estes valores, na mesma ordem das colunas. Texto entre aspas simples; números sem aspas.</dd>
+  <dt>VALUES (…), (…), (…)</dt><dd>Vários produtos num comando só, separados por vírgula: "3 linha(s) afetada(s)".</dd>
+  <dt>(nome, preco) VALUES ('Borracha', 0.90)</dt><dd>Sem o estoque: vale o <code>DEFAULT 0</code>.</dd>
+</dl>
+
+<div class="warning">
+<strong>No PHP de verdade, os valores não vão escritos dentro do SQL</strong>
+<p>Aqui os valores estão fixos no código, escritos por você, para aprender o SQL. Quando os dados vierem de um formulário, eles <strong>nunca</strong> devem ser colados dentro do texto do SQL: isso abre a porta para o ataque <strong>SQL injection</strong>. O jeito certo (<code>prepare</code> e <code>?</code>) está em <a href="crud.html">CRUD com PDO</a> e <a href="prepared-statements.html">Prepared Statements</a>.</p>
+</div>
+
+<hr>
+
+<h2>3. Consultar: <code>SELECT</code></h2>
+<p>O comando mais usado do SQL. Ele não muda nada: só <strong>pergunta</strong>.</p>
+
+<pre class="file" data-file="consultar.php">&lt;?php
+require "console.php";
+
+sql("SELECT * FROM produtos");
+sql("SELECT nome, preco FROM produtos");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php consultar.php
+sql&gt; SELECT * FROM produtos
+id | nome        | preco | estoque
+---+-------------+-------+--------
+1  | Caderno     | 15.9  | 30
+2  | Caneta azul | 2.5   | 100
+3  | Mochila     | 89.9  | 5
+4  | Lápis       | 1.2   | 200
+5  | Estojo      | 9.9   | 12
+6  | Borracha    | 0.9   | 0
+(6 linha(s))
+
+sql&gt; SELECT nome, preco FROM produtos
+nome        | preco
+------------+------
+Caderno     | 15.9
+Caneta azul | 2.5
+Mochila     | 89.9
+Lápis       | 1.2
+Estojo      | 9.9
+Borracha    | 0.9
+(6 linha(s))</pre>
+
+<dl class="anatomy">
+  <dt>SELECT</dt><dd>"Selecione…"</dd>
+  <dt>*</dt><dd>…todas as colunas. Ou escreva só as que quer: <code>nome, preco</code>.</dd>
+  <dt>FROM produtos</dt><dd>…da tabela <code>produtos</code>.</dd>
+</dl>
+
+<p>Repare: os ids vieram em sequência (1 a 6) sem você escrever nenhum, a Borracha ganhou estoque 0 (o <code>DEFAULT</code>), e os preços aparecem como <code>15.9</code>: um número <code>REAL</code> não guarda "quantos zeros você digitou". Mostrar <code>R$ 15,90</code> é trabalho do PHP, com <a href="number-format.html"><code>number_format</code></a>.</p>
+
+<h3>Filtrar: <code>WHERE</code></h3>
+<p>O <code>WHERE</code> ("onde") escolhe <strong>quais linhas</strong> vêm. Só passam as linhas em que a condição é verdadeira:</p>
+
+<pre class="file" data-file="filtrar.php">&lt;?php
+require "console.php";
+
+sql("SELECT nome, preco FROM produtos WHERE preco &lt; 10");
+sql("SELECT nome, estoque FROM produtos WHERE estoque &gt;= 30 AND preco &gt; 2");
+sql("SELECT * FROM produtos WHERE nome = 'Mochila'");
+sql("SELECT nome FROM produtos WHERE nome LIKE 'C%'");
+sql("SELECT nome FROM produtos WHERE nome = 'Régua'");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php filtrar.php
+sql&gt; SELECT nome, preco FROM produtos WHERE preco &lt; 10
+nome        | preco
+------------+------
+Caneta azul | 2.5
+Lápis       | 1.2
+Estojo      | 9.9
+Borracha    | 0.9
+(4 linha(s))
+
+sql&gt; SELECT nome, estoque FROM produtos WHERE estoque &gt;= 30 AND preco &gt; 2
+nome        | estoque
+------------+--------
+Caderno     | 30
+Caneta azul | 100
+(2 linha(s))
+
+sql&gt; SELECT * FROM produtos WHERE nome = 'Mochila'
+id | nome    | preco | estoque
+---+---------+-------+--------
+3  | Mochila | 89.9  | 5
+(1 linha(s))
+
+sql&gt; SELECT nome FROM produtos WHERE nome LIKE 'C%'
+nome
+-----------
+Caderno
+Caneta azul
+(2 linha(s))
+
+sql&gt; SELECT nome FROM produtos WHERE nome = 'Régua'
+(nenhuma linha)              « não existe: não é erro, só uma resposta vazia</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No <code>WHERE</code></th><th>Significa</th><th>Repare</th></tr>
+<tr><td><code>=</code></td><td>igual</td><td><strong>Um</strong> sinal só (no PHP seria <code>==</code>)</td></tr>
+<tr><td><code>&lt;&gt;</code> ou <code>!=</code></td><td>diferente</td><td></td></tr>
+<tr><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>menor, maior, menor ou igual, maior ou igual</td><td></td></tr>
+<tr><td><code>AND</code>, <code>OR</code>, <code>NOT</code></td><td>e, ou, não</td><td>Em palavras, não <code>&amp;&amp;</code> e <code>||</code></td></tr>
+<tr><td><code>BETWEEN 2 AND 20</code></td><td>entre 2 e 20 (incluindo as pontas)</td><td></td></tr>
+<tr><td><code>IN (1, 3, 5)</code></td><td>é um destes</td><td></td></tr>
+<tr><td><code>LIKE 'C%'</code></td><td>texto que combina com o modelo</td><td><code>%</code> = qualquer coisa; <code>_</code> = um caractere</td></tr>
+<tr><td><code>IS NULL</code>, <code>IS NOT NULL</code></td><td>está vazio / não está</td><td><code>= NULL</code> <strong>não funciona</strong></td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-goal="out:(3 linha(s)),out:Mochila,out:Estojo,out:Borracha,src:WHERE,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana quer saber quais produtos estão acabando. Mude a consulta para mostrar <code>nome</code> e <code>estoque</code> só dos produtos com estoque <strong>menor que 20</strong>. Devem vir 3 linhas. Depois, brinque: troque o <code>&lt; 20</code> por outras condições da tabela acima.</p>
+<pre class="script" data-file="consultas.php">&lt;?php
+require "console.php";
+
+sql("SELECT nome, estoque FROM produtos");
+</pre>
+<pre class="script" data-file="console.php">&lt;?php
+// Um "console" de SQL para o editor: cria a lojinha da Ana na memória
+// e mostra o resultado de cada comando como uma tabela.
+// (Como ele funciona por dentro é assunto da próxima aula, sobre PDO.)
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30), ('Caneta azul', 2.50, 100), ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200), ('Estojo', 9.90, 12), ('Borracha', 0.90, 0)");
+
+function sql(string $comando): void
+{
+    global $pdo;
+    echo "sql&gt; $comando\n";
+    $stmt = $pdo-&gt;query($comando);
+
+    if ($stmt-&gt;columnCount() === 0) {           // não era um SELECT
+        if (preg_match('/^\s*(INSERT|UPDATE|DELETE)/i', $comando)) {
+            echo "OK, ", $stmt-&gt;rowCount(), " linha(s) afetada(s)\n\n";
+        } else {
+            echo "OK\n\n";
+        }
+        return;
+    }
+    $linhas = $stmt-&gt;fetchAll(PDO::FETCH_ASSOC);
+    if (count($linhas) === 0) {
+        echo "(nenhuma linha)\n\n";
+        return;
+    }
+    $colunas = array_keys($linhas[0]);
+    $largura = [];
+    foreach ($colunas as $c) {
+        $largura[$c] = mb_strlen($c);
+        foreach ($linhas as $l) {
+            $largura[$c] = max($largura[$c], mb_strlen($l[$c] ?? "NULL"));
+        }
+    }
+    $celulas = fn($valores) =&gt; rtrim(implode(" | ", array_map(
+        fn($c) =&gt; mb_str_pad($valores[$c] ?? "NULL", $largura[$c]), $colunas)));
+    echo $celulas(array_combine($colunas, $colunas)), "\n";
+    echo implode("-+-", array_map(fn($c) =&gt; str_repeat("-", $largura[$c]), $colunas)), "\n";
+    foreach ($linhas as $l) {
+        echo $celulas($l), "\n";
+    }
+    echo "(", count($linhas), " linha(s))\n\n";
+}
+</pre>
+<pre class="solucao" data-file="consultas.php">&lt;?php
+require "console.php";
+
+sql("SELECT nome, estoque FROM produtos WHERE estoque &lt; 20");
+</pre>
+</div>
+
+<h3>Ordenar e limitar: <code>ORDER BY</code> e <code>LIMIT</code></h3>
+
+<pre class="file" data-file="ordenar.php">&lt;?php
+require "console.php";
+
+sql("SELECT nome, preco FROM produtos ORDER BY preco");
+sql("SELECT nome, preco FROM produtos ORDER BY preco DESC LIMIT 3");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php ordenar.php
+sql&gt; SELECT nome, preco FROM produtos ORDER BY preco
+nome        | preco
+------------+------
+Borracha    | 0.9
+Lápis       | 1.2
+Caneta azul | 2.5
+Estojo      | 9.9
+Caderno     | 15.9
+Mochila     | 89.9
+(6 linha(s))
+
+sql&gt; SELECT nome, preco FROM produtos ORDER BY preco DESC LIMIT 3
+nome    | preco
+--------+------
+Mochila | 89.9
+Caderno | 15.9
+Estojo  | 9.9
+(3 linha(s))</pre>
+
+<dl class="anatomy">
+  <dt>ORDER BY preco</dt><dd>Ordena pelo preço, do menor para o maior (<code>ASC</code>, o padrão).</dd>
+  <dt>DESC</dt><dd>Do maior para o menor (<em>descending</em>, "descendente").</dd>
+  <dt>LIMIT 3</dt><dd>Só as 3 primeiras linhas. Junto com o <code>ORDER BY … DESC</code>: "os 3 mais caros".</dd>
+</dl>
+<p>Sem <code>ORDER BY</code>, a ordem das linhas <strong>não é garantida</strong>. Se a ordem importa, peça.</p>
+
+<h3>Contar e somar</h3>
+
+<pre class="file" data-file="contas.php">&lt;?php
+require "console.php";
+
+sql("SELECT COUNT(*) FROM produtos");
+sql("SELECT COUNT(*) AS total, SUM(estoque) AS itens, MIN(preco) AS menor, MAX(preco) AS maior FROM produtos");
+sql("SELECT nome, preco * estoque AS valor_em_estoque FROM produtos ORDER BY valor_em_estoque DESC");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php contas.php
+sql&gt; SELECT COUNT(*) FROM produtos
+COUNT(*)
+--------
+6
+(1 linha(s))
+
+sql&gt; SELECT COUNT(*) AS total, SUM(estoque) AS itens, MIN(preco) AS menor, MAX(preco) AS maior FROM produtos
+total | itens | menor | maior
+------+-------+-------+------
+6     | 347   | 0.9   | 89.9
+(1 linha(s))
+
+sql&gt; SELECT nome, preco * estoque AS valor_em_estoque FROM produtos ORDER BY valor_em_estoque DESC
+nome        | valor_em_estoque
+------------+-----------------
+Caderno     | 477
+Mochila     | 449.5
+Caneta azul | 250
+Lápis       | 240
+Estojo      | 118.8
+Borracha    | 0
+(6 linha(s))</pre>
+
+<dl class="anatomy">
+  <dt>COUNT(*)</dt><dd>Conta as linhas.</dd>
+  <dt>SUM, MIN, MAX, AVG</dt><dd>Soma, menor, maior e média de uma coluna.</dd>
+  <dt>AS total</dt><dd>Dá um <strong>apelido</strong> à coluna do resultado (sem ele, o título é <code>COUNT(*)</code>).</dd>
+  <dt>preco * estoque</dt><dd>Contas linha por linha: quanto dinheiro está parado em cada produto.</dd>
+</dl>
+
+<hr>
+
+<h2>4. Alterar: <code>UPDATE</code></h2>
+
+<pre class="file" data-file="atualizar.php">&lt;?php
+require "console.php";
+
+sql("UPDATE produtos SET preco = 17.50 WHERE id = 1");
+sql("UPDATE produtos SET estoque = estoque + 20 WHERE nome = 'Borracha'");
+sql("SELECT * FROM produtos WHERE id IN (1, 6)");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php atualizar.php
+sql&gt; UPDATE produtos SET preco = 17.50 WHERE id = 1
+OK, 1 linha(s) afetada(s)
+
+sql&gt; UPDATE produtos SET estoque = estoque + 20 WHERE nome = 'Borracha'
+OK, 1 linha(s) afetada(s)
+
+sql&gt; SELECT * FROM produtos WHERE id IN (1, 6)
+id | nome     | preco | estoque
+---+----------+-------+--------
+1  | Caderno  | 17.5  | 30
+6  | Borracha | 0.9   | 20
+(2 linha(s))</pre>
+
+<dl class="anatomy">
+  <dt>UPDATE produtos</dt><dd>"Altere a tabela <code>produtos</code>…"</dd>
+  <dt>SET preco = 17.50</dt><dd>"…pondo 17.50 na coluna <code>preco</code>…". Várias colunas: <code>SET preco = 17.50, estoque = 40</code>.</dd>
+  <dt>SET estoque = estoque + 20</dt><dd>Usa o valor atual: "o estoque passa a ser o estoque mais 20" (chegou mercadoria).</dd>
+  <dt>WHERE id = 1</dt><dd>"…<strong>só</strong> na linha de id 1."</dd>
+</dl>
+
+<div class="warning">
+<strong>UPDATE sem WHERE muda TODAS as linhas</strong>
+<p><code>UPDATE produtos SET preco = 17.50</code>, sem <code>WHERE</code>, deixa <strong>todos</strong> os produtos custando 17,50. O banco não pergunta "tem certeza?". Escreva o <code>WHERE</code> primeiro, e filtre pela chave primária (<code>WHERE id = 1</code>) sempre que puder: ela garante uma linha só.</p>
+</div>
+
+<hr>
+
+<h2>5. Apagar: <code>DELETE</code></h2>
+
+<pre class="file" data-file="apagar.php">&lt;?php
+require "console.php";
+
+sql("DELETE FROM produtos WHERE id = 5");
+sql("DELETE FROM produtos WHERE id = 5");
+sql("SELECT id, nome FROM produtos");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php apagar.php
+sql&gt; DELETE FROM produtos WHERE id = 5
+OK, 1 linha(s) afetada(s)
+
+sql&gt; DELETE FROM produtos WHERE id = 5
+OK, 0 linha(s) afetada(s)          « já não existia: zero linhas, sem erro
+
+sql&gt; SELECT id, nome FROM produtos
+id | nome
+---+------------
+1  | Caderno
+2  | Caneta azul
+3  | Mochila
+4  | Lápis
+6  | Borracha
+(5 linha(s))</pre>
+
+<dl class="anatomy">
+  <dt>DELETE FROM produtos</dt><dd>"Apague linhas da tabela <code>produtos</code>…"</dd>
+  <dt>WHERE id = 5</dt><dd>"…a de id 5" (o Estojo). Sem <code>WHERE</code>: apaga <strong>todas</strong> as linhas (a tabela continua existindo, vazia).</dd>
+</dl>
+<p>O id 5 deixou um "buraco" na sequência, e é assim mesmo: ids não são reaproveitados para não confundir registros antigos com novos. Para apagar a <strong>tabela</strong> inteira (estrutura e dados), o comando é outro: <code>DROP TABLE produtos</code>.</p>
+
+<div class="tryphp" data-goal="out:79.9,out:(5 linha(s)),src:UPDATE,src:DELETE,semerro">
+<p class="try-task"><strong>Missão:</strong> a Mochila (id 3) entrou em promoção: mude o preço dela para <code>79.90</code>. O Estojo (id 5) saiu de linha: apague-o. O <code>SELECT</code> do fim deve mostrar 5 produtos, com a Mochila a <code>79.9</code>.</p>
+<pre class="script" data-file="consultas.php">&lt;?php
+require "console.php";
+
+// 1. UPDATE: Mochila (id 3) por 79.90
+// 2. DELETE: Estojo (id 5)
+
+sql("SELECT * FROM produtos");
+</pre>
+<pre class="script" data-file="console.php">&lt;?php
+// Um "console" de SQL para o editor: cria a lojinha da Ana na memória
+// e mostra o resultado de cada comando como uma tabela.
+// (Como ele funciona por dentro é assunto da próxima aula, sobre PDO.)
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30), ('Caneta azul', 2.50, 100), ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200), ('Estojo', 9.90, 12), ('Borracha', 0.90, 0)");
+
+function sql(string $comando): void
+{
+    global $pdo;
+    echo "sql&gt; $comando\n";
+    $stmt = $pdo-&gt;query($comando);
+
+    if ($stmt-&gt;columnCount() === 0) {           // não era um SELECT
+        if (preg_match('/^\s*(INSERT|UPDATE|DELETE)/i', $comando)) {
+            echo "OK, ", $stmt-&gt;rowCount(), " linha(s) afetada(s)\n\n";
+        } else {
+            echo "OK\n\n";
+        }
+        return;
+    }
+    $linhas = $stmt-&gt;fetchAll(PDO::FETCH_ASSOC);
+    if (count($linhas) === 0) {
+        echo "(nenhuma linha)\n\n";
+        return;
+    }
+    $colunas = array_keys($linhas[0]);
+    $largura = [];
+    foreach ($colunas as $c) {
+        $largura[$c] = mb_strlen($c);
+        foreach ($linhas as $l) {
+            $largura[$c] = max($largura[$c], mb_strlen($l[$c] ?? "NULL"));
+        }
+    }
+    $celulas = fn($valores) =&gt; rtrim(implode(" | ", array_map(
+        fn($c) =&gt; mb_str_pad($valores[$c] ?? "NULL", $largura[$c]), $colunas)));
+    echo $celulas(array_combine($colunas, $colunas)), "\n";
+    echo implode("-+-", array_map(fn($c) =&gt; str_repeat("-", $largura[$c]), $colunas)), "\n";
+    foreach ($linhas as $l) {
+        echo $celulas($l), "\n";
+    }
+    echo "(", count($linhas), " linha(s))\n\n";
+}
+</pre>
+<pre class="solucao" data-file="consultas.php">&lt;?php
+require "console.php";
+
+sql("UPDATE produtos SET preco = 79.90 WHERE id = 3");
+sql("DELETE FROM produtos WHERE id = 5");
+
+sql("SELECT * FROM produtos");
+</pre>
+</div>
+
+<hr>
+
+<h2>SQLite, MySQL ou PostgreSQL?</h2>
+<p>O SQL é quase o mesmo em todos os bancos relacionais, mas cada um tem seu jeito de funcionar. Os três que você mais vai encontrar com PHP:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>SQLite</th><th>MySQL / MariaDB</th><th>PostgreSQL</th></tr>
+<tr><td>Como funciona</td><td>Uma biblioteca dentro do PHP; o banco é <strong>um arquivo</strong></td><td>Um <strong>servidor</strong>: um programa sempre rodando, que atende pela rede</td><td>Um <strong>servidor</strong>, como o MySQL</td></tr>
+<tr><td>Instalar</td><td>Nada: vem com o PHP</td><td>Instalar e ligar o servidor</td><td>Instalar e ligar o servidor</td></tr>
+<tr><td>Driver do PDO</td><td><code>pdo_sqlite</code> (<code>sqlite:</code>)</td><td><code>pdo_mysql</code> (<code>mysql:</code>)</td><td><code>pdo_pgsql</code> (<code>pgsql:</code>)</td></tr>
+<tr><td>Usuários e senhas</td><td>Não</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Vários escrevendo ao mesmo tempo</td><td>Um de cada vez</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Tipos das colunas</td><td>Flexíveis (aceita texto em coluna de número, salvo tabelas <code>STRICT</code>)</td><td>Rígidos</td><td>Rígidos e muito variados (datas, JSON, listas…)</td></tr>
+<tr><td>Id automático</td><td><code>INTEGER PRIMARY KEY</code></td><td><code>INT AUTO_INCREMENT PRIMARY KEY</code></td><td><code>SERIAL</code> ou <code>GENERATED ALWAYS AS IDENTITY</code></td></tr>
+<tr><td>Onde aparece</td><td>Celulares, navegadores, programas de computador, sites pequenos, testes</td><td>A maioria das hospedagens PHP, WordPress, lojas virtuais</td><td>Sistemas grandes, dados complexos, empresas</td></tr>
+<tr><td>Bom para aprender?</td><td><strong>Ótimo</strong>: zero instalação</td><td>Sim, depois do básico</td><td>Sim, depois do básico</td></tr>
+</table>
+</div>
+
+<p>Este guia usa o <strong>SQLite</strong> em todos os exemplos e missões: ele roda no seu computador e no editor do guia sem instalar nada. Como o PHP conversa com todos pelo mesmo <a href="pdo.html">PDO</a>, o que você aprender vale para os outros; as diferenças estão em <a href="mysql.html">MySQL e MariaDB</a>.</p>
+
+<hr>
+
+<h2 id="cenarios">Quando dá errado</h2>
+<p>Nos erros abaixo, o PHP mostra o rastro (<em>stack trace</em>) passando pelo <code>console.php</code>, porque é lá dentro que o comando roda. A linha que interessa é a mensagem do banco, no começo, e a linha <code>#1</code>, que aponta o <strong>seu</strong> arquivo.</p>
+
+<div class="cenario">
+<strong><code>no such column: Mochila</code> (faltaram as aspas)</strong>
+<pre class="term" data-cwd="~/loja">$ php erro-aspas.php
+sql&gt; SELECT * FROM produtos WHERE nome = Mochila
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: Mochila in /home/ana/loja/console.php:10
+Stack trace:
+#0 /home/ana/loja/console.php(10): PDO-&gt;query('SELECT * FROM p...')
+#1 /home/ana/loja/erro-aspas.php(4): sql('SELECT * FROM p...')
+#2 {main}
+  thrown in /home/ana/loja/console.php on line 10</pre>
+<p><strong>O que significa:</strong> sem aspas, <code>Mochila</code> é lido como <strong>nome de coluna</strong>, e não existe coluna com esse nome ("não existe a coluna Mochila").</p>
+<p><strong>Como consertar:</strong> texto sempre entre aspas simples: <code>WHERE nome = 'Mochila'</code>. Se a coluna realmente se chama assim, confira a grafia: a mesma mensagem aparece com <code>SELECT nome, valor</code> quando a coluna é <code>preco</code> (<code>no such column: valor</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>unrecognized token</code> (aspa sem par)</strong>
+<pre class="term" data-cwd="~/loja">$ php erro-faltou-aspa.php
+sql&gt; INSERT INTO produtos (nome, preco) VALUES ('Agenda, 25.00)
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 unrecognized token: "'Agenda, 25.00)" in /home/ana/loja/console.php:10
+Stack trace:
+#0 /home/ana/loja/console.php(10): PDO-&gt;query('INSERT INTO pro...')
+#1 /home/ana/loja/erro-faltou-aspa.php(4): sql('INSERT INTO pro...')
+#2 {main}
+  thrown in /home/ana/loja/console.php on line 10</pre>
+<p><strong>O que significa:</strong> "símbolo não reconhecido". A aspa abriu em <code>'Agenda</code> e nunca fechou, então o banco leu tudo até o fim como um texto sem final.</p>
+<p><strong>Como consertar:</strong> feche a aspa: <code>('Agenda', 25.00)</code>. Cada texto, um par de aspas.</p>
+</div>
+
+<div class="cenario">
+<strong><code>UNIQUE constraint failed: produtos.id</code></strong>
+<pre class="term" data-cwd="~/loja">$ php erro-chave.php
+sql&gt; INSERT INTO produtos (id, nome, preco) VALUES (1, 'Agenda', 25.00)
+
+Fatal error: Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: produtos.id in /home/ana/loja/console.php:10
+Stack trace:
+#0 /home/ana/loja/console.php(10): PDO-&gt;query('INSERT INTO pro...')
+#1 /home/ana/loja/erro-chave.php(4): sql('INSERT INTO pro...')
+#2 {main}
+  thrown in /home/ana/loja/console.php on line 10</pre>
+<p><strong>O que significa:</strong> "a regra de valor único falhou em <code>produtos.id</code>". Já existe o id 1 (o Caderno), e a chave primária não se repete. É o banco protegendo os seus dados.</p>
+<p><strong>Como consertar:</strong> não informe o id: deixe o banco escolher (<code>INSERT INTO produtos (nome, preco) VALUES (…)</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>NOT NULL constraint failed: produtos.preco</code></strong>
+<pre class="term" data-cwd="~/loja">$ php erro-nulo.php
+sql&gt; INSERT INTO produtos (nome) VALUES ('Agenda')
+
+Fatal error: Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 NOT NULL constraint failed: produtos.preco in /home/ana/loja/console.php:10
+Stack trace:
+#0 /home/ana/loja/console.php(10): PDO-&gt;query('INSERT INTO pro...')
+#1 /home/ana/loja/erro-nulo.php(4): sql('INSERT INTO pro...')
+#2 {main}
+  thrown in /home/ana/loja/console.php on line 10</pre>
+<p><strong>O que significa:</strong> a coluna <code>preco</code> é <code>NOT NULL</code> e não tem <code>DEFAULT</code>; o <code>INSERT</code> não a preencheu. (O <code>estoque</code> também ficou de fora, mas tem <code>DEFAULT 0</code>, então não reclamou.)</p>
+<p><strong>Como consertar:</strong> inclua a coluna e o valor: <code>INSERT INTO produtos (nome, preco) VALUES ('Agenda', 25.00)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>table produtos already exists</code></strong>
+<pre class="term" data-cwd="~/loja">$ php erro-tabela-existe.php
+sql&gt; CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT)
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 table produtos already exists in /home/ana/loja/console.php:10
+Stack trace:
+#0 /home/ana/loja/console.php(10): PDO-&gt;query('CREATE TABLE pr...')
+#1 /home/ana/loja/erro-tabela-existe.php(4): sql('CREATE TABLE pr...')
+#2 {main}
+  thrown in /home/ana/loja/console.php on line 10</pre>
+<p><strong>O que significa:</strong> "a tabela produtos já existe". O <code>CREATE TABLE</code> roda uma vez; depois, a tabela fica no arquivo <code>loja.db</code>.</p>
+<p><strong>Como consertar:</strong> use <code>CREATE TABLE IF NOT EXISTS produtos (…)</code>, que só cria se ainda não existir. Para recomeçar do zero: <code>DROP TABLE produtos</code> (apaga tudo!) ou apague o arquivo <code>loja.db</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Ana,out:Bruno,out:(2 linha(s)),src:CREATE TABLE clientes,src:INSERT INTO clientes,semerro">
+<p class="try-task"><strong>Missão final:</strong> a loja vai ter cadastro de clientes. Crie a tabela <code>clientes</code> com as colunas <code>id</code> (chave primária), <code>nome</code> (texto obrigatório) e <code>cidade</code> (texto). Insira dois clientes: Ana, de Recife, e Bruno, de Belém. Por fim, mostre todos com <code>SELECT</code>. O resultado deve terminar com <code>(2 linha(s))</code>.</p>
+<pre class="script" data-file="consultas.php">&lt;?php
+require "console.php";
+
+// 1. CREATE TABLE clientes (...)
+// 2. INSERT INTO clientes ...
+// 3. SELECT ...
+</pre>
+<pre class="script" data-file="console.php">&lt;?php
+// Um "console" de SQL para o editor: cria a lojinha da Ana na memória
+// e mostra o resultado de cada comando como uma tabela.
+// (Como ele funciona por dentro é assunto da próxima aula, sobre PDO.)
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30), ('Caneta azul', 2.50, 100), ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200), ('Estojo', 9.90, 12), ('Borracha', 0.90, 0)");
+
+function sql(string $comando): void
+{
+    global $pdo;
+    echo "sql&gt; $comando\n";
+    $stmt = $pdo-&gt;query($comando);
+
+    if ($stmt-&gt;columnCount() === 0) {           // não era um SELECT
+        if (preg_match('/^\s*(INSERT|UPDATE|DELETE)/i', $comando)) {
+            echo "OK, ", $stmt-&gt;rowCount(), " linha(s) afetada(s)\n\n";
+        } else {
+            echo "OK\n\n";
+        }
+        return;
+    }
+    $linhas = $stmt-&gt;fetchAll(PDO::FETCH_ASSOC);
+    if (count($linhas) === 0) {
+        echo "(nenhuma linha)\n\n";
+        return;
+    }
+    $colunas = array_keys($linhas[0]);
+    $largura = [];
+    foreach ($colunas as $c) {
+        $largura[$c] = mb_strlen($c);
+        foreach ($linhas as $l) {
+            $largura[$c] = max($largura[$c], mb_strlen($l[$c] ?? "NULL"));
+        }
+    }
+    $celulas = fn($valores) =&gt; rtrim(implode(" | ", array_map(
+        fn($c) =&gt; mb_str_pad($valores[$c] ?? "NULL", $largura[$c]), $colunas)));
+    echo $celulas(array_combine($colunas, $colunas)), "\n";
+    echo implode("-+-", array_map(fn($c) =&gt; str_repeat("-", $largura[$c]), $colunas)), "\n";
+    foreach ($linhas as $l) {
+        echo $celulas($l), "\n";
+    }
+    echo "(", count($linhas), " linha(s))\n\n";
+}
+</pre>
+<pre class="solucao" data-file="consultas.php">&lt;?php
+require "console.php";
+
+sql("CREATE TABLE clientes (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    cidade TEXT
+)");
+sql("INSERT INTO clientes (nome, cidade) VALUES ('Ana', 'Recife'), ('Bruno', 'Belém')");
+sql("SELECT * FROM clientes");
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>Faz</th><th>Exemplo</th></tr>
+<tr><td><code>CREATE TABLE</code></td><td>Cria uma tabela</td><td><code>CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT NOT NULL)</code></td></tr>
+<tr><td><code>CREATE TABLE IF NOT EXISTS</code></td><td>Cria se ainda não existir</td><td></td></tr>
+<tr><td><code>DROP TABLE</code></td><td>Apaga a tabela inteira</td><td><code>DROP TABLE produtos</code></td></tr>
+<tr><td><code>INSERT INTO … VALUES</code></td><td>Insere linhas</td><td><code>INSERT INTO produtos (nome, preco) VALUES ('Lápis', 1.20)</code></td></tr>
+<tr><td><code>SELECT … FROM</code></td><td>Consulta</td><td><code>SELECT nome, preco FROM produtos</code></td></tr>
+<tr><td><code>WHERE</code></td><td>Filtra as linhas</td><td><code>WHERE preco &lt; 10 AND estoque &gt; 0</code></td></tr>
+<tr><td><code>ORDER BY … [DESC]</code></td><td>Ordena</td><td><code>ORDER BY preco DESC</code></td></tr>
+<tr><td><code>LIMIT</code></td><td>Limita a quantidade</td><td><code>LIMIT 3</code></td></tr>
+<tr><td><code>COUNT SUM MIN MAX AVG</code></td><td>Contas sobre as linhas</td><td><code>SELECT COUNT(*) FROM produtos</code></td></tr>
+<tr><td><code>AS</code></td><td>Apelido de coluna</td><td><code>SELECT COUNT(*) AS total</code></td></tr>
+<tr><td><code>UPDATE … SET … WHERE</code></td><td>Altera linhas</td><td><code>UPDATE produtos SET preco = 17.50 WHERE id = 1</code></td></tr>
+<tr><td><code>DELETE FROM … WHERE</code></td><td>Apaga linhas</td><td><code>DELETE FROM produtos WHERE id = 5</code></td></tr>
+<tr><td><code>PRIMARY KEY</code></td><td>Chave primária: valor único que identifica a linha</td><td><code>id INTEGER PRIMARY KEY</code></td></tr>
+<tr><td><code>NOT NULL</code> / <code>DEFAULT</code></td><td>Obrigatório / valor padrão</td><td><code>estoque INTEGER NOT NULL DEFAULT 0</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Todas as colunas</h3>
+<p>Complete para mostrar todas as colunas de todos os produtos:</p>
+<div class="ex-code">SELECT <input data-answer="*" aria-label="colunas" size="3"> FROM produtos</div>
+</div>
+
+<div class="exercise">
+<h3>2. Os mais caros primeiro</h3>
+<p>Complete para ordenar do mais caro para o mais barato:</p>
+<div class="ex-code">SELECT nome, preco FROM produtos ORDER BY <input data-answer="preco DESC|preco desc" aria-label="ordem"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Só um produto</h3>
+<p>Complete para apagar <strong>só</strong> o produto de id 4:</p>
+<div class="ex-code">DELETE FROM produtos <input data-answer="WHERE id = 4|where id = 4|WHERE id=4|where id=4" aria-label="condição"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Para que serve a chave primária?</p>
+<label><input type="radio" name="q4"> Para deixar a tabela mais rápida de criar.</label>
+<label><input type="radio" name="q4"> Para identificar cada linha com um valor que nunca se repete.</label>
+<label><input type="radio" name="q4"> Para guardar a senha do banco.</label>
+<label><input type="radio" name="q4"> Para ordenar as linhas em ordem alfabética.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O que acontece com <code>UPDATE produtos SET estoque = 0</code>?</p>
+<label><input type="radio" name="q5"> Dá erro, porque falta o <code>WHERE</code>.</label>
+<label><input type="radio" name="q5"> Zera o estoque só do primeiro produto.</label>
+<label><input type="radio" name="q5"> Zera o estoque de todos os produtos.</label>
+<label><input type="radio" name="q5"> Apaga a coluna <code>estoque</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual consulta busca o produto chamado Caderno?</p>
+<label><input type="radio" name="q6"> <code>SELECT * FROM produtos WHERE nome = 'Caderno'</code></label>
+<label><input type="radio" name="q6"> <code>SELECT * FROM produtos WHERE nome = Caderno</code></label>
+<label><input type="radio" name="q6"> <code>SELECT * FROM produtos WHERE nome == 'Caderno'</code></label>
+<label><input type="radio" name="q6"> <code>SELECT * FROM produtos IF nome = 'Caderno'</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Qual destas afirmações sobre o SQLite está correta?</p>
+<label><input type="radio" name="q7"> Precisa de um servidor ligado o tempo todo, como o MySQL.</label>
+<label><input type="radio" name="q7"> Exige usuário e senha para conectar.</label>
+<label><input type="radio" name="q7"> Usa uma língua diferente do SQL.</label>
+<label><input type="radio" name="q7"> Guarda o banco inteiro num arquivo e já vem com o PHP.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um <strong>banco de dados</strong> guarda dados de forma permanente, encontra rápido e confere regras. O seu programa faz <strong>pedidos</strong> a ele.</li>
+  <li>Num banco <strong>relacional</strong>, os dados ficam em <strong>tabelas</strong>, com <strong>colunas</strong> (campos, com tipo) e <strong>linhas</strong> (registros).</li>
+  <li>A <strong>chave primária</strong> (<code>id INTEGER PRIMARY KEY</code>) identifica cada linha e nunca se repete.</li>
+  <li><strong>SQL</strong>: <code>CREATE TABLE</code> cria, <code>INSERT</code> insere, <code>SELECT</code> consulta, <code>UPDATE</code> altera, <code>DELETE</code> apaga.</li>
+  <li><code>WHERE</code> escolhe as linhas; sem ele, <code>UPDATE</code> e <code>DELETE</code> atingem <strong>todas</strong>.</li>
+  <li>Texto entre aspas simples; números com ponto, sem aspas; comparação com <code>=</code>.</li>
+  <li>SQLite é um arquivo, sem instalação; MySQL e PostgreSQL são servidores. O PHP fala com todos pelo PDO.</li>
+</ul>
+
+<p>Próxima aula: <a href="pdo.html">Conectar com PDO</a>, para entender o que o <code>console.php</code> faz e escrever os seus próprios programas com banco.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
