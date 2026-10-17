@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP $_SERVER e Outras Superglobais — o mapa completo | Guia PHP</title>
+<meta name="description" content="As superglobais do PHP: $_SERVER e suas chaves mais úteis (REQUEST_METHOD, REQUEST_URI, HTTP_USER_AGENT, REMOTE_ADDR), com a saída real do php -S, e a tabela completa com $_GET, $_POST, $_FILES, $_COOKIE, $_SESSION, $_ENV e $GLOBALS.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">$_SERVER e Outras Superglobais</span></h1>
+
+<p class="intro">Você já usou três variáveis "mágicas" que existem sozinhas em qualquer programa PHP: <code>$_GET</code>, <code>$_POST</code> e <code>$_FILES</code>. Elas fazem parte de uma família de nove, as <strong>superglobais</strong>. Esta aula apresenta a mais curiosa delas, <code>$_SERVER</code>, que conta tudo sobre o pedido que chegou (quem pediu, qual endereço, com qual navegador), e fecha com o mapa da família inteira.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma superglobal e por que ela funciona dentro de funções.</li>
+  <li>O que tem dentro de <code>$_SERVER</code>, com a saída real do <code>php -S</code>.</li>
+  <li>As chaves mais úteis: <code>REQUEST_METHOD</code>, <code>REQUEST_URI</code>, <code>QUERY_STRING</code>, <code>SCRIPT_NAME</code>, <code>HTTP_HOST</code>, <code>HTTP_USER_AGENT</code>, <code>REMOTE_ADDR</code>.</li>
+  <li>Quais delas o visitante pode falsificar (e o caso do <code>PHP_SELF</code>).</li>
+  <li>Como <code>$_SERVER</code> muda no terminal (<code>php arquivo.php</code>).</li>
+  <li><code>$_ENV</code>, <code>getenv</code> e <code>$GLOBALS</code>.</li>
+  <li>A tabela com todas as superglobais, e onde cada uma é estudada.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o carimbo do correio</h2>
+<p>Quando uma carta chega, além do conteúdo, o envelope traz informações: o carimbo com a data, a cidade de origem, o endereço de destino, às vezes o remetente. Ninguém escreveu isso na carta; vem "de brinde" com a entrega.</p>
+<p><code>$_GET</code> e <code>$_POST</code> são o conteúdo da carta. <code>$_SERVER</code> é o envelope: o PHP anota nele como o pedido chegou e onde ele está rodando. E, como num envelope, parte dessas anotações foi escrita pelo correio (o servidor, confiável) e parte pelo remetente (o navegador, que pode escrever o que quiser).</p>
+
+<h2>O que é uma superglobal</h2>
+<p>Normalmente, uma variável criada fora de uma função não existe dentro dela (veja <a href="escopo.html">Escopo</a>). As superglobais são a exceção: o PHP as cria antes do seu código rodar e elas são visíveis <strong>em todo lugar</strong>, sem <code>global</code>:</p>
+<pre class="file" data-file="trecho.php">function foiEnviado(): bool
+{
+    return $_SERVER['REQUEST_METHOD'] === 'POST';   // funciona: superglobal
+}</pre>
+<p>Todas começam com <code>$_</code> e são escritas em maiúsculas (a única exceção é <code>$GLOBALS</code>, sem o sublinhado). Você não pode criar novas superglobais: a família é fixa.</p>
+
+<hr>
+
+<h2><code>$_SERVER</code> por dentro</h2>
+<p>A forma mais rápida de conhecer <code>$_SERVER</code> é imprimir tudo. A Ana criou um <code>server.php</code> e abriu no servidor embutido (<a href="servidor-embutido.html">O Servidor Embutido</a>):</p>
+
+<pre class="file" data-file="server.php">&lt;?php
+print_r($_SERVER);
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/server.php
+Array
+(
+    [DOCUMENT_ROOT] =&gt; /home/ana/site
+    [REMOTE_ADDR] =&gt; 127.0.0.1
+    [REMOTE_PORT] =&gt; 37966
+    [SERVER_SOFTWARE] =&gt; PHP/8.5.8 (Development Server)
+    [SERVER_PROTOCOL] =&gt; HTTP/1.1
+    [SERVER_NAME] =&gt; localhost
+    [SERVER_PORT] =&gt; 8000
+    [REQUEST_URI] =&gt; /server.php
+    [REQUEST_METHOD] =&gt; GET
+    [SCRIPT_NAME] =&gt; /server.php
+    [SCRIPT_FILENAME] =&gt; /home/ana/site/server.php
+    [PHP_SELF] =&gt; /server.php
+    [HTTP_HOST] =&gt; localhost:8000
+    [HTTP_USER_AGENT] =&gt; curl/8.18.0
+    [HTTP_ACCEPT] =&gt; */*
+    [REQUEST_TIME_FLOAT] =&gt; 1792195356.5285
+    [REQUEST_TIME] =&gt; 1792195356
+)</pre>
+
+<p>As chaves se dividem em três grupos:</p>
+<ul>
+  <li><strong>Sobre o pedido:</strong> <code>REQUEST_METHOD</code>, <code>REQUEST_URI</code>, <code>QUERY_STRING</code>, <code>REQUEST_TIME</code>.</li>
+  <li><strong>Cabeçalhos que o navegador mandou:</strong> todas as que começam com <code>HTTP_</code>. Cada cabeçalho HTTP vira uma chave: <code>User-Agent</code> → <code>HTTP_USER_AGENT</code>, <code>Accept-Language</code> → <code>HTTP_ACCEPT_LANGUAGE</code> (maiúsculas, hífen vira sublinhado, <code>HTTP_</code> na frente).</li>
+  <li><strong>Sobre o servidor e o arquivo:</strong> <code>SERVER_NAME</code>, <code>SERVER_PORT</code>, <code>DOCUMENT_ROOT</code>, <code>SCRIPT_FILENAME</code>.</li>
+</ul>
+
+<p>Num Apache ou Nginx, a lista é bem maior (e algumas chaves mudam). O que vale para todos: as chaves abaixo.</p>
+
+<h3>As chaves mais úteis</h3>
+<p>Para ver cada uma com calma, a Ana pediu a página <code>loja/produto.php?id=7&amp;cor=azul</code> como se fosse um Firefox, vindo de um link na página <code>/loja/</code>. O <code>-A</code> do <code>curl</code> define o <code>User-Agent</code>, e o <code>-H</code> acrescenta outros cabeçalhos:</p>
+
+<pre class="file" data-file="loja/produto.php">&lt;?php
+$chaves = ['REQUEST_METHOD', 'REQUEST_URI', 'QUERY_STRING', 'SCRIPT_NAME', 'PHP_SELF',
+           'HTTP_HOST', 'HTTP_USER_AGENT', 'HTTP_ACCEPT_LANGUAGE', 'HTTP_REFERER',
+           'REMOTE_ADDR', 'SERVER_NAME', 'SERVER_PORT', 'SERVER_PROTOCOL', 'DOCUMENT_ROOT', 'SCRIPT_FILENAME', 'HTTPS'];
+foreach ($chaves as $c) {
+    echo str_pad($c, 22), '= ', $_SERVER[$c] ?? '(não existe)', "\n";
+}
+</pre>
+
+<pre class="term">$ curl -s "localhost:8000/loja/produto.php?id=7&amp;cor=azul" -H "Accept-Language: pt-BR,pt;q=0.9" -H "Referer: http://localhost:8000/loja/" -A "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
+REQUEST_METHOD        = GET
+REQUEST_URI           = /loja/produto.php?id=7&amp;cor=azul
+QUERY_STRING          = id=7&amp;cor=azul
+SCRIPT_NAME           = /loja/produto.php
+PHP_SELF              = /loja/produto.php
+HTTP_HOST             = localhost:8000
+HTTP_USER_AGENT       = Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0
+HTTP_ACCEPT_LANGUAGE  = pt-BR,pt;q=0.9
+HTTP_REFERER          = http://localhost:8000/loja/
+REMOTE_ADDR           = 127.0.0.1
+SERVER_NAME           = localhost
+SERVER_PORT           = 8000
+SERVER_PROTOCOL       = HTTP/1.1
+DOCUMENT_ROOT         = /home/ana/site
+SCRIPT_FILENAME       = /home/ana/site/loja/produto.php
+HTTPS                 = (não existe)</pre>
+
+<p>E a mesma página pedida pelo <code>curl</code> "puro", sem endereço com dados nem cabeçalhos extras. Repare nas chaves que <strong>desaparecem</strong>:</p>
+<pre class="term">$ curl -s localhost:8000/loja/produto.php
+REQUEST_METHOD        = GET
+REQUEST_URI           = /loja/produto.php
+QUERY_STRING          = (não existe)
+…
+HTTP_USER_AGENT       = curl/8.18.0
+HTTP_ACCEPT_LANGUAGE  = (não existe)
+HTTP_REFERER          = (não existe)
+…</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>Exemplo</th><th>O que é</th><th>Quem escreve</th></tr>
+<tr><td><code>REQUEST_METHOD</code></td><td><code>GET</code></td><td>O método do pedido (veja <a href="get-post.html">$_GET e $_POST</a>)</td><td>Servidor</td></tr>
+<tr><td><code>REQUEST_URI</code></td><td><code>/loja/produto.php?id=7&amp;cor=azul</code></td><td>O endereço pedido, a partir da <code>/</code>, com a query string</td><td>Visitante (o endereço que ele digitou)</td></tr>
+<tr><td><code>QUERY_STRING</code></td><td><code>id=7&amp;cor=azul</code></td><td>Só a parte depois do <code>?</code>. Não existe quando não há <code>?</code></td><td>Visitante</td></tr>
+<tr><td><code>SCRIPT_NAME</code></td><td><code>/loja/produto.php</code></td><td>O caminho do arquivo PHP no site</td><td>Servidor</td></tr>
+<tr><td><code>PHP_SELF</code></td><td><code>/loja/produto.php</code></td><td>Parecido com <code>SCRIPT_NAME</code>, mas pode incluir texto extra do endereço (veja o cenário de erro)</td><td>Visitante, em parte</td></tr>
+<tr><td><code>HTTP_HOST</code></td><td><code>localhost:8000</code></td><td>O nome do site que o navegador pediu</td><td>Visitante</td></tr>
+<tr><td><code>HTTP_USER_AGENT</code></td><td><code>Mozilla/5.0 … Firefox/140.0</code></td><td>"Agente do usuário": o programa que fez o pedido (navegador, robô, <code>curl</code>)</td><td>Visitante</td></tr>
+<tr><td><code>HTTP_ACCEPT_LANGUAGE</code></td><td><code>pt-BR,pt;q=0.9</code></td><td>Os idiomas preferidos do navegador</td><td>Visitante</td></tr>
+<tr><td><code>HTTP_REFERER</code></td><td><code>http://localhost:8000/loja/</code></td><td>A página de onde a pessoa veio (pelo link). Muitas vezes não vem</td><td>Visitante</td></tr>
+<tr><td><code>REMOTE_ADDR</code></td><td><code>127.0.0.1</code></td><td>O endereço IP de quem fez o pedido (<code>127.0.0.1</code> = a própria máquina)</td><td>Servidor (a conexão)</td></tr>
+<tr><td><code>SERVER_NAME</code>, <code>SERVER_PORT</code></td><td><code>localhost</code>, <code>8000</code></td><td>Nome e porta do servidor</td><td>Servidor</td></tr>
+<tr><td><code>DOCUMENT_ROOT</code></td><td><code>/home/ana/site</code></td><td>A pasta raiz do site no disco</td><td>Servidor</td></tr>
+<tr><td><code>SCRIPT_FILENAME</code></td><td><code>/home/ana/site/loja/produto.php</code></td><td>O caminho completo do arquivo no disco</td><td>Servidor</td></tr>
+<tr><td><code>HTTPS</code></td><td>(não existe)</td><td>Existe (com um valor diferente de <code>off</code>) quando a conexão é segura (<code>https://</code>). O <code>php -S</code> não tem HTTPS</td><td>Servidor</td></tr>
+<tr><td><code>REQUEST_TIME</code></td><td><code>1792195356</code></td><td>A hora do pedido, em segundos desde 1970 (veja <a href="datas.html">Datas e Horas</a>)</td><td>Servidor</td></tr>
+</table>
+</div>
+
+<div class="warning"><strong>Tudo o que começa com <code>HTTP_</code> foi escrito pelo navegador</strong> e pode ser qualquer coisa: o <code>curl</code> acima "virou" um Firefox com uma opção. Use esses valores para estatísticas e conveniências (escolher o idioma da página), nunca para segurança ("só deixa entrar se vier do Chrome"). E, ao mostrar qualquer um deles na página, <code>htmlspecialchars</code> (<a href="escapar-saida.html">Escapar a Saída</a>). Até o <code>REMOTE_ADDR</code>, que é confiável, pode ser o endereço de um <em>proxy</em> no meio do caminho, e não da pessoa.</div>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?pagina=2&amp;busca=bolo">
+<p class="try-task">O <code>$_SERVER</code> do editor do guia. Aqui o "servidor" é o PHP rodando dentro do seu navegador, então alguns valores são diferentes dos do <code>php -S</code>, mas o <code>HTTP_USER_AGENT</code> é o do <strong>seu</strong> navegador. Rode, envie o formulário (GET e depois POST) e veja <code>REQUEST_METHOD</code>, <code>REQUEST_URI</code> e <code>QUERY_STRING</code> mudarem. Troque a lista para <code>print_r($_SERVER)</code> e veja tudo.</p>
+<pre class="script">&lt;form method="get"&gt;&lt;input name="busca" value="torta"&gt; &lt;button&gt;GET&lt;/button&gt;&lt;/form&gt;
+&lt;form method="post"&gt;&lt;input name="busca" value="pudim"&gt; &lt;button&gt;POST&lt;/button&gt;&lt;/form&gt;
+&lt;pre&gt;
+&lt;?php
+foreach (['REQUEST_METHOD', 'REQUEST_URI', 'QUERY_STRING', 'SCRIPT_NAME',
+          'HTTP_HOST', 'HTTP_USER_AGENT', 'REMOTE_ADDR'] as $c) {
+    echo str_pad($c, 16), '= ', htmlspecialchars($_SERVER[$c] ?? '(não existe)'), "\n";
+}
+?&gt;
+&lt;/pre&gt;
+</pre>
+</div>
+
+<h3>Usos comuns</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Use</th></tr>
+<tr><td>Saber se um formulário POST foi enviado</td><td><code>$_SERVER['REQUEST_METHOD'] === 'POST'</code></td></tr>
+<tr><td>Montar o link da página atual</td><td><code>$_SERVER['REQUEST_URI']</code> (escapado com <code>htmlspecialchars</code>)</td></tr>
+<tr><td>Destacar o item atual de um menu</td><td><code>$_SERVER['SCRIPT_NAME'] === '/contato.php'</code></td></tr>
+<tr><td>Registrar quem acessou (um log)</td><td><code>REMOTE_ADDR</code>, <code>HTTP_USER_AGENT</code>, <code>REQUEST_TIME</code></td></tr>
+<tr><td>Saber se está em HTTPS</td><td><code>($_SERVER['HTTPS'] ?? 'off') !== 'off'</code></td></tr>
+<tr><td>Caminhos de arquivos no disco</td><td>Prefira <code>__DIR__</code> (a pasta do arquivo atual) a <code>DOCUMENT_ROOT</code></td></tr>
+</table>
+</div>
+
+<h3><code>$_SERVER</code> no terminal</h3>
+<p>Quando o PHP roda no terminal (<code>php arquivo.php</code>, veja <a href="linha-comando.html">PHP na Linha de Comando</a>), não existe pedido HTTP. Então não há <code>REQUEST_METHOD</code> nem cabeçalhos, mas aparecem os argumentos (<code>argv</code>, <code>argc</code>) e as variáveis de ambiente do sistema:</p>
+<pre class="file" data-file="cli.php">&lt;?php
+echo $_SERVER['argv'][1] ?? '-', ' ', $_SERVER['argc'], ' ', $_SERVER['SCRIPT_NAME'], ' ', $_SERVER['REQUEST_METHOD'] ?? '(sem REQUEST_METHOD)', "\n";
+</pre>
+<pre class="term">$ php cli.php Ana
+Ana 2 cli.php (sem REQUEST_METHOD)</pre>
+<p>Por isso, num código que pode rodar dos dois jeitos, leia sempre com <code>?? …</code>.</p>
+
+<hr>
+
+<h2><code>$_ENV</code> e <code>getenv</code>: variáveis de ambiente</h2>
+<p>O sistema operacional guarda <strong>variáveis de ambiente</strong>: configurações como <code>HOME</code> (a pasta pessoal), <code>LANG</code> (o idioma) e, em servidores, coisas como a senha do banco de dados, para não ficarem escritas no código. O PHP pode lê-las de dois jeitos:</p>
+<pre class="file" data-file="env.php">&lt;?php
+var_dump(count($_ENV), getenv('HOME'));
+</pre>
+<pre class="term">$ php env.php
+int(15)
+string(9) "/home/ana"</pre>
+<p>No laboratório da Ana, <code>$_ENV</code> veio cheio porque o PHP está sem <code>php.ini</code>. Nos <code>php.ini</code> que acompanham o PHP (e na maioria dos servidores), a configuração <code>variables_order</code> é <code>"GPCS"</code>, sem o <code>E</code> de <em>Environment</em>, e <code>$_ENV</code> fica <strong>vazio</strong>. Por isso a forma mais segura é <code>getenv('NOME')</code>, que funciona nos dois casos e devolve <code>false</code> se a variável não existir.</p>
+
+<hr>
+
+<h2><code>$GLOBALS</code>: todas as variáveis globais</h2>
+<p><code>$GLOBALS</code> é um array com todas as variáveis criadas fora de funções. Dentro de uma função, ele dá acesso a elas pelo nome:</p>
+<pre class="file" data-file="globals.php">&lt;?php
+$loja = 'Padaria da Ana';
+function nomeDaLoja(): string
+{
+    return $GLOBALS['loja'];
+}
+echo nomeDaLoja(), "\n";
+</pre>
+<pre class="term">$ php globals.php
+Padaria da Ana</pre>
+<p>Funciona, mas cria a mesma bagunça do <code>global</code> (veja <a href="escopo.html">Escopo</a>): a função depende de uma variável que pode ser mudada em qualquer lugar. Prefira passar o valor como parâmetro. Desde o PHP 8.1, <code>$GLOBALS</code> não pode mais ser substituído inteiro:</p>
+<pre class="file" data-file="globals2.php">&lt;?php
+$GLOBALS = [];
+</pre>
+<pre class="term">$ php globals2.php
+
+Fatal error: $GLOBALS can only be modified using the $GLOBALS[$name] = $value syntax in /home/ana/site/globals2.php on line 2
+Stack trace:
+#0 {main}</pre>
+
+<hr>
+
+<h2>O mapa das superglobais</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Superglobal</th><th>O que guarda</th><th>De onde vem</th><th>Aula</th></tr>
+<tr><td><code>$_GET</code></td><td>Dados do endereço (<code>?nome=Ana</code>)</td><td>Visitante</td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>$_POST</code></td><td>Dados do corpo de um POST</td><td>Visitante</td><td><a href="get-post.html">$_GET e $_POST</a></td></tr>
+<tr><td><code>$_FILES</code></td><td>Arquivos enviados</td><td>Visitante</td><td><a href="upload.html">Upload de Arquivos</a></td></tr>
+<tr><td><code>$_COOKIE</code></td><td>Cookies que o navegador devolveu</td><td>Visitante</td><td><a href="cookies.html">Cookies</a></td></tr>
+<tr><td><code>$_SESSION</code></td><td>Dados da sessão, guardados no servidor (existe depois de <code>session_start()</code>)</td><td>Seu programa</td><td><a href="sessoes.html">Sessões</a></td></tr>
+<tr><td><code>$_REQUEST</code></td><td>Mistura de GET, POST e (talvez) cookies</td><td>Visitante</td><td><a href="get-post.html">$_GET e $_POST</a> (evite)</td></tr>
+<tr><td><code>$_SERVER</code></td><td>Informações do pedido e do servidor</td><td>Servidor + cabeçalhos do visitante</td><td>esta</td></tr>
+<tr><td><code>$_ENV</code></td><td>Variáveis de ambiente (muitas vezes vazio; use <code>getenv</code>)</td><td>Sistema</td><td>esta</td></tr>
+<tr><td><code>$GLOBALS</code></td><td>Todas as variáveis globais do programa</td><td>Seu programa</td><td>esta e <a href="escopo.html">Escopo</a></td></tr>
+</table>
+</div>
+<p>Repare na coluna "De onde vem": tudo o que vem do <strong>visitante</strong> passa por validação na entrada e escape na saída (<a href="validacao.html">Validar Dados</a>, <a href="escapar-saida.html">Escapar a Saída</a>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>XSS pelo <code>PHP_SELF</code></strong>
+<pre class="file" data-file="self.php">&lt;form action="&lt;?= $_SERVER['PHP_SELF'] ?&gt;" method="post"&gt;</pre>
+<pre class="term">$ curl -s "localhost:8000/self.php/%22%3E%3Cb%20style=%22color:red%22%3Ehackeado%3C/b%3E"
+&lt;form action="/self.php/"&gt;&lt;b style="color:red"&gt;hackeado&lt;/b&gt;" method="post"&gt;</pre>
+<p><strong>O que aconteceu:</strong> o servidor aceita texto extra depois do nome do arquivo (<code>/self.php/qualquer-coisa</code> ainda roda o <code>self.php</code>), e esse texto entra no <code>PHP_SELF</code>. A aspa fechou o <code>action</code> e o resto virou HTML. Esse código aparece em muitos tutoriais antigos.</p>
+<p><strong>Como resolver:</strong> para enviar à própria página, deixe o <code>action</code> de fora (<a href="formularios.html">Formulários HTML</a>). Se precisar do caminho, use <code>htmlspecialchars($_SERVER['SCRIPT_NAME'])</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key "HTTP_REFERER"</code></strong>
+<pre class="term">$ curl -s localhost:8000/ref.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "HTTP_REFERER" in &lt;b&gt;/home/ana/site/ref.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> chaves <code>HTTP_*</code> só existem se o navegador mandou aquele cabeçalho. O <code>Referer</code> não vem quando a pessoa digita o endereço, abre um favorito ou quando o navegador o esconde por privacidade. O mesmo vale para <code>QUERY_STRING</code> (sem <code>?</code>) e <code>REQUEST_METHOD</code> (no terminal).</p>
+<p><strong>Como resolver:</strong> <code>$_SERVER['HTTP_REFERER'] ?? ''</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined global variable $_SESSION</code></strong>
+<pre class="file" data-file="sess.php">&lt;?php
+echo $_SESSION["usuario"];
+</pre>
+<pre class="term">$ curl -s localhost:8000/sess.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined global variable $_SESSION in &lt;b&gt;/home/ana/site/sess.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Trying to access array offset on null in &lt;b&gt;/home/ana/site/sess.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> <code>$_SESSION</code> só passa a existir depois de <code>session_start()</code>. Sem ela, a variável não existe (primeiro aviso) e ler <code>["usuario"]</code> de "nada" (<code>null</code>) gera o segundo.</p>
+<p><strong>Como resolver:</strong> chame <code>session_start()</code> no começo do arquivo, como em <a href="sessoes.html">Sessões</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>O código funciona no laboratório, mas <code>$_ENV</code> vem vazio no servidor</strong>
+<p><strong>O que aconteceu:</strong> o <code>variables_order</code> do servidor não inclui o <code>E</code>.</p>
+<p><strong>Como resolver:</strong> troque <code>$_ENV['X']</code> por <code>getenv('X')</code>.</p>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O navegador</h3>
+<p>Complete a chave que guarda o programa que fez o pedido:</p>
+<div class="ex-code">$_SERVER['<input data-answer="HTTP_USER_AGENT" aria-label="chave">']</div>
+</div>
+
+<div class="exercise">
+<h3>2. O endereço pedido</h3>
+<p>Para o pedido <code>/blog.php?post=3</code>, qual chave vale <code>/blog.php?post=3</code>?</p>
+<div class="ex-code">$_SERVER['<input data-answer="REQUEST_URI" aria-label="chave">']</div>
+</div>
+
+<div class="exercise">
+<h3>3. Variável de ambiente</h3>
+<p>Complete com a função que lê a variável de ambiente <code>HOME</code> mesmo quando <code>$_ENV</code> está vazio:</p>
+<div class="ex-code"><input data-answer="getenv" aria-label="função">('HOME')</div>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Qual destas chaves <strong>não</strong> pode ser escolhida pelo visitante?</p>
+<label><input type="radio" name="q4"> <code>HTTP_USER_AGENT</code></label>
+<label><input type="radio" name="q4"> <code>HTTP_REFERER</code></label>
+<label><input type="radio" name="q4"> <code>QUERY_STRING</code></label>
+<label><input type="radio" name="q4"> <code>SCRIPT_FILENAME</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual superglobal só existe depois de chamar uma função?</p>
+<label><input type="radio" name="q5"> <code>$_COOKIE</code></label>
+<label><input type="radio" name="q5"> <code>$_SESSION</code></label>
+<label><input type="radio" name="q5"> <code>$_SERVER</code></label>
+<label><input type="radio" name="q5"> <code>$GLOBALS</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que <code>action="&lt;?= $_SERVER['PHP_SELF'] ?&gt;"</code> é perigoso?</p>
+<label><input type="radio" name="q6"> Porque o visitante pode colocar texto no endereço que entra no <code>PHP_SELF</code> sem escape.</label>
+<label><input type="radio" name="q6"> Porque <code>PHP_SELF</code> não existe no PHP 8.</label>
+<label><input type="radio" name="q6"> Porque ele envia o formulário por GET.</label>
+<label><input type="radio" name="q6"> Porque ele mostra a senha do banco.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?pagina=2" data-goal="outre:Você pediu: [^&lt;]*pagina=2,html:Método: GET,src:REQUEST_URI,src:REQUEST_METHOD,semerro">
+<p class="try-task"><strong>Missão:</strong> a página foi aberta com <code>?pagina=2</code>. Complete o rodapé para mostrar <code>Método: </code> seguido do <code>REQUEST_METHOD</code> e <code>Você pediu: </code> seguido do <code>REQUEST_URI</code>, os dois com <code>htmlspecialchars</code>.</p>
+<pre class="script">&lt;h1&gt;Receitas&lt;/h1&gt;
+&lt;p&gt;Página de receitas da Ana.&lt;/p&gt;
+&lt;footer&gt;
+&lt;?php
+// mostre aqui o método e o endereço pedido
+?&gt;
+&lt;/footer&gt;
+</pre>
+<pre class="solucao">&lt;h1&gt;Receitas&lt;/h1&gt;
+&lt;p&gt;Página de receitas da Ana.&lt;/p&gt;
+&lt;footer&gt;
+&lt;?php
+echo "&lt;p&gt;Método: " . htmlspecialchars($_SERVER['REQUEST_METHOD']) . "&lt;/p&gt;";
+echo "&lt;p&gt;Você pediu: " . htmlspecialchars($_SERVER['REQUEST_URI']) . "&lt;/p&gt;";
+?&gt;
+&lt;/footer&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="html:Seu navegador:,src:HTTP_USER_AGENT,src:htmlspecialchars,src:\?\?,semerro">
+<p class="try-task"><strong>Missão:</strong> mostre <code>Seu navegador: </code> seguido do <code>HTTP_USER_AGENT</code>. Lembre: esse cabeçalho pode não vir (use <code>?? 'desconhecido'</code>) e foi escrito pelo visitante (use <code>htmlspecialchars</code>).</p>
+<pre class="script">&lt;?php
+// seu código aqui
+</pre>
+<pre class="solucao">&lt;?php
+$agente = $_SERVER['HTTP_USER_AGENT'] ?? 'desconhecido';
+echo "&lt;p&gt;Seu navegador: " . htmlspecialchars($agente) . "&lt;/p&gt;";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Superglobais existem em todo lugar, inclusive em funções. São nove: <code>$_GET</code>, <code>$_POST</code>, <code>$_FILES</code>, <code>$_COOKIE</code>, <code>$_SESSION</code>, <code>$_REQUEST</code>, <code>$_SERVER</code>, <code>$_ENV</code>, <code>$GLOBALS</code>.</li>
+  <li><code>$_SERVER</code> descreve o pedido e o servidor: <code>REQUEST_METHOD</code>, <code>REQUEST_URI</code>, <code>QUERY_STRING</code>, <code>SCRIPT_NAME</code>, <code>REMOTE_ADDR</code>…</li>
+  <li>Cada cabeçalho HTTP vira <code>HTTP_NOME</code>; todos podem ser falsificados e podem não existir: <code>?? ''</code> e <code>htmlspecialchars</code>.</li>
+  <li>Não use <code>PHP_SELF</code> sem escape; para enviar à própria página, omita o <code>action</code>.</li>
+  <li>No terminal, <code>$_SERVER</code> não tem dados de pedido, mas tem <code>argv</code>/<code>argc</code>.</li>
+  <li>Para variáveis de ambiente, <code>getenv</code>. <code>$GLOBALS</code> existe, mas prefira parâmetros.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
