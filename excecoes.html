@@ -226,7 +226,7 @@ do try</pre>
 
 <p>Repare que esse <code>try</code> não tem <code>catch</code>: <code>try</code> + <code>finally</code> sozinhos também valem.</p>
 
-<div class="tryphp" data-goal="outre:(?s)Fechando o caixa.*Fechando o caixa.*Fechando o caixa,out:Erro: Quantidade inválida: -1,src:finally">
+<div class="tryphp" data-goal="outre:Fechando o caixa[\s\S]*Fechando o caixa[\s\S]*Fechando o caixa,out:Erro: Quantidade inválida: -1,src:finally">
 <p class="try-task"><strong>Missão:</strong> hoje o caixa só é fechado quando a venda dá certo. Mova o <code>echo "Fechando o caixa\n";</code> para um bloco <code>finally</code>, para ele aparecer nas três chamadas.</p>
 <pre class="script">&lt;?php
 function processar(int $qtd): void
