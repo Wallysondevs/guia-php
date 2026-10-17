@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP CSRF — token, hash_equals e SameSite | Guia PHP</title>
+<meta name="description" content="O ataque CSRF (falsificação de requisição entre sites) explicado com desenho e demonstração real com curl, e como proteger formulários PHP: token na sessão com random_bytes, campo oculto, conferência com hash_equals, cookies SameSite e um formulário protegido para testar no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">CSRF e Segurança de Formulários</span></h1>
+
+<p class="intro">A Ana já protege a lojinha contra scripts injetados (<a href="escapar-saida.html">XSS</a>) e contra SQL malicioso (<a href="prepared-statements.html">prepared statements</a>). Falta um ataque mais sorrateiro, em que o golpista nem chega a tocar no site dela: ele faz o <strong>navegador da própria vítima</strong> enviar um formulário. Esse ataque se chama <strong>CSRF</strong> (<em>Cross-Site Request Forgery</em>, "falsificação de requisição entre sites"). Nesta aula você vai ver o ataque acontecer de verdade e protegê-lo com três peças: um token, um campo oculto e o <code>hash_equals</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como funciona um ataque CSRF, passo a passo, e por que estar logado é o que o torna possível.</li>
+  <li>Gerar um token secreto com <code>random_bytes</code> e guardá-lo na <a href="sessoes.html">sessão</a>.</li>
+  <li>Colocar o token num campo oculto do formulário e conferi-lo com <code>hash_equals</code>.</li>
+  <li>O que o atributo <code>SameSite</code> dos cookies faz, e por que ele ajuda mas não substitui o token.</li>
+  <li>As regras de ouro: nunca mudar dados com <code>GET</code>, token em todo formulário que altera algo.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o bilhete com a assinatura certa</h2>
+<p>Imagine que o banco da Ana aceita qualquer bilhete que chegue com a assinatura dela. Um golpista não consegue falsificar a assinatura, mas descobre um truque: ele escreve "transfiram R$ 500 para o golpista" num papel e deixa em cima da mesa da Ana, no meio de outros papéis que ela vai assinar sem ler. A assinatura é verdadeira. O pedido, não.</p>
+<p>Na web, a "assinatura" é o <strong>cookie de sessão</strong>. Depois que a Ana faz login na lojinha, o navegador dela manda esse cookie automaticamente em <strong>toda</strong> requisição para a lojinha, não importa de onde a requisição partiu. Se um site do golpista fizer o navegador da Ana enviar um formulário para a lojinha, o cookie vai junto, e a lojinha acha que foi a Ana.</p>
+
+<figure>
+<svg viewBox="0 0 640 300" width="100%" role="img" aria-label="Desenho do ataque CSRF: a Ana, logada na lojinha, abre o site do golpista, que faz o navegador dela enviar um POST para a lojinha com o cookie de sessão" style="max-width:640px;font-family:inherit">
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="230" y="110" width="180" height="80" rx="10"/>
+    <rect x="20" y="10" width="190" height="70" rx="10"/>
+    <rect x="430" y="10" width="190" height="70" rx="10" stroke-dasharray="6 4"/>
+    <rect x="430" y="220" width="190" height="70" rx="10"/>
+  </g>
+  <g fill="currentColor" font-size="15" text-anchor="middle">
+    <text x="320" y="140" font-weight="bold">Navegador da Ana</text>
+    <text x="320" y="162" font-size="13">guarda o cookie</text>
+    <text x="320" y="180" font-size="13">PHPSESSID=6ceb8c…</text>
+    <text x="115" y="40" font-weight="bold">Lojinha (localhost:8000)</text>
+    <text x="115" y="62" font-size="13">1. a Ana faz login</text>
+    <text x="525" y="40" font-weight="bold">Site do golpista</text>
+    <text x="525" y="62" font-size="13">formulário escondido</text>
+    <text x="525" y="250" font-weight="bold">Lojinha</text>
+    <text x="525" y="272" font-size="13">"é a Ana!" → troca o e-mail</text>
+  </g>
+  <g stroke="currentColor" stroke-width="2" fill="none" marker-end="url(#seta)">
+    <path d="M150,80 L250,110"/>
+    <path d="M470,80 L395,110"/>
+    <path d="M360,190 L450,220"/>
+  </g>
+  <g fill="currentColor" font-size="13">
+    <text x="40" y="104">cookie de sessão</text>
+    <text x="440" y="104">2. a Ana abre o site</text>
+    <text x="250" y="232">3. POST alterar-email.php</text>
+    <text x="250" y="250">+ cookie (automático!)</text>
+  </g>
+</svg>
+<figcaption>O golpista nunca vê o cookie. Ele só faz o navegador da Ana enviar o pedido, e o navegador anexa o cookie sozinho.</figcaption>
+</figure>
+
+<ol class="passo">
+  <li>A Ana faz login na lojinha. O PHP cria a sessão e o navegador guarda o cookie <code>PHPSESSID</code>.</li>
+  <li>Em outra aba, sem sair da lojinha, a Ana abre um link "imperdível" que recebeu. É o site do golpista.</li>
+  <li>A página do golpista tem um formulário invisível que se envia sozinho para <code>localhost:8000/alterar-email.php</code>. O navegador manda o cookie da lojinha junto. A lojinha confere a sessão, vê "usuária ana" e troca o e-mail da conta para o do golpista. Depois é só ele pedir "esqueci minha senha".</li>
+</ol>
+
+<p>Repare: o golpista não roubou senha nem cookie, e o site da lojinha não tem nenhum bug de XSS ou SQL. O problema é que a lojinha <strong>não sabe de onde veio o formulário</strong>.</p>
+
+<hr>
+
+<h2>O ataque, de verdade</h2>
+<p>Este é o <code>alterar-email.php</code> da lojinha, ainda sem proteção. Ele confere se há alguém logado e troca o e-mail:</p>
+
+<pre class="file" data-file="alterar-email.php (vulnerável)">&lt;?php
+session_start();
+
+if (!isset($_SESSION['usuario'])) {
+    http_response_code(401);
+    exit("Faça login primeiro\n");
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['email'] = $_POST['email'];
+    echo "E-mail alterado para {$_SESSION['email']}\n";
+}
+</pre>
+
+<p>E esta é a página do golpista, hospedada em outro site qualquer:</p>
+
+<pre class="file" data-file="promocao.html (no site do golpista)">&lt;!doctype html&gt;
+&lt;html&gt;
+&lt;body onload="document.forms[0].submit()"&gt;
+  &lt;h1&gt;Parabéns! Você ganhou um cupom!&lt;/h1&gt;
+  &lt;form action="http://localhost:8000/alterar-email.php" method="post" style="display:none"&gt;
+    &lt;input name="email" value="golpista@exemplo.com"&gt;
+  &lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>action="http://localhost:8000/alterar-email.php"</dt><dd>O formulário aponta para a lojinha, não para o site do golpista. Qualquer página pode mandar um formulário para qualquer site.</dd>
+  <dt>style="display:none"</dt><dd>Invisível: a Ana só vê "Parabéns!".</dd>
+  <dt>onload="document.forms[0].submit()"</dt><dd>Um pouco de JavaScript que envia o formulário assim que a página carrega, sem clique nenhum.</dd>
+</dl>
+
+<p>Como este guia não abre navegador, a Ana reproduziu o que o navegador faria com o <code>curl</code>. O <code>-c cookies.txt</code> guarda o cookie recebido no login (como o navegador guarda) e o <code>-b cookies.txt</code> o envia de volta (como o navegador envia sozinho). O <code>-H 'Origin: …'</code> imita o cabeçalho que diz de qual site veio o formulário:</p>
+
+<pre class="term">$ curl -i -c cookies.txt localhost:8000/login.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:02:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Set-Cookie: PHPSESSID=6ceb8c39b417bf0769562ed04e51654a; path=/
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-type: text/html; charset=UTF-8
+
+Logada como ana
+$ curl -b cookies.txt -d 'email=golpista@exemplo.com' -H 'Origin: http://site-do-golpista.example' localhost:8000/alterar-email.php
+E-mail alterado para golpista@exemplo.com</pre>
+
+<p>Pronto: com o cookie da Ana, o pedido vindo "do site do golpista" foi aceito. Sem o cookie (alguém que não está logado), não funciona:</p>
+
+<pre class="term">$ curl -d 'email=golpista@exemplo.com' localhost:8000/alterar-email.php
+Faça login primeiro</pre>
+
+<p>É isso que torna o CSRF perigoso: ele ataca justamente quem <strong>está logado</strong>. Qualquer ação que um usuário logado pode fazer com um formulário (trocar e-mail ou senha, fazer um pedido, apagar uma conta, publicar um post) pode ser disparada assim.</p>
+
+<hr>
+
+<h2>A defesa: um token que só a lojinha conhece</h2>
+<p>O site do golpista consegue enviar o formulário, mas <strong>não consegue ler</strong> as páginas da lojinha (o navegador proíbe um site de ler a resposta de outro). Então a lojinha coloca em cada formulário um número secreto e aleatório, o <strong>token CSRF</strong>, e só aceita o pedido se o número voltar certo. O golpista não tem como saber o número, então o formulário falso chega sem ele.</p>
+<p>São três peças:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Peça</th><th>Onde</th><th>Código</th></tr>
+<tr><td>1. Criar o token</td><td>Na sessão, uma vez</td><td><code>$_SESSION['csrf'] = bin2hex(random_bytes(32));</code></td></tr>
+<tr><td>2. Mandar o token</td><td>Campo oculto em todo formulário que altera algo</td><td><code>&lt;input type="hidden" name="csrf" value="&lt;?= $_SESSION['csrf'] ?&gt;"&gt;</code></td></tr>
+<tr><td>3. Conferir o token</td><td>No começo de quem recebe o POST</td><td><code>hash_equals($_SESSION['csrf'], $_POST['csrf'])</code></td></tr>
+</table>
+</div>
+
+<h3>Peça 1: criar o token</h3>
+
+<pre class="file" data-file="conta.php">&lt;?php
+require __DIR__ . '/inicio.php';
+
+if (!isset($_SESSION['usuario'])) {
+    http_response_code(401);
+    exit("Faça login primeiro\n");
+}
+
+if (empty($_SESSION['csrf'])) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+}
+?&gt;
+&lt;p&gt;E-mail atual: &lt;?= htmlspecialchars($_SESSION['email']) ?&gt;&lt;/p&gt;
+&lt;form method="post" action="alterar-email.php"&gt;
+    &lt;input type="hidden" name="csrf" value="&lt;?= $_SESSION['csrf'] ?&gt;"&gt;
+    &lt;input type="email" name="email" required&gt;
+    &lt;button&gt;Alterar e-mail&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>require __DIR__ . '/inicio.php'</dt><dd>Um arquivo que configura o cookie e chama <code>session_start()</code>. Você o verá na seção sobre <code>SameSite</code>.</dd>
+  <dt>if (empty($_SESSION['csrf']))</dt><dd>Cria o token só se ainda não existir: um token por sessão, o mesmo para todos os formulários.</dd>
+  <dt>random_bytes(32)</dt><dd>32 bytes <strong>aleatórios de verdade</strong>, próprios para segurança (diferente de <code>rand()</code> ou <code>mt_rand()</code>, que são previsíveis).</dd>
+  <dt>bin2hex(…)</dt><dd>Transforma os bytes (que podem ser caracteres invisíveis) em texto hexadecimal: 64 caracteres de <code>0-9</code> e <code>a-f</code>, seguros para colocar num HTML.</dd>
+</dl>
+
+<h3>Peça 2: o campo oculto</h3>
+<p><code>&lt;input type="hidden"&gt;</code> é um campo que não aparece na tela, mas é enviado com o formulário como qualquer outro. Veja o que a lojinha devolve para a Ana logada (o <code>login.php</code> agora também usa o <code>inicio.php</code>):</p>
+
+<pre class="term">$ curl -i -c cookies.txt localhost:8000/login.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:02:46 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Set-Cookie: PHPSESSID=e9622eb6ec5b671dd698792ddbd6eb74; path=/; HttpOnly; SameSite=Lax
+Content-type: text/html; charset=UTF-8
+
+Logada como ana
+$ curl -b cookies.txt localhost:8000/conta.php
+&lt;p&gt;E-mail atual: ana@lojinha.com&lt;/p&gt;
+&lt;form method="post" action="alterar-email.php"&gt;
+    &lt;input type="hidden" name="csrf" value="142c8d20e0ebe6148d7b666822c12df6804b2ff5240a1cc414eecb720f958b5b"&gt;
+    &lt;input type="email" name="email" required&gt;
+    &lt;button&gt;Alterar e-mail&lt;/button&gt;
+&lt;/form&gt;</pre>
+
+<p>O token é aquele número de 64 caracteres. Ele é diferente para cada sessão: outra pessoa (ou a mesma Ana, em outro login) recebe outro. O <code>value</code> não precisa de <code>htmlspecialchars</code> porque o token só tem <code>0-9a-f</code>, que nós mesmos geramos.</p>
+
+<h3>Peça 3: conferir com <code>hash_equals</code></h3>
+
+<pre class="file" data-file="alterar-email.php (protegido)">&lt;?php
+require __DIR__ . '/inicio.php';
+
+if (!isset($_SESSION['usuario'])) {
+    http_response_code(401);
+    exit("Faça login primeiro\n");
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    exit("Use o formulário\n");
+}
+
+$tokenSessao = $_SESSION['csrf'] ?? '';
+$tokenEnviado = $_POST['csrf'] ?? '';
+
+if (!is_string($tokenEnviado) || $tokenSessao === '' || !hash_equals($tokenSessao, $tokenEnviado)) {
+    http_response_code(403);
+    exit("Pedido recusado: token CSRF inválido\n");
+}
+
+$_SESSION['email'] = $_POST['email'];
+echo 'E-mail alterado para ', htmlspecialchars($_SESSION['email']), "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>!== 'POST'</code> → <code>405</code></td><td>Só aceita POST. Ações que mudam dados nunca devem funcionar por <code>GET</code> (um simples <code>&lt;img src="…/alterar-email.php?email=…"&gt;</code> faria um GET).</td></tr>
+<tr><td><code>$_SESSION['csrf'] ?? ''</code></td><td>O token guardado. Se a sessão não tiver token (o usuário nunca abriu o formulário), vale <code>''</code>.</td></tr>
+<tr><td><code>$_POST['csrf'] ?? ''</code></td><td>O token que veio no formulário. Formulário falso = não veio = <code>''</code>.</td></tr>
+<tr><td><code>!is_string($tokenEnviado)</code></td><td>Recusa se alguém mandar um array (<code>csrf[]=x</code>), que faria o <code>hash_equals</code> dar erro fatal (veja os erros no fim da aula).</td></tr>
+<tr><td><code>$tokenSessao === ''</code></td><td>Sem token na sessão, não há o que comparar: recusa.</td></tr>
+<tr><td><code>hash_equals($tokenSessao, $tokenEnviado)</code></td><td>Compara os dois textos. Devolve <code>true</code> se forem idênticos.</td></tr>
+<tr><td><code>http_response_code(403)</code></td><td>403 Forbidden: "proibido".</td></tr>
+</table>
+</div>
+
+<h3>Por que <code>hash_equals</code> e não <code>===</code>?</h3>
+<p>O <code>===</code> compara os textos letra por letra e <strong>para na primeira diferença</strong>. Um token que começa errado é recusado um pouquinho mais rápido que um que só erra no fim. A diferença é de bilionésimos de segundo, mas medindo milhares de tentativas um atacante consegue descobrir o token letra por letra (isso se chama <strong>ataque de tempo</strong>, <em>timing attack</em>). O <code>hash_equals</code> ("hashes iguais?") foi feito para comparar segredos: ele sempre gasta o mesmo tempo, esteja o erro onde estiver. Regra: <strong>segredo se compara com <code>hash_equals</code></strong> (tokens, assinaturas, códigos de confirmação). Para senhas, quem compara é o <code>password_verify</code> (aula <a href="senhas.html">Senhas</a>). A ordem importa: primeiro o valor conhecido (o da sessão), depois o que veio do usuário.</p>
+
+<h3>O ataque de novo</h3>
+
+<pre class="term">$ curl -i -b cookies.txt -d 'email=golpista@exemplo.com' localhost:8000/alterar-email.php
+HTTP/1.1 403 Forbidden
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:02:46 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-type: text/html; charset=UTF-8
+
+Pedido recusado: token CSRF inválido
+$ curl -b cookies.txt -d 'csrf=123456&amp;email=golpista@exemplo.com' localhost:8000/alterar-email.php
+Pedido recusado: token CSRF inválido</pre>
+
+<p>Mesmo com o cookie da Ana, o pedido sem token (o formulário do golpista) e o pedido com um token chutado foram recusados. E a Ana de verdade, usando o formulário da lojinha? O navegador manda o campo oculto junto. Com o <code>curl</code>, a Ana pega o token da página (o <code>grep -o</code> separa a sequência de 64 caracteres hexadecimais) e o envia:</p>
+
+<pre class="term">$ token=$(curl -s -b cookies.txt localhost:8000/conta.php | grep -o '[0-9a-f]\{64\}')
+$ curl -b cookies.txt -d "csrf=$token&amp;email=ana.souza@lojinha.com" localhost:8000/alterar-email.php
+E-mail alterado para ana.souza@lojinha.com
+$ curl -b cookies.txt localhost:8000/conta.php
+&lt;p&gt;E-mail atual: ana.souza@lojinha.com&lt;/p&gt;
+&lt;form method="post" action="alterar-email.php"&gt;
+    &lt;input type="hidden" name="csrf" value="142c8d20e0ebe6148d7b666822c12df6804b2ff5240a1cc414eecb720f958b5b"&gt;
+    &lt;input type="email" name="email" required&gt;
+    &lt;button&gt;Alterar e-mail&lt;/button&gt;
+&lt;/form&gt;</pre>
+
+<p>Funcionou, e o token continua o mesmo durante a sessão.</p>
+
+<hr>
+
+<h2>Experimente: um formulário protegido</h2>
+<p>Abaixo está a página "Minha conta" inteira num arquivo só, com as três peças marcadas nos comentários. O editor roda em modo web, com sessão: o que você faz no formulário fica guardado entre um envio e outro.</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> (1) Rode e abra a aba <strong>Código-fonte HTML</strong> para ver o campo oculto com o token. (2) Na aba <strong>Resultado</strong>, digite um e-mail novo e envie: deve aparecer "E-mail alterado!". (3) Agora imite o golpista: apague a linha do <code>&lt;input type="hidden" …&gt;</code>, rode de novo e envie o formulário. O pedido chega sem token e é recusado.</p>
+<pre class="script">&lt;?php
+session_start();
+$_SESSION['email'] ??= 'ana@lojinha.com';
+
+// 1. Um token por sessão, criado na primeira visita
+if (empty($_SESSION['csrf'])) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+}
+
+$mensagem = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // 3. Conferir o token antes de qualquer mudança
+    $tokenEnviado = $_POST['csrf'] ?? '';
+    if (!is_string($tokenEnviado) || !hash_equals($_SESSION['csrf'], $tokenEnviado)) {
+        http_response_code(403);
+        $mensagem = 'Pedido recusado: token CSRF inválido.';
+    } else {
+        $_SESSION['email'] = $_POST['email'] ?? $_SESSION['email'];
+        $mensagem = 'E-mail alterado!';
+    }
+}
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Minha conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Minha conta&lt;/h1&gt;
+&lt;p&gt;&lt;strong&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;E-mail atual: &lt;?= htmlspecialchars($_SESSION['email']) ?&gt;&lt;/p&gt;
+&lt;form method="post"&gt;
+    &lt;!-- 2. O token vai escondido no formulário --&gt;
+    &lt;input type="hidden" name="csrf" value="&lt;?= $_SESSION['csrf'] ?&gt;"&gt;
+    &lt;input type="email" name="email" placeholder="novo e-mail" required&gt;
+    &lt;button&gt;Alterar e-mail&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<p>No computador da Ana, o mesmo arquivo servido pelo <code>php -S</code> responde assim a um POST sem token (o trecho do <code>&lt;body&gt;</code>):</p>
+
+<pre class="term">$ curl -s -d 'email=golpista@exemplo.com' localhost:8000/index.php
+…
+&lt;h1&gt;Minha conta&lt;/h1&gt;
+&lt;p&gt;&lt;strong&gt;Pedido recusado: token CSRF inválido.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;E-mail atual: ana@lojinha.com&lt;/p&gt;
+…</pre>
+
+<hr>
+
+<h2>SameSite: o navegador ajudando</h2>
+<p>Os cookies têm um atributo, <code>SameSite</code> ("mesmo site"), que diz ao navegador quando ele pode enviar o cookie em requisições que partiram de <strong>outro</strong> site. Compare o cabeçalho <code>Set-Cookie</code> das duas versões do login, lá em cima:</p>
+
+<pre class="term">Set-Cookie: PHPSESSID=6ceb8c39b417bf0769562ed04e51654a; path=/                      « padrão do PHP
+Set-Cookie: PHPSESSID=e9622eb6ec5b671dd698792ddbd6eb74; path=/; HttpOnly; SameSite=Lax « com o inicio.php</pre>
+
+<p>A diferença veio deste arquivo, incluído no começo de todas as páginas da versão protegida:</p>
+
+<pre class="file" data-file="inicio.php">&lt;?php
+session_set_cookie_params([
+    'httponly' =&gt; true,
+    'samesite' =&gt; 'Lax',
+]);
+session_start();
+</pre>
+
+<dl class="anatomy">
+  <dt>session_set_cookie_params([...])</dt><dd>Configura o cookie da sessão. Precisa vir <strong>antes</strong> do <code>session_start()</code>.</dd>
+  <dt>'httponly' =&gt; true</dt><dd>O JavaScript da página não consegue ler o cookie (dificulta roubá-lo por XSS). Não tem a ver com CSRF, mas é bom hábito.</dd>
+  <dt>'samesite' =&gt; 'Lax'</dt><dd>O navegador <strong>não</strong> envia o cookie em POSTs vindos de outro site. O formulário escondido do golpista chegaria sem o cookie, ou seja, como alguém não logado.</dd>
+  <dt>'secure' =&gt; true</dt><dd>(Não usado aqui porque o <code>php -S</code> é <code>http</code>.) No site real, com HTTPS, acrescente: o cookie só viaja por conexão criptografada.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th>O navegador envia o cookie em pedidos vindos de outro site?</th><th>Uso</th></tr>
+<tr><td><code>Strict</code></td><td>Nunca. Nem quando você clica num link para a lojinha vindo do e-mail (você chega "deslogado").</td><td>Bancos, áreas administrativas.</td></tr>
+<tr><td><code>Lax</code></td><td>Só em navegação comum com <code>GET</code> (clicar num link). Em POST, imagens, iframes: não.</td><td>O bom padrão para a maioria dos sites.</td></tr>
+<tr><td><code>None</code></td><td>Sempre (exige também <code>Secure</code>).</td><td>Só quando outro site precisa mesmo usar a sua sessão (ex.: um widget incorporado).</td></tr>
+</table>
+</div>
+
+<p>Para todo o site, sem mexer no código, o mesmo vale no <code>php.ini</code>: <code>session.cookie_samesite = "Lax"</code> e <code>session.cookie_httponly = 1</code>. Para cookies seus, o <code>setcookie</code> aceita a mesma opção: <code>setcookie('tema', 'escuro', ['samesite' =&gt; 'Lax'])</code> (veja <a href="cookies.html">Cookies</a>).</p>
+
+<div class="warning"><strong>SameSite não substitui o token.</strong> O <code>curl</code> não é um navegador e não respeita <code>SameSite</code> (por isso a demonstração acima precisou do token para ser barrada). Os navegadores respeitam, mas: navegadores antigos ignoram o atributo; <code>Lax</code> deixa passar <code>GET</code> (se alguma ação sua muda dados por GET, ela continua vulnerável); e "mesmo site" inclui subdomínios (um <code>blog.lojinha.com</code> invadido pode atacar <code>loja.lojinha.com</code>). Use os dois: <code>SameSite=Lax</code> como segunda camada, token como proteção principal.</div>
+
+<hr>
+
+<h2>Formas diferentes e boas práticas</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>O que fazer</th></tr>
+<tr><td>Vários formulários no site</td><td>O mesmo token da sessão em todos. Crie uma função <code>campoCsrf(): string</code> que devolve o <code>&lt;input type="hidden"…&gt;</code> e outra <code>conferirCsrf(): void</code> que recusa com 403, e chame-as em todo lugar.</td></tr>
+<tr><td>Depois do login</td><td>Chame <code>session_regenerate_id(true)</code> (troca o id da sessão) e gere um token novo. Assim um token de antes do login não serve depois.</td></tr>
+<tr><td>Requisições via JavaScript (<code>fetch</code>)</td><td>Mande o token num cabeçalho, como <code>X-CSRF-Token</code>, e confira com <code>$_SERVER['HTTP_X_CSRF_TOKEN']</code>.</td></tr>
+<tr><td>Ações muito sensíveis (trocar senha, apagar conta)</td><td>Além do token, peça a senha atual de novo.</td></tr>
+<tr><td>Frameworks</td><td>Laravel e Symfony já geram e conferem o token (no Laravel, a diretiva <code>@csrf</code> no formulário). Por baixo, é exatamente o que você fez aqui.</td></tr>
+<tr><td>Camada extra</td><td>Navegadores modernos mandam o cabeçalho <code>Sec-Fetch-Site</code> (<code>same-origin</code>, <code>cross-site</code>…) e o <code>Origin</code>. Recusar POSTs com <code>Sec-Fetch-Site: cross-site</code> é uma boa defesa adicional.</td></tr>
+</table>
+</div>
+
+<p><strong>Regras de ouro:</strong> (1) <code>GET</code> só consulta, nunca altera; (2) todo <code>POST</code> que altera algo confere o token; (3) cookies de sessão com <code>HttpOnly</code>, <code>SameSite=Lax</code> e, em produção, <code>Secure</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"hash_equals(): Argument #2 ($user_string) must be of type string, array given"</strong>
+<p>Sem o <code>is_string</code>, um atacante pode mandar o campo como array (<code>csrf[]=x</code>):</p>
+<pre class="term">$ curl -b cookies.txt -d 'csrf[]=x&amp;email=golpista@exemplo.com' localhost:8000/sem-is-string.php
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: hash_equals(): Argument #2 ($user_string) must be of type string, array given in /home/ana/csrf2/sem-is-string.php:17
+Stack trace:
+#0 /home/ana/csrf2/sem-is-string.php(17): hash_equals(Object(SensitiveParameterValue), Object(SensitiveParameterValue))
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/csrf2/sem-is-string.php&lt;/b&gt; on line &lt;b&gt;17&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que significa:</strong> no PHP, <code>csrf[]=x</code> no formulário vira <code>$_POST['csrf'] = ['x']</code>. O <code>hash_equals</code> só aceita textos e lançou um <code>TypeError</code>. O e-mail não foi trocado, mas a página quebrou mostrando o caminho do arquivo. Repare em <code>Object(SensitiveParameterValue)</code>: o PHP esconde os argumentos do <code>hash_equals</code> no rastro do erro, para o token não vazar na mensagem.</p>
+<p><strong>Como consertar:</strong> confira o tipo antes, como no <code>alterar-email.php</code> protegido. Com o <code>is_string</code>, a resposta é a de sempre:</p>
+<pre class="term">$ curl -b cookies.txt -d 'csrf[]=x&amp;email=golpista@exemplo.com' localhost:8000/alterar-email.php
+Pedido recusado: token CSRF inválido</pre>
+</div>
+
+<div class="cenario">
+<strong>O usuário de verdade recebe "token CSRF inválido"</strong>
+<p><strong>O que significa:</strong> o formulário foi enviado com um token que não bate com o da sessão. Causas comuns: o formulário não tem o campo oculto (esqueceu o <code>&lt;input type="hidden"&gt;</code>); o <code>name</code> do campo é diferente do que o PHP lê (<code>token</code> × <code>csrf</code>); a sessão expirou (a página ficou aberta horas) ou foi trocada por um novo login; ou a página de destino não chamou <code>session_start()</code>, e então <code>$_SESSION</code> está vazio.</p>
+<p><strong>Como consertar:</strong> confira o código-fonte da página (o campo está lá, com o nome certo?) e se todos os arquivos começam a sessão. Para sessão expirada, mostre uma mensagem amigável ("sua sessão expirou, recarregue a página") em vez de só "403".</p>
+</div>
+
+<div class="cenario">
+<strong>"Use o formulário" (405) ao abrir o endereço no navegador</strong>
+<pre class="term">$ curl -b cookies.txt localhost:8000/alterar-email.php
+Use o formulário</pre>
+<p><strong>O que significa:</strong> abrir a URL na barra de endereços faz um <code>GET</code>, e a página só aceita <code>POST</code>. Isso é proposital.</p>
+<p><strong>Como consertar:</strong> nada a consertar. Se você precisa de uma página de "confirmação", faça-a mostrar um formulário (com token) que envia o POST.</p>
+</div>
+
+<div class="cenario">
+<strong>"session_set_cookie_params(): Session cookie parameters cannot be changed when a session is active"</strong>
+<pre class="file" data-file="ordem.php">&lt;?php
+session_start();
+session_set_cookie_params([
+    'httponly' =&gt; true,
+    'samesite' =&gt; 'Lax',
+]);
+</pre>
+<pre class="term">$ curl -s localhost:8000/ordem.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  session_set_cookie_params(): Session cookie parameters cannot be changed when a session is active (started from /home/ana/csrf2/ordem.php on line 2) in &lt;b&gt;/home/ana/csrf2/ordem.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que significa:</strong> "os parâmetros do cookie da sessão não podem ser mudados com uma sessão ativa (iniciada na linha 2)". O <code>session_set_cookie_params</code> foi chamado depois do <code>session_start()</code>, e o cookie ficou sem <code>SameSite</code>. Os parâmetros do cookie precisam ser definidos antes de a sessão começar.</p>
+<p><strong>Como consertar:</strong> centralize as duas chamadas num arquivo como o <code>inicio.php</code>, nesta ordem, e inclua-o no topo de todas as páginas.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O quê</th><th>Como</th></tr>
+<tr><td>Gerar o token</td><td><code>$_SESSION['csrf'] = bin2hex(random_bytes(32));</code> (se ainda não existir)</td></tr>
+<tr><td>Campo oculto</td><td><code>&lt;input type="hidden" name="csrf" value="&lt;?= $_SESSION['csrf'] ?&gt;"&gt;</code></td></tr>
+<tr><td>Conferir</td><td><code>is_string($t) &amp;&amp; hash_equals($_SESSION['csrf'], $t)</code>; senão <code>http_response_code(403)</code></td></tr>
+<tr><td>Comparar segredos</td><td><code>hash_equals($conhecido, $enviado)</code> (tempo constante)</td></tr>
+<tr><td>Cookie de sessão</td><td><code>session_set_cookie_params(['httponly' =&gt; true, 'samesite' =&gt; 'Lax', 'secure' =&gt; true])</code> antes do <code>session_start()</code></td></tr>
+<tr><td>No <code>php.ini</code></td><td><code>session.cookie_samesite = "Lax"</code>, <code>session.cookie_httponly = 1</code>, <code>session.cookie_secure = 1</code></td></tr>
+<tr><td>Depois do login</td><td><code>session_regenerate_id(true);</code> e token novo</td></tr>
+<tr><td>Só POST altera</td><td><code>if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); … }</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Bytes aleatórios seguros</h3>
+<p>Complete a geração do token:</p>
+<div class="ex-code">$_SESSION['csrf'] = bin2hex(<input data-answer="random_bytes(32)" aria-label="função">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. O campo que não aparece</h3>
+<p>Complete o tipo do campo que leva o token no formulário:</p>
+<div class="ex-code">&lt;input type="<input data-answer="hidden" aria-label="tipo">" name="csrf" value="…"&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Comparar sem vazar tempo</h3>
+<p>Complete com a função que compara segredos em tempo constante:</p>
+<div class="ex-code">if (!<input data-answer="hash_equals" aria-label="função">($_SESSION['csrf'], $tokenEnviado)) {</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Por que o ataque CSRF funciona contra um site sem token?</p>
+<label><input type="radio" name="q4"> Porque o golpista roubou a senha da vítima.</label>
+<label><input type="radio" name="q4"> Porque o navegador da vítima envia o cookie de sessão junto com o formulário falso, e o site acha que foi ela.</label>
+<label><input type="radio" name="q4"> Porque o site tem um bug de SQL injection.</label>
+<label><input type="radio" name="q4"> Porque o golpista lê as páginas do site.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Com o cookie de sessão em <code>SameSite=Lax</code>, o que acontece com o formulário POST escondido no site do golpista?</p>
+<label><input type="radio" name="q5"> Ele é bloqueado pelo PHP.</label>
+<label><input type="radio" name="q5"> O navegador manda o cookie normalmente.</label>
+<label><input type="radio" name="q5"> O navegador mostra um aviso para a vítima.</label>
+<label><input type="radio" name="q5"> O navegador envia o formulário sem o cookie, e a lojinha trata como alguém não logado.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual destas ações está <strong>errada</strong>?</p>
+<label><input type="radio" name="q6"> Apagar um produto com um link <code>&lt;a href="apagar.php?id=3"&gt;</code></label>
+<label><input type="radio" name="q6"> Apagar um produto com um formulário POST que tem o token</label>
+<label><input type="radio" name="q6"> Mostrar a lista de produtos com GET</label>
+<label><input type="radio" name="q6"> Usar o mesmo token em todos os formulários da sessão</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="email=golpista@exemplo.com" data-goal="html:Pedido recusado,src:hash_equals,src:random_bytes,semerro">
+<p class="try-task"><strong>Missão final:</strong> a primeira requisição desta caixa já é o <strong>ataque</strong>: um POST com <code>email=golpista@exemplo.com</code> e sem token, como o do formulário escondido. Do jeito que está, a página aceita e mostra "E-mail alterado para golpista@exemplo.com". Proteja a página com as três peças: crie o token na sessão com <code>random_bytes</code>, coloque o campo oculto no formulário e confira com <code>hash_equals</code> antes de trocar o e-mail, mostrando "Pedido recusado: token CSRF inválido." quando falhar. Depois de rodar, use o formulário de verdade para conferir que a troca legítima continua funcionando.</p>
+<pre class="script">&lt;?php
+session_start();
+$_SESSION['email'] ??= 'ana@lojinha.com';
+
+$mensagem = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['email'] = $_POST['email'] ?? $_SESSION['email'];
+    $mensagem = 'E-mail alterado para ' . $_SESSION['email'];
+}
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Minha conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Minha conta&lt;/h1&gt;
+&lt;p&gt;&lt;strong&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;E-mail atual: &lt;?= htmlspecialchars($_SESSION['email']) ?&gt;&lt;/p&gt;
+&lt;form method="post"&gt;
+    &lt;input type="email" name="email" placeholder="novo e-mail" required&gt;
+    &lt;button&gt;Alterar e-mail&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+session_start();
+$_SESSION['email'] ??= 'ana@lojinha.com';
+
+if (empty($_SESSION['csrf'])) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+}
+
+$mensagem = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $tokenEnviado = $_POST['csrf'] ?? '';
+    if (!is_string($tokenEnviado) || !hash_equals($_SESSION['csrf'], $tokenEnviado)) {
+        http_response_code(403);
+        $mensagem = 'Pedido recusado: token CSRF inválido.';
+    } else {
+        $_SESSION['email'] = $_POST['email'] ?? $_SESSION['email'];
+        $mensagem = 'E-mail alterado para ' . $_SESSION['email'];
+    }
+}
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Minha conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Minha conta&lt;/h1&gt;
+&lt;p&gt;&lt;strong&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;E-mail atual: &lt;?= htmlspecialchars($_SESSION['email']) ?&gt;&lt;/p&gt;
+&lt;form method="post"&gt;
+    &lt;input type="hidden" name="csrf" value="&lt;?= $_SESSION['csrf'] ?&gt;"&gt;
+    &lt;input type="email" name="email" placeholder="novo e-mail" required&gt;
+    &lt;button&gt;Alterar e-mail&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>CSRF: um site do golpista faz o navegador de um usuário <strong>logado</strong> enviar um formulário para o seu site; o cookie de sessão vai junto automaticamente.</li>
+  <li>Defesa principal: um token secreto por sessão (<code>bin2hex(random_bytes(32))</code>), enviado num <code>&lt;input type="hidden"&gt;</code> e conferido com <code>hash_equals</code> antes de qualquer alteração. O golpista não consegue ler o token.</li>
+  <li>Confira também se o token é texto (<code>is_string</code>) e responda <code>403</code> quando falhar.</li>
+  <li><code>hash_equals</code> compara segredos em tempo constante; <code>===</code> vaza informação pelo tempo.</li>
+  <li><code>SameSite=Lax</code> (com <code>HttpOnly</code> e, em HTTPS, <code>Secure</code>) faz o navegador não mandar o cookie em POSTs de outros sites: ótima segunda camada, mas não substitui o token.</li>
+  <li><code>GET</code> nunca altera dados.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
