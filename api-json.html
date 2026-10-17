@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Criar uma API JSON — rotas, métodos, status e curl | Guia PHP</title>
+<meta name="description" content="Crie uma API JSON simples em PHP puro: header Content-Type application/json, json_encode, ler o corpo com php://input e json_decode, rotear por REQUEST_METHOD e REQUEST_URI, códigos de status 200, 201, 400, 404 e 405, e testes reais com curl contra o php -S.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Criar uma API JSON</span></h1>
+
+<p class="intro">Até aqui, o PHP da Ana sempre respondeu com <strong>páginas HTML</strong>, feitas para uma pessoa ler no navegador. Uma <strong>API</strong> responde com <strong>dados</strong>, feitos para outro programa ler: um aplicativo de celular, um site em JavaScript, o sistema de um parceiro. O formato mais usado para esses dados é o JSON. Nesta aula, a Ana transforma a lista de produtos da lojinha numa API de verdade e a testa com o <code>curl</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma API e o que muda em relação a uma página HTML.</li>
+  <li>Responder JSON: <code>json_encode</code> e o cabeçalho <code>Content-Type: application/json</code>.</li>
+  <li>Descobrir o que o cliente pediu: <code>$_SERVER['REQUEST_METHOD']</code> e <code>$_SERVER['REQUEST_URI']</code>.</li>
+  <li>Ler um JSON enviado pelo cliente com <code>php://input</code> e <code>json_decode</code> (o <code>$_POST</code> não serve aqui).</li>
+  <li>Os códigos de status 200, 201, 400, 404 e 405, e como enviá-los com <code>http_response_code</code>.</li>
+  <li>Testar cada caso com o <code>curl</code>: GET, POST com JSON, 404 e 405.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o balcão e o pedido por escrito</h2>
+<p>Na lojinha física, a Ana atende pessoas no balcão: mostra os produtos, conversa, embrulha. Isso é a <strong>página HTML</strong>. Agora imagine que uma escola quer fazer pedidos automaticamente todo mês. Ela não quer "conversar": quer mandar um formulário padronizado e receber de volta outro formulário padronizado, que o sistema dela consiga ler sozinho. Isso é a <strong>API</strong> (<em>Application Programming Interface</em>, "interface de programação de aplicações").</p>
+<p>Uma API em PHP é um script PHP comum, com três diferenças:</p>
+<ol>
+  <li>Responde <strong>JSON</strong> em vez de HTML, e avisa isso no cabeçalho <code>Content-Type</code>.</li>
+  <li>Olha <strong>o método</strong> (<code>GET</code> = consultar, <code>POST</code> = criar…) e <strong>o caminho</strong> (<code>/produtos</code>, <code>/produtos/2</code>) para decidir o que fazer. Isso se chama <strong>roteamento</strong>.</li>
+  <li>Usa o <strong>código de status</strong> HTTP para dizer se deu certo (<code>200</code>, <code>201</code>) ou o que deu errado (<code>404</code>, <code>400</code>…).</li>
+</ol>
+
+<hr>
+
+<h2>1. A primeira resposta JSON</h2>
+<p>Comece pelo mais simples: um array do PHP convertido em JSON com <code>json_encode</code> (veja a aula <a href="json.html">JSON</a>).</p>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$dados = ['mensagem' =&gt; 'Olá, API!', 'versao' =&gt; 1];
+echo json_encode($dados), "\n";
+</pre>
+
+<p>A Ana liga o <a href="servidor-embutido.html">servidor embutido</a> num terminal (<code>php -S localhost:8000</code>) e, em outro, pede a página com o <code>curl -i</code>. O <code>-i</code> ("incluir") mostra também os <strong>cabeçalhos</strong> da resposta, que o navegador esconde:</p>
+
+<pre class="term">$ curl -i localhost:8000/ola.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:20 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+{"mensagem":"Olá, API!","versao":1}</pre>
+
+<p>Duas coisas estão erradas:</p>
+<ul>
+  <li><code>Content-type: text/html</code>: o PHP avisou que a resposta é uma <strong>página HTML</strong>, porque é o padrão dele. Um cliente que confere o tipo vai recusar ou tratar como texto.</li>
+  <li><code>Olá</code>: o <code>json_encode</code> escreveu o <code>á</code> como código (<code>á</code>). É JSON válido (quem ler vai entender <code>á</code>), mas fica difícil de ler. A opção <code>JSON_UNESCAPED_UNICODE</code> mantém os acentos.</li>
+</ul>
+
+<p>O cabeçalho certo é enviado com <code>header()</code>, <strong>antes</strong> de qualquer <code>echo</code> (como em <a href="redirecionar.html">header e Redirecionamento</a>):</p>
+
+<pre class="file" data-file="ola2.php">&lt;?php
+header('Content-Type: application/json; charset=utf-8');
+
+$dados = ['mensagem' =&gt; 'Olá, API!', 'versao' =&gt; 1];
+echo json_encode($dados), "\n";
+</pre>
+
+<pre class="term">$ curl -i localhost:8000/ola2.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:21 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{"mensagem":"Olá, API!","versao":1}</pre>
+
+<dl class="anatomy">
+  <dt>header('Content-Type: application/json; charset=utf-8')</dt><dd>Diz ao cliente: "o corpo é JSON, em UTF-8". <code>application/json</code> é o nome oficial do tipo JSON.</dd>
+  <dt>json_encode($dados)</dt><dd>Array do PHP → texto JSON. Array associativo vira objeto <code>{…}</code>; lista vira <code>[…]</code>.</dd>
+  <dt>, "\n"</dt><dd>Só para o terminal ficar arrumado (o próximo prompt começa na linha de baixo). O cliente ignora.</dd>
+</dl>
+
+<p>As opções do <code>json_encode</code> usadas no resto da aula:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>Efeito</th></tr>
+<tr><td><code>JSON_UNESCAPED_UNICODE</code></td><td>Mantém acentos: <code>"Olá"</code> em vez de <code>"Olá"</code>.</td></tr>
+<tr><td><code>JSON_UNESCAPED_SLASHES</code></td><td>Mantém as barras: <code>"/produtos"</code> em vez de <code>"\/produtos"</code>.</td></tr>
+<tr><td><code>JSON_PRETTY_PRINT</code></td><td>Quebra linhas e indenta, para pessoas lerem. Opcional (os programas não precisam).</td></tr>
+</table>
+</div>
+<p>Várias opções se juntam com <code>|</code> ("ou" de bits): <code>JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES</code>.</p>
+
+<hr>
+
+<h2>2. O que o cliente pediu: método e caminho</h2>
+<p>Numa API, a mesma "porta" atende vários pedidos diferentes. Para saber qual é, o PHP oferece, em <a href="superglobais.html"><code>$_SERVER</code></a>:</p>
+<ul>
+  <li><code>$_SERVER['REQUEST_METHOD']</code>: o método (<code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code>…).</li>
+  <li><code>$_SERVER['REQUEST_URI']</code>: o caminho pedido, <strong>com</strong> a query string (<code>?ordem=preco</code>).</li>
+</ul>
+<p>Para todas as URLs caírem no mesmo arquivo, o servidor embutido aceita um <strong>roteador</strong>: um script PHP passado depois do endereço, que recebe <strong>toda</strong> requisição. A Ana fez um "eco", que só devolve o que recebeu:</p>
+
+<pre class="file" data-file="eco.php">&lt;?php
+header('Content-Type: application/json; charset=utf-8');
+
+echo json_encode([
+    'metodo' =&gt; $_SERVER['REQUEST_METHOD'],
+    'uri'    =&gt; $_SERVER['REQUEST_URI'],
+    'caminho' =&gt; parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH),
+    'post'   =&gt; $_POST,
+    'corpo'  =&gt; file_get_contents('php://input'),
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+</pre>
+
+<pre class="term">$ php -S localhost:8000 eco.php          « eco.php é o roteador: recebe todas as URLs
+[Fri Oct 16 20:53:26 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>No outro terminal, o <code>-X</code> do <code>curl</code> escolhe o método:</p>
+
+<pre class="term">$ curl localhost:8000/produtos/2?ordem=preco
+{
+    "metodo": "GET",
+    "uri": "/produtos/2?ordem=preco",
+    "caminho": "/produtos/2",
+    "post": [],
+    "corpo": ""
+}
+$ curl -X DELETE localhost:8000/produtos/2
+{
+    "metodo": "DELETE",
+    "uri": "/produtos/2",
+    "caminho": "/produtos/2",
+    "post": [],
+    "corpo": ""
+}</pre>
+
+<dl class="anatomy">
+  <dt>/produtos/2?ordem=preco</dt><dd>Não existe arquivo com esse nome: quem respondeu foi o roteador <code>eco.php</code>.</dd>
+  <dt>"uri"</dt><dd>O <code>REQUEST_URI</code> traz a query string junto. Comparar <code>$_SERVER['REQUEST_URI'] === '/produtos'</code> falharia com <code>/produtos?ordem=preco</code>.</dd>
+  <dt>parse_url(…, PHP_URL_PATH)</dt><dd>Separa só o caminho (<code>/produtos/2</code>). É ele que usamos para rotear. A query string continua em <code>$_GET</code>.</dd>
+</dl>
+
+<h3>O corpo da requisição: <code>php://input</code></h3>
+<p>Num <code>POST</code>, o cliente manda dados no <strong>corpo</strong>. Veja a diferença entre mandar um formulário e mandar JSON:</p>
+
+<pre class="term">$ curl -X POST localhost:8000/produtos -d 'nome=Lápis&amp;preco=2'
+{
+    "metodo": "POST",
+    "uri": "/produtos",
+    "caminho": "/produtos",
+    "post": {
+        "nome": "Lápis",
+        "preco": "2"
+    },
+    "corpo": "nome=Lápis&amp;preco=2"
+}
+$ curl -X POST localhost:8000/produtos -H 'Content-Type: application/json' -d '{"nome": "Lápis", "preco": 2}'
+{
+    "metodo": "POST",
+    "uri": "/produtos",
+    "caminho": "/produtos",
+    "post": [],
+    "corpo": "{\"nome\": \"Lápis\", \"preco\": 2}"
+}</pre>
+
+<p>O <code>-d</code> manda um corpo; o <code>-H</code> acrescenta um cabeçalho. No primeiro caso, o corpo está no formato de formulário (<code>nome=…&amp;preco=…</code>) e o PHP preencheu o <code>$_POST</code> sozinho. No segundo, o corpo é <strong>JSON</strong>: o PHP <strong>não</strong> sabe decodificá-lo automaticamente, e o <code>$_POST</code> ficou vazio. O texto cru do corpo está sempre disponível no fluxo especial <code>php://input</code> ("a entrada do PHP"), e é dele que a API lê:</p>
+
+<pre class="file" data-file="trecho">$dados = json_decode(file_get_contents('php://input'), true);
+</pre>
+
+<dl class="anatomy">
+  <dt>file_get_contents('php://input')</dt><dd>Lê o corpo inteiro da requisição como texto.</dd>
+  <dt>json_decode(…, true)</dt><dd>Texto JSON → array associativo. Se o texto não for JSON válido, devolve <code>null</code>.</dd>
+</dl>
+
+<hr>
+
+<h2>3. Códigos de status: a resposta em um número</h2>
+<p>Toda resposta HTTP começa com um código de três dígitos. O cliente olha o número antes de ler o corpo. Por padrão o PHP manda <code>200</code>; para outro, use <code>http_response_code(404)</code>, também antes de qualquer saída.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Nome</th><th>Quando usar na API</th></tr>
+<tr><td><code>200</code></td><td>OK</td><td>Deu certo (consulta, alteração).</td></tr>
+<tr><td><code>201</code></td><td>Created ("criado")</td><td>Um <code>POST</code> criou algo. Costuma vir com o cabeçalho <code>Location</code> apontando para o item novo.</td></tr>
+<tr><td><code>204</code></td><td>No Content ("sem conteúdo")</td><td>Deu certo e não há nada para devolver (comum no <code>DELETE</code>).</td></tr>
+<tr><td><code>400</code></td><td>Bad Request ("pedido ruim")</td><td>O cliente mandou dados inválidos ou faltando.</td></tr>
+<tr><td><code>401</code> / <code>403</code></td><td>Unauthorized / Forbidden</td><td>Falta login / está logado mas não tem permissão.</td></tr>
+<tr><td><code>404</code></td><td>Not Found ("não encontrado")</td><td>A rota ou o item não existe.</td></tr>
+<tr><td><code>405</code></td><td>Method Not Allowed ("método não permitido")</td><td>A rota existe, mas não aceita esse método. Mande junto o cabeçalho <code>Allow</code> com os métodos aceitos.</td></tr>
+<tr><td><code>500</code></td><td>Internal Server Error</td><td>Erro no servidor (o PHP manda sozinho quando há um erro fatal).</td></tr>
+</table>
+</div>
+
+<p>Regra prática: <strong>2xx</strong> = deu certo; <strong>4xx</strong> = o cliente errou; <strong>5xx</strong> = o servidor errou. E mesmo no erro, responda JSON (<code>{"erro": "…"}</code>), para o cliente mostrar uma mensagem útil.</p>
+
+<hr>
+
+<h2>4. A API da lojinha</h2>
+<p>Juntando tudo. Os produtos ficam num arquivo <code>produtos.json</code> (no mundo real, num <a href="banco-dados.html">banco de dados</a>):</p>
+
+<pre class="file" data-file="produtos.json">[
+    {"id": 1, "nome": "Caderno", "preco": 25.5},
+    {"id": 2, "nome": "Caneta azul", "preco": 3.9}
+]
+</pre>
+
+<p>A API atende três rotas: <code>GET /produtos</code> (lista), <code>POST /produtos</code> (cria) e <code>GET /produtos/{id}</code> (um produto).</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+
+declare(strict_types=1);
+
+const ARQUIVO = __DIR__ . '/produtos.json';
+
+function responder(int $status, array $dados): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    exit;
+}
+
+$produtos = json_decode(file_get_contents(ARQUIVO), true);
+$metodo = $_SERVER['REQUEST_METHOD'];
+$caminho = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// /produtos
+if ($caminho === '/produtos') {
+    if ($metodo === 'GET') {
+        responder(200, $produtos);
+    }
+
+    if ($metodo === 'POST') {
+        $dados = json_decode(file_get_contents('php://input'), true);
+
+        if (!is_array($dados) || !isset($dados['nome'], $dados['preco'])) {
+            responder(400, ['erro' =&gt; 'Envie um JSON com "nome" e "preco"']);
+        }
+
+        $novo = [
+            'id' =&gt; max(array_column($produtos, 'id')) + 1,
+            'nome' =&gt; (string) $dados['nome'],
+            'preco' =&gt; (float) $dados['preco'],
+        ];
+        $produtos[] = $novo;
+        file_put_contents(ARQUIVO, json_encode($produtos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        header('Location: /produtos/' . $novo['id']);
+        responder(201, $novo);
+    }
+
+    header('Allow: GET, POST');
+    responder(405, ['erro' =&gt; "Método $metodo não permitido em /produtos"]);
+}
+
+// /produtos/2
+if (preg_match('#^/produtos/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+
+    if ($metodo !== 'GET') {
+        header('Allow: GET');
+        responder(405, ['erro' =&gt; "Método $metodo não permitido em /produtos/$id"]);
+    }
+
+    foreach ($produtos as $produto) {
+        if ($produto['id'] === $id) {
+            responder(200, $produto);
+        }
+    }
+
+    responder(404, ['erro' =&gt; "Produto $id não encontrado"]);
+}
+
+responder(404, ['erro' =&gt; "Rota $caminho não encontrada"]);
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>function responder(…): never</code></td><td>Um lugar só para responder: status, cabeçalho, JSON e <code>exit</code>. O tipo de retorno <code>never</code> (<span class="versao">PHP 8.1+</span>) diz "esta função nunca volta": depois dela, o script acabou. Sem o <code>exit</code>, o código continuaria e poderia mandar uma segunda resposta grudada na primeira.</td></tr>
+<tr><td><code>$caminho === '/produtos'</code></td><td>A rota da coleção. Dentro dela, um <code>if</code> por método.</td></tr>
+<tr><td><code>!is_array($dados) || !isset(…)</code></td><td>Validação: JSON inválido (<code>json_decode</code> devolveu <code>null</code>) ou sem os campos → <code>400</code>. Nunca confie no que o cliente manda (veja <a href="validacao.html">Validar Dados</a>).</td></tr>
+<tr><td><code>max(array_column($produtos, 'id')) + 1</code></td><td>O próximo id: o maior que existe, mais um.</td></tr>
+<tr><td><code>header('Location: …')</code> + <code>201</code></td><td>"Criado, e ele mora aqui."</td></tr>
+<tr><td><code>header('Allow: GET, POST')</code> + <code>405</code></td><td>Rota certa, método errado: diz quais métodos ela aceita.</td></tr>
+<tr><td><code>preg_match('#^/produtos/(\d+)$#', …)</code></td><td>Uma expressão regular (um "molde" de texto) que casa <code>/produtos/</code> seguido só de dígitos. Os parênteses capturam o número em <code>$partes[1]</code>.</td></tr>
+<tr><td>último <code>responder(404, …)</code></td><td>Nenhuma rota casou.</td></tr>
+</table>
+</div>
+
+<p>A Ana liga a API com o <code>index.php</code> como roteador:</p>
+
+<pre class="term">$ php -S localhost:8000 index.php
+[Fri Oct 16 20:53:38 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<h3>Testando com o curl: GET</h3>
+
+<pre class="term">$ curl localhost:8000/produtos
+[
+    {
+        "id": 1,
+        "nome": "Caderno",
+        "preco": 25.5
+    },
+    {
+        "id": 2,
+        "nome": "Caneta azul",
+        "preco": 3.9
+    }
+]
+$ curl -i localhost:8000/produtos/2
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "id": 2,
+    "nome": "Caneta azul",
+    "preco": 3.9
+}</pre>
+
+<h3>404: o produto não existe</h3>
+
+<pre class="term">$ curl -i localhost:8000/produtos/9
+HTTP/1.1 404 Not Found
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Produto 9 não encontrado"
+}
+$ curl -i localhost:8000/clientes
+HTTP/1.1 404 Not Found
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Rota /clientes não encontrada"
+}</pre>
+
+<h3>POST com JSON: criando um produto</h3>
+
+<pre class="term">$ curl -i -X POST localhost:8000/produtos -H 'Content-Type: application/json' -d '{"nome": "Borracha", "preco": 1.5}'
+HTTP/1.1 201 Created
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Location: /produtos/3
+Content-Type: application/json; charset=utf-8
+
+{
+    "id": 3,
+    "nome": "Borracha",
+    "preco": 1.5
+}
+$ curl localhost:8000/produtos/3
+{
+    "id": 3,
+    "nome": "Borracha",
+    "preco": 1.5
+}</pre>
+
+<p>Status <code>201 Created</code>, o cabeçalho <code>Location</code> e o produto novo com <code>id</code> 3, que já pode ser consultado. O <code>produtos.json</code> agora tem três produtos.</p>
+
+<h3>405 e 400: método errado e dados errados</h3>
+
+<pre class="term">$ curl -i -X DELETE localhost:8000/produtos
+HTTP/1.1 405 Method Not Allowed
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Allow: GET, POST
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Método DELETE não permitido em /produtos"
+}
+$ curl -i -X PUT localhost:8000/produtos/1
+HTTP/1.1 405 Method Not Allowed
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Allow: GET
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Método PUT não permitido em /produtos/1"
+}
+$ curl -i -X POST localhost:8000/produtos -H 'Content-Type: application/json' -d '{nome: Lápis}'
+HTTP/1.1 400 Bad Request
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Envie um JSON com \"nome\" e \"preco\""
+}</pre>
+
+<p>O <code>{nome: Lápis}</code> parece JSON, mas não é (no JSON, nomes e textos precisam de aspas duplas): o <code>json_decode</code> devolveu <code>null</code> e a validação respondeu <code>400</code>. As aspas dentro da mensagem aparecem como <code>\"</code> porque é assim que o JSON escreve uma aspa dentro de um texto.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> o editor do guia não tem <code>curl</code> nem servidor rodando em segundo plano, então as duas primeiras linhas fazem o papel da requisição, preenchendo o <code>$_SERVER</code> à mão. Rode e depois troque o <code>REQUEST_URI</code> por <code>'/produtos'</code>, <code>'/produtos/9'</code> e <code>'/clientes?x=1'</code>. A função <code>responder</code> desta caixa mostra também uma linha <code>Status:</code>, que no <code>curl -i</code> apareceria no cabeçalho.</p>
+<pre class="script">&lt;?php
+
+declare(strict_types=1);
+
+// No editor não existe curl: estas duas linhas fazem o papel da requisição.
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['REQUEST_URI'] = '/produtos/2';
+
+function responder(int $status, array $dados): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo "Status: $status\n"; // só no editor: o curl -i mostraria isto no cabeçalho
+    echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    exit;
+}
+
+$produtos = [
+    ['id' =&gt; 1, 'nome' =&gt; 'Caderno', 'preco' =&gt; 25.5],
+    ['id' =&gt; 2, 'nome' =&gt; 'Caneta azul', 'preco' =&gt; 3.9],
+];
+
+$metodo = $_SERVER['REQUEST_METHOD'];
+$caminho = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+if ($caminho === '/produtos' &amp;&amp; $metodo === 'GET') {
+    responder(200, $produtos);
+}
+
+if (preg_match('#^/produtos/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === 'GET') {
+    $id = (int) $partes[1];
+    foreach ($produtos as $produto) {
+        if ($produto['id'] === $id) {
+            responder(200, $produto);
+        }
+    }
+    responder(404, ['erro' =&gt; "Produto $id não encontrado"]);
+}
+
+responder(404, ['erro' =&gt; "Rota $caminho não encontrada"]);
+</pre>
+</div>
+
+<p>No computador da Ana, com o <code>php</code> do terminal, essa caixa mostra:</p>
+
+<pre class="term">$ php api-editor.php
+Status: 200
+{
+    "id": 2,
+    "nome": "Caneta azul",
+    "preco": 3.9
+}</pre>
+
+<hr>
+
+<h2>Por que passar o roteador para o <code>php -S</code></h2>
+<p>Sem o roteador (<code>php -S localhost:8000</code>, só isso), o servidor embutido entrega <strong>qualquer arquivo da pasta</strong> que for pedido pelo nome. Para caminhos que não existem, como <code>/produtos</code>, ele procura um <code>index.php</code>, então a API parece funcionar igual. Mas veja:</p>
+
+<pre class="term">$ curl localhost:8000/produtos.json         « servidor ligado SEM o roteador
+[
+    {"id": 1, "nome": "Caderno", "preco": 25.5},
+    {"id": 2, "nome": "Caneta azul", "preco": 3.9}
+]</pre>
+
+<p>O arquivo de dados foi entregue cru, sem passar pela API. Com <code>php -S localhost:8000 index.php</code>, toda requisição passa pelo <code>index.php</code>:</p>
+
+<pre class="term">$ curl localhost:8000/produtos.json         « servidor ligado COM o roteador
+{
+    "erro": "Rota /produtos.json não encontrada"
+}</pre>
+
+<p>Num servidor de verdade (Apache, Nginx), o mesmo efeito vem da configuração de "reescrita" que manda tudo para o <code>index.php</code>, e os arquivos de dados ficam <strong>fora</strong> da pasta pública.</p>
+
+<hr>
+
+<h2>Formas diferentes</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Como</th><th>Quando usar</th></tr>
+<tr><td><code>if</code> + <code>preg_match</code> (esta aula)</td><td>Um bloco por rota.</td><td>APIs pequenas, aprender como funciona por dentro.</td></tr>
+<tr><td><code>match</code> com o método</td><td><code>match ($metodo) { 'GET' =&gt; …, 'POST' =&gt; …, default =&gt; responder(405, …) }</code></td><td>Dentro de cada rota, quando há vários métodos (veja <a href="match.html">match</a>).</td></tr>
+<tr><td>Arquivos separados</td><td><code>produtos.php</code>, <code>clientes.php</code>… e a URL com o nome do arquivo.</td><td>Muito simples, mas as URLs ficam feias (<code>/produtos.php?id=2</code>).</td></tr>
+<tr><td>Micro-frameworks</td><td>Slim, ou os roteadores do Laravel e do Symfony, instalados com o <a href="composer.html">Composer</a>.</td><td>Projetos reais: rotas declaradas numa linha, validação, autenticação. Por baixo, fazem o que você fez aqui.</td></tr>
+</table>
+</div>
+<p>O projeto <a href="projeto-api.html">API REST</a> leva esta API adiante, com SQLite, <code>PUT</code> e <code>DELETE</code>. Para o outro lado (o PHP chamando uma API), veja a próxima aula, <a href="consumir-api.html">Consumir APIs</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Um <code>Warning</code> em HTML no meio do JSON</strong>
+<pre class="file" data-file="erro1.php">&lt;?php
+header('Content-Type: application/json; charset=utf-8');
+
+echo json_encode(['id' =&gt; $_GET['id']]), "\n";
+</pre>
+<pre class="term">$ curl localhost:8000/erro1.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "id" in &lt;b&gt;/home/ana/api/erro1.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;
+{"id":null}</pre>
+<p><strong>O que aconteceu:</strong> o cliente não mandou <code>?id=</code>, o PHP avisou "chave de array indefinida" e o aviso saiu <strong>no corpo da resposta</strong>, em HTML, antes do JSON. Para o cliente, a resposta inteira deixou de ser JSON válido: o <code>json_decode</code> do outro lado devolve <code>null</code>.</p>
+<p><strong>Como consertar:</strong> valide a entrada (<code>$_GET['id'] ?? null</code> e responda <code>400</code> se faltar) e, em produção, desligue o <code>display_errors</code> (veja <a href="boas-praticas.html">Boas Práticas</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"Cannot modify header information - headers already sent"</strong>
+<pre class="file" data-file="erro2.php">&lt;?php
+echo "Começando...\n";
+header('Content-Type: application/json; charset=utf-8');
+
+echo json_encode(['ok' =&gt; true]), "\n";
+</pre>
+<pre class="term">$ curl -i localhost:8000/erro2.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:53:45 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+Começando...
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/api/erro2.php:2) in &lt;b&gt;/home/ana/api/erro2.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+{"ok":true}</pre>
+<p><strong>O que aconteceu:</strong> o <code>echo</code> da linha 2 já mandou o corpo, e com ele os cabeçalhos. O <code>header()</code> da linha 3 chegou tarde ("não dá para mudar os cabeçalhos: já foram enviados, a saída começou em erro2.php:2"), e a resposta saiu como <code>text/html</code>. O mesmo vale para <code>http_response_code</code>. Um espaço ou linha em branco antes do <code>&lt;?php</code> causa o mesmo erro.</p>
+<p><strong>Como consertar:</strong> nenhuma saída antes de <code>header()</code> e <code>http_response_code()</code>. Por isso a função <code>responder</code> faz os dois antes do <code>echo</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>As barras aparecem como <code>\/</code></strong>
+<pre class="term">$ curl -i -X DELETE localhost:8000/produtos
+HTTP/1.1 405 Method Not Allowed
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:52:48 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Allow: GET, POST
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Método DELETE não permitido em \/produtos"
+}</pre>
+<p><strong>O que aconteceu:</strong> esta resposta veio de uma versão anterior da API, sem a opção <code>JSON_UNESCAPED_SLASHES</code>. Por padrão, o <code>json_encode</code> escreve <code>/</code> como <code>\/</code>. Não é erro (o cliente lê <code>/produtos</code> do mesmo jeito), só fica feio.</p>
+<p><strong>Como consertar:</strong> acrescente <code>JSON_UNESCAPED_SLASHES</code> às opções do <code>json_encode</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O POST chega, mas <code>$_POST</code> está vazio</strong>
+<p><strong>O que aconteceu:</strong> o cliente mandou JSON (<code>Content-Type: application/json</code>). O PHP só preenche o <code>$_POST</code> para corpos de formulário. Você viu isso no <code>eco.php</code>.</p>
+<p><strong>Como consertar:</strong> leia <code>json_decode(file_get_contents('php://input'), true)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O quê</th><th>Como</th></tr>
+<tr><td>Dizer que a resposta é JSON</td><td><code>header('Content-Type: application/json; charset=utf-8');</code></td></tr>
+<tr><td>Array → JSON</td><td><code>json_encode($dados, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)</code></td></tr>
+<tr><td>Código de status</td><td><code>http_response_code(404);</code> (antes de qualquer saída)</td></tr>
+<tr><td>Método pedido</td><td><code>$_SERVER['REQUEST_METHOD']</code></td></tr>
+<tr><td>Caminho pedido</td><td><code>parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)</code></td></tr>
+<tr><td>Corpo JSON enviado</td><td><code>json_decode(file_get_contents('php://input'), true)</code></td></tr>
+<tr><td>Parte variável da rota</td><td><code>preg_match('#^/produtos/(\d+)$#', $caminho, $partes)</code> → <code>$partes[1]</code></td></tr>
+<tr><td>Métodos aceitos (com 405)</td><td><code>header('Allow: GET, POST');</code></td></tr>
+<tr><td>Onde mora o item criado (com 201)</td><td><code>header('Location: /produtos/3');</code></td></tr>
+<tr><td>Servidor com roteador</td><td><code>php -S localhost:8000 index.php</code></td></tr>
+<tr><td>Testar</td><td><code>curl -i URL</code>, <code>curl -X POST URL -H 'Content-Type: application/json' -d '{…}'</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O tipo da resposta</h3>
+<p>Complete o cabeçalho que diz que a resposta é JSON:</p>
+<div class="ex-code">header('Content-Type: <input data-answer="application/json|application/json; charset=utf-8" aria-label="tipo">');</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ler o corpo</h3>
+<p>Complete para ler o JSON enviado no corpo da requisição:</p>
+<div class="ex-code">$dados = json_decode(file_get_contents('<input data-answer="php://input" aria-label="fluxo">'), true);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Produto não encontrado</h3>
+<p>Complete com o código de status certo:</p>
+<div class="ex-code">http_response_code(<input data-answer="404" aria-label="código">); // não existe produto com esse id</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Um <code>POST /produtos</code> criou o produto 7. Qual a melhor resposta?</p>
+<label><input type="radio" name="q4"> <code>200</code> com o texto <code>ok</code></label>
+<label><input type="radio" name="q4"> <code>404</code>, porque o produto ainda não existia</label>
+<label><input type="radio" name="q4"> <code>201</code>, cabeçalho <code>Location: /produtos/7</code> e o produto em JSON</label>
+<label><input type="radio" name="q4"> <code>405</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Com <code>curl -X POST … -H 'Content-Type: application/json' -d '{"nome":"Lápis"}'</code>, o que o PHP coloca em <code>$_POST</code>?</p>
+<label><input type="radio" name="q5"> <code>['nome' =&gt; 'Lápis']</code></label>
+<label><input type="radio" name="q5"> Nada: um array vazio. O JSON está em <code>php://input</code>.</label>
+<label><input type="radio" name="q5"> O texto <code>{"nome":"Lápis"}</code></label>
+<label><input type="radio" name="q5"> <code>null</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Para a URL <code>/produtos?ordem=preco</code>, o que vale <code>$_SERVER['REQUEST_URI']</code>?</p>
+<label><input type="radio" name="q6"> <code>/produtos</code></label>
+<label><input type="radio" name="q6"> <code>ordem=preco</code></label>
+<label><input type="radio" name="q6"> <code>GET</code></label>
+<label><input type="radio" name="q6"> <code>/produtos?ordem=preco</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Status: 405,out:Método DELETE não permitido,semerro">
+<p class="try-task"><strong>Missão final:</strong> a requisição simulada agora é <code>DELETE /produtos</code>, e a API responde <code>404 Rota /produtos não encontrada</code>, o que está errado: a rota existe, o método é que não é aceito. Mude o primeiro <code>if</code> para que, em <code>/produtos</code>, o <code>GET</code> continue devolvendo a lista e <strong>qualquer outro método</strong> receba <code>405</code> com <code>{"erro": "Método DELETE não permitido"}</code> (use a variável <code>$metodo</code> na mensagem) e o cabeçalho <code>Allow: GET</code>.</p>
+<pre class="script">&lt;?php
+
+declare(strict_types=1);
+
+// No editor não existe curl: estas duas linhas fazem o papel da requisição.
+$_SERVER['REQUEST_METHOD'] = 'DELETE';
+$_SERVER['REQUEST_URI'] = '/produtos';
+
+function responder(int $status, array $dados): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo "Status: $status\n"; // só no editor: o curl -i mostraria isto no cabeçalho
+    echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    exit;
+}
+
+$produtos = [
+    ['id' =&gt; 1, 'nome' =&gt; 'Caderno', 'preco' =&gt; 25.5],
+    ['id' =&gt; 2, 'nome' =&gt; 'Caneta azul', 'preco' =&gt; 3.9],
+];
+
+$metodo = $_SERVER['REQUEST_METHOD'];
+$caminho = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+if ($caminho === '/produtos' &amp;&amp; $metodo === 'GET') {
+    responder(200, $produtos);
+}
+
+if (preg_match('#^/produtos/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === 'GET') {
+    $id = (int) $partes[1];
+    foreach ($produtos as $produto) {
+        if ($produto['id'] === $id) {
+            responder(200, $produto);
+        }
+    }
+    responder(404, ['erro' =&gt; "Produto $id não encontrado"]);
+}
+
+responder(404, ['erro' =&gt; "Rota $caminho não encontrada"]);
+</pre>
+<pre class="solucao">&lt;?php
+
+declare(strict_types=1);
+
+// No editor não existe curl: estas duas linhas fazem o papel da requisição.
+$_SERVER['REQUEST_METHOD'] = 'DELETE';
+$_SERVER['REQUEST_URI'] = '/produtos';
+
+function responder(int $status, array $dados): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo "Status: $status\n"; // só no editor: o curl -i mostraria isto no cabeçalho
+    echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    exit;
+}
+
+$produtos = [
+    ['id' =&gt; 1, 'nome' =&gt; 'Caderno', 'preco' =&gt; 25.5],
+    ['id' =&gt; 2, 'nome' =&gt; 'Caneta azul', 'preco' =&gt; 3.9],
+];
+
+$metodo = $_SERVER['REQUEST_METHOD'];
+$caminho = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+if ($caminho === '/produtos') {
+    if ($metodo === 'GET') {
+        responder(200, $produtos);
+    }
+    header('Allow: GET');
+    responder(405, ['erro' =&gt; "Método $metodo não permitido"]);
+}
+
+if (preg_match('#^/produtos/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === 'GET') {
+    $id = (int) $partes[1];
+    foreach ($produtos as $produto) {
+        if ($produto['id'] === $id) {
+            responder(200, $produto);
+        }
+    }
+    responder(404, ['erro' =&gt; "Produto $id não encontrado"]);
+}
+
+responder(404, ['erro' =&gt; "Rota $caminho não encontrada"]);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma API responde <strong>dados</strong> (JSON) para programas, não páginas para pessoas.</li>
+  <li><code>header('Content-Type: application/json; charset=utf-8')</code> + <code>json_encode</code> (com <code>JSON_UNESCAPED_UNICODE</code> e <code>JSON_UNESCAPED_SLASHES</code>).</li>
+  <li>Roteie pelo método (<code>$_SERVER['REQUEST_METHOD']</code>) e pelo caminho (<code>parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)</code>).</li>
+  <li>JSON enviado pelo cliente não vai para o <code>$_POST</code>: leia com <code>json_decode(file_get_contents('php://input'), true)</code> e valide.</li>
+  <li>O status conta o resultado: 200 OK, 201 criado, 400 dados ruins, 404 não existe, 405 método não aceito (com <code>Allow</code>). Mesmo no erro, responda JSON.</li>
+  <li><code>header()</code> e <code>http_response_code()</code> vêm antes de qualquer saída; avisos do PHP no meio da resposta estragam o JSON.</li>
+  <li>Teste tudo com <code>curl -i</code>, com o servidor ligado assim: <code>php -S localhost:8000 index.php</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
