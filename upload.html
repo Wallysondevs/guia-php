@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Upload de Arquivos — $_FILES e move_uploaded_file | Guia PHP</title>
+<meta name="description" content="Como receber arquivos de um formulário em PHP: enctype multipart/form-data, a estrutura real de $_FILES, move_uploaded_file, validar o tipo pelo conteúdo com finfo (e não pela extensão), limites de tamanho upload_max_filesize e post_max_size, os códigos UPLOAD_ERR e nomes de arquivo seguros.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Upload de Arquivos</span></h1>
+
+<p class="intro">Foto de perfil, currículo em PDF, comprovante de pagamento: muitos sites recebem arquivos. Em PHP, isso usa o mesmo formulário que você já conhece, com dois detalhes a mais, e uma superglobal nova, <code>$_FILES</code>. Receber é fácil; o cuidado está em <strong>conferir</strong> o que chegou, porque um arquivo enviado por um desconhecido é a coisa mais perigosa que um site pode guardar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O formulário de upload: <code>method="post"</code>, <code>enctype="multipart/form-data"</code> e <code>&lt;input type="file"&gt;</code>.</li>
+  <li>A estrutura de <code>$_FILES</code>, vista com <code>var_dump</code>: <code>name</code>, <code>type</code>, <code>tmp_name</code>, <code>error</code>, <code>size</code>.</li>
+  <li>Como guardar o arquivo com <code>move_uploaded_file</code>.</li>
+  <li>Por que não confiar na extensão nem no <code>type</code>, e como descobrir o tipo de verdade com <code>finfo</code>.</li>
+  <li>Os limites de tamanho: <code>upload_max_filesize</code>, <code>post_max_size</code> e <code>MAX_FILE_SIZE</code>.</li>
+  <li>Os códigos de erro <code>UPLOAD_ERR_*</code>.</li>
+  <li>Como dar ao arquivo um nome seguro.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: a encomenda que chega na portaria</h2>
+<p>Quando chega um pacote no prédio da Ana, o porteiro não leva direto para o apartamento. Ele guarda numa <strong>sala de espera</strong> e anota numa ficha: nome escrito na etiqueta, tamanho, se chegou inteiro. A Ana então decide: abre a caixa, confere se é mesmo o que encomendou e leva para casa. Se não buscar, o pacote é descartado.</p>
+<p>O upload no PHP é igualzinho:</p>
+<ul>
+  <li>O PHP recebe o arquivo e o guarda numa <strong>pasta temporária</strong> (a sala de espera), com um nome aleatório.</li>
+  <li>Ele preenche uma <strong>ficha</strong> em <code>$_FILES</code>: nome original, tamanho, tipo informado, se houve erro.</li>
+  <li>O seu programa confere e, se estiver tudo certo, <strong>move</strong> o arquivo para uma pasta definitiva. Se não mover, o PHP apaga o temporário assim que a página termina.</li>
+</ul>
+<p>E, como na portaria, a etiqueta do pacote pode mentir: o nome e o tipo informados foram escritos por quem enviou.</p>
+
+<hr>
+
+<h2>O formulário de upload</h2>
+<pre class="file" data-file="form.html">&lt;form action="upload.php" method="post" enctype="multipart/form-data"&gt;
+  &lt;p&gt;Foto: &lt;input type="file" name="foto" accept="image/*"&gt;&lt;/p&gt;
+  &lt;p&gt;Legenda: &lt;input name="legenda"&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>method="post"</dt><dd>Obrigatório. Arquivos não cabem no endereço (GET).</dd>
+  <dt>enctype="multipart/form-data"</dt><dd><em>Encoding type</em>, "tipo de codificação". O formato normal (<code>nome=valor&amp;…</code>, de <a href="formularios.html">Formulários HTML</a>) só leva texto. O <code>multipart/form-data</code> divide o pedido em "partes" separadas, e cada parte pode ser um campo de texto ou um arquivo inteiro. <strong>Sem isso, o arquivo não vai.</strong></dd>
+  <dt>&lt;input type="file" name="foto"&gt;</dt><dd>O botão "Escolher arquivo". O <code>name</code> é a chave em <code>$_FILES</code>.</dd>
+  <dt>accept="image/*"</dt><dd>Sugere ao navegador mostrar só imagens na janela de escolha. É conforto, não proteção: a pessoa pode trocar para "todos os arquivos".</dd>
+  <dt>name="legenda"</dt><dd>Campos de texto continuam funcionando normalmente, e chegam em <code>$_POST</code>.</dd>
+</dl>
+
+<hr>
+
+<h2><code>$_FILES</code> por dentro</h2>
+<p>Vamos ver a "ficha" que o PHP preenche. Este programa só mostra as duas superglobais:</p>
+
+<pre class="file" data-file="dump.php">&lt;?php
+var_dump($_FILES);
+var_dump($_POST);
+</pre>
+
+<p>No laboratório, o envio é feito com o <code>curl -F</code> (<em>form</em>), que monta um pedido <code>multipart/form-data</code> como o navegador. <code>-F "foto=@gato.png"</code> quer dizer "o campo <code>foto</code> é o arquivo <code>gato.png</code>" (o <code>@</code> indica arquivo); <code>-F "legenda=Meu gato"</code> é um campo de texto:</p>
+
+<pre class="term">$ curl -s localhost:8000/dump.php -F "foto=@gato.png" -F "legenda=Meu gato"
+array(1) {
+  ["foto"]=&gt;
+  array(6) {
+    ["name"]=&gt;
+    string(8) "gato.png"
+    ["full_path"]=&gt;
+    string(8) "gato.png"
+    ["type"]=&gt;
+    string(9) "image/png"
+    ["tmp_name"]=&gt;
+    string(27) "/tmp/phpv324i422nmvt0CCFjoC"
+    ["error"]=&gt;
+    int(0)
+    ["size"]=&gt;
+    int(124)
+  }
+}
+array(1) {
+  ["legenda"]=&gt;
+  string(8) "Meu gato"
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chave</th><th>Exemplo</th><th>O que é</th><th>Confiável?</th></tr>
+<tr><td><code>name</code></td><td><code>gato.png</code></td><td>Nome do arquivo no computador de quem enviou</td><td><strong>Não</strong>: escrito por quem enviou</td></tr>
+<tr><td><code>full_path</code></td><td><code>gato.png</code></td><td>O caminho completo, quando se envia uma pasta inteira (PHP 8.1+)</td><td><strong>Não</strong></td></tr>
+<tr><td><code>type</code></td><td><code>image/png</code></td><td>O tipo que o <strong>navegador</strong> disse que é (o "MIME type")</td><td><strong>Não</strong>: é só a etiqueta do pacote</td></tr>
+<tr><td><code>tmp_name</code></td><td><code>/tmp/phpv324…</code></td><td>Onde o PHP guardou o arquivo de verdade (a sala de espera)</td><td>Sim: quem criou foi o PHP</td></tr>
+<tr><td><code>error</code></td><td><code>0</code></td><td>Código do resultado: <code>0</code> = deu certo (veja a tabela de erros)</td><td>Sim</td></tr>
+<tr><td><code>size</code></td><td><code>124</code></td><td>Tamanho em bytes</td><td>Sim: o PHP mediu</td></tr>
+</table>
+</div>
+
+<p>O <code>tmp_name</code> é diferente a cada envio, e o arquivo nele <strong>some</strong> quando o PHP termina de responder. Por isso o próximo passo é obrigatório: mover.</p>
+
+<h3>Vários arquivos: <code>name="fotos[]"</code> e o formato "virado"</h3>
+<p>Com <code>&lt;input type="file" name="fotos[]" multiple&gt;</code>, a pessoa escolhe vários arquivos de uma vez. Os colchetes funcionam como em <a href="get-post.html">$_GET e $_POST</a>, mas o array sai num formato curioso: em vez de uma ficha por arquivo, vem <strong>uma lista por chave</strong>:</p>
+
+<pre class="term">$ curl -s localhost:8000/dump.php -F "fotos[]=@gato.png" -F "fotos[]=@bolo.jpg"
+array(1) {
+  ["fotos"]=&gt;
+  array(6) {
+    ["name"]=&gt;
+    array(2) {
+      [0]=&gt;
+      string(8) "gato.png"
+      [1]=&gt;
+      string(8) "bolo.jpg"
+    }
+    …
+    ["error"]=&gt;
+    array(2) {
+      [0]=&gt;
+      int(0)
+      [1]=&gt;
+      int(0)
+    }
+    ["size"]=&gt;
+    array(2) {
+      [0]=&gt;
+      int(124)
+      [1]=&gt;
+      int(716)
+    }
+  }
+}</pre>
+
+<p>O primeiro arquivo é <code>$_FILES['fotos']['name'][0]</code>, <code>$_FILES['fotos']['tmp_name'][0]</code>, e assim por diante. Para percorrer:</p>
+<pre class="file" data-file="trecho.php">foreach ($_FILES['fotos']['name'] as $i =&gt; $nome) {
+    $erro = $_FILES['fotos']['error'][$i];
+    $tmp  = $_FILES['fotos']['tmp_name'][$i];
+    // confira e mova cada um, como no exemplo completo abaixo
+}</pre>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task">Um formulário de upload de verdade. Rode, escolha um arquivo qualquer do seu computador na aba <strong>Resultado</strong> e envie: o <code>var_dump</code> mostra a ficha que o PHP preencheu. Tente também enviar sem escolher arquivo (repare no <code>error</code>), e depois apague o <code>enctype</code> e envie de novo. <em>No editor do guia, o arquivo vai para o PHP que roda dentro do seu próprio navegador: nada é enviado para a internet.</em> Se o seu navegador não deixar escolher arquivos aqui dentro, use a caixa logo abaixo, em que um campo de texto faz o papel do arquivo.</p>
+<pre class="script">&lt;form method="post" enctype="multipart/form-data"&gt;
+  &lt;p&gt;Arquivo: &lt;input type="file" name="foto"&gt;&lt;/p&gt;
+  &lt;p&gt;Legenda: &lt;input name="legenda"&gt;&lt;/p&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;h3&gt;$_FILES&lt;/h3&gt;
+&lt;pre&gt;&lt;?php var_dump($_FILES); ?&gt;&lt;/pre&gt;
+&lt;h3&gt;$_POST&lt;/h3&gt;
+&lt;pre&gt;&lt;?php var_dump($_POST); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Guardar: <code>move_uploaded_file</code></h2>
+<p>Para tirar o arquivo da sala de espera, use <code>move_uploaded_file</code> ("mover arquivo enviado"):</p>
+
+<pre class="file" data-file="mover.php">&lt;?php
+$arq = $_FILES['foto'];
+$destino = 'uploads/' . $arq['name'];
+if (move_uploaded_file($arq['tmp_name'], $destino)) {
+    echo "Salvo em $destino\n";
+} else {
+    echo "Não foi possível salvar.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>move_uploaded_file(</dt><dd>Move o arquivo e devolve <code>true</code> (deu certo) ou <code>false</code>.</dd>
+  <dt>$arq['tmp_name'],</dt><dd>De onde: o arquivo temporário. A função só aceita arquivos que <strong>chegaram por upload</strong> neste pedido; um caminho qualquer, como <code>/etc/passwd</code>, é recusado. Por isso use ela, e não <code>rename</code> ou <code>copy</code>.</dd>
+  <dt>$destino)</dt><dd>Para onde: o caminho final, com o nome do arquivo. A pasta precisa existir e o PHP precisa ter permissão de escrita nela.</dd>
+</dl>
+
+<p>A primeira vez que a Ana testou, a pasta <code>uploads</code> ainda não existia:</p>
+
+<pre class="term">$ curl -s localhost:8000/mover.php -F "foto=@gato.png"
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  move_uploaded_file(uploads/gato.png): Failed to open stream: No such file or directory in &lt;b&gt;/home/ana/site/mover.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  move_uploaded_file(): Unable to move &amp;quot;/tmp/php5942e2shniftfKdlkkp&amp;quot; to &amp;quot;uploads/gato.png&amp;quot; in &lt;b&gt;/home/ana/site/mover.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;
+Não foi possível salvar.
+$ mkdir uploads
+$ curl -s localhost:8000/mover.php -F "foto=@gato.png"
+Salvo em uploads/gato.png
+$ ls -l uploads
+total 4
+-rw-rw-r-- 1 ana ana 124 out 16 20:58 gato.png</pre>
+
+<p>Funcionou, mas este <code>mover.php</code> tem <strong>três falhas graves</strong>: não confere se houve erro, aceita qualquer tipo de arquivo e usa o nome escolhido por quem enviou. As próximas seções fecham cada uma.</p>
+
+<hr>
+
+<h2>Os códigos de erro (<code>UPLOAD_ERR_*</code>)</h2>
+<p>A chave <code>error</code> diz como foi o envio. Cada número tem uma constante com nome, que deixa o código mais legível:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th>Constante</th><th>Significa</th><th>O que dizer ao visitante</th></tr>
+<tr><td><code>0</code></td><td><code>UPLOAD_ERR_OK</code></td><td>Deu tudo certo</td><td>—</td></tr>
+<tr><td><code>1</code></td><td><code>UPLOAD_ERR_INI_SIZE</code></td><td>Maior que o <code>upload_max_filesize</code> do <code>php.ini</code></td><td>"Arquivo grande demais"</td></tr>
+<tr><td><code>2</code></td><td><code>UPLOAD_ERR_FORM_SIZE</code></td><td>Maior que o campo <code>MAX_FILE_SIZE</code> do formulário</td><td>"Arquivo grande demais"</td></tr>
+<tr><td><code>3</code></td><td><code>UPLOAD_ERR_PARTIAL</code></td><td>Chegou só um pedaço (conexão caiu)</td><td>"Tente de novo"</td></tr>
+<tr><td><code>4</code></td><td><code>UPLOAD_ERR_NO_FILE</code></td><td>Nenhum arquivo foi escolhido</td><td>"Escolha um arquivo"</td></tr>
+<tr><td><code>6</code></td><td><code>UPLOAD_ERR_NO_TMP_DIR</code></td><td>Falta a pasta temporária no servidor</td><td>Problema do servidor: avise o administrador</td></tr>
+<tr><td><code>7</code></td><td><code>UPLOAD_ERR_CANT_WRITE</code></td><td>Não conseguiu gravar no disco (cheio, sem permissão)</td><td>Problema do servidor</td></tr>
+<tr><td><code>8</code></td><td><code>UPLOAD_ERR_EXTENSION</code></td><td>Uma extensão do PHP interrompeu o envio</td><td>Problema do servidor</td></tr>
+</table>
+</div>
+<p>(Não existe o 5.) Enviar o formulário sem escolher arquivo dá uma ficha "vazia", com <code>error</code> 4:</p>
+
+<pre class="term">$ curl -s localhost:8000/dump.php -F "foto=@/dev/null;filename="
+array(1) {
+  ["foto"]=&gt;
+  array(6) {
+    ["name"]=&gt;
+    string(0) ""
+    ["full_path"]=&gt;
+    string(0) ""
+    ["type"]=&gt;
+    string(0) ""
+    ["tmp_name"]=&gt;
+    string(0) ""
+    ["error"]=&gt;
+    int(4)
+    ["size"]=&gt;
+    int(0)
+  }
+}
+…</pre>
+<p>(O <code>filename=</code> vazio é como o navegador avisa "nenhum arquivo escolhido".) Repare: <code>$_FILES['foto']</code> <strong>existe</strong> mesmo sem arquivo. Por isso não basta <code>isset($_FILES['foto'])</code>: confira o <code>error</code>.</p>
+
+<hr>
+
+<h2>Limites de tamanho</h2>
+<p>Três configurações controlam o tamanho, e é bom conhecer as três porque cada uma falha de um jeito:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Limite</th><th>Onde</th><th>Padrão</th><th>Se passar</th></tr>
+<tr><td><code>upload_max_filesize</code></td><td><code>php.ini</code></td><td><code>2M</code></td><td>Aquele arquivo vem com <code>error</code> 1; os outros campos chegam normalmente</td></tr>
+<tr><td><code>post_max_size</code></td><td><code>php.ini</code></td><td><code>8M</code></td><td>O pedido <strong>inteiro</strong> é descartado: <code>$_POST</code> e <code>$_FILES</code> chegam vazios</td></tr>
+<tr><td><code>MAX_FILE_SIZE</code></td><td>Campo escondido no formulário</td><td>—</td><td><code>error</code> 2. Só ajuda; quem envia pode mudar o valor</td></tr>
+</table>
+</div>
+
+<p>Os padrões do PHP da Ana (sem <code>php.ini</code>):</p>
+<pre class="term">$ php -i | grep -E "upload_max_filesize|post_max_size|max_file_uploads"
+max_file_uploads =&gt; 20 =&gt; 20
+post_max_size =&gt; 8M =&gt; 8M
+upload_max_filesize =&gt; 2M =&gt; 2M</pre>
+
+<p>Um arquivo de 3 MB (passa dos 2M) e um de 9 MB (passa até dos 8M do pedido inteiro), enviados para este programa:</p>
+<pre class="file" data-file="erro.php">&lt;?php
+var_dump($_FILES['foto']['error'] ?? 'nada em $_FILES');
+var_dump($_POST);
+</pre>
+<pre class="term">$ curl -s localhost:8000/erro.php -F "foto=@grande.bin" -F "legenda=x"
+int(1)                « UPLOAD_ERR_INI_SIZE
+array(1) {
+  ["legenda"]=&gt;
+  string(1) "x"        « o resto do formulário chegou
+}
+$ curl -s localhost:8000/erro.php -F "foto=@enorme.bin" -F "legenda=x"
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  PHP Request Startup: POST Content-Length of 9000317 bytes exceeds the limit of 8388608 bytes in &lt;b&gt;Unknown&lt;/b&gt; on line &lt;b&gt;0&lt;/b&gt;&lt;br /&gt;
+string(15) "nada em $_FILES"
+array(0) {           « nem a legenda chegou
+}</pre>
+
+<p>O segundo caso é traiçoeiro: o PHP descarta tudo <strong>antes</strong> do seu código rodar ("Request Startup" = início do pedido; "Unknown on line 0" porque nenhum arquivo seu estava rodando ainda). Para o seu programa, parece que o formulário veio vazio. Se <code>REQUEST_METHOD</code> é <code>POST</code> mas <code>$_POST</code> e <code>$_FILES</code> estão vazios, desconfie do <code>post_max_size</code>.</p>
+
+<p>O campo <code>MAX_FILE_SIZE</code> vai <strong>antes</strong> do <code>&lt;input type="file"&gt;</code>:</p>
+<pre class="file" data-file="trecho.html">&lt;input type="hidden" name="MAX_FILE_SIZE" value="1000000"&gt;
+&lt;input type="file" name="foto"&gt;</pre>
+<pre class="term">$ curl -s localhost:8000/erro.php -F "MAX_FILE_SIZE=500" -F "foto=@bolo.jpg"
+int(2)                « bolo.jpg tem 716 bytes: UPLOAD_ERR_FORM_SIZE
+array(1) {
+  ["MAX_FILE_SIZE"]=&gt;
+  string(3) "500"
+}</pre>
+
+<p>Para aceitar arquivos maiores, aumente os dois no <code>php.ini</code> (com <code>post_max_size</code> um pouco maior que <code>upload_max_filesize</code>, porque o pedido também leva os outros campos), ou, no servidor de testes, na linha de comando:</p>
+<pre class="term">$ php -d upload_max_filesize=10M -d post_max_size=12M -S localhost:8000</pre>
+<p>E, no seu código, tenha o <strong>seu</strong> limite (<code>$arq['size'] &gt; 1_000_000</code>), que não depende da configuração do servidor.</p>
+
+<hr>
+
+<h2>Validar o tipo: não confie na extensão</h2>
+<p>Uma foto chamada <code>gato.jpg</code> é uma foto? Não necessariamente. O nome (e a extensão <code>.jpg</code>) e o <code>type</code> (<code>image/jpeg</code>) foram <strong>escritos por quem enviou</strong>. A Ana copiou um arquivo de texto com o nome <code>falsa.jpg</code> e mandou com o <code>curl</code> dizendo que era JPEG:</p>
+
+<pre class="file" data-file="tipo.php">&lt;?php
+$arq = $_FILES['foto'];
+echo "O navegador disse: ", $arq['type'], "\n";
+$finfo = new finfo(FILEINFO_MIME_TYPE);
+echo "O finfo viu:       ", $finfo-&gt;file($arq['tmp_name']), "\n";
+echo "mime_content_type: ", mime_content_type($arq['tmp_name']), "\n";
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/tipo.php -F "foto=@falsa.jpg;type=image/jpeg"
+O navegador disse: image/jpeg      « a etiqueta mentiu
+O finfo viu:       text/plain      « o conteúdo é texto
+mime_content_type: text/plain
+$ curl -s localhost:8000/tipo.php -F "foto=@bolo.jpg"
+O navegador disse: image/jpeg
+O finfo viu:       image/jpeg
+mime_content_type: image/jpeg</pre>
+
+<dl class="anatomy">
+  <dt>new finfo(FILEINFO_MIME_TYPE)</dt><dd>Cria um "inspetor de arquivos" (<em>file info</em>) da extensão <code>fileinfo</code>. Ele abre o arquivo e olha os primeiros bytes, a "assinatura" que todo formato tem (um PNG sempre começa com os bytes <code>‰PNG</code>, um JPEG com <code>FF D8 FF</code>). <code>FILEINFO_MIME_TYPE</code> pede a resposta no formato <code>tipo/subtipo</code>.</dd>
+  <dt>$finfo-&gt;file($caminho)</dt><dd>Devolve o tipo descoberto pelo <strong>conteúdo</strong>. (A seta <code>-&gt;</code> chama um método de um objeto, assunto de <a href="classes-objetos.html">Classes e Objetos</a>; aqui, basta copiar a forma.)</dd>
+  <dt>mime_content_type($caminho)</dt><dd>Faz o mesmo numa função só. Use a que achar mais simples.</dd>
+</dl>
+
+<p>Por que isso importa? O pior caso é alguém enviar um programa PHP com nome de foto. Se ele for salvo numa pasta acessível pelo navegador com a extensão <code>.php</code>, o atacante abre o endereço e o servidor <strong>executa</strong> o programa dele. O <code>finfo</code> não se engana com o nome:</p>
+
+<pre class="term">$ php tipos.php
+falsa.jpg: text/plain
+foto.png: image/png
+script.jpg: text/x-php            « um programa PHP disfarçado de .jpg</pre>
+
+<p>A defesa tem duas partes, e as duas são necessárias:</p>
+<ol>
+  <li>Aceitar só os tipos que você espera, descobertos pelo <code>finfo</code>, numa <strong>lista</strong> (<code>['image/jpeg' =&gt; 'jpg', 'image/png' =&gt; 'png']</code>).</li>
+  <li>Escolher a extensão do arquivo salvo <strong>a partir dessa lista</strong>, nunca a partir do nome original. Assim, mesmo um arquivo malicioso nunca é salvo como <code>.php</code>.</li>
+</ol>
+
+<hr>
+
+<h2>Nomes seguros</h2>
+<p>Usar <code>$arq['name']</code> como nome do arquivo salvo traz vários problemas:</p>
+<ul>
+  <li><strong>Sobrescrever:</strong> duas pessoas enviam <code>foto.jpg</code>, e a segunda apaga a primeira.</li>
+  <li><strong>Extensões perigosas:</strong> <code>foto.php</code>, <code>.htaccess</code>.</li>
+  <li><strong>Caracteres problemáticos:</strong> espaços, acentos, parênteses (<code>minha foto (1).PNG</code>), nomes enormes.</li>
+  <li><strong>Caminhos:</strong> um nome como <code>../../index.php</code> tentaria sair da pasta. O PHP já corta o caminho do <code>name</code> (fica só <code>index.php</code>), mas o <code>full_path</code> mantém tudo:</li>
+</ul>
+<pre class="term">$ curl -s localhost:8000/dump.php -F "foto=@receita.txt;filename=../../index.php"
+array(1) {
+  ["foto"]=&gt;
+  array(6) {
+    ["name"]=&gt;
+    string(9) "index.php"
+    ["full_path"]=&gt;
+    string(15) "../../index.php"
+…</pre>
+
+<p>A solução é <strong>inventar</strong> o nome: letras aleatórias + a extensão da sua lista. <code>random_bytes(16)</code> gera 16 bytes aleatórios, e <code>bin2hex</code> os escreve como 32 letras e números (<code>0-9</code>, <code>a-f</code>):</p>
+<pre class="file" data-file="trecho.php">$novoNome = bin2hex(random_bytes(16)) . '.' . $tipos[$tipo];
+// por exemplo: 1a99be15d05c6e4708f3bc45fd5c9c9b.png</pre>
+<p>Se precisar mostrar o nome original depois ("gato.png"), guarde-o num banco de dados junto do nome novo, e mostre-o com <code>htmlspecialchars</code> (<a href="escapar-saida.html">Escapar a Saída</a>).</p>
+
+<hr>
+
+<h2>Tudo junto: o upload seguro</h2>
+<pre class="file" data-file="upload.php">&lt;?php
+$mensagem = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $arq = $_FILES['foto'] ?? null;
+    $tipos = ['image/jpeg' =&gt; 'jpg', 'image/png' =&gt; 'png', 'image/webp' =&gt; 'webp'];
+
+    if ($arq === null || !is_int($arq['error'])) {
+        $mensagem = 'Nenhum arquivo recebido.';
+    } elseif ($arq['error'] === UPLOAD_ERR_NO_FILE) {
+        $mensagem = 'Escolha uma foto.';
+    } elseif ($arq['error'] === UPLOAD_ERR_INI_SIZE || $arq['error'] === UPLOAD_ERR_FORM_SIZE) {
+        $mensagem = 'A foto é grande demais.';
+    } elseif ($arq['error'] !== UPLOAD_ERR_OK) {
+        $mensagem = 'O envio falhou (código ' . $arq['error'] . ').';
+    } elseif ($arq['size'] &gt; 1_000_000) {
+        $mensagem = 'A foto pode ter no máximo 1 MB.';
+    } else {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $tipo = $finfo-&gt;file($arq['tmp_name']);
+        if (!isset($tipos[$tipo])) {
+            $mensagem = 'Envie uma imagem JPG, PNG ou WebP.';
+        } else {
+            $novoNome = bin2hex(random_bytes(16)) . '.' . $tipos[$tipo];
+            if (move_uploaded_file($arq['tmp_name'], __DIR__ . '/uploads/' . $novoNome)) {
+                $mensagem = 'Foto salva como ' . $novoNome;
+            } else {
+                $mensagem = 'Não foi possível salvar a foto.';
+            }
+        }
+    }
+}
+?&gt;
+&lt;p&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/p&gt;
+&lt;form method="post" enctype="multipart/form-data"&gt;
+  &lt;input type="hidden" name="MAX_FILE_SIZE" value="1000000"&gt;
+  &lt;input type="file" name="foto" accept="image/*"&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Por quê</th></tr>
+<tr><td><code>$_FILES['foto'] ?? null</code></td><td>O pedido pode nem ter o campo (ou ter passado do <code>post_max_size</code>).</td></tr>
+<tr><td><code>!is_int($arq['error'])</code></td><td>Se alguém mandou <code>foto[]</code>, o <code>error</code> vira array. Recuse.</td></tr>
+<tr><td>a sequência de <code>elseif</code> com <code>UPLOAD_ERR_*</code></td><td>Uma mensagem clara para cada problema; só segue com <code>UPLOAD_ERR_OK</code>.</td></tr>
+<tr><td><code>$arq['size'] &gt; 1_000_000</code></td><td>O seu limite (1 MB), independente do servidor. O <code>_</code> é só para ler melhor o número.</td></tr>
+<tr><td><code>$finfo-&gt;file(…)</code> + <code>isset($tipos[$tipo])</code></td><td>Tipo pelo conteúdo, conferido numa lista de permitidos.</td></tr>
+<tr><td><code>bin2hex(random_bytes(16)) . '.' . $tipos[$tipo]</code></td><td>Nome inventado, extensão vinda da lista.</td></tr>
+<tr><td><code>__DIR__ . '/uploads/'</code></td><td><code>__DIR__</code> é a pasta deste arquivo PHP: o destino não depende de onde o servidor foi aberto.</td></tr>
+</table>
+</div>
+
+<p>Testando cada situação (só a primeira linha da resposta, com a mensagem):</p>
+<pre class="term">$ curl -s localhost:8000/upload.php -F "foto=@gato.png" | head -1
+&lt;p&gt;Foto salva como 1a99be15d05c6e4708f3bc45fd5c9c9b.png&lt;/p&gt;
+$ curl -s localhost:8000/upload.php -F "foto=@falsa.jpg;type=image/jpeg" | head -1
+&lt;p&gt;Envie uma imagem JPG, PNG ou WebP.&lt;/p&gt;
+$ curl -s localhost:8000/upload.php -F "foto=@grande.bin" | head -1
+&lt;p&gt;A foto é grande demais.&lt;/p&gt;
+$ curl -s localhost:8000/upload.php -F "foto=@/dev/null;filename=" | head -1
+&lt;p&gt;Escolha uma foto.&lt;/p&gt;
+$ ls -l uploads
+total 8
+-rw-rw-r-- 1 ana ana 124 out 16 20:59 1a99be15d05c6e4708f3bc45fd5c9c9b.png
+-rw-rw-r-- 1 ana ana 124 out 16 20:58 gato.png</pre>
+
+<div class="warning"><strong>Mais duas proteções num site de verdade:</strong> guarde os uploads, se possível, numa pasta <strong>fora</strong> da pasta pública do site (e entregue-os por um PHP que lê o arquivo), e configure o servidor web para nunca executar PHP dentro da pasta de uploads. Assim, mesmo que algo passe, não roda.</div>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task">Sem arquivo de verdade: aqui um <strong>campo de texto faz o papel do arquivo</strong>. O PHP grava o que você digitar num arquivo temporário e pergunta ao <code>finfo</code> o que ele é, ignorando o nome. Experimente o nome <code>foto.jpg</code> com um texto qualquer, depois com <code>&lt;?php echo 1;</code>, depois com <code>{"nome": "Ana"}</code>.</p>
+<pre class="script">&lt;?php
+$nome = $_POST['nome'] ?? 'foto.jpg';
+$conteudo = $_POST['conteudo'] ?? 'Lista: farinha, ovos, leite';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $tmp = tempnam(sys_get_temp_dir(), 'up');
+    file_put_contents($tmp, $conteudo);
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    echo "&lt;p&gt;O nome diz: &lt;b&gt;" . htmlspecialchars($nome) . "&lt;/b&gt;&lt;br&gt;";
+    echo "O finfo viu: &lt;b&gt;" . htmlspecialchars($finfo-&gt;file($tmp)) . "&lt;/b&gt;&lt;/p&gt;";
+    unlink($tmp);
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;p&gt;Nome do "arquivo": &lt;input name="nome" value="&lt;?= htmlspecialchars($nome) ?&gt;"&gt;&lt;/p&gt;
+  &lt;p&gt;Conteúdo:&lt;br&gt;&lt;textarea name="conteudo" rows="4" cols="40"&gt;&lt;?= htmlspecialchars($conteudo) ?&gt;&lt;/textarea&gt;&lt;/p&gt;
+  &lt;button&gt;"Enviar"&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>$_FILES</code> vazio, e o nome do arquivo apareceu em <code>$_POST</code></strong>
+<pre class="term">$ curl -s localhost:8000/dump.php -d "foto=gato.png"
+array(0) {
+}
+array(1) {
+  ["foto"]=&gt;
+  string(8) "gato.png"
+}</pre>
+<p><strong>O que aconteceu:</strong> o formulário não tem <code>enctype="multipart/form-data"</code>. Sem ele, o navegador manda só o <strong>nome</strong> do arquivo, como texto comum (é o que o <code>curl -d</code> simula aqui), e o conteúdo fica para trás.</p>
+<p><strong>Como resolver:</strong> <code>&lt;form method="post" enctype="multipart/form-data"&gt;</code>. Com <code>method="get"</code> também não funciona.</p>
+</div>
+
+<div class="cenario">
+<strong><code>PHP Request Startup: POST Content-Length of … bytes exceeds the limit</code></strong>
+<pre class="term">&lt;b&gt;Warning&lt;/b&gt;:  PHP Request Startup: POST Content-Length of 9000317 bytes exceeds the limit of 8388608 bytes in &lt;b&gt;Unknown&lt;/b&gt; on line &lt;b&gt;0&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> o pedido inteiro passou do <code>post_max_size</code> (8388608 bytes = 8 MB). O PHP jogou fora <code>$_POST</code> e <code>$_FILES</code>.</p>
+<p><strong>Como resolver:</strong> aumente <code>post_max_size</code> (e <code>upload_max_filesize</code>) no <code>php.ini</code>, ou avise o limite no formulário. No código, trate "POST com <code>$_FILES</code> vazio" como "arquivo grande demais".</p>
+</div>
+
+<div class="cenario">
+<strong><code>move_uploaded_file(…): Failed to open stream: No such file or directory</code></strong>
+<p><strong>O que aconteceu:</strong> a pasta de destino não existe (ou o caminho está errado). A mensagem seguinte, <code>Unable to move "/tmp/php…" to "uploads/…"</code>, é a consequência.</p>
+<p><strong>Como resolver:</strong> crie a pasta (<code>mkdir uploads</code>) e use caminho absoluto: <code>__DIR__ . '/uploads/'</code>. Se a mensagem for <code>Permission denied</code>, o PHP não tem permissão de escrita na pasta (no Linux, confira o dono e as permissões da pasta com <code>ls -ld uploads</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>O upload "deu certo", mas o arquivo sumiu</strong>
+<p><strong>O que aconteceu:</strong> o código leu <code>$_FILES</code> mas não chamou <code>move_uploaded_file</code> (ou chamou com o destino errado e não conferiu o retorno). O arquivo temporário é apagado quando a página termina.</p>
+<p><strong>Como resolver:</strong> mova sempre, e confira: <code>if (!move_uploaded_file(…)) { … }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>error</code> 1 com um arquivo de 3 MB</strong>
+<p><strong>O que aconteceu:</strong> o padrão de <code>upload_max_filesize</code> é <code>2M</code>. Fotos de celular passam disso com facilidade.</p>
+<p><strong>Como resolver:</strong> aumente no <code>php.ini</code> (e o <code>post_max_size</code> junto), ou reduza a foto antes de enviar. Confira o valor em uso com <code>php -i | grep upload_max_filesize</code> ou <code>ini_get('upload_max_filesize')</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que é</th></tr>
+<tr><td><code>enctype="multipart/form-data"</code></td><td>Obrigatório no <code>&lt;form&gt;</code> para enviar arquivos (com <code>method="post"</code>)</td></tr>
+<tr><td><code>&lt;input type="file" name="x"&gt;</code></td><td>Campo de arquivo; <code>multiple</code> + <code>name="x[]"</code> para vários</td></tr>
+<tr><td><code>$_FILES['x']['name']</code></td><td>Nome original (não confiável)</td></tr>
+<tr><td><code>$_FILES['x']['type']</code></td><td>Tipo informado pelo navegador (não confiável)</td></tr>
+<tr><td><code>$_FILES['x']['tmp_name']</code></td><td>Caminho do arquivo temporário</td></tr>
+<tr><td><code>$_FILES['x']['error']</code></td><td><code>UPLOAD_ERR_OK</code> (0) ou um código de erro</td></tr>
+<tr><td><code>$_FILES['x']['size']</code></td><td>Tamanho em bytes</td></tr>
+<tr><td><code>move_uploaded_file($tmp, $destino)</code></td><td>Move o arquivo enviado; <code>true</code>/<code>false</code></td></tr>
+<tr><td><code>(new finfo(FILEINFO_MIME_TYPE))-&gt;file($tmp)</code></td><td>Tipo real, pelo conteúdo</td></tr>
+<tr><td><code>mime_content_type($tmp)</code></td><td>O mesmo, numa função</td></tr>
+<tr><td><code>bin2hex(random_bytes(16))</code></td><td>32 caracteres aleatórios para o nome</td></tr>
+<tr><td><code>upload_max_filesize</code> / <code>post_max_size</code></td><td>Limites do <code>php.ini</code> (padrão 2M / 8M)</td></tr>
+<tr><td><code>MAX_FILE_SIZE</code></td><td>Campo escondido, antes do <code>type="file"</code>; gera o erro 2</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O atributo esquecido</h3>
+<p>Complete o formulário de upload:</p>
+<div class="ex-code">&lt;form method="post" enctype="<input data-answer="multipart/form-data" aria-label="enctype">"&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Deu certo?</h3>
+<p>Complete com a constante que significa "upload sem erro":</p>
+<div class="ex-code">if ($arq['error'] === <input data-answer="UPLOAD_ERR_OK|0" aria-label="constante">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Mover</h3>
+<p>Complete com a função que guarda o arquivo enviado:</p>
+<div class="ex-code"><input data-answer="move_uploaded_file" aria-label="função">($arq['tmp_name'], $destino);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual informação de <code>$_FILES</code> é confiável para saber se o arquivo é mesmo uma imagem?</p>
+<label><input type="radio" name="q4"> <code>name</code> (a extensão <code>.jpg</code>)</label>
+<label><input type="radio" name="q4"> <code>type</code> (<code>image/jpeg</code>)</label>
+<label><input type="radio" name="q4"> Nenhuma: é preciso olhar o conteúdo de <code>tmp_name</code> com <code>finfo</code>.</label>
+<label><input type="radio" name="q4"> <code>size</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. A pessoa enviou um arquivo maior que <code>post_max_size</code>. O que o seu código encontra?</p>
+<label><input type="radio" name="q5"> <code>$_FILES['foto']['error']</code> igual a 1.</label>
+<label><input type="radio" name="q5"> <code>$_POST</code> e <code>$_FILES</code> vazios.</label>
+<label><input type="radio" name="q5"> O arquivo cortado no limite.</label>
+<label><input type="radio" name="q5"> Um erro fatal que para o servidor.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual é o nome mais seguro para salvar uma foto enviada?</p>
+<label><input type="radio" name="q6"> Letras aleatórias + extensão escolhida pelo tipo que o <code>finfo</code> detectou.</label>
+<label><input type="radio" name="q6"> O <code>name</code> original.</label>
+<label><input type="radio" name="q6"> O <code>name</code> original sem espaços.</label>
+<label><input type="radio" name="q6"> O <code>full_path</code>.</label>
+</div>
+
+<div class="tryphp" data-goal="outre:^[0-9a-f]{32}\.png,src:random_bytes,semerro">
+<p class="try-task"><strong>Missão:</strong> o <code>finfo</code> já descobriu que o arquivo é <code>image/png</code>. Monte em <code>$novo</code> um nome seguro: 32 caracteres aleatórios (<code>bin2hex(random_bytes(16))</code>), um ponto e a extensão que a lista <code>$tipos</code> dá para esse tipo. Ignore o nome original. A saída deve ser algo como <code>3f9a…c1.png</code>.</p>
+<pre class="script">&lt;?php
+$tipos = ['image/jpeg' =&gt; 'jpg', 'image/png' =&gt; 'png'];
+$nomeOriginal = '../../minha foto (1).PHP';
+$tipo = 'image/png';   // o que o finfo detectou
+
+$novo = $nomeOriginal;   // troque por um nome seguro
+
+echo $novo, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$tipos = ['image/jpeg' =&gt; 'jpg', 'image/png' =&gt; 'png'];
+$nomeOriginal = '../../minha foto (1).PHP';
+$tipo = 'image/png';   // o que o finfo detectou
+
+$novo = bin2hex(random_bytes(16)) . '.' . $tipos[$tipo];
+
+echo $novo, "\n";
+</pre>
+</div>
+
+<div class="tryphp" data-goal="out:Você não escolheu nenhum arquivo.,src:UPLOAD_ERR_NO_FILE,semerro">
+<p class="try-task"><strong>Missão:</strong> abaixo está a ficha que <code>$_FILES['foto']</code> recebe quando a pessoa clica em Enviar <strong>sem escolher arquivo</strong> (copiada do <code>var_dump</code> real). Rode: o <code>match</code> cai no <code>default</code>. Acrescente um braço para <code>UPLOAD_ERR_NO_FILE</code> com a mensagem <code>Você não escolheu nenhum arquivo.</code> (o <code>match</code> está em <a href="match.html">match</a>).</p>
+<pre class="script">&lt;?php
+$arq = ['name' =&gt; '', 'full_path' =&gt; '', 'type' =&gt; '', 'tmp_name' =&gt; '', 'error' =&gt; 4, 'size' =&gt; 0];
+
+$mensagem = match ($arq['error']) {
+    UPLOAD_ERR_OK =&gt; 'Arquivo recebido!',
+    UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE =&gt; 'Arquivo grande demais.',
+    default =&gt; 'Erro no envio (código ' . $arq['error'] . ').',
+};
+echo $mensagem, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$arq = ['name' =&gt; '', 'full_path' =&gt; '', 'type' =&gt; '', 'tmp_name' =&gt; '', 'error' =&gt; 4, 'size' =&gt; 0];
+
+$mensagem = match ($arq['error']) {
+    UPLOAD_ERR_OK =&gt; 'Arquivo recebido!',
+    UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE =&gt; 'Arquivo grande demais.',
+    UPLOAD_ERR_NO_FILE =&gt; 'Você não escolheu nenhum arquivo.',
+    default =&gt; 'Erro no envio (código ' . $arq['error'] . ').',
+};
+echo $mensagem, "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Upload precisa de <code>method="post"</code>, <code>enctype="multipart/form-data"</code> e <code>&lt;input type="file" name="…"&gt;</code>.</li>
+  <li><code>$_FILES['campo']</code> traz <code>name</code>, <code>full_path</code>, <code>type</code>, <code>tmp_name</code>, <code>error</code> e <code>size</code>. Nome e tipo foram escritos por quem enviou.</li>
+  <li>Confira <code>error</code> (<code>UPLOAD_ERR_OK</code> = 0) antes de tudo; 4 = nenhum arquivo, 1 e 2 = grande demais.</li>
+  <li>Limites: <code>upload_max_filesize</code> (2M) por arquivo; <code>post_max_size</code> (8M) para o pedido inteiro, que, se estourar, esvazia <code>$_POST</code> e <code>$_FILES</code>.</li>
+  <li>Descubra o tipo pelo conteúdo, com <code>finfo</code> ou <code>mime_content_type</code>, e aceite só uma lista de tipos.</li>
+  <li>Salve com <code>move_uploaded_file</code>, com um nome inventado (<code>bin2hex(random_bytes(16))</code>) e a extensão da sua lista.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
