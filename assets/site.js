@@ -544,7 +544,7 @@ var NIVEIS = [
 
   /* ---------- Exercícios de completar ----------
      <div class="exercise"><div class="ex-code">ls <input data-answer="-a|-A"> ~</div></div> */
-  /* "|" separa respostas alternativas; "\\|" é uma barra vertical dentro da resposta (ex.: int\|string). */
+  /* "|" separa respostas alternativas; "\|" é uma barra vertical dentro da resposta (ex.: int\|string). */
   function respostas(i) {
     return i.getAttribute("data-answer").split(/(?<!\\)\|/).map(function (r) { return r.replace(/\\\|/g, "|"); });
   }

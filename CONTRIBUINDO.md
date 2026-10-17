@@ -81,10 +81,11 @@ Não é uma imitação: é o **PHP 8.5.10 oficial compilado para WebAssembly** (
 ### O que roda e o que não roda
 - **Extensões** (`get_loaded_extensions()` no navegador): Core, date, lexbor, uri, pcre, json, SPL, standard, random, Reflection, mbstring, iconv, ctype, filter, hash, session, tokenizer, calendar, bcmath, fileinfo, exif, gd, zlib, zip, Phar, openssl, curl (sem rede), dom, libxml, SimpleXML, xml, xmlreader, xmlwriter, soap, **PDO + pdo_sqlite, sqlite3**, OPcache. **Não tem**: intl (`NumberFormatter`, `IntlDateFormatter` — o laboratório também não), mysqli/pdo_mysql/mysqlnd, pdo_pgsql/pgsql, gmp, bz2, ftp, sockets, posix, pcntl, redis, readline.
 - **Sem rede**: `allow_url_fopen=0` (`file_get_contents("https://…")` dá os dois `Warning` reais do PHP e devolve `false`), `curl_exec`, `curl_multi_exec`, `fsockopen`, `stream_socket_client/server` estão **desligadas** (`Call to undefined function curl_exec()`); `curl_init`/`curl_setopt` existem. MySQL: `new PDO('mysql:…')` → `could not find driver`. Nas aulas de rede, MySQL, Composer e `php -S` use saídas reais do laboratório em `pre.term`.
-- **Sem sistema operacional**: `exec()`, `shell_exec()`, `system()`, `passthru()`, `proc_open()` não rodam comando nenhum (devolvem vazio/`false`, código 1); `mail()` → `Warning: mail(): Sendmail killed by signal 127`.
+- **Sem sistema operacional**: `exec()`, `shell_exec()`, `system()`, `passthru()`, `proc_open()` não rodam comando nenhum (`shell_exec`/`passthru` → `NULL`; `exec`/`system` → `""`, com código de retorno 1); `mail()` → `Warning: mail(): Sendmail killed by signal 127`.
 - **A "máquina"**: `getenv()` mostra a Ana (`HOME=/home/ana`, `USER=ana`, `LANG=pt_BR.UTF-8`), fuso **UTC** (como o laboratório), `PHP_OS` = `Linux`, mas `php_uname()` = `Emscripten emscripten 4.0.19 #1 wasm32` e `gethostname()` = `emscripten` — não mostre esses dois no editor. `PHP_VERSION` = `8.5.10` (laboratório: `8.5.8`). O sistema de arquivos é só da caixa (`/home/ana`, `/tmp`), em memória, e some no próximo Rodar.
 - **Desempenho**: o PHP leva ~0,5–1 s para carregar do cache e ~0,1–0,2 s por Rodar; o WebAssembly é umas 2–3× mais lento que o nativo (`password_hash` ≈ 0,4 s). Use números pequenos.
 - Só **um programa por vez** na página: rodar outra caixa interrompe o programa que estava esperando entrada.
+- O testador (Node) usa o mesmo PHP 8.5.10, mas o build para Node tem **a mais** mysqli/pdo_mysql/mysqlnd e imagick (lá `new PDO('mysql:…')` dá `Host is unreachable`, no navegador `could not find driver`). Fora isso, as saídas são iguais.
 - Navegadores: precisa de `DecompressionStream` (Chrome/Edge 80+, Firefox 113+, Safari 16.4+).
 
 ## 5. Fidelidade: o laboratório (`~/guia-php-lab/lab`)
@@ -92,13 +93,13 @@ A máquina da Ana do Guia Bash (usuária `ana`, `notebook`, `/home/ana`, pt_BR) 
 ```bash
 L=~/guia-php-lab/lab
 printf '%s\n' 'mkdir -p site && cd site' "cat > ola.php <<'FIM'" '<?php' 'echo "Olá, mundo!\n";' 'FIM' 'php ola.php' | $L -n SEUNOME -i
-$L -n SEUNOME -- bash -c 'cd site && (php -S localhost:8000 >/tmp/srv.log 2>&1 &) && sleep 1 && curl -s localhost:8000/ola.php; pkill -f "php -S"'
+$L -n SEUNOME -N -- bash -c 'cd site && php -S localhost:8000 >/tmp/srv.log 2>&1 & sleep 1; curl -s localhost:8000/ola.php; kill %1'
 ```
 - `-n SEUNOME` (pasta própria), `-r` (recomeça), `-t` (terminal de verdade).
 - **Dois binários do mesmo PHP 8.5.8:** `php` (perfil "common": tem `pdo_sqlite`, **sem readline**) e `php-completo` (perfil "bulk": **com readline e intl** — `Collator`, `NumberFormatter`, `IntlDateFormatter` — e mais extensões, sem `pdo_sqlite`; o PHP do navegador **não** tem intl, então intl só em `pre.term`). Para sessões do modo interativo `php -a` e para `readline()`, rode `php-completo` com `-t` e mostre o comando como `php -a` (no PHP instalado pelo apt/dnf/pacman, o `php` normal tem readline). Não confunda: o `php` do laboratório dá `Interactive shell (-a) requires the readline extension.`, o que **não** acontece numa instalação comum.
 - Fatos já conferidos: **`printf("%.2f")` ignora o idioma** (sai `3.14`, com ponto — diferente do Java); `number_format(1234.5, 2, ",", ".")` → `1.234,50`; `echo 10/3` → `3.3333333333333`; `var_dump(0.1+0.2 == 0.3)` → `bool(false)`.
 - No CLI os erros saem como `PHP Warning:  …` no stderr **e** `Warning: …` no stdout, conforme `display_errors`/`log_errors` — confira e explique o que o leitor vê no terminal × no navegador.
-- Um processo por vez, `timeout 60`; **sempre** encerre o `php -S` que você abrir. **Use `-N` em toda sessão com `php -S`** (`$L -n SEUNOME -N -- bash -c …`): a caixa ganha um `localhost` só dela, e vários autores podem usar a porta 8000 ao mesmo tempo sem um pegar o servidor do outro (com `-N` não há internet — para Composer, rode sem `-N`).
+- Um processo por vez, `timeout 60`; **sempre** encerre o `php -S` que você abrir. **Use `-N` em toda sessão com `php -S`** e encerre com `kill %1` ou `kill $!` — **nunca `pkill`/`killall`**, que sem `-N` alcançam os processos de outros autores (`$L -n SEUNOME -N -- bash -c …`): a caixa ganha um `localhost` só dela, e vários autores podem usar a porta 8000 ao mesmo tempo sem um pegar o servidor do outro (com `-N` não há internet — para Composer, rode sem `-N`).
 - **Privacidade:** nada da máquina real (redes, IPs, usuário real). Só a máquina fictícia da Ana.
 
 ### Versões
