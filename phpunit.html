@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Testes com PHPUnit — TestCase, assertSame, exceções e data providers | Guia PHP</title>
+<meta name="description" content="Testes automatizados em PHP com o PHPUnit 13: instalar com o Composer, o primeiro TestCase, assertSame, rodar vendor/bin/phpunit (saídas reais com sucesso e com falha), expectException, data providers com #[DataProvider], phpunit.xml e --testdox, testando o carrinho da lojinha da Ana.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Testes com PHPUnit</span></h1>
+
+<p class="intro">Toda vez que a Ana muda o carrinho da lojinha, ela abre o site, coloca produtos, aplica um cupom e confere o total na calculadora. Funciona, mas cansa, e um dia ela vai esquecer de conferir alguma coisa. Um <strong>teste automatizado</strong> é um pequeno programa que faz essa conferência por ela, em segundos, quantas vezes ela quiser. O <strong>PHPUnit</strong> é a ferramenta padrão do PHP para escrever e rodar esses testes.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um teste automatizado e por que ele vale o trabalho.</li>
+  <li>Instalar o PHPUnit com o Composer, só para o desenvolvimento.</li>
+  <li>Escrever uma classe de teste (<code>TestCase</code>) com <code>assertSame</code>.</li>
+  <li>Rodar com <code>vendor/bin/phpunit</code> e ler a saída de sucesso e de falha.</li>
+  <li>Testar exceções com <code>expectException</code>.</li>
+  <li>Testar vários casos de uma vez com data providers (<code>#[DataProvider]</code>).</li>
+  <li>Configurar o projeto com <code>phpunit.xml</code> e ver os testes como frases com <code>--testdox</code>.</li>
+</ul>
+</div>
+
+<div class="warning"><strong>O PHPUnit não roda no editor do guia.</strong> Ele é instalado pelo Composer, que precisa de internet e de um terminal de verdade. Todas as saídas de <code>composer</code> e <code>vendor/bin/phpunit</code> desta aula vieram do computador da Ana (PHPUnit 13.4.3, PHP 8.5). Nas caixas "Experimente", você vai treinar a mesma ideia com um "mini PHPUnit" de poucas linhas, escrito em PHP puro.</div>
+
+<hr>
+
+<h2>A ideia: a lista de conferência do confeiteiro</h2>
+<p>Um confeiteiro que muda a receita do bolo não serve o bolo novo direto ao cliente: ele prova. E um confeiteiro organizado tem uma lista do que provar: "está doce?", "a massa cresceu?", "o recheio não vazou?". Se mudar o fermento, ele passa a lista inteira de novo, porque às vezes mexer numa coisa estraga outra.</p>
+<p>Um teste é um item dessa lista, escrito em PHP: "um carrinho novo tem 0 itens", "2 cadernos de R$ 25,50 dão R$ 51,00", "o cupom PROMO10 tira 10%". O PHPUnit passa a lista inteira e responde com um relatório. Quase todo teste segue três passos, conhecidos como <strong>Preparar, Agir, Conferir</strong>:</p>
+<ol>
+  <li><strong>Preparar:</strong> criar o que o teste precisa (um carrinho, uns produtos).</li>
+  <li><strong>Agir:</strong> chamar o método que está sendo testado.</li>
+  <li><strong>Conferir:</strong> comparar o resultado com o esperado (uma <em>assertion</em>, "afirmação").</li>
+</ol>
+
+<hr>
+
+<h2>1. O projeto e a classe a testar</h2>
+<p>A Ana organizou a lojinha como um projeto Composer (veja <a href="composer.html">Composer</a> e <a href="autoload.html">Autoload e PSR-4</a>): o código fica em <code>src/</code>, os testes em <code>tests/</code>.</p>
+
+<pre class="term">lojinha/
+├── composer.json
+├── src/
+│   └── Carrinho.php       « o código da lojinha (namespace Loja)
+└── tests/
+    └── CarrinhoTest.php   « os testes</pre>
+
+<pre class="file" data-file="composer.json">{
+    "name": "ana/lojinha",
+    "autoload": {
+        "psr-4": {
+            "Loja\\": "src/"
+        }
+    }
+}
+</pre>
+
+<p>Esta é a classe que vamos testar. Ela guarda os itens num array (produto → preço e quantidade), soma as quantidades, calcula o total e aplica cupons:</p>
+
+<pre class="file" data-file="src/Carrinho.php">&lt;?php
+
+declare(strict_types=1);
+
+namespace Loja;
+
+use InvalidArgumentException;
+
+final class Carrinho
+{
+    /** @var array&lt;string, array{preco: float, quantidade: int}&gt; */
+    private array $itens = [];
+
+    public function adicionar(string $produto, float $preco, int $quantidade = 1): void
+    {
+        if ($quantidade &lt; 1) {
+            throw new InvalidArgumentException("Quantidade inválida: $quantidade");
+        }
+
+        if (isset($this-&gt;itens[$produto])) {
+            $this-&gt;itens[$produto]['quantidade'] += $quantidade;
+        } else {
+            $this-&gt;itens[$produto] = ['preco' =&gt; $preco, 'quantidade' =&gt; $quantidade];
+        }
+    }
+
+    public function quantidadeDeItens(): int
+    {
+        return array_sum(array_column($this-&gt;itens, 'quantidade'));
+    }
+
+    public function total(): float
+    {
+        $total = 0.0;
+        foreach ($this-&gt;itens as $item) {
+            $total += $item['preco'] * $item['quantidade'];
+        }
+        return round($total, 2);
+    }
+
+    public function totalComCupom(string $cupom): float
+    {
+        $desconto = match ($cupom) {
+            'PROMO10' =&gt; 0.10,
+            'METADE'  =&gt; 0.50,
+            ''        =&gt; 0.0,
+            default   =&gt; throw new InvalidArgumentException("Cupom desconhecido: $cupom"),
+        };
+        return round($this-&gt;total() * (1 - $desconto), 2);
+    }
+}
+</pre>
+
+<hr>
+
+<h2>2. Instalar o PHPUnit</h2>
+<p>O PHPUnit é um pacote do Composer. Como ele só é usado por quem desenvolve (o site no ar não precisa dele), instale-o como dependência <strong>de desenvolvimento</strong>, com <code>--dev</code>:</p>
+
+<pre class="term">$ cd lojinha
+$ composer require --dev phpunit/phpunit
+Composer could not detect the root package (ana/lojinha) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+./composer.json has been updated
+Composer could not detect the root package (ana/lojinha) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version
+Running composer update phpunit/phpunit
+Loading composer repositories with package information
+Updating dependencies
+Lock file operations: 27 installs, 0 updates, 0 removals
+  - Locking myclabs/deep-copy (1.14.0)
+  - Locking nikic/php-parser (v5.9.0)
+  «… mais 23 linhas "Locking", uma por pacote …»
+  - Locking phpunit/phpunit (13.4.3)
+  - Locking theseer/tokenizer (2.0.1)
+Writing lock file
+Installing dependencies from lock file (including require-dev)
+Package operations: 27 installs, 0 updates, 0 removals
+  - Downloading staabm/side-effects-detector (1.0.5)
+  «… um "Downloading" e um "Installing" por pacote, com barras de progresso …»
+  - Installing phpunit/phpunit (13.4.3): Extracting archive
+2 package suggestions were added by new dependencies, use `composer suggest` to see details.
+Generating autoload files
+25 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+No security vulnerability advisories found.
+Using version ^13.4 for phpunit/phpunit</pre>
+
+<dl class="anatomy">
+  <dt>--dev</dt><dd>Grava o pacote em <code>"require-dev"</code> no <code>composer.json</code>. No servidor de produção, <code>composer install --no-dev</code> deixa esses pacotes de fora.</dd>
+  <dt>27 installs</dt><dd>O PHPUnit trouxe 26 pacotes que ele usa (comparar valores, mostrar diferenças, medir tempo…). Todos vão para a pasta <code>vendor/</code>.</dd>
+  <dt>Using version ^13.4</dt><dd>A versão escolhida: PHPUnit 13 (exige PHP 8.4 ou mais novo). O <code>^</code> aceita atualizações 13.x.</dd>
+  <dt>Composer could not detect the root package version</dt><dd>Um aviso inofensivo: o projeto da Ana não está num repositório Git nem tem o campo <code>"version"</code>, então o Composer supôs <code>1.0.0</code>. Pode ignorar.</dd>
+</dl>
+
+<p>O <code>composer.json</code> ganhou a seção nova:</p>
+
+<pre class="file" data-file="composer.json">{
+    "name": "ana/lojinha",
+    "autoload": {
+        "psr-4": {
+            "Loja\\": "src/"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.4"
+    }
+}
+</pre>
+
+<p>E o programa do PHPUnit ficou em <code>vendor/bin/phpunit</code>. Ele não fica "instalado no sistema": cada projeto tem o seu, na versão que o projeto pediu.</p>
+
+<hr>
+
+<h2>3. O primeiro teste</h2>
+
+<pre class="file" data-file="tests/CarrinhoTest.php">&lt;?php
+
+declare(strict_types=1);
+
+use Loja\Carrinho;
+use PHPUnit\Framework\TestCase;
+
+final class CarrinhoTest extends TestCase
+{
+    public function testCarrinhoNovoEstaVazio(): void
+    {
+        $carrinho = new Carrinho();
+
+        $this-&gt;assertSame(0, $carrinho-&gt;quantidadeDeItens());
+        $this-&gt;assertSame(0.0, $carrinho-&gt;total());
+    }
+
+    public function testTotalSomaPrecoVezesQuantidade(): void
+    {
+        $carrinho = new Carrinho();
+        $carrinho-&gt;adicionar('Caderno', 25.50, 2);
+        $carrinho-&gt;adicionar('Caneta', 3.90, 10);
+
+        $this-&gt;assertSame(90.0, $carrinho-&gt;total());
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>use PHPUnit\Framework\TestCase;</dt><dd>Importa a classe base dos testes (veja <a href="namespaces.html">Namespaces</a>).</dd>
+  <dt>final class CarrinhoTest extends TestCase</dt><dd>Uma classe de teste <a href="heranca.html">herda</a> de <code>TestCase</code>. Por convenção, o nome é o da classe testada + <code>Test</code>, e o arquivo tem o mesmo nome: <code>CarrinhoTest.php</code>.</dd>
+  <dt>public function testCarrinhoNovoEstaVazio(): void</dt><dd>Cada método <strong>público</strong> cujo nome começa com <code>test</code> é um teste. O resto do nome descreve o que se confere, como uma frase.</dd>
+  <dt>$carrinho = new Carrinho();</dt><dd><strong>Preparar.</strong> Cada teste cria o seu carrinho do zero: um teste nunca depende de outro.</dd>
+  <dt>$carrinho-&gt;adicionar(…)</dt><dd><strong>Agir.</strong></dd>
+  <dt>$this-&gt;assertSame(esperado, obtido)</dt><dd><strong>Conferir.</strong> "Afirme que são idênticos": passa se <code>esperado === obtido</code> (mesmo valor e mesmo tipo). Primeiro o valor <strong>esperado</strong>, depois o <strong>obtido</strong>.</dd>
+</dl>
+
+<h3>Rodando: <code>vendor/bin/phpunit</code></h3>
+
+<pre class="term">$ vendor/bin/phpunit tests/CarrinhoTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+
+..                                                                  2 / 2 (100%)
+
+Time: 00:00.001, Memory: 20.00 MB
+
+OK (2 tests, 3 assertions)
+$ echo $?
+0</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>Significa</th></tr>
+<tr><td><code>Runtime: PHP 8.5.8</code></td><td>A versão do PHP que rodou os testes.</td></tr>
+<tr><td><code>..</code></td><td>Um caractere por teste: <code>.</code> passou, <code>F</code> falhou (<em>failure</em>, a conferência deu diferente), <code>E</code> erro (<em>error</em>, o código lançou uma exceção inesperada).</td></tr>
+<tr><td><code>2 / 2 (100%)</code></td><td>Quantos testes já rodaram, do total.</td></tr>
+<tr><td><code>OK (2 tests, 3 assertions)</code></td><td>Tudo passou: 2 testes, 3 conferências (o primeiro teste tem duas).</td></tr>
+<tr><td><code>echo $?</code> → <code>0</code></td><td>O <a href="linha-comando.html">código de saída</a> 0 significa "tudo certo". Ferramentas de publicação automática usam isso para bloquear uma versão com testes quebrados.</td></tr>
+</table>
+</div>
+
+<p>No terminal de verdade, o <code>OK</code> aparece com fundo verde.</p>
+
+<h3>Quando um teste falha</h3>
+<p>A Ana acrescentou um teste para um caso que ela tinha medo de quebrar: adicionar o mesmo produto duas vezes deve <strong>somar</strong> as quantidades.</p>
+
+<pre class="file" data-file="tests/CarrinhoTest.php (teste novo, dentro da classe)">    public function testAdicionarOMesmoProdutoSomaAsQuantidades(): void
+    {
+        $carrinho = new Carrinho();
+        $carrinho-&gt;adicionar('Caneta', 3.90, 2);
+        $carrinho-&gt;adicionar('Caneta', 3.90, 3);
+
+        $this-&gt;assertSame(5, $carrinho-&gt;quantidadeDeItens());
+    }
+</pre>
+
+<p>Para ver o que acontece numa falha, ela "quebrou" o carrinho de propósito, trocando <code>+=</code> por <code>=</code> no <code>adicionar</code> (a segunda vez substitui a quantidade em vez de somar):</p>
+
+<pre class="file" data-file="src/Carrinho.php (com o defeito)">            $this-&gt;itens[$produto]['quantidade'] = $quantidade;
+</pre>
+
+<pre class="term">$ vendor/bin/phpunit tests/CarrinhoTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+
+..F                                                                 3 / 3 (100%)
+
+Time: 00:00.003, Memory: 20.00 MB
+
+There was 1 failure:
+
+1) CarrinhoTest::testAdicionarOMesmoProdutoSomaAsQuantidades
+Failed asserting that 3 is identical to 5.
+
+/home/ana/lojinha/tests/CarrinhoTest.php:33
+
+FAILURES!
+Tests: 3, Assertions: 4, Failures: 1.
+$ echo $?
+1</pre>
+
+<dl class="anatomy">
+  <dt>..F</dt><dd>Os dois primeiros passaram; o terceiro falhou.</dd>
+  <dt>1) CarrinhoTest::testAdicionarOMesmoProdutoSomaAsQuantidades</dt><dd>Qual teste falhou. Um nome descritivo já diz o que quebrou, antes mesmo de ler o código.</dd>
+  <dt>Failed asserting that 3 is identical to 5.</dt><dd>"Falhou ao afirmar que 3 é idêntico a 5": o carrinho disse 3 (só a última quantidade), o teste esperava 5.</dd>
+  <dt>CarrinhoTest.php:33</dt><dd>A linha do <code>assertSame</code> que falhou.</dd>
+  <dt>FAILURES! / echo $? → 1</dt><dd>Fundo vermelho no terminal e código de saída 1.</dd>
+</dl>
+
+<p>Com o <code>+=</code> de volta, os três passam: <code>OK (3 tests, 4 assertions)</code>. É esse o valor do teste: se daqui a seis meses alguém mexer no <code>adicionar</code> e cometer esse engano, o PHPUnit avisa na hora.</p>
+
+<div class="tryphp" data-goal="out:3 de 3 testes passaram,semerro">
+<p class="try-task"><strong>Missão:</strong> como o PHPUnit não roda no editor, esta caixa tem um "mini PHPUnit": a função <code>verificarIgual</code> compara com <code>===</code>, como o <code>assertSame</code>, e mostra ✔ ou ✘. O carrinho está com o defeito do <code>=</code>. Rode, leia a mensagem do teste que falhou e conserte o método <code>adicionar</code> até aparecer <code>3 de 3 testes passaram</code>.</p>
+<pre class="script">&lt;?php
+
+declare(strict_types=1);
+
+final class Carrinho
+{
+    private array $itens = [];
+
+    public function adicionar(string $produto, float $preco, int $quantidade = 1): void
+    {
+        if ($quantidade &lt; 1) {
+            throw new InvalidArgumentException("Quantidade inválida: $quantidade");
+        }
+        if (isset($this-&gt;itens[$produto])) {
+            $this-&gt;itens[$produto]['quantidade'] = $quantidade;
+        } else {
+            $this-&gt;itens[$produto] = ['preco' =&gt; $preco, 'quantidade' =&gt; $quantidade];
+        }
+    }
+
+    public function quantidadeDeItens(): int
+    {
+        return array_sum(array_column($this-&gt;itens, 'quantidade'));
+    }
+
+    public function total(): float
+    {
+        $total = 0.0;
+        foreach ($this-&gt;itens as $item) {
+            $total += $item['preco'] * $item['quantidade'];
+        }
+        return round($total, 2);
+    }
+}
+
+// Um "mini PHPUnit": compara com === e conta os resultados
+$resultados = [];
+
+function verificarIgual(mixed $esperado, mixed $obtido, string $teste): bool
+{
+    if ($esperado === $obtido) {
+        echo "✔ $teste\n";
+        return true;
+    }
+    echo "✘ $teste: esperava ", var_export($esperado, true), ', veio ', var_export($obtido, true), "\n";
+    return false;
+}
+
+// Teste 1
+$carrinho = new Carrinho();
+$resultados[] = verificarIgual(0, $carrinho-&gt;quantidadeDeItens(), 'carrinho novo está vazio');
+
+// Teste 2
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caderno', 25.50, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 10);
+$resultados[] = verificarIgual(90.0, $carrinho-&gt;total(), 'total soma preço × quantidade');
+
+// Teste 3
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caneta', 3.90, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 3);
+$resultados[] = verificarIgual(5, $carrinho-&gt;quantidadeDeItens(), 'adicionar o mesmo produto soma as quantidades');
+
+$passaram = count(array_filter($resultados));
+echo "\n$passaram de ", count($resultados), " testes passaram\n";
+</pre>
+<pre class="solucao">&lt;?php
+
+declare(strict_types=1);
+
+final class Carrinho
+{
+    private array $itens = [];
+
+    public function adicionar(string $produto, float $preco, int $quantidade = 1): void
+    {
+        if ($quantidade &lt; 1) {
+            throw new InvalidArgumentException("Quantidade inválida: $quantidade");
+        }
+        if (isset($this-&gt;itens[$produto])) {
+            $this-&gt;itens[$produto]['quantidade'] += $quantidade;
+        } else {
+            $this-&gt;itens[$produto] = ['preco' =&gt; $preco, 'quantidade' =&gt; $quantidade];
+        }
+    }
+
+    public function quantidadeDeItens(): int
+    {
+        return array_sum(array_column($this-&gt;itens, 'quantidade'));
+    }
+
+    public function total(): float
+    {
+        $total = 0.0;
+        foreach ($this-&gt;itens as $item) {
+            $total += $item['preco'] * $item['quantidade'];
+        }
+        return round($total, 2);
+    }
+}
+
+// Um "mini PHPUnit": compara com === e conta os resultados
+$resultados = [];
+
+function verificarIgual(mixed $esperado, mixed $obtido, string $teste): bool
+{
+    if ($esperado === $obtido) {
+        echo "✔ $teste\n";
+        return true;
+    }
+    echo "✘ $teste: esperava ", var_export($esperado, true), ', veio ', var_export($obtido, true), "\n";
+    return false;
+}
+
+// Teste 1
+$carrinho = new Carrinho();
+$resultados[] = verificarIgual(0, $carrinho-&gt;quantidadeDeItens(), 'carrinho novo está vazio');
+
+// Teste 2
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caderno', 25.50, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 10);
+$resultados[] = verificarIgual(90.0, $carrinho-&gt;total(), 'total soma preço × quantidade');
+
+// Teste 3
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caneta', 3.90, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 3);
+$resultados[] = verificarIgual(5, $carrinho-&gt;quantidadeDeItens(), 'adicionar o mesmo produto soma as quantidades');
+
+$passaram = count(array_filter($resultados));
+echo "\n$passaram de ", count($resultados), " testes passaram\n";
+</pre>
+</div>
+
+<p>No computador da Ana, a versão com defeito mostra:</p>
+
+<pre class="term">$ php mini.php
+✔ carrinho novo está vazio
+✔ total soma preço × quantidade
+✘ adicionar o mesmo produto soma as quantidades: esperava 5, veio 3
+
+2 de 3 testes passaram</pre>
+
+<hr>
+
+<h2>4. Testando exceções: <code>expectException</code></h2>
+<p>Às vezes o comportamento certo é <strong>dar erro</strong>: adicionar 0 canetas deve lançar uma <a href="excecoes.html">exceção</a>. Para testar isso, avise o PHPUnit <strong>antes</strong> de agir:</p>
+
+<pre class="file" data-file="tests/CarrinhoTest.php (dois testes novos)">    public function testQuantidadeZeroLancaExcecao(): void
+    {
+        $carrinho = new Carrinho();
+
+        $this-&gt;expectException(InvalidArgumentException::class);
+        $this-&gt;expectExceptionMessage('Quantidade inválida: 0');
+
+        $carrinho-&gt;adicionar('Caneta', 3.90, 0);
+    }
+
+    public function testPrecoNegativoLancaExcecao(): void
+    {
+        $carrinho = new Carrinho();
+
+        $this-&gt;expectException(InvalidArgumentException::class);
+
+        $carrinho-&gt;adicionar('Caneta', -3.90);
+    }
+</pre>
+
+<dl class="anatomy">
+  <dt>expectException(InvalidArgumentException::class)</dt><dd>"Espere uma exceção deste tipo." O teste <strong>passa</strong> se ela for lançada e <strong>falha</strong> se o código terminar normalmente. <code>::class</code> dá o nome completo da classe como texto.</dd>
+  <dt>expectExceptionMessage('…')</dt><dd>Opcional: confere também se a mensagem <strong>contém</strong> esse texto.</dd>
+  <dt>a última linha</dt><dd>A ação que deve lançar a exceção vem <strong>depois</strong> do <code>expect</code>. O que estiver depois dela no método não roda (a exceção interrompe).</dd>
+</dl>
+
+<p>O primeiro passa: o <code>Carrinho</code> já recusa quantidade 0. E o segundo? O <code>--filter</code> roda só os testes cujo nome contém o texto dado:</p>
+
+<pre class="term">$ vendor/bin/phpunit --filter testPrecoNegativo tests/CarrinhoTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+
+F                                                                   1 / 1 (100%)
+
+Time: 00:00.003, Memory: 20.00 MB
+
+There was 1 failure:
+
+1) CarrinhoTest::testPrecoNegativoLancaExcecao
+Failed asserting that exception of type "InvalidArgumentException" is thrown.
+
+FAILURES!
+Tests: 1, Assertions: 1, Failures: 1.</pre>
+
+<p>"Falhou ao afirmar que uma exceção do tipo InvalidArgumentException é lançada." O teste encontrou um defeito de verdade: o carrinho aceita preço negativo! A Ana acrescentou a validação no <code>adicionar</code>, logo depois da conferência da quantidade:</p>
+
+<pre class="file" data-file="src/Carrinho.php (trecho acrescentado)">        if ($preco &lt; 0) {
+            throw new InvalidArgumentException("Preço inválido: $preco");
+        }
+</pre>
+
+<p>Repare na ordem em que isso aconteceu: primeiro o teste (que falhou), depois o código (que fez o teste passar). Escrever o teste antes do código tem nome: <strong>TDD</strong> (<em>Test-Driven Development</em>, "desenvolvimento guiado por testes"). Não é obrigatório, mas é uma ótima forma de pensar no que o código deve fazer antes de fazê-lo.</p>
+
+<hr>
+
+<h2>5. Vários casos de uma vez: data providers</h2>
+<p>Para testar o cupom, a Ana quer conferir três situações: sem cupom, <code>PROMO10</code> e <code>METADE</code>. Escrever três métodos quase iguais seria repetitivo. Um <strong>data provider</strong> ("fornecedor de dados") é um método que devolve uma lista de casos; o PHPUnit roda o mesmo teste uma vez para cada caso.</p>
+
+<pre class="file" data-file="tests/CarrinhoTest.php (início e fim do arquivo)">&lt;?php
+
+declare(strict_types=1);
+
+use Loja\Carrinho;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+
+final class CarrinhoTest extends TestCase
+{
+    // … os testes anteriores …
+
+    #[DataProvider('cupons')]
+    public function testTotalComCupom(string $cupom, float $esperado): void
+    {
+        $carrinho = new Carrinho();
+        $carrinho-&gt;adicionar('Caderno', 25.50, 2);
+        $carrinho-&gt;adicionar('Caneta', 3.90, 10);
+
+        $this-&gt;assertSame($esperado, $carrinho-&gt;totalComCupom($cupom));
+    }
+
+    public static function cupons(): array
+    {
+        return [
+            'sem cupom'       =&gt; ['', 90.0],
+            'dez por cento'   =&gt; ['PROMO10', 81.0],
+            'metade do preço' =&gt; ['METADE', 40.0],
+        ];
+    }
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>use PHPUnit\Framework\Attributes\DataProvider;</dt><dd>Importa o <a href="atributos.html">atributo</a> <code>DataProvider</code>.</dd>
+  <dt>#[DataProvider('cupons')]</dt><dd>Diz: "os dados deste teste vêm do método <code>cupons</code>". Em versões antigas do PHPUnit, isso era um comentário <code>@dataProvider</code>; no PHPUnit 12 e 13, use o atributo.</dd>
+  <dt>testTotalComCupom(string $cupom, float $esperado)</dt><dd>O teste agora recebe <strong>parâmetros</strong>: um caso por vez.</dd>
+  <dt>public static function cupons(): array</dt><dd>O provider precisa ser <code>public</code> e <code>static</code>. Cada item é um caso: a chave é o nome do caso (aparece nos relatórios) e o valor é a lista de argumentos, na ordem dos parâmetros.</dd>
+</dl>
+
+<p>Repare no último caso: a Ana fez a conta de cabeça e escreveu 40,00 para o cupom <code>METADE</code>. Rodando só esse teste:</p>
+
+<pre class="term">$ vendor/bin/phpunit --filter testTotalComCupom tests/CarrinhoTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+
+..F                                                                 3 / 3 (100%)
+
+Time: 00:00.003, Memory: 20.00 MB
+
+There was 1 failure:
+
+1) CarrinhoTest::testTotalComCupom@metade do preço with data ('METADE', 40.0)
+Failed asserting that 45.0 is identical to 40.0.
+
+/home/ana/lojinha/tests/CarrinhoTest.php:63
+
+FAILURES!
+Tests: 3, Assertions: 3, Failures: 1.</pre>
+
+<p>Um método, três testes (<code>3 / 3</code>). A falha diz exatamente qual caso quebrou (<code>@metade do preço</code>) e com quais dados. Metade de R$ 90,00 é R$ 45,00: dessa vez o erro estava no <strong>teste</strong>, não no código. Acontece; o PHPUnit só compara, quem decide quem está certo é você. Com <code>45.0</code> no lugar de <code>40.0</code>, tudo passa.</p>
+
+<hr>
+
+<h2>6. O <code>phpunit.xml</code> e o <code>--testdox</code></h2>
+<p>Digitar <code>tests/CarrinhoTest.php</code> toda vez cansa, e um projeto real tem dezenas de arquivos de teste. Um arquivo <code>phpunit.xml</code> na raiz do projeto diz ao PHPUnit onde procurar:</p>
+
+<pre class="file" data-file="phpunit.xml">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"&gt;
+    &lt;testsuites&gt;
+        &lt;testsuite name="lojinha"&gt;
+            &lt;directory&gt;tests&lt;/directory&gt;
+        &lt;/testsuite&gt;
+    &lt;/testsuites&gt;
+&lt;/phpunit&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>bootstrap="vendor/autoload.php"</dt><dd>Carrega o autoload do Composer antes dos testes (é o que faz <code>new Carrinho()</code> encontrar <code>src/Carrinho.php</code>).</dd>
+  <dt>colors="true"</dt><dd>Verde para sucesso, vermelho para falha.</dd>
+  <dt>&lt;directory&gt;tests&lt;/directory&gt;</dt><dd>Roda todos os arquivos <code>*Test.php</code> da pasta <code>tests</code>.</dd>
+</dl>
+
+<p>Agora basta <code>vendor/bin/phpunit</code>. E com <code>--testdox</code>, o PHPUnit transforma os nomes dos métodos em frases, uma lista de conferência legível até por quem não programa:</p>
+
+<pre class="term">$ vendor/bin/phpunit
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+Configuration: /home/ana/lojinha/phpunit.xml
+
+........                                                            8 / 8 (100%)
+
+Time: 00:00.003, Memory: 20.00 MB
+
+OK (8 tests, 10 assertions)
+$ vendor/bin/phpunit --testdox
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+Configuration: /home/ana/lojinha/phpunit.xml
+
+........                                                            8 / 8 (100%)
+
+Time: 00:00.003, Memory: 20.00 MB
+
+Carrinho
+ ✔ Carrinho novo esta vazio
+ ✔ Total soma preco vezes quantidade
+ ✔ Adicionar o mesmo produto soma as quantidades
+ ✔ Quantidade zero lanca excecao
+ ✔ Preco negativo lanca excecao
+ ✔ Total com cupom with sem·cupom
+ ✔ Total com cupom with dez·por·cento
+ ✔ Total com cupom with metade·do·preço
+
+OK (8 tests, 10 assertions)</pre>
+
+<p>Oito testes (5 métodos comuns + 3 casos do provider) e 10 conferências. A linha <code>Configuration:</code> mostra que o <code>phpunit.xml</code> foi usado. Nos casos do provider, o PHPUnit mostra os espaços do nome como <code>·</code>. Por isso vale a pena nomear os testes como frases: <code>testCarrinhoNovoEstaVazio</code> vira "Carrinho novo esta vazio" (os nomes de métodos não podem ter acento, então a frase também fica sem).</p>
+
+<hr>
+
+<h2>As assertions mais usadas</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Assertion</th><th>Passa quando…</th></tr>
+<tr><td><code>assertSame($esperado, $obtido)</code></td><td><code>$esperado === $obtido</code>. <strong>A que você mais vai usar.</strong></td></tr>
+<tr><td><code>assertEquals($esperado, $obtido)</code></td><td><code>$esperado == $obtido</code> (aceita tipos diferentes: <code>51</code> e <code>51.0</code>).</td></tr>
+<tr><td><code>assertEqualsWithDelta(0.3, $obtido, 0.0001)</code></td><td>A diferença é menor que a margem. Para contas com <code>float</code> (<code>0.1 + 0.2</code> não é exatamente <code>0.3</code>).</td></tr>
+<tr><td><code>assertTrue($x)</code> / <code>assertFalse($x)</code></td><td><code>$x === true</code> / <code>$x === false</code>.</td></tr>
+<tr><td><code>assertNull($x)</code></td><td><code>$x === null</code>.</td></tr>
+<tr><td><code>assertCount(3, $lista)</code></td><td>A lista tem 3 elementos.</td></tr>
+<tr><td><code>assertContains('Caneta', $lista)</code></td><td>O valor está na lista.</td></tr>
+<tr><td><code>assertArrayHasKey('preco', $item)</code></td><td>O array tem a chave.</td></tr>
+<tr><td><code>assertStringContainsString('R$', $texto)</code></td><td>O texto contém o pedaço.</td></tr>
+<tr><td><code>assertInstanceOf(Carrinho::class, $obj)</code></td><td>O objeto é daquela classe.</td></tr>
+<tr><td><code>expectException(Classe::class)</code></td><td>(Antes da ação.) A ação lança essa exceção.</td></tr>
+</table>
+</div>
+
+<h3>Formas diferentes de organizar</h3>
+<ul>
+  <li><strong>Um teste, uma ideia.</strong> Prefira vários testes pequenos com nomes claros a um teste gigante: quando falhar, o nome já diz o que quebrou.</li>
+  <li><strong><code>setUp()</code></strong>: um método <code>protected function setUp(): void</code> roda <strong>antes de cada teste</strong>. Use para a preparação repetida (por exemplo, <code>$this-&gt;carrinho = new Carrinho();</code>, guardado numa propriedade).</li>
+  <li><strong>Data provider</strong> quando o teste é o mesmo e só mudam os dados (como os cupons).</li>
+  <li><strong>O que testar:</strong> o caso comum, os limites (0, 1, vazio, o maior valor permitido) e os erros esperados (exceções). Não precisa testar o PHP (que <code>array_sum</code> soma, por exemplo); teste as <strong>suas</strong> regras.</li>
+</ul>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"bash: phpunit: comando não encontrado"</strong>
+<pre class="term">$ phpunit
+bash: phpunit: comando não encontrado</pre>
+<p><strong>O que significa:</strong> o PHPUnit não está instalado no sistema; ele mora dentro do projeto.</p>
+<p><strong>Como consertar:</strong> rode <code>vendor/bin/phpunit</code>, de dentro da pasta do projeto. Se a pasta <code>vendor</code> não existir (projeto recém-baixado), rode antes <code>composer install</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Failed asserting that 51.0 is identical to 51."</strong>
+<pre class="file" data-file="tests/TiposTest.php (trecho)">        $carrinho-&gt;adicionar('Caderno', 25.50, 2);
+
+        $this-&gt;assertSame(51, $carrinho-&gt;total());
+</pre>
+<pre class="term">$ vendor/bin/phpunit tests/TiposTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+Configuration: /home/ana/lojinha/phpunit.xml
+
+F                                                                   1 / 1 (100%)
+
+Time: 00:00.002, Memory: 20.00 MB
+
+There was 1 failure:
+
+1) TiposTest::testTotalDeDoisCadernos
+Failed asserting that 51.0 is identical to 51.
+
+/home/ana/lojinha/tests/TiposTest.php:15
+
+FAILURES!
+Tests: 1, Assertions: 1, Failures: 1.</pre>
+<p><strong>O que significa:</strong> o valor está "certo", mas o tipo não: <code>total()</code> devolve <code>float</code> (<code>51.0</code>) e o teste esperava <code>int</code> (<code>51</code>). O <code>assertSame</code> usa <code>===</code>, então tipo conta.</p>
+<p><strong>Como consertar:</strong> escreva o valor esperado com o tipo certo: <code>51.0</code>. (O <code>assertEquals(51, …)</code> passaria, mas esconderia o tipo; prefira acertar o tipo.)</p>
+</div>
+
+<div class="cenario">
+<strong>"Failed asserting that exception of type … is thrown"</strong>
+<p>Você viu esse acima. <strong>O que significa:</strong> o teste esperava uma exceção (<code>expectException</code>) e o código terminou sem lançar nenhuma. Ou o código não valida aquele caso (foi o preço negativo), ou a ação veio <strong>antes</strong> do <code>expectException</code> no método.</p>
+<p><strong>Como consertar:</strong> confira a ordem (<code>expect…</code> primeiro, ação por último) e, se a ordem estiver certa, implemente a validação que falta.</p>
+</div>
+
+<div class="cenario">
+<strong>"There was 1 error" (E em vez de F)</strong>
+<pre class="file" data-file="tests/ErroTest.php (trecho)">        $this-&gt;assertSame(45.9, $carrinho-&gt;totalComCupom('promo10'));
+</pre>
+<pre class="term">$ vendor/bin/phpunit tests/ErroTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+Configuration: /home/ana/lojinha/phpunit.xml
+
+E                                                                   1 / 1 (100%)
+
+Time: 00:00.002, Memory: 20.00 MB
+
+There was 1 error:
+
+1) ErroTest::testCupomEmMinusculas
+InvalidArgumentException: Cupom desconhecido: promo10
+
+/home/ana/lojinha/src/Carrinho.php:50
+/home/ana/lojinha/tests/ErroTest.php:15
+
+ERRORS!
+Tests: 1, Assertions: 0, Errors: 1.</pre>
+<p><strong>O que significa:</strong> <code>E</code> é diferente de <code>F</code>. O teste nem chegou a conferir (<code>Assertions: 0</code>): o código lançou uma exceção que ninguém esperava (<code>promo10</code> em minúsculas não é um cupom conhecido). As duas últimas linhas mostram onde a exceção nasceu (<code>Carrinho.php:50</code>) e de onde veio a chamada (<code>ErroTest.php:15</code>).</p>
+<p><strong>Como consertar:</strong> decida o comportamento certo. Se cupom em minúsculas deve funcionar, mude o código (por exemplo, <code>strtoupper($cupom)</code>). Se deve ser recusado, mude o teste para <code>expectException</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"No tests found in class"</strong>
+<pre class="file" data-file="tests/NomeTest.php (trecho)">    public function carrinhoNovoEstaVazio(): void
+</pre>
+<pre class="term">$ vendor/bin/phpunit tests/NomeTest.php
+PHPUnit 13.4.3 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.8
+Configuration: /home/ana/lojinha/phpunit.xml
+
+There was 1 PHPUnit test runner warning:
+
+1) No tests found in class "NomeTest".
+
+No tests executed!</pre>
+<p><strong>O que significa:</strong> o método não começa com <code>test</code>, então o PHPUnit não o reconhece como teste. O mesmo acontece se ele for <code>private</code> ou <code>protected</code>.</p>
+<p><strong>Como consertar:</strong> renomeie para <code>testCarrinhoNovoEstaVazio</code> (ou marque o método com o atributo <code>#[Test]</code>, de <code>PHPUnit\Framework\Attributes\Test</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>"Class "TestCase" not found"</strong>
+<pre class="term">$ vendor/bin/phpunit tests/SemUseTest.php
+
+
+An error occurred inside PHPUnit.
+
+Message:  Class "TestCase" not found
+Location: /home/ana/lojinha/tests/SemUseTest.php:7
+
+#0 /home/ana/lojinha/vendor/phpunit/phpunit/src/Runner/TestSuiteLoader.php(134): require_once()
+«… mais 10 linhas do rastro, todas dentro de vendor/phpunit …»</pre>
+<p><strong>O que significa:</strong> faltou a linha <code>use PHPUnit\Framework\TestCase;</code>. Sem ela, o PHP procura uma classe chamada só <code>TestCase</code>, que não existe.</p>
+<p><strong>Como consertar:</strong> acrescente o <code>use</code> no topo do arquivo de teste. O mesmo vale para <code>use Loja\Carrinho;</code> (o erro seria <code>Class "Carrinho" not found</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando / código</th><th>Para quê</th></tr>
+<tr><td><code>composer require --dev phpunit/phpunit</code></td><td>Instalar o PHPUnit no projeto</td></tr>
+<tr><td><code>vendor/bin/phpunit</code></td><td>Rodar todos os testes (com <code>phpunit.xml</code>)</td></tr>
+<tr><td><code>vendor/bin/phpunit tests/CarrinhoTest.php</code></td><td>Rodar um arquivo</td></tr>
+<tr><td><code>vendor/bin/phpunit --filter nomeDoTeste</code></td><td>Rodar só os testes cujo nome contém o texto</td></tr>
+<tr><td><code>vendor/bin/phpunit --testdox</code></td><td>Relatório em frases</td></tr>
+<tr><td><code>final class XTest extends TestCase</code></td><td>Classe de teste</td></tr>
+<tr><td><code>public function testAlgumaCoisa(): void</code></td><td>Um teste</td></tr>
+<tr><td><code>$this-&gt;assertSame($esperado, $obtido)</code></td><td>Conferir (com <code>===</code>)</td></tr>
+<tr><td><code>$this-&gt;expectException(X::class)</code></td><td>Esperar uma exceção (antes da ação)</td></tr>
+<tr><td><code>#[DataProvider('metodo')]</code> + <code>public static function metodo(): array</code></td><td>Mesmo teste, vários casos</td></tr>
+<tr><td><code>protected function setUp(): void</code></td><td>Preparação que roda antes de cada teste</td></tr>
+<tr><td><code>.</code> / <code>F</code> / <code>E</code></td><td>Passou / falhou a conferência / exceção inesperada</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Onde mora o PHPUnit</h3>
+<p>Complete o comando que roda os testes do projeto:</p>
+<div class="ex-code"><input data-answer="vendor/bin/phpunit|./vendor/bin/phpunit" aria-label="comando"></div>
+</div>
+
+<div class="exercise">
+<h3>2. A classe base</h3>
+<p>Complete a declaração da classe de teste:</p>
+<div class="ex-code">final class CarrinhoTest extends <input data-answer="TestCase" aria-label="classe"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Conferir com ===</h3>
+<p>Complete a assertion que compara valor e tipo:</p>
+<div class="ex-code">$this-&gt;<input data-answer="assertSame" aria-label="método">(5, $carrinho-&gt;quantidadeDeItens());</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Na saída <code>..F.E</code>, o que aconteceu?</p>
+<label><input type="radio" name="q4"> 5 testes passaram.</label>
+<label><input type="radio" name="q4"> 3 testes falharam.</label>
+<label><input type="radio" name="q4"> 3 passaram, 1 falhou numa conferência e 1 lançou uma exceção inesperada.</label>
+<label><input type="radio" name="q4"> O PHPUnit travou no quinto teste.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Onde fica o <code>$this-&gt;expectException(...)</code> num teste de exceção?</p>
+<label><input type="radio" name="q5"> Depois da ação que lança a exceção.</label>
+<label><input type="radio" name="q5"> Antes da ação que lança a exceção.</label>
+<label><input type="radio" name="q5"> Num método separado chamado <code>exception</code>.</label>
+<label><input type="radio" name="q5"> Dentro de um <code>try/catch</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Por que o PHPUnit é instalado com <code>--dev</code>?</p>
+<label><input type="radio" name="q6"> Porque ele só funciona na versão de desenvolvimento do PHP.</label>
+<label><input type="radio" name="q6"> Porque assim ele roda mais rápido.</label>
+<label><input type="radio" name="q6"> Porque é obrigatório para todo pacote do Composer.</label>
+<label><input type="radio" name="q6"> Porque só quem desenvolve precisa dele; o site em produção pode ser instalado sem ele.</label>
+</div>
+
+<div class="tryphp" data-goal="out:5 de 5 testes passaram,src:PROMO10,src:catch\s*\(\s*InvalidArgumentException,semerro">
+<p class="try-task"><strong>Missão final:</strong> o carrinho já está consertado e tem o método <code>totalComCupom</code>. Escreva mais dois testes no lugar indicado: (4) com 2 cadernos de 25,50 e 10 canetas de 3,90, o cupom <code>PROMO10</code> deve dar <code>81.0</code>; (5) adicionar uma caneta com quantidade <code>0</code> deve lançar <code>InvalidArgumentException</code> com a mensagem <code>Quantidade inválida: 0</code>. Sem PHPUnit, o "expectException" se faz com <code>try/catch</code>: chame o método no <code>try</code> e, no <code>catch (InvalidArgumentException $e)</code>, confira <code>$e-&gt;getMessage()</code>. A meta é <code>5 de 5 testes passaram</code>.</p>
+<pre class="script">&lt;?php
+
+declare(strict_types=1);
+
+final class Carrinho
+{
+    private array $itens = [];
+
+    public function adicionar(string $produto, float $preco, int $quantidade = 1): void
+    {
+        if ($quantidade &lt; 1) {
+            throw new InvalidArgumentException("Quantidade inválida: $quantidade");
+        }
+        if (isset($this-&gt;itens[$produto])) {
+            $this-&gt;itens[$produto]['quantidade'] += $quantidade;
+        } else {
+            $this-&gt;itens[$produto] = ['preco' =&gt; $preco, 'quantidade' =&gt; $quantidade];
+        }
+    }
+
+    public function quantidadeDeItens(): int
+    {
+        return array_sum(array_column($this-&gt;itens, 'quantidade'));
+    }
+
+    public function total(): float
+    {
+        $total = 0.0;
+        foreach ($this-&gt;itens as $item) {
+            $total += $item['preco'] * $item['quantidade'];
+        }
+        return round($total, 2);
+    }
+
+    public function totalComCupom(string $cupom): float
+    {
+        $desconto = match ($cupom) {
+            'PROMO10' =&gt; 0.10,
+            'METADE'  =&gt; 0.50,
+            ''        =&gt; 0.0,
+            default   =&gt; throw new InvalidArgumentException("Cupom desconhecido: $cupom"),
+        };
+        return round($this-&gt;total() * (1 - $desconto), 2);
+    }
+}
+
+// Um "mini PHPUnit": compara com === e conta os resultados
+$resultados = [];
+
+function verificarIgual(mixed $esperado, mixed $obtido, string $teste): bool
+{
+    if ($esperado === $obtido) {
+        echo "✔ $teste\n";
+        return true;
+    }
+    echo "✘ $teste: esperava ", var_export($esperado, true), ', veio ', var_export($obtido, true), "\n";
+    return false;
+}
+
+// Teste 1
+$carrinho = new Carrinho();
+$resultados[] = verificarIgual(0, $carrinho-&gt;quantidadeDeItens(), 'carrinho novo está vazio');
+
+// Teste 2
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caderno', 25.50, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 10);
+$resultados[] = verificarIgual(90.0, $carrinho-&gt;total(), 'total soma preço × quantidade');
+
+// Teste 3
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caneta', 3.90, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 3);
+$resultados[] = verificarIgual(5, $carrinho-&gt;quantidadeDeItens(), 'adicionar o mesmo produto soma as quantidades');
+
+// Escreva aqui os testes 4 e 5
+
+$passaram = count(array_filter($resultados));
+echo "\n$passaram de ", count($resultados), " testes passaram\n";
+</pre>
+<pre class="solucao">&lt;?php
+
+declare(strict_types=1);
+
+final class Carrinho
+{
+    private array $itens = [];
+
+    public function adicionar(string $produto, float $preco, int $quantidade = 1): void
+    {
+        if ($quantidade &lt; 1) {
+            throw new InvalidArgumentException("Quantidade inválida: $quantidade");
+        }
+        if (isset($this-&gt;itens[$produto])) {
+            $this-&gt;itens[$produto]['quantidade'] += $quantidade;
+        } else {
+            $this-&gt;itens[$produto] = ['preco' =&gt; $preco, 'quantidade' =&gt; $quantidade];
+        }
+    }
+
+    public function quantidadeDeItens(): int
+    {
+        return array_sum(array_column($this-&gt;itens, 'quantidade'));
+    }
+
+    public function total(): float
+    {
+        $total = 0.0;
+        foreach ($this-&gt;itens as $item) {
+            $total += $item['preco'] * $item['quantidade'];
+        }
+        return round($total, 2);
+    }
+
+    public function totalComCupom(string $cupom): float
+    {
+        $desconto = match ($cupom) {
+            'PROMO10' =&gt; 0.10,
+            'METADE'  =&gt; 0.50,
+            ''        =&gt; 0.0,
+            default   =&gt; throw new InvalidArgumentException("Cupom desconhecido: $cupom"),
+        };
+        return round($this-&gt;total() * (1 - $desconto), 2);
+    }
+}
+
+// Um "mini PHPUnit": compara com === e conta os resultados
+$resultados = [];
+
+function verificarIgual(mixed $esperado, mixed $obtido, string $teste): bool
+{
+    if ($esperado === $obtido) {
+        echo "✔ $teste\n";
+        return true;
+    }
+    echo "✘ $teste: esperava ", var_export($esperado, true), ', veio ', var_export($obtido, true), "\n";
+    return false;
+}
+
+// Teste 1
+$carrinho = new Carrinho();
+$resultados[] = verificarIgual(0, $carrinho-&gt;quantidadeDeItens(), 'carrinho novo está vazio');
+
+// Teste 2
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caderno', 25.50, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 10);
+$resultados[] = verificarIgual(90.0, $carrinho-&gt;total(), 'total soma preço × quantidade');
+
+// Teste 3
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caneta', 3.90, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 3);
+$resultados[] = verificarIgual(5, $carrinho-&gt;quantidadeDeItens(), 'adicionar o mesmo produto soma as quantidades');
+
+// Teste 4
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar('Caderno', 25.50, 2);
+$carrinho-&gt;adicionar('Caneta', 3.90, 10);
+$resultados[] = verificarIgual(81.0, $carrinho-&gt;totalComCupom('PROMO10'), 'PROMO10 dá 10% de desconto');
+
+// Teste 5
+$carrinho = new Carrinho();
+try {
+    $carrinho-&gt;adicionar('Caneta', 3.90, 0);
+    $resultados[] = verificarIgual('exceção', 'nada', 'quantidade zero lança exceção');
+} catch (InvalidArgumentException $e) {
+    $resultados[] = verificarIgual('Quantidade inválida: 0', $e-&gt;getMessage(), 'quantidade zero lança exceção');
+}
+
+$passaram = count(array_filter($resultados));
+echo "\n$passaram de ", count($resultados), " testes passaram\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um teste automatizado confere o seu código por você: Preparar, Agir, Conferir.</li>
+  <li>Instale com <code>composer require --dev phpunit/phpunit</code> e rode com <code>vendor/bin/phpunit</code>.</li>
+  <li>Classe <code>XTest extends TestCase</code>; métodos públicos começando com <code>test</code>; <code>$this-&gt;assertSame($esperado, $obtido)</code>.</li>
+  <li>Saída: <code>.</code> passou, <code>F</code> falhou, <code>E</code> erro; <code>OK (…)</code> ou <code>FAILURES!</code>, com o nome do teste, a diferença e a linha.</li>
+  <li><code>expectException</code> antes da ação para testar erros esperados; <code>#[DataProvider]</code> + método <code>public static</code> para vários casos.</li>
+  <li><code>phpunit.xml</code> para rodar tudo com um comando; <code>--testdox</code> para ler os testes como frases; <code>--filter</code> para rodar só alguns.</li>
+  <li>Quando um teste falha, pode ser o código ou o teste que está errado: o PHPUnit só compara, a decisão é sua.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
