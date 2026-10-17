@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Novidades do 8.0 ao 8.5 — o que cada versão trouxe e o que saiu | Guia PHP</title>
+<meta name="description" content="As novidades do PHP 8.0 ao 8.5, versão por versão, cada uma conferida no PHP 8.5 com um exemplo real: match, named arguments, nullsafe, promoção no construtor, enums, readonly, fibers, DNF, #[\Override], json_validate, property hooks, visibilidade assimétrica, array_find, pipe |&gt;, clone with, #[\NoDiscard], array_first, extensão uri; e o que foi removido ou ficou obsoleto.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Novidades do 8.0 ao 8.5</span></h1>
+
+<p class="intro">O PHP lança uma versão nova por ano, sempre em novembro. Do 8.0 (2020) ao 8.5 (2025), a linguagem mudou muito: ganhou <code>match</code>, enums, propriedades somente-leitura, o operador pipe… Esta página é um mapa: o que cada versão trouxe, um exemplo curto de cada recurso <strong>rodado de verdade</strong> no PHP 8.5 do laboratório, a aula do guia onde ele é explicado, e o que foi removido ou ficou obsoleto pelo caminho.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os recursos mais importantes de cada versão, do 8.0 ao 8.5.</li>
+  <li>Como reconhecer, num código, a versão mínima de PHP que ele exige.</li>
+  <li>O que foi <strong>removido</strong> (e dá erro) e o que está <strong>obsoleto</strong> (e dá aviso <code>Deprecated</code>).</li>
+  <li>A modernizar um trecho de código antigo.</li>
+</ul>
+</div>
+
+<p>Não precisa decorar nada daqui. Use como consulta quando encontrar um código ou tutorial e quiser saber "isso funciona no meu PHP?". Para ver a versão instalada: <code>php -v</code> (veja <a href="versoes.html">Versões do PHP</a>).</p>
+
+<pre class="term">$ php -v
+PHP 8.5.8 (cli) (built: Jul  7 2026 05:21:52) (NTS gcc 14.2.0)
+Copyright (c) The PHP Group
+Built by static-php-cli 2.8.6
+Zend Engine v4.5.8, Copyright (c) Zend Technologies
+    with Zend OPcache v8.5.8, Copyright (c), by Zend Technologies</pre>
+
+<hr>
+
+<h2>A linha do tempo</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Versão</th><th>Lançamento</th><th>Destaques</th></tr>
+<tr><td>8.0</td><td>nov/2020</td><td><code>match</code>, argumentos nomeados, <code>?-&gt;</code>, promoção no construtor, union types, atributos, JIT</td></tr>
+<tr><td>8.1</td><td>nov/2021</td><td>Enums, <code>readonly</code>, fibers, <code>strlen(...)</code>, <code>never</code></td></tr>
+<tr><td>8.2</td><td>dez/2022</td><td>Classes <code>readonly</code>, DNF, <code>true</code>/<code>false</code>/<code>null</code> como tipos, propriedades dinâmicas obsoletas</td></tr>
+<tr><td>8.3</td><td>nov/2023</td><td><code>#[\Override]</code>, constantes de classe tipadas, <code>json_validate</code></td></tr>
+<tr><td>8.4</td><td>nov/2024</td><td>Property hooks, visibilidade assimétrica, <code>array_find</code>, <code>new</code> sem parênteses, <code>#[\Deprecated]</code></td></tr>
+<tr><td>8.5</td><td>nov/2025</td><td>Pipe <code>|&gt;</code>, <code>clone</code> com propriedades, <code>#[\NoDiscard]</code>, <code>array_first</code>/<code>array_last</code>, extensão <code>uri</code></td></tr>
+</table>
+</div>
+
+<p>Cada versão recebe correções de erros por 2 anos e de segurança por mais 2. Em outubro de 2026, as versões com suporte são da 8.2 em diante; o 8.0 e o 8.1 já não recebem nem correções de segurança.</p>
+
+<hr>
+
+<h2>PHP 8.0 <span class="versao">PHP 8.0+</span></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td><code>match</code></td><td><code>match ($status) { 200 =&gt; "OK", 404 =&gt; "Não encontrado", default =&gt; "Outro" }</code></td><td><a href="match.html">match</a></td></tr>
+<tr><td>Argumentos nomeados</td><td><code>str_pad(string: "7", length: 3, pad_string: "0", pad_type: STR_PAD_LEFT)</code></td><td><a href="parametros.html">Parâmetros</a></td></tr>
+<tr><td>Operador nullsafe <code>?-&gt;</code></td><td><code>$cliente?-&gt;endereco?-&gt;cidade</code></td><td><a href="null-coalescing.html">?? e ?-&gt;</a></td></tr>
+<tr><td>Promoção no construtor</td><td><code>public function __construct(public string $nome) {}</code></td><td><a href="construtores.html">Construtores</a></td></tr>
+<tr><td>Union types, <code>mixed</code>, <code>static</code></td><td><code>function dobro(int|float $n): int|float</code></td><td><a href="tipos-avancados.html">Tipos Avançados</a></td></tr>
+<tr><td>Atributos</td><td><code>#[Rota('/x')]</code></td><td><a href="atributos.html">Atributos</a></td></tr>
+<tr><td><code>str_contains</code>, <code>str_starts_with</code>, <code>str_ends_with</code></td><td><code>str_contains("Caneca de café", "café")</code></td><td><a href="funcoes-string.html">Funções de String</a></td></tr>
+<tr><td><code>throw</code> como expressão</td><td><code>$nome = $_GET['nome'] ?? throw new InvalidArgumentException(…);</code></td><td><a href="excecoes.html">Exceções</a></td></tr>
+<tr><td>JIT</td><td>Compilação para código de máquina (ganho em contas pesadas; pouco efeito em sites)</td><td>—</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="v80.php">&lt;?php
+// match
+$status = 404;
+echo match ($status) { 200 =&gt; "OK", 404 =&gt; "Não encontrado", default =&gt; "Outro" }, "\n";
+
+// named arguments
+echo str_pad(string: "7", length: 3, pad_string: "0", pad_type: STR_PAD_LEFT), "\n";
+
+// nullsafe
+$cliente = null;
+var_dump($cliente?-&gt;endereco?-&gt;cidade);
+
+// constructor promotion
+class Produto
+{
+    public function __construct(public string $nome, public float $preco) {}
+}
+$p = new Produto("Caneca", 19.9);
+echo "$p-&gt;nome: $p-&gt;preco\n";
+
+// union types
+function dobro(int|float $n): int|float { return $n * 2; }
+var_dump(dobro(2.5));
+
+// atributos
+#[Attribute]
+class Rota { public function __construct(public string $c) {} }
+#[Rota('/x')]
+function f() {}
+echo (new ReflectionFunction('f'))-&gt;getAttributes()[0]-&gt;getName(), "\n";
+
+// str_contains / throw como expressão
+var_dump(str_contains("Caneca de café", "café"));
+$nome = $_GET['nome'] ?? throw new InvalidArgumentException("nome obrigatório");
+</pre>
+
+<pre class="term">$ php v80.php
+Não encontrado
+007
+NULL               « $cliente é null: ?-&gt; parou ali, sem erro
+Caneca: 19.9
+float(5)
+Rota
+bool(true)
+
+Fatal error: Uncaught InvalidArgumentException: nome obrigatório in /home/ana/nov/v80.php:34
+Stack trace:
+#0 {main}
+  thrown in /home/ana/nov/v80.php on line 34</pre>
+
+<p>A última linha <strong>deveria</strong> dar erro: no terminal não existe <code>$_GET['nome']</code>, e o <code>?? throw</code> lançou a exceção, como esperado.</p>
+
+<hr>
+
+<h2>PHP 8.1 <span class="versao">PHP 8.1+</span></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td>Enums</td><td><code>enum Status: string { case Pago = 'pago'; }</code></td><td><a href="enums.html">Enums</a></td></tr>
+<tr><td>Propriedades <code>readonly</code></td><td><code>public readonly int $id</code></td><td><a href="readonly-hooks.html">readonly e Property Hooks</a></td></tr>
+<tr><td>Fibers</td><td><code>new Fiber(function () { Fiber::suspend(…); })</code></td><td>(base de bibliotecas assíncronas; você raramente usa direto)</td></tr>
+<tr><td>Callable de primeira classe</td><td><code>$tamanho = strlen(...);</code></td><td><a href="callables.html">Callables</a></td></tr>
+<tr><td>Tipo <code>never</code>, interseção <code>A&amp;B</code></td><td><code>function parar(): never</code></td><td><a href="tipos-avancados.html">Tipos Avançados</a></td></tr>
+<tr><td><code>array_is_list</code></td><td><code>array_is_list([1, 2, 3])</code></td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="v81.php">&lt;?php
+enum Status: string
+{
+    case Pago = 'pago';
+    case Pendente = 'pendente';
+}
+echo Status::from('pago')-&gt;name, "\n";
+
+class Pedido
+{
+    public function __construct(public readonly int $id) {}
+}
+$p = new Pedido(7);
+try {
+    $p-&gt;id = 8;
+} catch (Error $e) {
+    echo get_class($e), ": ", $e-&gt;getMessage(), "\n";
+}
+
+$fiber = new Fiber(function (): string {
+    $x = Fiber::suspend("pausei");
+    return "recebi $x";
+});
+echo $fiber-&gt;start(), "\n";
+$fiber-&gt;resume("oi");
+echo $fiber-&gt;getReturn(), "\n";
+
+$tamanho = strlen(...);
+echo $tamanho("caneca"), "\n";
+
+function parar(): never { throw new RuntimeException("fim"); }
+
+var_dump(array_is_list([1, 2, 3]), array_is_list([1 =&gt; 'a']));
+</pre>
+
+<pre class="term">$ php v81.php
+Pago
+Error: Cannot modify readonly property Pedido::$id
+pausei             « a fiber pausou e devolveu um valor
+recebi oi          « foi retomada com "oi" e terminou
+6
+bool(true)
+bool(false)        « chaves que não começam em 0: não é lista</pre>
+
+<p>Uma <strong>fiber</strong> ("fibra") é uma função que pode <strong>pausar</strong> no meio (<code>Fiber::suspend</code>) e ser retomada depois (<code>resume</code>), do ponto onde parou. Bibliotecas como ReactPHP e Amp usam fibers para fazer várias tarefas de rede "ao mesmo tempo". No dia a dia de um site, você não vai criá-las.</p>
+
+<hr>
+
+<h2>PHP 8.2 <span class="versao">PHP 8.2+</span></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td>Classes <code>readonly</code></td><td><code>readonly class Ponto { … }</code> (todas as propriedades ficam <code>readonly</code>)</td><td><a href="readonly-hooks.html">readonly e Property Hooks</a></td></tr>
+<tr><td>DNF types</td><td><code>(Countable&amp;ArrayAccess)|null</code></td><td><a href="tipos-avancados.html">Tipos Avançados</a></td></tr>
+<tr><td><code>true</code>, <code>false</code>, <code>null</code> como tipos</td><td><code>function salvar(): true</code></td><td><a href="tipos-avancados.html">Tipos Avançados</a></td></tr>
+<tr><td>Extensão <code>Random</code></td><td><code>new Random\Randomizer(…)</code></td><td>—</td></tr>
+<tr><td><code>#[\SensitiveParameter]</code></td><td>Esconde senhas nos rastros de erro</td><td><a href="atributos.html">Atributos</a></td></tr>
+<tr><td>Propriedades dinâmicas <strong>obsoletas</strong></td><td><code>$c-&gt;idade = 30;</code> sem declarar <code>$idade</code></td><td>(abaixo)</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="v82.php">&lt;?php
+readonly class Ponto
+{
+    public function __construct(public int $x, public int $y) {}
+}
+$p = new Ponto(1, 2);
+try { $p-&gt;x = 5; } catch (Error $e) { echo $e-&gt;getMessage(), "\n"; }
+
+function f((Countable&amp;ArrayAccess)|null $x): string { return $x === null ? "nulo" : "objeto"; }
+echo f(null), " / ", f(new ArrayObject([])), "\n";
+
+function salvar(): true { return true; }
+var_dump(salvar());
+
+class Cliente { public string $nome = "Ana"; }
+$c = new Cliente();
+$c-&gt;idade = 30;
+echo "idade: $c-&gt;idade\n";
+
+$r = new Random\Randomizer(new Random\Engine\Mt19937(42));
+echo $r-&gt;getInt(1, 100), "\n";
+</pre>
+
+<pre class="term">$ php v82.php
+Cannot modify readonly property Ponto::$x
+nulo / objeto
+bool(true)
+
+Deprecated: Creation of dynamic property Cliente::$idade is deprecated in /home/ana/nov/v82.php on line 17
+idade: 30
+43                 « sorteio com semente fixa (42): sempre o mesmo número</pre>
+
+<hr>
+
+<h2>PHP 8.3 <span class="versao">PHP 8.3+</span></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td><code>#[\Override]</code></td><td>Erro se o método não substitui nenhum</td><td><a href="atributos.html">Atributos</a></td></tr>
+<tr><td>Constantes de classe tipadas</td><td><code>public const string MOEDA = "BRL";</code></td><td><a href="static.html">static</a></td></tr>
+<tr><td><code>json_validate</code></td><td><code>json_validate('{"nome": "Ana"}')</code></td><td><a href="json.html">JSON</a></td></tr>
+<tr><td>Constante de classe dinâmica</td><td><code>Loja::{$qual}</code></td><td>—</td></tr>
+<tr><td><code>mb_str_pad</code></td><td><code>mb_str_pad("Café", 8, ".")</code></td><td><a href="mbstring.html">mbstring</a></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="v83.php">&lt;?php
+class Pagamento { public function processar(): string { return "pag"; } }
+class Pix extends Pagamento
+{
+    #[\Override]
+    public function processar(): string { return "pix"; }
+}
+echo (new Pix())-&gt;processar(), "\n";
+
+class Loja
+{
+    public const string MOEDA = "BRL";
+    public const float TAXA = 0.05;
+}
+echo Loja::MOEDA, "\n";
+
+var_dump(json_validate('{"nome": "Ana"}'), json_validate('{nome: Ana}'));
+
+$qual = "MOEDA";
+echo Loja::{$qual}, "\n";
+
+echo mb_str_pad("Café", 8, "."), "|\n";
+</pre>
+
+<pre class="term">$ php v83.php
+pix
+BRL
+bool(true)
+bool(false)        « sem aspas nas chaves não é JSON válido
+BRL
+Café....|          « 8 letras (str_pad contaria o é como 2)</pre>
+
+<p>Com o tipo na constante, o PHP confere o valor:</p>
+
+<pre class="term">$ php v83erro.php       « public const int TAXA = 0.05;
+
+Fatal error: Cannot use float as value for class constant Loja::TAXA of type int in /home/ana/nov/v83erro.php on line 4
+Stack trace:
+#0 {main}</pre>
+
+<hr>
+
+<h2>PHP 8.4 <span class="versao">PHP 8.4+</span></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td>Property hooks</td><td><code>public string $nome { set(string $v) =&gt; trim($v); }</code></td><td><a href="readonly-hooks.html">readonly e Property Hooks</a></td></tr>
+<tr><td>Visibilidade assimétrica</td><td><code>public private(set) float $preco</code>: lê de fora, só muda de dentro</td><td><a href="visibilidade.html">Visibilidade</a></td></tr>
+<tr><td><code>array_find</code>, <code>array_find_key</code>, <code>array_any</code>, <code>array_all</code></td><td><code>array_find($precos, fn($v) =&gt; $v &gt; 50)</code></td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td><code>new</code> sem parênteses em volta</td><td><code>new DateTime('2026-10-16')-&gt;format('d/m/Y')</code></td><td><a href="classes-objetos.html">Classes e Objetos</a></td></tr>
+<tr><td><code>#[\Deprecated]</code></td><td>Aviso ao usar uma função sua marcada</td><td><a href="atributos.html">Atributos</a></td></tr>
+<tr><td><code>mb_trim</code>, <code>mb_ucfirst</code></td><td><code>mb_trim("  café  ")</code></td><td><a href="mbstring.html">mbstring</a></td></tr>
+<tr><td><code>T $x = null</code> implícito <strong>obsoleto</strong></td><td>Use <code>?T $x = null</code></td><td><a href="tipos-avancados.html">Tipos Avançados</a></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="v84.php">&lt;?php
+class Produto
+{
+    public string $nome {
+        set(string $valor) =&gt; mb_convert_case(trim($valor), MB_CASE_TITLE);
+    }
+
+    public private(set) float $preco = 0;
+
+    public function __construct(string $nome, float $preco)
+    {
+        $this-&gt;nome = $nome;
+        $this-&gt;preco = $preco;
+    }
+}
+
+$p = new Produto("  caneca de café ", 19.9);
+echo $p-&gt;nome, " - ", $p-&gt;preco, "\n";
+try {
+    $p-&gt;preco = 1;
+} catch (Error $e) {
+    echo $e-&gt;getMessage(), "\n";
+}
+
+$precos = [10, 55, 30, 80];
+var_dump(array_find($precos, fn($v) =&gt; $v &gt; 50));
+var_dump(array_find_key($precos, fn($v) =&gt; $v &gt; 50));
+var_dump(array_any($precos, fn($v) =&gt; $v &gt; 70), array_all($precos, fn($v) =&gt; $v &gt; 5));
+
+echo new DateTime('2026-10-16')-&gt;format('d/m/Y'), "\n";
+
+#[\Deprecated("use novo()")]
+function velho() {}
+velho();
+
+var_dump(mb_trim("  café  "));
+</pre>
+
+<pre class="term">$ php v84.php
+Caneca De Café - 19.9             « o hook "set" arrumou o nome ao gravar
+Cannot modify private(set) property Produto::$preco from global scope
+int(55)            « o primeiro valor maior que 50
+int(1)             « a chave dele
+bool(true)         « algum é maior que 70?
+bool(true)         « todos são maiores que 5?
+16/10/2026
+
+Deprecated: Function velho() is deprecated, use novo() in /home/ana/nov/v84.php on line 34
+string(5) "café"</pre>
+
+<p>Antes do 8.4, a linha do <code>DateTime</code> precisava de parênteses extras: <code>(new DateTime('2026-10-16'))-&gt;format('d/m/Y')</code>. As duas formas continuam valendo.</p>
+
+<div class="tryphp" data-goal="out:Primeiro caro: Camiseta,out:Último da lista: Boné,src:array_find\(,semerro">
+<p class="try-task"><strong>Missão:</strong> use <code>array_find</code> (8.4) para achar o primeiro produto com preço acima de 40 e <code>array_last</code> (8.5) para pegar o último da lista. Substitua os dois <code>???</code>. A saída deve ser <code>Primeiro caro: Camiseta</code> e <code>Último da lista: Boné</code>.</p>
+<pre class="script">&lt;?php
+$produtos = [
+    ['nome' =&gt; 'Caneca', 'preco' =&gt; 19.9],
+    ['nome' =&gt; 'Camiseta', 'preco' =&gt; 49.9],
+    ['nome' =&gt; 'Moletom', 'preco' =&gt; 129.9],
+    ['nome' =&gt; 'Boné', 'preco' =&gt; 35.0],
+];
+
+$caro = null;   // ??? use array_find
+$ultimo = $produtos[0];   // ??? use array_last
+
+echo "Primeiro caro: ", $caro['nome'] ?? 'nenhum', "\n";
+echo "Último da lista: ", $ultimo['nome'], "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$produtos = [
+    ['nome' =&gt; 'Caneca', 'preco' =&gt; 19.9],
+    ['nome' =&gt; 'Camiseta', 'preco' =&gt; 49.9],
+    ['nome' =&gt; 'Moletom', 'preco' =&gt; 129.9],
+    ['nome' =&gt; 'Boné', 'preco' =&gt; 35.0],
+];
+
+$caro = array_find($produtos, fn($p) =&gt; $p['preco'] &gt; 40);
+$ultimo = array_last($produtos);
+
+echo "Primeiro caro: ", $caro['nome'] ?? 'nenhum', "\n";
+echo "Último da lista: ", $ultimo['nome'], "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>PHP 8.5 <span class="versao">PHP 8.5+</span></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Exemplo</th><th>Aula</th></tr>
+<tr><td>Operador pipe <code>|&gt;</code></td><td><code>"  Olá Mundo  " |&gt; trim(...) |&gt; mb_strtoupper(...)</code></td><td><a href="pipe.html">Operador Pipe</a></td></tr>
+<tr><td><code>clone</code> com propriedades ("clone with")</td><td><code>clone($this, ['y' =&gt; $y])</code></td><td>(abaixo)</td></tr>
+<tr><td><code>#[\NoDiscard]</code> e <code>(void)</code></td><td>Aviso se o retorno for ignorado</td><td><a href="atributos.html">Atributos</a></td></tr>
+<tr><td><code>array_first</code>, <code>array_last</code></td><td><code>array_first($frutas)</code></td><td><a href="funcoes-array.html">Funções de Array</a></td></tr>
+<tr><td>Extensão <code>uri</code></td><td><code>Uri\Rfc3986\Uri::parse(…)</code>, <code>new Uri\WhatWg\Url(…)</code></td><td>(abaixo)</td></tr>
+<tr><td>Rastro (<em>stack trace</em>) também nos erros fatais de compilação</td><td>As linhas <code>Stack trace: #0 {main}</code> que aparecem em todo o guia</td><td><a href="erros.html">Lendo Erros</a></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="v85.php">&lt;?php
+echo "  Olá Mundo  " |&gt; trim(...) |&gt; mb_strtoupper(...), "\n";
+
+final readonly class Ponto
+{
+    public function __construct(public int $x, public int $y) {}
+
+    public function comY(int $y): static
+    {
+        return clone($this, ['y' =&gt; $y]);
+    }
+}
+$a = new Ponto(1, 2);
+$b = $a-&gt;comY(5);
+echo "a=($a-&gt;x,$a-&gt;y) b=($b-&gt;x,$b-&gt;y)\n";
+
+class Etiqueta { public string $texto = ""; public string $cor = "azul"; }
+$e1 = new Etiqueta();
+$e2 = clone($e1, ['texto' =&gt; 'Promoção', 'cor' =&gt; 'vermelho']);
+echo "$e1-&gt;cor / $e2-&gt;texto $e2-&gt;cor\n";
+
+#[\NoDiscard]
+function contar(array $l): int { return count($l); }
+contar([1, 2]);
+(void) contar([1, 2]);
+
+$frutas = ['b' =&gt; 'banana', 'a' =&gt; 'abacate', 'c' =&gt; 'caju'];
+var_dump(array_first($frutas), array_last($frutas), array_first([]));
+
+$uri = Uri\Rfc3986\Uri::parse("https://loja.exemplo.com:8080/produtos?id=7#fotos");
+echo $uri-&gt;getScheme(), " | ", $uri-&gt;getHost(), " | ", $uri-&gt;getPort(), " | ", $uri-&gt;getPath(), " | ", $uri-&gt;getQuery(), " | ", $uri-&gt;getFragment(), "\n";
+$url = new Uri\WhatWg\Url("HTTPS://Loja.Exemplo.com/a/../produtos");
+echo $url-&gt;toAsciiString(), "\n";
+var_dump(Uri\Rfc3986\Uri::parse("http://exemplo com/"));
+echo PHP_VERSION, "\n";
+</pre>
+
+<pre class="term">$ php v85.php
+OLÁ MUNDO
+a=(1,2) b=(1,5)                   « $a não mudou; $b é uma cópia com y=5
+azul / Promoção vermelho
+
+Warning: The return value of function contar() should either be used or intentionally ignored by casting it as (void) in /home/ana/nov/v85.php on line 24
+string(6) "banana"                   « o primeiro, seja qual for a chave
+string(4) "caju"
+NULL                              « array vazio: null
+https | loja.exemplo.com | 8080 | /produtos | id=7 | fotos
+https://loja.exemplo.com/produtos « a WHATWG normalizou maiúsculas e o "/a/.."
+NULL                              « endereço inválido (tem espaço): parse devolve null
+8.5.8</pre>
+
+<dl class="anatomy">
+  <dt>clone($objeto, [...])</dt><dd>Copia o objeto já trocando algumas propriedades. É o jeito de "mudar" objetos <code>readonly</code>: você não muda, cria uma cópia alterada. Com propriedades <code>readonly</code>, o <code>clone</code> com mudanças precisa ser feito <strong>dentro</strong> da classe (como no método <code>comY</code>), porque <code>readonly</code> só permite gravar de dentro (veja o erro abaixo).</dd>
+  <dt>array_first / array_last</dt><dd>O primeiro e o último <strong>valor</strong> do array, sem mexer no ponteiro interno (diferente de <code>reset</code>/<code>end</code>) e sem depender de as chaves serem 0, 1, 2… Array vazio dá <code>null</code>.</dd>
+  <dt>Uri\Rfc3986\Uri</dt><dd>Analisa endereços seguindo a norma RFC 3986, com um método para cada parte. Substitui com vantagens o antigo <code>parse_url()</code>, que aceita muita coisa errada.</dd>
+  <dt>Uri\WhatWg\Url</dt><dd>Analisa endereços do jeito que os navegadores fazem (norma WHATWG), normalizando-os.</dd>
+</dl>
+
+<p>Tentando usar o <code>clone</code> com mudanças de fora de uma classe <code>readonly</code>:</p>
+
+<pre class="term">$ php v85.php        « versão com $b = clone($a, ['y' =&gt; 5]); fora da classe
+
+Fatal error: Uncaught Error: Cannot modify protected(set) readonly property Ponto::$y from global scope in /home/ana/nov/v85.php:9
+Stack trace:
+#0 /home/ana/nov/v85.php(9): clone(Object(Ponto), Array)
+#1 {main}
+  thrown in /home/ana/nov/v85.php on line 9</pre>
+
+<p>"Não é possível modificar a propriedade <code>readonly</code> <code>Ponto::$y</code>, que é <code>protected(set)</code>, a partir do escopo global". Propriedades <code>readonly</code> só podem ser gravadas de dentro da classe; o <code>clone</code> com mudanças obedece à mesma regra.</p>
+
+<hr>
+
+<h2>O que saiu: removido e obsoleto</h2>
+<p>Duas palavras importantes:</p>
+<ul>
+  <li><strong>Obsoleto</strong> (<em>deprecated</em>): ainda funciona, mas mostra um aviso <code>Deprecated: …</code> e vai ser removido numa versão futura. É o momento de trocar.</li>
+  <li><strong>Removido</strong>: não existe mais; dá erro.</li>
+</ul>
+
+<h3>Propriedades dinâmicas (obsoletas desde o 8.2)</h3>
+<p>Antes, dava para criar uma propriedade em qualquer objeto só atribuindo: <code>$c-&gt;idade = 30;</code>, mesmo sem <code>$idade</code> declarada na classe. Isso escondia erros de digitação (<code>$c-&gt;nmoe = "Ana"</code> criava uma propriedade nova em vez de reclamar). Desde o 8.2, avisa, como você viu acima:</p>
+
+<pre class="term">Deprecated: Creation of dynamic property Cliente::$idade is deprecated in /home/ana/nov/v82.php on line 17</pre>
+
+<p>Conserto: declare a propriedade na classe (<code>public int $idade;</code>). Se a classe realmente precisa disso, marque-a com <code>#[\AllowDynamicProperties]</code>. Objetos <code>stdClass</code> (os de <code>json_decode</code>, por exemplo) continuam aceitando sem aviso:</p>
+
+<pre class="file" data-file="dinamica.php">&lt;?php
+#[\AllowDynamicProperties]
+class Ficha {}
+$f = new Ficha();
+$f-&gt;qualquer = 1;
+echo "sem aviso: $f-&gt;qualquer\n";
+$o = new stdClass();
+$o-&gt;nome = "Ana";
+echo "stdClass: $o-&gt;nome\n";
+</pre>
+
+<pre class="term">$ php dinamica.php
+sem aviso: 1
+stdClass: Ana</pre>
+
+<h3>Outros avisos que você pode encontrar no PHP 8.5</h3>
+
+<pre class="file" data-file="dep.php">&lt;?php
+$nome = "Ana";
+echo "Olá, ${nome}!\n";
+echo utf8_encode("x"), "\n";
+$n = (integer) "5";
+$b = (boolean) 1;
+$lista = ["a" =&gt; 1];
+var_dump($lista[null] ?? "sem");
+echo "fim\n";
+</pre>
+
+<pre class="term">$ php dep.php
+
+Deprecated: Non-canonical cast (integer) is deprecated, use the (int) cast instead in /home/ana/nov/dep.php on line 5
+
+Deprecated: Non-canonical cast (boolean) is deprecated, use the (bool) cast instead in /home/ana/nov/dep.php on line 6
+
+Deprecated: Using ${var} in strings is deprecated, use {$var} instead in /home/ana/nov/dep.php on line 3
+Olá, Ana!
+
+Deprecated: Function utf8_encode() is deprecated since 8.2, visit the php.net documentation for various alternatives in /home/ana/nov/dep.php on line 4
+x
+
+Deprecated: Using null as an array offset is deprecated, use an empty string instead in /home/ana/nov/dep.php on line 8
+string(3) "sem"
+fim</pre>
+
+<p>Repare que os avisos das linhas 3, 5 e 6 aparecem <strong>antes</strong> do <code>Olá, Ana!</code>: eles são dados quando o arquivo é compilado. Os das linhas 4 e 8, na hora em que a linha roda. E o programa chegou ao <code>fim</code>: obsoleto ainda funciona.</p>
+
+<pre class="term">$ php crase.php      « $saida = `echo oi`;
+
+Deprecated: The backtick (`) operator is deprecated, use shell_exec() instead in /home/ana/nov/crase.php on line 2
+oi</pre>
+
+<h3>Tabela: o que trocar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Antigo</th><th>Situação</th><th>Use</th></tr>
+<tr><td><code>each()</code>, <code>create_function()</code>, <code>__autoload()</code></td><td>Removidos no 8.0</td><td><code>foreach</code>, <a href="closures.html">funções anônimas</a>, <code>spl_autoload_register</code> (<a href="autoload.html">Autoload</a>)</td></tr>
+<tr><td>Propriedade dinâmica</td><td>Obsoleta no 8.2</td><td>Declarar a propriedade</td></tr>
+<tr><td><code>"${var}"</code></td><td>Obsoleto no 8.2</td><td><code>"{$var}"</code> ou <code>"$var"</code> (veja <a href="interpolacao.html">Interpolação</a>)</td></tr>
+<tr><td><code>utf8_encode</code>/<code>utf8_decode</code></td><td>Obsoletos no 8.2</td><td><code>mb_convert_encoding()</code></td></tr>
+<tr><td><code>function f(T $x = null)</code></td><td>Obsoleto no 8.4</td><td><code>?T $x = null</code></td></tr>
+<tr><td><code>(integer)</code>, <code>(boolean)</code>, <code>(double)</code>, <code>(binary)</code></td><td>Obsoletos no 8.5</td><td><code>(int)</code>, <code>(bool)</code>, <code>(float)</code>, <code>(string)</code></td></tr>
+<tr><td>Crase <code>`comando`</code></td><td>Obsoleta no 8.5</td><td><code>shell_exec('comando')</code></td></tr>
+<tr><td><code>null</code> como chave de array</td><td>Obsoleto no 8.5</td><td><code>""</code> (texto vazio), se era isso que você queria</td></tr>
+</table>
+</div>
+
+<p>Tentando usar uma função removida:</p>
+
+<pre class="term">$ php rem.php        « each($a);
+
+Fatal error: Uncaught Error: Call to undefined function each() in /home/ana/nov/rem.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/nov/rem.php on line 3</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Parse error num código copiado de um tutorial</strong>
+<p><strong>O que significa:</strong> o código usa um recurso mais novo que o seu PHP (por exemplo, <code>|&gt;</code> num PHP 8.4, ou <code>enum</code> num PHP 8.0).</p>
+<p><strong>Como consertar:</strong> <code>php -v</code>, procure o recurso nesta página e atualize o PHP, ou reescreva com a forma antiga.</p>
+</div>
+
+<div class="cenario">
+<strong>Call to undefined function array_find() (ou json_validate, array_first…)</strong>
+<p><strong>O que significa:</strong> a função é mais nova que o seu PHP: <code>array_find</code> é do 8.4; <code>array_first</code>, do 8.5; <code>json_validate</code>, do 8.3.</p>
+<p><strong>Como consertar:</strong> atualize o PHP. Se não der, escreva o equivalente com <code>foreach</code>, ou instale um pacote "polyfill" com o <a href="composer.html">Composer</a> (como o <code>symfony/polyfill-php84</code>), que cria essas funções em versões antigas.</p>
+</div>
+
+<div class="cenario">
+<strong>Uma tela cheia de Deprecated depois de atualizar o PHP</strong>
+<p><strong>O que significa:</strong> o código usa recursos marcados como obsoletos na versão nova. Ele ainda funciona.</p>
+<p><strong>Como consertar:</strong> leia cada aviso (ele quase sempre diz o que usar), troque usando a tabela acima e não esconda os avisos: na próxima versão, eles viram erros.</p>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A versão mínima</h3>
+<p>Um código usa <code>enum</code> e <code>readonly</code>. Qual a versão mínima do PHP?</p>
+<div class="ex-code">PHP <input data-answer="8.1" aria-label="versão"></div>
+</div>
+
+<div class="exercise">
+<h3>2. O conserto do aviso</h3>
+<p>O aviso diz <code>Non-canonical cast (integer) is deprecated</code>. Complete o conserto:</p>
+<div class="ex-code">$n = <input data-answer="(int)" aria-label="cast"> $_GET['n'];</div>
+</div>
+
+<div class="exercise">
+<h3>3. Último valor</h3>
+<p>Complete com a função do PHP 8.5 que devolve o último valor de um array:</p>
+<div class="ex-code">$ultimo = <input data-answer="array_last" aria-label="função">($lista);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Em qual versão o operador pipe <code>|&gt;</code> apareceu?</p>
+<label><input type="radio" name="q4"> 8.0</label>
+<label><input type="radio" name="q4"> 8.3</label>
+<label><input type="radio" name="q4"> 8.5</label>
+<label><input type="radio" name="q4"> 8.4</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. No PHP 8.5, <code>$cliente-&gt;idade = 30;</code> numa classe que não declara <code>$idade</code>:</p>
+<label><input type="radio" name="q5"> Dá <code>Fatal error</code></label>
+<label><input type="radio" name="q5"> Funciona, com um aviso <code>Deprecated</code></label>
+<label><input type="radio" name="q5"> Funciona sem aviso</label>
+<label><input type="radio" name="q5"> É ignorado</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual a diferença entre "obsoleto" e "removido"?</p>
+<label><input type="radio" name="q6"> Obsoleto funciona com aviso; removido dá erro</label>
+<label><input type="radio" name="q6"> São a mesma coisa</label>
+<label><input type="radio" name="q6"> Obsoleto dá erro; removido só avisa</label>
+<label><input type="radio" name="q6"> Removido só vale para funções; obsoleto, para classes</label>
+</div>
+
+<div class="tryphp" data-goal="out:Bruno: Pago,out:Carla: Aguardando pagamento,src:private string \$cliente,src:match\s*\(,semerro">
+<p class="try-task"><strong>Missão final:</strong> modernize esta classe escrita no estilo do PHP 7: (1) use a <strong>promoção no construtor</strong> com tipos (<code>private string $cliente</code>, <code>private string $status</code>) e apague as propriedades e atribuições repetidas; (2) troque o <code>switch</code> por <code>match</code>; (3) declare o retorno <code>: string</code>. A saída não deve mudar.</p>
+<pre class="script">&lt;?php
+class Pedido
+{
+    private $cliente;
+    private $status;
+
+    public function __construct($cliente, $status)
+    {
+        $this-&gt;cliente = $cliente;
+        $this-&gt;status = $status;
+    }
+
+    public function descricao()
+    {
+        switch ($this-&gt;status) {
+            case 'pago':
+                $texto = 'Pago';
+                break;
+            case 'enviado':
+                $texto = 'A caminho';
+                break;
+            default:
+                $texto = 'Aguardando pagamento';
+        }
+        return $this-&gt;cliente . ': ' . $texto;
+    }
+}
+
+foreach ([new Pedido('Bruno', 'pago'), new Pedido('Carla', 'novo')] as $p) {
+    echo $p-&gt;descricao(), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+class Pedido
+{
+    public function __construct(
+        private string $cliente,
+        private string $status,
+    ) {}
+
+    public function descricao(): string
+    {
+        $texto = match ($this-&gt;status) {
+            'pago' =&gt; 'Pago',
+            'enviado' =&gt; 'A caminho',
+            default =&gt; 'Aguardando pagamento',
+        };
+        return "$this-&gt;cliente: $texto";
+    }
+}
+
+foreach ([new Pedido('Bruno', 'pago'), new Pedido('Carla', 'novo')] as $p) {
+    echo $p-&gt;descricao(), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>8.0</strong>: <code>match</code>, argumentos nomeados, <code>?-&gt;</code>, promoção no construtor, union types, atributos, <code>str_contains</code>.</li>
+  <li><strong>8.1</strong>: enums, <code>readonly</code>, fibers, <code>strlen(...)</code>, <code>never</code>, <code>array_is_list</code>.</li>
+  <li><strong>8.2</strong>: classes <code>readonly</code>, DNF, <code>true</code>/<code>false</code>/<code>null</code>; propriedades dinâmicas obsoletas.</li>
+  <li><strong>8.3</strong>: <code>#[\Override]</code>, constantes tipadas, <code>json_validate</code>.</li>
+  <li><strong>8.4</strong>: property hooks, <code>private(set)</code>, <code>array_find</code>/<code>any</code>/<code>all</code>, <code>new X()-&gt;m()</code>, <code>#[\Deprecated]</code>.</li>
+  <li><strong>8.5</strong>: <code>|&gt;</code>, <code>clone($obj, [...])</code>, <code>#[\NoDiscard]</code>, <code>array_first</code>/<code>array_last</code>, extensão <code>uri</code>.</li>
+  <li>Obsoleto = funciona com <code>Deprecated</code>; removido = erro. Leia os avisos e troque antes da próxima versão.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
