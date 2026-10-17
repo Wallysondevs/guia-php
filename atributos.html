@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Atributos — #[...], #[\Override], #[\Deprecated], #[\NoDiscard] e Reflection | Guia PHP</title>
+<meta name="description" content="Atributos no PHP 8: a sintaxe #[...], os atributos nativos #[\Override], #[\Deprecated], #[\SensitiveParameter] e #[\NoDiscard] (com os avisos reais do PHP 8.5), como criar o seu próprio atributo e lê-lo com Reflection para montar rotas.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Atributos</span></h1>
+
+<p class="intro">Um <strong>atributo</strong> é uma etiqueta que você cola num pedaço do código (uma classe, um método, um parâmetro) para dizer algo <strong>sobre</strong> ele, sem mudar o que ele faz: "este método substitui o da classe-mãe", "esta função está obsoleta", "este parâmetro é uma senha, não mostre". Quem lê a etiqueta pode ser o próprio PHP, uma ferramenta, ou o seu código. A sintaxe é <code>#[...]</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A sintaxe <code>#[...]</code> e onde ela pode ser usada. <span class="versao">PHP 8.0+</span></li>
+  <li><code>#[\Override]</code>: pegar erro de digitação em métodos herdados. <span class="versao">PHP 8.3+</span></li>
+  <li><code>#[\Deprecated]</code>: marcar suas funções como obsoletas. <span class="versao">PHP 8.4+</span></li>
+  <li><code>#[\SensitiveParameter]</code>: esconder senhas dos rastros de erro. <span class="versao">PHP 8.2+</span></li>
+  <li><code>#[\NoDiscard]</code>: avisar quando alguém ignora o resultado. <span class="versao">PHP 8.5+</span></li>
+  <li>A criar o seu próprio atributo e lê-lo com <strong>Reflection</strong>.</li>
+</ul>
+</div>
+
+<p>Esta aula usa <a href="heranca.html">herança</a>, <a href="construtores.html">construtores</a> e <a href="namespaces.html">namespaces</a>.</p>
+
+<hr>
+
+<h2>A ideia: etiquetas na mercadoria</h2>
+<p>Na lojinha da Ana, uma caixa pode ter etiquetas: "FRÁGIL", "ESTE LADO PARA CIMA", "VENCE EM 10/2026". A etiqueta não muda o que está dentro da caixa; ela informa quem manuseia. O entregador lê "FRÁGIL" e muda o comportamento dele.</p>
+<p>Atributos são etiquetas no código. São <strong>metadados</strong>: dados sobre o código, e não dados do programa. Antes do PHP 8, as bibliotecas faziam isso com comentários especiais (<code>/** @Route("/produtos") */</code>), lidos como texto. Os atributos são a versão oficial: o PHP confere a sintaxe e entrega os dados prontos.</p>
+
+<hr>
+
+<h2>A sintaxe <code>#[...]</code> <span class="versao">PHP 8.0+</span></h2>
+
+<pre class="file" data-file="sintaxe.php">&lt;?php
+#[MinhaEtiqueta]                          // sem argumentos
+#[Rota('/produtos', metodo: 'POST')]      // com argumentos (até nomeados)
+#[Etiqueta1, Etiqueta2('x')]              // duas de uma vez
+class Exemplo
+{
+    #[Coluna('preco')]                    // numa propriedade
+    public float $preco = 0;
+
+    #[\Override]                          // num método
+    public function __toString(): string { return "ex"; }
+
+    public function entrar(#[\SensitiveParameter] string $senha) {}   // num parâmetro
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#[ … ]</dt><dd>Abre e fecha o atributo. Fica logo <strong>antes</strong> do que ele etiqueta, normalmente na linha de cima.</dd>
+  <dt>Rota</dt><dd>O nome do atributo é o nome de uma <strong>classe</strong>. Segue as regras de <a href="namespaces.html">namespaces</a>: <code>#[\Override]</code> com barra é a classe <code>Override</code> do PHP; sem <code>use</code> nem barra, dentro de um namespace, o PHP procuraria <code>SeuNamespace\Override</code>.</dd>
+  <dt>('/produtos', metodo: 'POST')</dt><dd>Argumentos, como numa chamada de função, inclusive <a href="parametros.html">nomeados</a>. Só valores constantes: textos, números, arrays, constantes, <code>new</code> de objetos simples. Nada de variáveis.</dd>
+</dl>
+
+<p>Podem receber atributos: classes (e interfaces, traits, enums), funções, métodos, propriedades, constantes de classe, parâmetros, casos de enum e funções anônimas.</p>
+
+<div class="note">
+<strong>Por que <code>#[</code>?</strong>
+<p>Em PHP, <code>#</code> começa um <a href="comentarios.html">comentário</a> de uma linha. Até o PHP 7.4, <code>#[Rota('/x')]</code> era só um comentário e era ignorado. Isso foi de propósito: uma biblioteca pode usar atributos e continuar rodando (sem eles) em PHP antigo. O lado ruim: no PHP 8, um comentário que começa com <code>#[</code> deixa de ser comentário.</p>
+</div>
+
+<p>Um atributo, sozinho, <strong>não faz nada</strong>. O que dá efeito é alguém ler a etiqueta. Os atributos <strong>nativos</strong> (da barra invertida, como <code>#[\Override]</code>) são lidos pelo próprio PHP. Vamos a eles.</p>
+
+<hr>
+
+<h2><code>#[\Override]</code>: "estou substituindo um método" <span class="versao">PHP 8.3+</span></h2>
+<p>A classe <code>Pix</code> quer substituir o método <code>processar</code> da classe-mãe <code>Pagamento</code>. Mas a Ana digitou <code>procesar</code>, com um <code>s</code> só:</p>
+
+<pre class="file" data-file="sem-override.php">&lt;?php
+class Pagamento
+{
+    public function processar(float $valor): string
+    {
+        return "Pagamento de $valor";
+    }
+}
+
+class Pix extends Pagamento
+{
+    public function procesar(float $valor): string
+    {
+        return "Pix de $valor";
+    }
+}
+
+echo (new Pix())-&gt;processar(10), "\n";
+</pre>
+
+<pre class="term">$ php sem-override.php
+Pagamento de 10</pre>
+
+<p>Nenhum erro, e o resultado está <strong>errado</strong>: para o PHP, <code>procesar</code> é só um método novo, e o <code>processar</code> chamado foi o da mãe. Esse tipo de engano pode ficar meses escondido. Com o atributo, a Ana declara a intenção:</p>
+
+<pre class="file" data-file="override-erro.php">&lt;?php
+class Pagamento
+{
+    public function processar(float $valor): string
+    {
+        return "Pagamento de $valor";
+    }
+}
+
+class Pix extends Pagamento
+{
+    #[\Override]
+    public function procesar(float $valor): string
+    {
+        return "Pix de $valor";
+    }
+}
+
+echo (new Pix())-&gt;processar(10), "\n";
+</pre>
+
+<pre class="term">$ php override-erro.php
+
+Fatal error: Pix::procesar() has #[\Override] attribute, but no matching parent method exists in /home/ana/attr/override-erro.php on line 13
+Stack trace:
+#0 {main}</pre>
+
+<p>"<code>Pix::procesar()</code> tem o atributo <code>#[\Override]</code>, mas não existe um método correspondente na classe-mãe". O erro aparece antes de qualquer linha rodar, apontando o método. Corrigindo o nome:</p>
+
+<pre class="term">$ php override.php
+Pix de 10</pre>
+
+<p>O <code>#[\Override]</code> também protege contra o contrário: se um dia alguém <strong>renomear</strong> o método na classe-mãe, todas as filhas marcadas dão erro na hora, em vez de pararem de funcionar em silêncio. Vale para métodos que vêm de classes-mãe e de <a href="interfaces.html">interfaces</a>; no PHP 8.5, também para propriedades. Em funções soltas, não faz sentido:</p>
+
+<pre class="term">$ php override-interno.php       « #[Override] function f() {}
+
+Fatal error: Attribute "Override" cannot target function (allowed targets: method, property) in /home/ana/attr/override-interno.php on line 3
+Stack trace:
+#0 {main}</pre>
+
+<div class="tryphp" data-goal="out:Boleto de R$ 10,src:#\[\\Override\],semerro">
+<p class="try-task"><strong>Missão:</strong> a classe <code>Boleto</code> deveria substituir <code>processar</code>, mas a saída mostra "Pagamento". Coloque <code>#[\Override]</code> em cima do método da <code>Boleto</code>, rode para ver o erro apontar o problema e conserte o nome. A saída deve ser <code>Boleto de R$ 10</code>.</p>
+<pre class="script">&lt;?php
+class Pagamento
+{
+    public function processar(float $valor): string
+    {
+        return "Pagamento de R$ $valor";
+    }
+}
+
+class Boleto extends Pagamento
+{
+    public function procesar(float $valor): string
+    {
+        return "Boleto de R$ $valor";
+    }
+}
+
+echo (new Boleto())-&gt;processar(10), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Pagamento
+{
+    public function processar(float $valor): string
+    {
+        return "Pagamento de R$ $valor";
+    }
+}
+
+class Boleto extends Pagamento
+{
+    #[\Override]
+    public function processar(float $valor): string
+    {
+        return "Boleto de R$ $valor";
+    }
+}
+
+echo (new Boleto())-&gt;processar(10), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2><code>#[\Deprecated]</code>: "não use mais" <span class="versao">PHP 8.4+</span></h2>
+<p>O PHP sempre avisou quando você usa uma função <strong>dele</strong> que vai sumir (<code>Deprecated: …</code>). Desde o 8.4, você pode fazer o mesmo com as <strong>suas</strong> funções, métodos e constantes de classe. Útil quando outras pessoas usam o seu código: você cria o substituto, marca o antigo, e elas têm tempo de trocar.</p>
+
+<pre class="file" data-file="deprecated.php">&lt;?php
+#[\Deprecated(message: "use calcularFrete()", since: "2.0")]
+function frete(float $peso): float
+{
+    return calcularFrete($peso);
+}
+
+function calcularFrete(float $peso): float
+{
+    return 10 + $peso * 2;
+}
+
+class Loja
+{
+    #[\Deprecated("use Loja::TAXA_NOVA")]
+    public const TAXA = 0.05;
+    public const TAXA_NOVA = 0.06;
+
+    #[\Deprecated]
+    public function totalAntigo(): int { return 0; }
+}
+
+echo frete(3), "\n";
+echo Loja::TAXA, "\n";
+echo (new Loja())-&gt;totalAntigo(), "\n";
+echo "fim\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>message: "…"</dt><dd>O que fazer em vez disso. Opcional.</dd>
+  <dt>since: "2.0"</dt><dd>Desde qual versão do seu código está obsoleto. Opcional.</dd>
+  <dt>#[\Deprecated]</dt><dd>Sem argumentos também vale.</dd>
+</dl>
+
+<pre class="term">$ php deprecated.php
+
+Deprecated: Function frete() is deprecated since 2.0, use calcularFrete() in /home/ana/attr/deprecated.php on line 23
+16
+
+Deprecated: Constant Loja::TAXA is deprecated, use Loja::TAXA_NOVA in /home/ana/attr/deprecated.php on line 24
+0.05
+
+Deprecated: Method Loja::totalAntigo() is deprecated in /home/ana/attr/deprecated.php on line 25
+0
+fim</pre>
+
+<p>Repare: tudo <strong>continuou funcionando</strong> (<code>16</code>, <code>0.05</code>, <code>0</code>, <code>fim</code>). <code>Deprecated</code> é um aviso, não um erro. A linha indicada é a do <strong>uso</strong> (23, 24, 25), não a da declaração, para quem usa saber onde trocar. Os avisos aparecem se o <code>error_reporting</code> incluir <code>E_DEPRECATED</code> (o padrão em desenvolvimento; veja <a href="tipos-erro.html">Tipos de Erro</a>).</p>
+
+<hr>
+
+<h2><code>#[\SensitiveParameter]</code>: esconda a senha <span class="versao">PHP 8.2+</span></h2>
+<p>Quando uma exceção não é tratada, o PHP mostra o <em>stack trace</em> com os <strong>valores</strong> dos argumentos. Em produção, esse rastro vai para os arquivos de log. Veja o problema:</p>
+
+<pre class="file" data-file="sem-sensivel.php">&lt;?php
+function entrar(string $usuario, string $senha): void
+{
+    throw new Exception("Usuário ou senha inválidos");
+}
+
+entrar("ana", "minhaSenha123");
+</pre>
+
+<pre class="term">$ php sem-sensivel.php
+
+Fatal error: Uncaught Exception: Usuário ou senha inválidos in /home/ana/attr/sem-sensivel.php:4
+Stack trace:
+#0 /home/ana/attr/sem-sensivel.php(7): entrar('ana', 'minhaSenha123')
+#1 {main}
+  thrown in /home/ana/attr/sem-sensivel.php on line 4</pre>
+
+<p>A senha está ali, em texto puro, para quem ler o log. Com o atributo no parâmetro:</p>
+
+<pre class="file" data-file="sensivel.php">&lt;?php
+function entrar(string $usuario, #[\SensitiveParameter] string $senha): void
+{
+    throw new Exception("Usuário ou senha inválidos");
+}
+
+entrar("ana", "minhaSenha123");
+</pre>
+
+<pre class="term">$ php sensivel.php
+
+Fatal error: Uncaught Exception: Usuário ou senha inválidos in /home/ana/attr/sensivel.php:4
+Stack trace:
+#0 /home/ana/attr/sensivel.php(7): entrar('ana', Object(SensitiveParameterValue))
+#1 {main}
+  thrown in /home/ana/attr/sensivel.php on line 4</pre>
+
+<p>No lugar da senha, aparece <code>Object(SensitiveParameterValue)</code>, uma "caixa fechada". Use em todo parâmetro que recebe senha, token, número de cartão ou chave de API. As próprias funções do PHP, como <code>password_hash()</code>, já vêm marcadas assim (veja <a href="senhas.html">Senhas</a>).</p>
+
+<hr>
+
+<h2><code>#[\NoDiscard]</code>: "não ignore o resultado" <span class="versao">PHP 8.5+</span></h2>
+<p>Algumas funções devolvem uma informação que <strong>não pode</strong> ser jogada fora: "deu certo?", "o valor novo". Chamar <code>salvar(…)</code> sem olhar se salvou é um erro comum. O PHP 8.5 permite marcar a função para que ignorar o resultado gere um aviso:</p>
+
+<pre class="file" data-file="nodiscard.php">&lt;?php
+#[\NoDiscard("o resultado diz se o arquivo foi salvo")]
+function salvar(string $arquivo, string $texto): bool
+{
+    return file_put_contents($arquivo, $texto) !== false;
+}
+
+salvar('/tmp/nota.txt', 'oi');
+echo "1. ignorei o resultado\n";
+
+$ok = salvar('/tmp/nota.txt', 'oi');
+echo "2. guardei: ", var_export($ok, true), "\n";
+
+(void) salvar('/tmp/nota.txt', 'oi');
+echo "3. ignorei de propósito\n";
+</pre>
+
+<pre class="term">$ php nodiscard.php
+
+Warning: The return value of function salvar() should either be used or intentionally ignored by casting it as (void), o resultado diz se o arquivo foi salvo in /home/ana/attr/nodiscard.php on line 8
+1. ignorei o resultado
+2. guardei: true
+3. ignorei de propósito</pre>
+
+<p>A mensagem: "o valor de retorno de <code>salvar()</code> deve ser usado ou ignorado de propósito com <code>(void)</code>", seguida do texto que a Ana escreveu no atributo. Só a chamada da linha 8 avisou:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th>Aviso?</th></tr>
+<tr><td><code>salvar(…);</code> (resultado jogado fora)</td><td><strong>Sim</strong>: <code>Warning</code></td></tr>
+<tr><td><code>$ok = salvar(…);</code> (resultado usado)</td><td>Não</td></tr>
+<tr><td><code>(void) salvar(…);</code> (ignorado de propósito)</td><td>Não. O "cast" <code>(void)</code> também é novo no PHP 8.5 e só serve para isso</td></tr>
+</table>
+</div>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja o <code>Warning</code>. Depois tire o atributo <code>#[\NoDiscard]</code> e rode de novo; em seguida, recoloque-o e troque a linha <code>reservar("Caneca");</code> por <code>$ok = reservar("Caneca");</code>.</p>
+<pre class="script">&lt;?php
+#[\NoDiscard("confira se a reserva deu certo")]
+function reservar(string $produto): bool
+{
+    return $produto !== "Boné";   // o boné esgotou
+}
+
+reservar("Caneca");
+echo "reserva enviada\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Criando o seu atributo</h2>
+<p>Agora o outro lado: o <strong>seu</strong> código lendo etiquetas. Frameworks usam isso para rotas (<code>#[Route('/produtos')]</code>), validação (<code>#[Email]</code>), banco de dados (<code>#[Column]</code>) e testes (<code>#[Test]</code>, no <a href="phpunit.html">PHPUnit</a>). Vamos montar um mini-roteador.</p>
+
+<h3>Passo 1: a classe do atributo</h3>
+<p>Um atributo é uma classe comum, marcada com o atributo nativo <code>#[Attribute]</code>:</p>
+
+<pre class="file" data-file="rotas.php (início)">&lt;?php
+#[Attribute(Attribute::TARGET_METHOD)]
+class Rota
+{
+    public function __construct(
+        public string $caminho,
+        public string $metodo = 'GET',
+    ) {}
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>#[Attribute]</dt><dd>"Esta classe pode ser usada como atributo." Sem isso, o PHP recusa (veja "Quando dá errado").</dd>
+  <dt>Attribute::TARGET_METHOD</dt><dd>Onde ela pode ser colada: só em métodos. Outras opções: <code>TARGET_CLASS</code>, <code>TARGET_PROPERTY</code>, <code>TARGET_FUNCTION</code>, <code>TARGET_PARAMETER</code>, <code>TARGET_ALL</code> (padrão). Combine com <code>|</code>, e acrescente <code>Attribute::IS_REPEATABLE</code> para permitir colar a mesma etiqueta duas vezes.</dd>
+  <dt>__construct(…)</dt><dd>Os argumentos do atributo (<code>#[Rota('/produtos', metodo: 'POST')]</code>) vão para este construtor.</dd>
+</dl>
+
+<h3>Passo 2: colar as etiquetas</h3>
+<pre class="file" data-file="rotas.php (meio)">class ProdutoController
+{
+    #[Rota('/produtos')]
+    public function listar(): string
+    {
+        return "lista de produtos";
+    }
+
+    #[Rota('/produtos', metodo: 'POST')]
+    public function criar(): string
+    {
+        return "produto criado";
+    }
+
+    public function ajudante(): void {}
+}
+</pre>
+
+<h3>Passo 3: ler com Reflection</h3>
+<p><strong>Reflection</strong> ("reflexão") é a parte do PHP que deixa um programa examinar o próprio código: quais métodos uma classe tem, quais parâmetros, quais atributos. Primeiro, o básico, num método só:</p>
+
+<pre class="file" data-file="ler-basico.php (final)">$metodo = new ReflectionMethod(ProdutoController::class, 'criar');
+$atributos = $metodo-&gt;getAttributes();
+
+echo count($atributos), " atributo(s)\n";
+$a = $atributos[0];
+echo "Nome: ", $a-&gt;getName(), "\n";
+echo "Argumentos: ";
+var_dump($a-&gt;getArguments());
+$rota = $a-&gt;newInstance();
+var_dump($rota);
+</pre>
+
+<pre class="term">$ php ler-basico.php
+1 atributo(s)
+Nome: Rota
+Argumentos: array(2) {
+  [0]=&gt;
+  string(9) "/produtos"
+  ["metodo"]=&gt;
+  string(4) "POST"
+}
+object(Rota)#3 (2) {
+  ["caminho"]=&gt;
+  string(9) "/produtos"
+  ["metodo"]=&gt;
+  string(4) "POST"
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Devolve</th></tr>
+<tr><td><code>new ReflectionMethod(Classe::class, 'metodo')</code></td><td>Um objeto que descreve o método</td></tr>
+<tr><td><code>-&gt;getAttributes()</code></td><td>Lista de <code>ReflectionAttribute</code>, um por etiqueta. <code>getAttributes(Rota::class)</code> filtra só as <code>Rota</code></td></tr>
+<tr><td><code>-&gt;getName()</code></td><td>O nome completo da classe do atributo</td></tr>
+<tr><td><code>-&gt;getArguments()</code></td><td>Os argumentos, como array (nomeados com a chave do nome)</td></tr>
+<tr><td><code>-&gt;newInstance()</code></td><td>Cria o objeto <code>Rota</code> de verdade, chamando o construtor. É aqui que o PHP confere se a classe existe e se o alvo é permitido</td></tr>
+</table>
+</div>
+
+<p>Agora o roteador completo, que percorre todos os métodos da classe:</p>
+
+<pre class="file" data-file="rotas.php (final)">$classe = new ReflectionClass(ProdutoController::class);
+
+foreach ($classe-&gt;getMethods() as $metodo) {
+    foreach ($metodo-&gt;getAttributes(Rota::class) as $atributo) {
+        $rota = $atributo-&gt;newInstance();
+        echo str_pad($rota-&gt;metodo, 5), $rota-&gt;caminho, " -&gt; ", $metodo-&gt;getName(), "()\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php rotas.php
+GET  /produtos -&gt; listar()
+POST /produtos -&gt; criar()</pre>
+
+<p>O método <code>ajudante()</code>, sem etiqueta, ficou de fora. Um framework faria o passo seguinte: comparar o caminho e o método da requisição (<code>$_SERVER['REQUEST_URI']</code>, <code>$_SERVER['REQUEST_METHOD']</code>) com essa tabela e chamar o método certo. É o que você vai fazer, sem atributos, em <a href="api-json.html">Criar uma API JSON</a>.</p>
+
+<hr>
+
+<h2>Atributo ou outra coisa? Qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Necessidade</th><th>Use</th></tr>
+<tr><td>Pegar erro de nome em método herdado</td><td><code>#[\Override]</code> em todo método que substitui outro</td></tr>
+<tr><td>Avisar que algo vai sumir</td><td><code>#[\Deprecated]</code> (no PHP &lt; 8.4: comentário <code>@deprecated</code> + <code>trigger_error(…, E_USER_DEPRECATED)</code>)</td></tr>
+<tr><td>Proteger senhas nos logs</td><td><code>#[\SensitiveParameter]</code></td></tr>
+<tr><td>Obrigar a conferir o resultado</td><td><code>#[\NoDiscard]</code>, ou lançar uma <a href="excecoes.html">exceção</a> quando der errado (mais forte: não dá para ignorar)</td></tr>
+<tr><td>Configuração lida pelo seu código ou framework</td><td>Atributo próprio + Reflection</td></tr>
+<tr><td>Documentação para pessoas</td><td>Comentários <code>/** … */</code></td></tr>
+<tr><td>Comportamento do programa</td><td>Código normal. Atributos não executam nada sozinhos</td></tr>
+</table>
+</div>
+
+<p>Outros atributos nativos que você pode encontrar: <code>#[\AllowDynamicProperties]</code> (8.2: permite criar propriedades não declaradas, veja <a href="novidades.html">Novidades</a>) e <code>#[\ReturnTypeWillChange]</code> (silencia avisos de compatibilidade em código antigo).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>has #[\Override] attribute, but no matching parent method exists</strong>
+<p><strong>O que significa:</strong> o método marcado não substitui nada: nome digitado errado, classe-mãe errada, ou o método da mãe foi renomeado/removido.</p>
+<p><strong>Como consertar:</strong> confira o nome na classe-mãe (ou na interface) e o <code>extends</code>/<code>implements</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Attribute class "Rotta" not found</strong>
+<pre class="term">$ php inexistente.php
+lista
+Nome lido: Rotta
+
+Fatal error: Uncaught Error: Attribute class "Rotta" not found in /home/ana/attr/inexistente.php:11
+Stack trace:
+#0 /home/ana/attr/inexistente.php(11): ReflectionAttribute-&gt;newInstance()
+#1 {main}
+  thrown in /home/ana/attr/inexistente.php on line 11</pre>
+<p><strong>O que significa:</strong> o atributo tem um nome que não é classe nenhuma. Repare que o programa rodou normalmente (<code>lista</code>) e até leu o nome: o PHP <strong>não confere</strong> atributos próprios até alguém chamar <code>newInstance()</code>. Por isso um erro de digitação num atributo pode passar despercebido.</p>
+<p><strong>Como consertar:</strong> corrija o nome; confira o <code>use</code> do namespace do atributo.</p>
+</div>
+
+<div class="cenario">
+<strong>Attempting to use non-attribute class "Rota" as attribute</strong>
+<pre class="term">$ php nao-atributo.php
+
+Fatal error: Uncaught Error: Attempting to use non-attribute class "Rota" as attribute in /home/ana/attr/nao-atributo.php:14
+Stack trace:
+#0 /home/ana/attr/nao-atributo.php(14): ReflectionAttribute-&gt;newInstance()
+#1 {main}
+  thrown in /home/ana/attr/nao-atributo.php on line 14</pre>
+<p><strong>O que significa:</strong> a classe existe, mas falta o <code>#[Attribute]</code> em cima dela.</p>
+<p><strong>Como consertar:</strong> acrescente <code>#[Attribute]</code> (com o alvo, se quiser) acima de <code>class Rota</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Attribute "Rota" cannot target class (allowed targets: method)</strong>
+<pre class="term">$ php alvo-errado.php
+Lido: Rota
+
+Fatal error: Uncaught Error: Attribute "Rota" cannot target class (allowed targets: method) in /home/ana/attr/alvo-errado.php:13
+Stack trace:
+#0 /home/ana/attr/alvo-errado.php(13): ReflectionAttribute-&gt;newInstance()
+#1 {main}
+  thrown in /home/ana/attr/alvo-errado.php on line 13</pre>
+<p><strong>O que significa:</strong> a etiqueta foi colada numa classe, mas a <code>Rota</code> só aceita métodos (<code>TARGET_METHOD</code>).</p>
+<p><strong>Como consertar:</strong> mova a etiqueta para um método, ou amplie o alvo: <code>#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_CLASS)]</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Attribute "Rota" must not be repeated</strong>
+<pre class="term">$ php repetido.php
+
+Fatal error: Uncaught Error: Attribute "Rota" must not be repeated in /home/ana/attr/repetido.php:16
+Stack trace:
+#0 /home/ana/attr/repetido.php(16): ReflectionAttribute-&gt;newInstance()
+#1 {main}
+  thrown in /home/ana/attr/repetido.php on line 16</pre>
+<p><strong>O que significa:</strong> duas etiquetas <code>#[Rota]</code> no mesmo método, e a classe não permite repetição.</p>
+<p><strong>Como consertar:</strong> <code>#[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atributo / item</th><th>Para quê</th><th>Desde</th></tr>
+<tr><td><code>#[Attribute]</code></td><td>Marca uma classe como atributo</td><td>8.0</td></tr>
+<tr><td><code>#[\SensitiveParameter]</code></td><td>Esconde o valor do parâmetro nos rastros</td><td>8.2</td></tr>
+<tr><td><code>#[\AllowDynamicProperties]</code></td><td>Permite propriedades dinâmicas na classe</td><td>8.2</td></tr>
+<tr><td><code>#[\Override]</code></td><td>Garante que o método substitui outro</td><td>8.3</td></tr>
+<tr><td><code>#[\Deprecated]</code></td><td>Marca função, método ou constante de classe como obsoleta</td><td>8.4</td></tr>
+<tr><td><code>#[\NoDiscard]</code> e <code>(void)</code></td><td>Avisa quando o retorno é ignorado</td><td>8.5</td></tr>
+<tr><td><code>ReflectionClass</code>, <code>ReflectionMethod</code>, <code>ReflectionProperty</code>, <code>ReflectionFunction</code></td><td>Examinam o código; todos têm <code>getAttributes()</code></td><td>5 / 8.0</td></tr>
+<tr><td><code>ReflectionAttribute::getName()</code>, <code>getArguments()</code>, <code>newInstance()</code></td><td>Nome, argumentos, objeto do atributo</td><td>8.0</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Proteger a senha</h3>
+<p>Complete o atributo que esconde o valor do parâmetro <code>$senha</code> nos rastros de erro:</p>
+<div class="ex-code">function login(string $email, #[<input data-answer="\SensitiveParameter" aria-label="atributo">] string $senha)</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ignorar de propósito</h3>
+<p>A função <code>salvar()</code> tem <code>#[\NoDiscard]</code>. Complete para chamá-la ignorando o resultado <strong>sem</strong> aviso:</p>
+<div class="ex-code"><input data-answer="(void)" aria-label="cast"> salvar($arquivo, $texto);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Marcar a classe</h3>
+<p>Complete a linha que transforma a classe <code>Coluna</code> num atributo:</p>
+<div class="ex-code"><input data-answer="#[Attribute]" aria-label="atributo"><br>class Coluna { … }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Um atributo próprio com nome errado (<code>#[Rotta]</code>, classe inexistente). Quando o PHP reclama?</p>
+<label><input type="radio" name="q4"> Ao carregar o arquivo</label>
+<label><input type="radio" name="q4"> Só quando alguém chama <code>newInstance()</code> nele</label>
+<label><input type="radio" name="q4"> Nunca</label>
+<label><input type="radio" name="q4"> Ao chamar o método etiquetado</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que o PHP 7.4 faz com a linha <code>#[\Override]</code>?</p>
+<label><input type="radio" name="q5"> Dá <code>Parse error</code></label>
+<label><input type="radio" name="q5"> Confere o método, como o PHP 8.3</label>
+<label><input type="radio" name="q5"> Mostra um <code>Warning</code></label>
+<label><input type="radio" name="q5"> Ignora: para ele, <code>#</code> começa um comentário</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Uma função marcada com <code>#[\Deprecated]</code> é chamada. O que acontece?</p>
+<label><input type="radio" name="q6"> Aparece um aviso <code>Deprecated</code> e a função roda normalmente</label>
+<label><input type="radio" name="q6"> <code>Fatal error</code></label>
+<label><input type="radio" name="q6"> A função não roda e devolve <code>null</code></label>
+<label><input type="radio" name="q6"> Nada; o atributo só serve para a documentação</label>
+</div>
+
+<div class="tryphp" data-goal="out:GET  /produtos/novo -&gt; formulario(),out:POST /produtos -&gt; criar(),semerro">
+<p class="try-task"><strong>Missão final:</strong> o roteador lista só as rotas dos métodos etiquetados. Cole etiquetas <code>Rota</code> em mais dois métodos: <code>formulario()</code> deve responder a <code>GET</code> em <code>/produtos/novo</code>, e <code>criar()</code> a <code>POST</code> em <code>/produtos</code> (use o argumento nomeado <code>metodo:</code>). O <code>ajudante()</code> continua sem rota.</p>
+<pre class="script">&lt;?php
+#[Attribute(Attribute::TARGET_METHOD)]
+class Rota
+{
+    public function __construct(
+        public string $caminho,
+        public string $metodo = 'GET',
+    ) {}
+}
+
+class ProdutoController
+{
+    #[Rota('/produtos')]
+    public function listar(): string { return "lista"; }
+
+    public function formulario(): string { return "formulário"; }
+
+    public function criar(): string { return "criado"; }
+
+    public function ajudante(): void {}
+}
+
+$classe = new ReflectionClass(ProdutoController::class);
+foreach ($classe-&gt;getMethods() as $metodo) {
+    foreach ($metodo-&gt;getAttributes(Rota::class) as $atributo) {
+        $rota = $atributo-&gt;newInstance();
+        echo str_pad($rota-&gt;metodo, 5), $rota-&gt;caminho, " -&gt; ", $metodo-&gt;getName(), "()\n";
+    }
+}
+</pre>
+<pre class="solucao">&lt;?php
+#[Attribute(Attribute::TARGET_METHOD)]
+class Rota
+{
+    public function __construct(
+        public string $caminho,
+        public string $metodo = 'GET',
+    ) {}
+}
+
+class ProdutoController
+{
+    #[Rota('/produtos')]
+    public function listar(): string { return "lista"; }
+
+    #[Rota('/produtos/novo')]
+    public function formulario(): string { return "formulário"; }
+
+    #[Rota('/produtos', metodo: 'POST')]
+    public function criar(): string { return "criado"; }
+
+    public function ajudante(): void {}
+}
+
+$classe = new ReflectionClass(ProdutoController::class);
+foreach ($classe-&gt;getMethods() as $metodo) {
+    foreach ($metodo-&gt;getAttributes(Rota::class) as $atributo) {
+        $rota = $atributo-&gt;newInstance();
+        echo str_pad($rota-&gt;metodo, 5), $rota-&gt;caminho, " -&gt; ", $metodo-&gt;getName(), "()\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Atributos são etiquetas <code>#[Nome(args)]</code> antes de classes, métodos, propriedades, parâmetros… Não executam nada: alguém precisa lê-las.</li>
+  <li>Nativos lidos pelo PHP: <code>#[\Override]</code> (8.3, pega erro de nome), <code>#[\Deprecated]</code> (8.4, aviso de obsoleto), <code>#[\SensitiveParameter]</code> (8.2, esconde senhas), <code>#[\NoDiscard]</code> (8.5, aviso se o retorno for ignorado; <code>(void)</code> para ignorar de propósito).</li>
+  <li>Atributo próprio = classe com <code>#[Attribute(alvos)]</code>; os argumentos vão para o construtor.</li>
+  <li>Leitura: <code>ReflectionClass</code>/<code>ReflectionMethod</code> → <code>getAttributes()</code> → <code>getName()</code>, <code>getArguments()</code>, <code>newInstance()</code>.</li>
+  <li>Erros de atributos próprios só aparecem no <code>newInstance()</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
