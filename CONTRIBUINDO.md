@@ -69,7 +69,7 @@ $L -n SEUNOME -- bash -c 'cd site && (php -S localhost:8000 >/tmp/srv.log 2>&1 &
 - **Dois binários do mesmo PHP 8.5.8:** `php` (perfil "common": tem `pdo_sqlite`, **sem readline**) e `php-completo` (perfil "bulk": **com readline** e mais extensões, sem `pdo_sqlite`). Para sessões do modo interativo `php -a` e para `readline()`, rode `php-completo` com `-t` e mostre o comando como `php -a` (no PHP instalado pelo apt/dnf/pacman, o `php` normal tem readline). Não confunda: o `php` do laboratório dá `Interactive shell (-a) requires the readline extension.`, o que **não** acontece numa instalação comum.
 - Fatos já conferidos: **`printf("%.2f")` ignora o idioma** (sai `3.14`, com ponto — diferente do Java); `number_format(1234.5, 2, ",", ".")` → `1.234,50`; `echo 10/3` → `3.3333333333333`; `var_dump(0.1+0.2 == 0.3)` → `bool(false)`.
 - No CLI os erros saem como `PHP Warning:  …` no stderr **e** `Warning: …` no stdout, conforme `display_errors`/`log_errors` — confira e explique o que o leitor vê no terminal × no navegador.
-- Um processo por vez, `timeout 60`; **sempre** encerre o `php -S` que você abrir.
+- Um processo por vez, `timeout 60`; **sempre** encerre o `php -S` que você abrir. **Use `-N` em toda sessão com `php -S`** (`$L -n SEUNOME -N -- bash -c …`): a caixa ganha um `localhost` só dela, e vários autores podem usar a porta 8000 ao mesmo tempo sem um pegar o servidor do outro (com `-N` não há internet — para Composer, rode sem `-N`).
 - **Privacidade:** nada da máquina real (redes, IPs, usuário real). Só a máquina fictícia da Ana.
 
 ### Versões
