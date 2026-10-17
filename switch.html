@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP switch — case, break, default e o fall-through | Guia PHP</title>
+<meta name="description" content="O switch do PHP do zero: switch, case, break e default, vários casos no mesmo bloco, o fall-through (quando falta o break), a comparação frouxa == que surpreende com &quot;0&quot;, null e &quot;1e1&quot;, o switch(true) e os erros reais. Saídas do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">switch</span></h1>
+
+<p class="intro">Quando você compara <strong>a mesma variável</strong> com uma lista de valores (o dia da semana é 1? é 2? é 3?…), um <code>if</code>/<code>elseif</code> fica longo e repetitivo. O <code>switch</code> foi feito para isso: você diz uma vez qual valor está examinando e lista os casos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do <code>switch</code>: <code>case</code>, <code>break</code> e <code>default</code>.</li>
+  <li>O que acontece quando falta um <code>break</code> (o <em>fall-through</em>) e como usar isso a seu favor.</li>
+  <li>Vários valores levando ao mesmo bloco.</li>
+  <li>A comparação <strong>frouxa</strong> (<code>==</code>) do <code>switch</code> e as surpresas com <code>"0"</code>, <code>null</code> e <code>"1e1"</code>.</li>
+  <li>O truque do <code>switch (true)</code>, a sintaxe <code>endswitch</code> e os erros reais.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: a central telefônica</h2>
+<p>"Para falar com o financeiro, digite 1. Para o suporte, digite 2. Para outros assuntos, aguarde." A central olha o número que você digitou e <strong>pula</strong> direto para o atendimento certo. O <code>switch</code> ("chave", "interruptor" de desvio) funciona assim: olha um valor e salta para o <code>case</code> ("caso") correspondente.</p>
+
+<hr>
+
+<h2>A anatomia</h2>
+
+<pre class="file" data-file="dia.php">&lt;?php
+$dia = 3;
+switch ($dia) {
+    case 1:
+        echo "Domingo\n";
+        break;
+    case 2:
+        echo "Segunda\n";
+        break;
+    case 3:
+        echo "Terça\n";
+        break;
+    default:
+        echo "Outro dia\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>switch ($dia)</dt><dd>O valor examinado, entre parênteses. É calculado <strong>uma vez</strong>.</dd>
+  <dt>{ … }</dt><dd>Todos os casos ficam dentro de um par de chaves.</dd>
+  <dt>case 1:</dt><dd>"No caso de ser 1". Um valor seguido de <strong>dois-pontos</strong>. O PHP compara <code>$dia == 1</code>.</dd>
+  <dt>echo …</dt><dd>As linhas que rodam a partir desse caso. Não precisam de chaves.</dd>
+  <dt>break;</dt><dd>"Interromper": sai do <code>switch</code>. Sem ele, o PHP <strong>continua</strong> rodando os casos de baixo (já, já você vê).</dd>
+  <dt>default:</dt><dd>"Padrão": roda quando nenhum <code>case</code> combinou. É opcional, como o <code>else</code>. Por costume, fica no fim.</dd>
+</dl>
+
+<pre class="term">$ php dia.php
+Terça</pre>
+
+<p>Como o PHP faz: compara <code>$dia</code> com o <code>case 1</code> (não), com o <code>case 2</code> (não), com o <code>case 3</code> (sim!) e começa a rodar dali, até encontrar o <code>break</code>. O mesmo programa com <code>if</code> seria <code>if ($dia == 1) … elseif ($dia == 2) … elseif ($dia == 3) … else …</code>, repetindo <code>$dia ==</code> em cada linha.</p>
+
+<hr>
+
+<h2>Sem <code>break</code>: o <em>fall-through</em></h2>
+<p>O <code>case</code> é só um <strong>ponto de entrada</strong>, como uma porta. Depois de entrar, o PHP segue em frente, linha por linha, passando por cima dos outros <code>case</code>, até achar um <code>break</code> ou o fim do <code>switch</code>. Veja o que acontece quando a Ana esquece todos os <code>break</code>:</p>
+
+<pre class="file" data-file="sem-break.php">&lt;?php
+$dia = 2;
+switch ($dia) {
+    case 1:
+        echo "Domingo\n";
+    case 2:
+        echo "Segunda\n";
+    case 3:
+        echo "Terça\n";
+    default:
+        echo "Outro dia\n";
+}
+</pre>
+<pre class="term">$ php sem-break.php
+Segunda          « entrou no case 2...
+Terça            « ...e "caiu" no case 3...
+Outro dia        « ...e no default</pre>
+
+<p>Esse comportamento se chama <strong>fall-through</strong> ("cair através"): a execução cai de um caso para o próximo. Nenhum erro ou aviso: o PHP acha que você quis assim. Esquecer um <code>break</code> é o bug mais comum com <code>switch</code>.</p>
+
+<div class="tip">
+<strong>Regra prática</strong>
+<p>Termine <strong>todo</strong> <code>case</code> com <code>break</code>. Se um dia você quiser cair de propósito no caso de baixo, deixe um comentário dizendo isso (<code>// continua no próximo caso</code>), para ninguém "consertar" depois.</p>
+</div>
+
+<h3>O lado bom: vários valores, um bloco</h3>
+<p>O fall-through tem um uso legítimo e muito comum: vários <code>case</code> vazios, um embaixo do outro, levando ao mesmo bloco.</p>
+
+<pre class="file" data-file="frutas.php">&lt;?php
+$fruta = "uva";
+switch ($fruta) {
+    case "maçã":
+    case "pera":
+        echo "Fruta de árvore\n";
+        break;
+    case "uva":
+    case "morango":
+        echo "Fruta pequena\n";
+        break;
+    default:
+        echo "Não sei\n";
+}
+</pre>
+<pre class="term">$ php frutas.php
+Fruta pequena</pre>
+
+<p>O <code>case "uva":</code> não tem nada; a execução "cai" no <code>case "morango":</code>, que também não tem nada, e chega ao <code>echo</code>. Leia como "no caso de uva <strong>ou</strong> morango".</p>
+
+<div class="tryphp" data-goal="out:Fim de semana,semerro,src:case\s+1\s*:\s*case\s+7|case\s+7\s*:\s*case\s+1">
+<p class="try-task"><strong>Missão:</strong> com <code>$dia = 7</code> (sábado), o programa deve mostrar <code>Fim de semana</code>. Os dias 1 (domingo) e 7 (sábado) são fim de semana; os outros, dia útil. Junte <code>case 1:</code> e <code>case 7:</code> no mesmo bloco.</p>
+<pre class="script">&lt;?php
+$dia = 7;
+switch ($dia) {
+    case 1:
+        echo "Fim de semana";
+        break;
+    default:
+        echo "Dia útil";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$dia = 7;
+switch ($dia) {
+    case 1:
+    case 7:
+        echo "Fim de semana";
+        break;
+    default:
+        echo "Dia útil";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>A comparação frouxa: <code>switch</code> usa <code>==</code></h2>
+<p>Aqui está a maior armadilha. O <code>switch</code> compara com <code>==</code> (igualdade "frouxa", que converte os tipos), e não com <code>===</code> (veja <a href="operadores-comparacao.html">Comparação (== e ===)</a>). Na maior parte do tempo isso não aparece. Mas veja este <code>switch</code>, rodado com vários valores de <code>$v</code>:</p>
+
+<pre class="file" data-file="frouxo.php">&lt;?php
+$v = null;     // troque por "0", 0, "", false, "a" e rode de novo
+switch ($v) {
+    case 0:
+        echo "case 0\n";
+        break;
+    case "":
+        echo "case \"\"\n";
+        break;
+    default:
+        echo "default\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor de <code>$v</code></th><th>Saída real</th><th>Por quê</th></tr>
+<tr><td><code>"0"</code></td><td><code>case 0</code></td><td><code>"0" == 0</code>: o texto numérico vira número</td></tr>
+<tr><td><code>0</code></td><td><code>case 0</code></td><td>Igual</td></tr>
+<tr><td><code>""</code></td><td><code>case ""</code></td><td>No PHP 8, <code>"" == 0</code> é <code>false</code></td></tr>
+<tr><td><code>null</code></td><td><code>case 0</code></td><td><code>null == 0</code> é <code>true</code>: os dois viram "falso"</td></tr>
+<tr><td><code>false</code></td><td><code>case 0</code></td><td><code>false == 0</code> é <code>true</code></td></tr>
+<tr><td><code>"a"</code></td><td><code>default</code></td><td>Nenhum caso combina</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php frouxo.php
+case 0              « com $v = null: uma variável "sem valor" entrou no caso do zero</pre>
+
+<p>Se <code>$v</code> fosse uma quantidade que não veio do formulário (<code>null</code>), o programa trataria como "zero itens", sem aviso nenhum. E tem um caso ainda mais estranho, com textos que <strong>parecem números</strong>:</p>
+
+<pre class="file" data-file="codigo.php">&lt;?php
+$codigo = "1e1";
+switch ($codigo) {
+    case "10":
+        echo "Código 10?!\n";
+        break;
+    default:
+        echo "outro\n";
+}
+</pre>
+<pre class="term">$ php codigo.php
+Código 10?!</pre>
+
+<p><code>"1e1"</code> é a notação científica de 10 (1 × 10¹). Quando os <strong>dois</strong> lados do <code>==</code> são textos numéricos, o PHP compara como números, e <code>10 == 10</code>. Se esses fossem códigos de produto da lojinha, o produto "1e1" seria confundido com o "10".</p>
+
+<div class="warning">
+<strong>Como se proteger</strong>
+<ul>
+  <li>Garanta o tipo antes do <code>switch</code>: <code>switch ((int) $dia)</code> para números, ou <code>switch ((string) $codigo)</code>… (mas lembre: dois textos numéricos ainda se comparam como números).</li>
+  <li>Use <a href="match.html"><code>match</code></a> <span class="versao">PHP 8.0+</span>, que compara com <code>===</code>. É a próxima aula, e é o motivo principal de o <code>match</code> existir.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2><code>switch (true)</code>: faixas de valores</h2>
+<p>O <code>case</code> aceita qualquer expressão, não só valores fixos. Um truque comum é examinar <code>true</code> e colocar condições nos <code>case</code>: o primeiro cuja condição der <code>true</code> é escolhido.</p>
+
+<pre class="file" data-file="faixas.php">&lt;?php
+$nota = 8;
+switch (true) {
+    case $nota &gt;= 7:
+        echo "Aprovado\n";
+        break;
+    case $nota &gt;= 5:
+        echo "Recuperação\n";
+        break;
+    default:
+        echo "Reprovado\n";
+}
+</pre>
+<pre class="term">$ php faixas.php
+Aprovado</pre>
+
+<p>Funciona, mas a comparação frouxa continua valendo (<code>true == "texto"</code> também é verdadeiro), e o <code>if</code>/<code>elseif</code> faz o mesmo de forma mais direta. Você vai ver esse truque em códigos existentes; para os seus, prefira <code>if</code>/<code>elseif</code> ou <code>match (true)</code>.</p>
+
+<hr>
+
+<h2>Detalhes que você vai encontrar</h2>
+
+<h3>Sintaxe alternativa: <code>endswitch</code></h3>
+<p>Como o <code>if</code>, o <code>switch</code> tem uma forma com <code>:</code> e <code>endswitch;</code> para templates HTML (veja <a href="php-e-html.html">PHP Dentro do HTML</a>):</p>
+<pre class="file" data-file="alternativa.php">&lt;?php
+$x = 1;
+switch ($x):
+    case 1:
+        echo "um\n";
+        break;
+endswitch;
+</pre>
+<pre class="term">$ php alternativa.php
+um</pre>
+<p>Na prática, é raro: no meio do HTML, um <code>switch</code> fica confuso. Calcule o valor antes, em PHP puro, e mostre só o resultado.</p>
+
+<h3>Nenhum caso e nenhum <code>default</code></h3>
+<p>Se nada combinar e não houver <code>default</code>, o <code>switch</code> simplesmente não faz nada, sem aviso. (O <code>match</code>, ao contrário, dá erro; veja a próxima aula.)</p>
+
+<h3><code>return</code> no lugar do <code>break</code></h3>
+<p>Dentro de uma <a href="funcoes.html">função</a>, é comum cada <code>case</code> terminar com <code>return valor;</code>: o <code>return</code> sai da função inteira, então o <code>break</code> não é necessário.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Rodou mais de um caso</strong>
+<pre class="term">$ php sem-break.php
+Segunda
+Terça
+Outro dia</pre>
+<p><strong>O que significa:</strong> faltou <code>break</code> no fim de um <code>case</code>, e a execução caiu nos de baixo.</p>
+<p><strong>Como consertar:</strong> coloque <code>break;</code> como última linha de cada <code>case</code> que tem código.</p>
+</div>
+
+<div class="cenario">
+<strong>Switch statements may only contain one default clause</strong>
+<pre class="file" data-file="dois-default.php">&lt;?php
+$x = 1;
+switch ($x) {
+    case 1:
+        echo "um\n";
+        break;
+    default:
+        echo "outro\n";
+        break;
+    default:
+        echo "de novo\n";
+}
+</pre>
+<pre class="term">$ php dois-default.php
+
+Fatal error: Switch statements may only contain one default clause in /home/ana/php/dois-default.php on line 10
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "um switch só pode ter um <code>default</code>". Acontece ao copiar e colar blocos. É detectado antes de rodar: nada executa.</p>
+<p><strong>Como consertar:</strong> deixe um só <code>default</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected token "echo" — faltou o <code>:</code> do <code>case</code></strong>
+<pre class="file" data-file="sem-dois-pontos.php">&lt;?php
+$x = 1;
+switch ($x) {
+    case 1:
+        echo "um\n";
+        break;
+    case 2
+        echo "dois\n";
+}
+</pre>
+<pre class="term">$ php sem-dois-pontos.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/php/sem-dois-pontos.php on line 8</pre>
+<p><strong>O que significa:</strong> depois do valor do <code>case</code>, o PHP esperava <code>:</code>. Ele só percebe o problema na linha seguinte (8), ao encontrar o <code>echo</code>.</p>
+<p><strong>Como consertar:</strong> <code>case 2:</code>. (Curiosidade: <code>case 2;</code> com ponto e vírgula é aceito, por motivos históricos. Não use.)</p>
+</div>
+
+<div class="cenario">
+<strong>"continue" targeting switch is equivalent to "break"</strong>
+<pre class="file" data-file="continue.php">&lt;?php
+$x = 1;
+switch ($x) {
+    case 1:
+        echo "a\n";
+        continue;
+}
+</pre>
+<pre class="term">$ php continue.php
+
+Warning: "continue" targeting switch is equivalent to "break" in /home/ana/php/continue.php on line 6
+a</pre>
+<p><strong>O que significa:</strong> "um <code>continue</code> que mira o switch equivale a <code>break</code>". Para o PHP, o <code>switch</code> conta como uma estrutura de repetição para o <code>break</code> e o <code>continue</code>. Isso confunde quando o <code>switch</code> está dentro de um laço e você queria pular para a próxima volta do laço.</p>
+<p><strong>Como consertar:</strong> use <code>break</code> para sair do <code>switch</code>. Para pular a volta do laço de fora, use <code>continue 2</code> (veja <a href="break-continue.html">break e continue</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>Entrou no caso errado, sem nenhum erro</strong>
+<pre class="term">$ php codigo.php
+Código 10?!</pre>
+<p><strong>O que significa:</strong> a comparação frouxa (<code>==</code>) achou iguais valores que você considera diferentes: <code>null</code> e <code>0</code>, <code>"1e1"</code> e <code>"10"</code>, <code>false</code> e <code>0</code>.</p>
+<p><strong>Como consertar:</strong> converta o valor para o tipo certo antes do <code>switch</code>, ou troque por <a href="match.html"><code>match</code></a>, que usa <code>===</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>O que faz</th></tr>
+<tr><td><code>switch (valor) { … }</code></td><td>Examina o valor uma vez</td></tr>
+<tr><td><code>case X:</code></td><td>Ponto de entrada quando <code>valor == X</code></td></tr>
+<tr><td><code>case A: case B:</code></td><td>A ou B levam ao mesmo bloco</td></tr>
+<tr><td><code>break;</code></td><td>Sai do <code>switch</code></td></tr>
+<tr><td><code>default:</code></td><td>Nenhum caso combinou (no máximo um)</td></tr>
+<tr><td><code>switch (true) { case $n &gt; 5: … }</code></td><td>Faixas de valores</td></tr>
+<tr><td><code>switch (…): … endswitch;</code></td><td>Sintaxe alternativa</td></tr>
+<tr><td>Comparação</td><td><code>==</code> (frouxa)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Sair do caso</h3>
+<p>Complete a palavra que impede a execução de cair no próximo <code>case</code>:</p>
+<div class="ex-code">case "pix": echo "Pagamento instantâneo"; <input data-answer="break;|break" aria-label="comando"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Nenhum caso</h3>
+<p>Complete com a palavra do caso "padrão":</p>
+<div class="ex-code"><input data-answer="default:|default" aria-label="palavra"> echo "Forma de pagamento desconhecida";</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Com <code>$n = 1</code>, o que mostra <code>switch ($n) { case 1: echo "A"; case 2: echo "B"; break; case 3: echo "C"; }</code>?</p>
+<label><input type="radio" name="q3"> <code>A</code></label>
+<label><input type="radio" name="q3"> <code>ABC</code></label>
+<label><input type="radio" name="q3"> <code>AB</code></label>
+<label><input type="radio" name="q3"> Nada</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Com <code>$v = null</code>, em qual caso o <code>switch ($v)</code> entra, se houver <code>case 0:</code> e <code>default:</code>?</p>
+<label><input type="radio" name="q4"> <code>case 0</code></label>
+<label><input type="radio" name="q4"> <code>default</code></label>
+<label><input type="radio" name="q4"> Em nenhum: dá erro</label>
+<label><input type="radio" name="q4"> Nos dois</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Que tipo de comparação o <code>switch</code> usa?</p>
+<label><input type="radio" name="q5"> <code>===</code></label>
+<label><input type="radio" name="q5"> <code>==</code></label>
+<label><input type="radio" name="q5"> <code>&gt;=</code></label>
+<label><input type="radio" name="q5"> Depende do <code>default</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Pagamento por PIX,outre:Desconto de 5%\s*$,semerro">
+<p class="try-task"><strong>Missão final:</strong> na lojinha, o pagamento <code>"pix"</code> deve mostrar <code>Pagamento por PIX</code> e, na linha de baixo, <code>Desconto de 5%</code>; <code>"cartao"</code> mostra <code>Pagamento no cartão</code>; qualquer outro, <code>Forma desconhecida</code>. O código abaixo tem um bug: rode com <code>$pagamento = "pix"</code> e veja o que sobra na saída. Corrija.</p>
+<pre class="script">&lt;?php
+$pagamento = "pix";
+switch ($pagamento) {
+    case "pix":
+        echo "Pagamento por PIX\n";
+        echo "Desconto de 5%\n";
+    case "cartao":
+        echo "Pagamento no cartão\n";
+        break;
+    default:
+        echo "Forma desconhecida\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$pagamento = "pix";
+switch ($pagamento) {
+    case "pix":
+        echo "Pagamento por PIX\n";
+        echo "Desconto de 5%\n";
+        break;
+    case "cartao":
+        echo "Pagamento no cartão\n";
+        break;
+    default:
+        echo "Forma desconhecida\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>switch</code> examina um valor e salta para o <code>case</code> igual; <code>default</code> é o "nenhum dos anteriores".</li>
+  <li>Cada <code>case</code> é só uma porta de entrada: sem <code>break</code>, a execução cai nos casos de baixo (<em>fall-through</em>).</li>
+  <li><code>case</code>s vazios empilhados = "este <strong>ou</strong> aquele".</li>
+  <li>O <code>switch</code> compara com <code>==</code>: <code>null</code> e <code>false</code> entram no <code>case 0</code>, <code>"1e1"</code> entra no <code>case "10"</code>.</li>
+  <li>Para comparação estrita e código mais curto, o PHP 8 tem o <code>match</code>: a próxima aula.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
