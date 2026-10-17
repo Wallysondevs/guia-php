@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP O Editor do Guia — como usar as caixas Experimente | Guia PHP</title>
+<meta name="description" content="Como usar o editor Experimente do Guia PHP, que roda o PHP 8.5 de verdade no navegador: Rodar e Parar, o carregamento na primeira vez, o terminal e o código de saída, argumentos e entrada, abas de arquivos, o modo web com Resultado e Código-fonte HTML, formulários, Restaurar, Ver solução, missões e o que funciona ou não no navegador.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">O Editor do Guia</span></h1>
+
+<p class="intro">Quase toda aula tem caixas <strong>Experimente</strong>: um editor de código com um botão <strong>Rodar</strong>. Elas não são uma imitação do PHP: rodam o <strong>PHP 8.5 de verdade</strong>, o programa oficial, transformado num formato que o navegador sabe executar. Nesta aula você vai aprender a usar cada parte do editor, nos dois modos (terminal e página web), e saber o que ele consegue e o que não consegue fazer.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Rodar, parar e ler a saída (inclusive os erros e o código de saída).</li>
+  <li>O que acontece na primeira vez que você clica em Rodar.</li>
+  <li>Passar argumentos e digitar a entrada de um programa.</li>
+  <li>Trabalhar com várias abas (vários arquivos).</li>
+  <li>Usar o modo web: Resultado, Código-fonte HTML, links e formulários.</li>
+  <li>Restaurar o código, ver a solução e cumprir missões.</li>
+  <li>O que funciona e o que não funciona no PHP do navegador.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: um laboratório portátil</h2>
+<p>Na escola, o laboratório de ciências tem tudo pronto: você chega, faz o experimento e vai embora, sem levar nada para casa. O editor do guia é assim. O PHP fica guardado <strong>dentro da página</strong>, num "computador de mentirinha" que só existe enquanto a aba está aberta: ele tem uma pasta da Ana (<code>/home/ana</code>), aceita arquivos e banco de dados SQLite, e nada do que você fizer ali toca no seu computador de verdade. Se algo der muito errado, é só recarregar a página.</p>
+
+<p>O motor é o mesmo que o projeto WordPress Playground usa: o PHP 8.5.10 oficial compilado para <strong>WebAssembly</strong> (um formato de programa que os navegadores modernos executam quase tão rápido quanto um programa comum). Por isso as mensagens de erro, os avisos e as saídas são os mesmos do PHP instalado.</p>
+
+<hr>
+
+<h2>O modo terminal (o padrão)</h2>
+<p>A maioria das caixas funciona como o comando <code>php programa.php</code> num terminal: o código é um arquivo, e a saída aparece como texto. Rode esta:</p>
+
+<div class="tryphp">
+<pre class="script">&lt;?php
+echo "Olá, mundo!\n";
+echo "2 + 3 = " . (2 + 3) . "\n";
+</pre>
+</div>
+
+<p>As partes da caixa, de cima para baixo:</p>
+
+<dl class="anatomy">
+  <dt>Aba <code>programa.php</code></dt><dd>O nome do arquivo que está sendo editado. Algumas caixas têm várias abas (veja <a href="#abas">Várias abas</a>).</dd>
+  <dt>Restaurar</dt><dd>Volta ao código original da aula, apagando as suas mudanças.</dd>
+  <dt>Editor</dt><dd>Clique e digite. Os números à esquerda são os <strong>números das linhas</strong>, os mesmos que as mensagens de erro citam.</dd>
+  <dt>Argumentos</dt><dd>Palavras passadas ao programa, como no terminal (veja <a href="#args">Argumentos e entrada</a>).</dd>
+  <dt>▶ Rodar</dt><dd>Executa o código. Enquanto o programa roda, o botão vira <strong>■ Parar</strong>.</dd>
+  <dt>Terminal</dt><dd>Aparece depois de rodar, com o comando (<code>ana@notebook:~$ php programa.php</code>), a saída do programa e, no fim, o código de saída.</dd>
+</dl>
+
+<p>Depois de rodar, o terminal da caixa mostra:</p>
+
+<pre class="file" data-file="o que o editor mostra">ana@notebook:~$ php programa.php
+Olá, mundo!
+2 + 3 = 5
+[código de saída: 0]</pre>
+
+<p>O <code>[código de saída: 0]</code> é o número que o programa devolve ao terminar: <code>0</code> quer dizer "terminou bem"; qualquer outro número indica um problema (o PHP usa <code>255</code> para erros fatais). No terminal de verdade, esse número fica escondido, e você o vê com <code>echo $?</code>; o editor mostra sempre. A aula <a href="linha-comando.html">PHP na Linha de Comando</a> explica como escolher esse número com <code>exit</code>.</p>
+
+<h3>A primeira vez: o carregamento</h3>
+<p>Na <strong>primeira</strong> vez que você clica em Rodar numa página, o navegador baixa o PHP (cerca de 8 MB). Aparece uma barra com a mensagem <code>Carregando o PHP (≈ 7,6 MB, só na primeira vez)…</code> e a porcentagem, depois <code>Preparando o PHP 8.5…</code>. Leva de um a alguns segundos, conforme a internet. Depois disso:</p>
+<ul>
+  <li>as outras caixas da mesma página rodam na hora;</li>
+  <li>nas outras aulas, o navegador reaproveita o arquivo já baixado (fica guardado no <em>cache</em>), então o carregamento é bem mais rápido;</li>
+  <li>se a internet cair durante o download, aparece <code>Não consegui carregar o PHP: …</code>; confira a conexão e clique em Rodar de novo.</li>
+</ul>
+
+<h3>Atalhos do editor</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tecla</th><th>O que faz</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd> (Mac: <kbd>Cmd</kbd>+<kbd>Enter</kbd>)</td><td>Roda o código, sem tirar a mão do teclado.</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>Insere 4 espaços (o recuo padrão do PHP). Com várias linhas selecionadas, recua todas.</td></tr>
+<tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Tira um nível de recuo.</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>Pula a linha mantendo o recuo; depois de <code>{</code>, <code>(</code> ou <code>[</code>, recua mais um nível.</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Sai do editor (para quem navega pelo teclado: depois, <kbd>Tab</kbd> vai para o próximo botão).</td></tr>
+</table>
+</div>
+
+<h3>Erros e avisos</h3>
+<p>Quando o PHP reclama, a mensagem aparece no terminal da caixa, em destaque, exatamente como no terminal de verdade. Este programa tem um aviso e um erro fatal. Rode e compare com o que o editor mostra:</p>
+
+<div class="tryphp">
+<pre class="script">&lt;?php
+echo "Antes do erro\n";
+echo $preco;
+echo "Depois do aviso\n";
+echo total();
+echo "Esta linha nunca roda\n";
+</pre>
+</div>
+
+<pre class="file" data-file="o que o editor mostra">ana@notebook:~$ php programa.php
+Antes do erro
+
+Warning: Undefined variable $preco in /home/ana/programa.php on line 3
+Depois do aviso
+
+Fatal error: Uncaught Error: Call to undefined function total() in /home/ana/programa.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/programa.php on line 5
+[código de saída: 255]</pre>
+
+<p>Repare na diferença: depois do <strong>aviso</strong> (<code>Warning</code>, linha 3), o programa continuou e escreveu "Depois do aviso"; depois do <strong>erro fatal</strong> (<code>Fatal error</code>, linha 5), ele parou, e a última linha nunca rodou. O código de saída <code>255</code> confirma o erro. É a mesma saída do laboratório do guia (lá o arquivo se chamava <code>erro.php</code>). A aula <a href="erros.html">Lendo Erros do PHP</a> ensina a ler cada parte dessas mensagens.</p>
+
+<h3>Parar um programa</h3>
+<p>Um programa que não termina nunca (um "laço infinito", que você vai conhecer em <a href="while.html">while e do-while</a>) não trava a página: o PHP roda separado. Clique em <strong>■ Parar</strong>: o terminal mostra <code>^C</code> (como o <kbd>Ctrl</kbd>+<kbd>C</kbd> do terminal) e o código de saída <code>130</code>, o mesmo que o terminal de verdade usa para "interrompido". Se você não parar, o editor para sozinho depois de 30 segundos, com a mensagem <code>(o editor parou o programa: ele rodou mais de 30 segundos sem terminar — laço infinito?)</code>. E se um programa escrever demais (mais de 2 MB de texto), o editor também o interrompe.</p>
+
+<hr>
+
+<h2 id="args">Argumentos e entrada</h2>
+<p>Programas de terminal recebem informações de dois jeitos: <strong>argumentos</strong> (palavras escritas depois do nome do arquivo, como em <code>php args.php Ana 29</code>) e <strong>entrada</strong> (o que a pessoa digita enquanto o programa roda). O editor tem os dois.</p>
+
+<h3>Argumentos</h3>
+<p>O campo <strong>Argumentos</strong> faz o papel das palavras depois do nome do arquivo. Separe-as com espaços; para um argumento com espaço dentro, use aspas (<code>"Ana Souza"</code>). Dentro do programa, eles ficam na lista <code>$argv</code>. Rode a caixa abaixo, depois troque <code>Ana 29</code> no campo Argumentos por <code>Bruno</code> e rode de novo:</p>
+
+<div class="tryphp" data-args="Ana 29">
+<pre class="script">&lt;?php
+echo "Você passou " . ($argc - 1) . " argumento(s).\n";
+echo "Olá, " . ($argv[1] ?? "ninguém") . "!\n";
+</pre>
+</div>
+
+<pre class="file" data-file="o que o editor mostra">ana@notebook:~$ php programa.php Ana 29
+Você passou 2 argumento(s).
+Olá, Ana!
+[código de saída: 0]</pre>
+
+<p>No laboratório, com <code>php args.php Ana 29</code>, as duas linhas são idênticas. O <code>$argv</code> e o <code>$argc</code> são explicados em <a href="linha-comando.html">PHP na Linha de Comando</a>.</p>
+
+<h3>Entrada (o teclado)</h3>
+<p>Quando um programa lê o teclado com <code>fgets(STDIN)</code>, o editor oferece duas formas de responder:</p>
+<ul>
+  <li><strong>Campo Entrada</strong> (aparece em caixas preparadas para isso): escreva as respostas antes de rodar, uma por linha. O editor as entrega ao programa na ordem e mostra cada uma no terminal, como se tivessem sido digitadas.</li>
+  <li><strong>Digitando na hora</strong>: se o programa pede algo e não há resposta pronta, aparece um campo de texto dentro do terminal da caixa. Digite e aperte <kbd>Enter</kbd>. <kbd>Ctrl</kbd>+<kbd>D</kbd> avisa "acabou a entrada"; <kbd>Ctrl</kbd>+<kbd>C</kbd> interrompe o programa.</li>
+</ul>
+
+<div class="tryphp" data-stdin="Ana\n29\n">
+<pre class="script">&lt;?php
+echo "Qual é o seu nome? ";
+$nome = trim(fgets(STDIN));
+echo "Qual é a sua idade? ";
+$idade = trim(fgets(STDIN));
+echo "$nome tem $idade anos.\n";
+</pre>
+</div>
+
+<pre class="file" data-file="o que o editor mostra">ana@notebook:~$ php programa.php
+Qual é o seu nome? Ana
+Qual é a sua idade? 29
+Ana tem 29 anos.
+[código de saída: 0]</pre>
+
+<p>Apague o conteúdo do campo Entrada e rode de novo: o programa vai esperar você digitar no próprio terminal da caixa.</p>
+
+<div class="warning">
+<strong><code>readline()</code> não existe no editor</strong>
+<p>No PHP instalado, a função <code>readline("Pergunta: ")</code> também lê o teclado. O PHP do navegador não tem essa extensão; nas caixas, use sempre <code>fgets(STDIN)</code>. Se tentar, verá <code>Call to undefined function readline()</code>.</p>
+</div>
+
+<hr>
+
+<h2 id="abas">Várias abas: vários arquivos</h2>
+<p>Algumas caixas têm mais de um arquivo, cada um numa aba. O <strong>primeiro</strong> é o que roda; os outros são usados por ele (por exemplo, com <code>require</code>, que você vai estudar em <a href="include-require.html">include e require</a>). Clique nas abas para alternar. Todas as abas são gravadas na mesma pasta antes de rodar.</p>
+
+<div class="tryphp" data-goal="out:Pão: R$ 9\,00">
+<p class="try-task"><strong>Missão:</strong> o preço do pão subiu. Abra a aba <code>precos.php</code>, troque <code>"8,50"</code> por <code>"9,00"</code> e rode (a partir de qualquer aba, o que roda é sempre o <code>programa.php</code>).</p>
+<pre class="script" data-file="programa.php">&lt;?php
+require "precos.php";
+echo "Pão: R$ " . $precos["pão"] . "\n";
+echo "Leite: R$ " . $precos["leite"] . "\n";
+</pre>
+<pre class="script" data-file="precos.php">&lt;?php
+$precos = [
+    "pão" =&gt; "8,50",
+    "leite" =&gt; "5,90",
+];
+</pre>
+<pre class="solucao" data-file="precos.php">&lt;?php
+$precos = [
+    "pão" =&gt; "9,00",
+    "leite" =&gt; "5,90",
+];
+</pre>
+</div>
+
+<p>Antes da mudança, a saída é a mesma do laboratório:</p>
+
+<pre class="term" data-cwd="~/w/multi">$ php programa.php
+Pão: R$ 8,50
+Leite: R$ 5,90</pre>
+
+<hr>
+
+<h2>O modo web: o PHP montando páginas</h2>
+<p>Nas caixas em <strong>modo web</strong>, o código é a página <code>index.php</code> de um site de mentirinha em <code>localhost:8000</code>, como se você tivesse ligado o <a href="servidor-embutido.html">servidor embutido</a> e aberto a página num navegador. A caixa avisa: "O código vira a página <code>index.php</code> de um site em <code>localhost:8000</code>." Depois de rodar, aparecem:</p>
+
+<dl class="anatomy">
+  <dt>← e ⟳</dt><dd><strong>Voltar</strong> para a página anterior e <strong>Recarregar</strong> (pedir a página de novo ao PHP), como no navegador.</dd>
+  <dt>Barra de endereço</dt><dd>O endereço pedido, como <code>localhost:8000/index.php</code>. Dá para editar e apertar <kbd>Enter</kbd>, por exemplo para acrescentar <code>?nome=Ana</code>. Quando a resposta não é <code>200</code>, o código (como <code>404</code>) aparece ao lado.</dd>
+  <dt>Resultado</dt><dd>A página desenhada, como o navegador mostra.</dd>
+  <dt>Código-fonte HTML</dt><dd>O texto que o PHP enviou, igual ao "Exibir código-fonte" do navegador. Tem também, num item que abre e fecha, os <strong>Cabeçalhos da resposta</strong> (<code>HTTP/1.1 200 OK</code>, <code>Content-Type</code>…), como no <code>curl -i</code>.</dd>
+</dl>
+
+<h3>Formulários e links funcionam</h3>
+<p>Dentro do Resultado, links para outras páginas do site e formulários fazem uma nova requisição ao PHP, com <code>GET</code> ou <code>POST</code>, exatamente como num site de verdade. Rode, digite um nome e clique em <strong>Enviar</strong>. Depois olhe a barra de endereço (o nome foi parar nela, depois do <code>?</code>) e o Código-fonte HTML:</p>
+
+<div class="tryphp" data-modo="web">
+<pre class="script">&lt;?php
+$nome = $_GET["nome"] ?? "";
+?&gt;
+&lt;form method="get"&gt;
+  &lt;label&gt;Seu nome: &lt;input name="nome" value="&lt;?= htmlspecialchars($nome) ?&gt;"&gt;&lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($nome !== ""): ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+</pre>
+</div>
+
+<p>O formulário é estudado em <a href="formularios.html">Formulários HTML</a> e <a href="get-post.html">$_GET e $_POST</a>. Links para sites de fora (como <code>https://www.php.net</code>) não abrem: a caixa mostra um aviso de que o link sai do site de exemplo.</p>
+
+<h3>Sessões e cookies lembram entre as requisições</h3>
+<p>Dentro da mesma caixa, cookies e sessões funcionam de uma requisição para a outra, como no navegador. Rode e clique várias vezes em ⟳ (Recarregar):</p>
+
+<div class="tryphp" data-modo="web">
+<pre class="script">&lt;?php
+session_start();
+$_SESSION["visitas"] = ($_SESSION["visitas"] ?? 0) + 1;
+?&gt;
+&lt;p&gt;Você abriu esta página &lt;?= $_SESSION["visitas"] ?&gt; vez(es).&lt;/p&gt;
+&lt;p&gt;Clique em ⟳ (Recarregar) e veja o número subir.&lt;/p&gt;
+</pre>
+</div>
+
+<p>Clicar em <strong>Rodar</strong> de novo recomeça o site do zero (e a contagem volta a 1). As sessões são o assunto de <a href="sessoes.html">Sessões</a>.</p>
+
+<div class="note">
+<strong>Endereços que não existem dão 404</strong>
+<p>Uma diferença em relação ao <code>php -S</code> sem roteador: no editor, um caminho que não corresponde a nenhuma aba (como <code>localhost:8000/contato</code>) responde <code>404 Not Found</code>, em vez de cair no <code>index.php</code>. Para endereços "bonitos" nas caixas, as aulas usam <code>/index.php/contato</code> (veja o fim de <a href="servidor-embutido.html">O Servidor Embutido</a>) ou <code>?pagina=contato</code>.</p>
+</div>
+
+<hr>
+
+<h2>Missões, Restaurar e Ver solução</h2>
+<p>Muitas caixas trazem uma <strong>Missão</strong>: um desafio escrito acima do editor. Embaixo da caixa aparece a situação:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Quer dizer</th></tr>
+<tr><td><code>Missão em andamento…</code></td><td>Você ainda não rodou, ou a missão não foi cumprida.</td></tr>
+<tr><td><code>Missão em andamento… (a saída ainda não é a esperada)</code></td><td>Rodou, mas o resultado ainda não é o pedido. Releia a missão.</td></tr>
+<tr><td><code>Missão em andamento… (ainda há avisos ou erros do PHP)</code></td><td>O resultado está quase lá, mas apareceu um <code>Warning</code>, <code>Deprecated</code> ou erro. A missão pede um programa limpo.</td></tr>
+<tr><td><code>Missão em andamento… (ainda falta: …)</code></td><td>A saída está certa, mas a missão exige um recurso específico no código (por exemplo, usar uma certa função) ou um certo código de saída.</td></tr>
+<tr><td><code>✔ Missão cumprida!</code></td><td>Parabéns. A partir daí, a caixa continua livre para você experimentar.</td></tr>
+</table>
+</div>
+
+<p>Dois botões ajudam:</p>
+<ul>
+  <li><strong>Restaurar</strong>: devolve o código original da caixa (em todas as abas). Use quando o código ficar tão bagunçado que é mais fácil recomeçar.</li>
+  <li><strong>Ver solução</strong>: pergunta "Trocar o seu código pela solução?" e, se você clicar em <strong>Sim, mostrar</strong>, coloca no editor uma resposta possível. Rode-a para ver a missão cumprida. Tente sozinho antes: quase sempre há mais de uma solução certa, e o editor confere o <strong>resultado</strong>, não se o seu código é igual ao da solução.</li>
+</ul>
+
+<p>Pratique agora com uma missão que usa o código de saída:</p>
+
+<div class="tryphp" data-goal="exit:3,src:exit\s*\(\s*3\s*\)">
+<p class="try-task"><strong>Missão:</strong> faça o programa terminar com o código de saída <code>3</code>. Para isso, acrescente uma última linha com <code>exit(3);</code> e rode. Repare no <code>[código de saída: 3]</code> no fim do terminal e na mensagem embaixo da caixa. Depois, clique em <strong>Restaurar</strong> e em <strong>Ver solução</strong> para conhecer os dois botões.</p>
+<pre class="script">&lt;?php
+echo "Conferindo o estoque...\n";
+echo "Faltam 3 produtos.\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Conferindo o estoque...\n";
+echo "Faltam 3 produtos.\n";
+exit(3);
+</pre>
+</div>
+
+<hr>
+
+<h2>O que funciona e o que não funciona</h2>
+<p>O PHP do navegador é o PHP de verdade, mas o "computador de mentirinha" onde ele roda não tem tudo o que um computador real tem.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Funciona</th><th>Observação</th></tr>
+<tr><td>Toda a linguagem PHP 8.5</td><td>Variáveis, funções, classes, enums, o operador <code>|&gt;</code>, exceções…</td></tr>
+<tr><td>Arquivos</td><td>Criar, ler e apagar arquivos e pastas (<code>file_put_contents</code>, <code>fopen</code>…), dentro de <code>/home/ana</code>. Somem quando você roda de novo.</td></tr>
+<tr><td>SQLite</td><td>Banco de dados com <code>PDO</code> e <code>pdo_sqlite</code> (em arquivo ou na memória).</td></tr>
+<tr><td>Extensões comuns</td><td><code>mbstring</code>, <code>json</code>, <code>ctype</code>, <code>date</code>, <code>pcre</code>, <code>session</code>, <code>filter</code>, <code>dom</code>, <code>SimpleXML</code>, <code>gd</code>, <code>zip</code>…</td></tr>
+<tr><td>Modo web</td><td><code>$_GET</code>, <code>$_POST</code>, <code>$_FILES</code> (envio de arquivos), cookies, sessões, <code>header()</code> e redirecionamentos.</td></tr>
+<tr><td>Terminal</td><td><code>$argv</code>, <code>fgets(STDIN)</code>, <code>exit(código)</code>.</td></tr>
+</table>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Não funciona</th><th>O que acontece</th><th>Onde aprender</th></tr>
+<tr><td>Acessar a internet</td><td><code>file_get_contents("https://…")</code> e o <code>curl</code> falham (<code>Failed to open stream: no suitable wrapper could be found</code>).</td><td><a href="consumir-api.html">Consumir APIs</a> mostra saídas reais do laboratório.</td></tr>
+<tr><td>MySQL e outros servidores</td><td>Não há servidor de banco de dados no navegador.</td><td><a href="mysql.html">MySQL e MariaDB</a></td></tr>
+<tr><td>Rodar comandos do sistema</td><td><code>shell_exec</code>, <code>exec</code> e parecidos não executam nada (devolvem vazio ou <code>null</code>).</td><td><a href="linha-comando.html">PHP na Linha de Comando</a></td></tr>
+<tr><td><code>readline()</code> e o <code>php -a</code></td><td>A função não existe; use <code>fgets(STDIN)</code>.</td><td><a href="linha-comando.html">PHP na Linha de Comando</a></td></tr>
+<tr><td>Composer e pacotes</td><td>Não há como baixar pacotes.</td><td><a href="composer.html">Composer</a></td></tr>
+<tr><td>O sistema operacional</td><td><code>PHP_OS_FAMILY</code> responde <code>Unknown</code>, e o fuso horário é <code>UTC</code>.</td><td><a href="datas.html">Datas e Horas</a></td></tr>
+</table>
+</div>
+
+<p>Quando uma aula trata de algo que não roda no navegador, ela mostra a saída real do laboratório do guia num bloco de terminal (os que começam com <code>ana@notebook:~$</code>), em vez de uma caixa Experimente.</p>
+
+<div class="tip">
+<strong>Nada é salvo</strong>
+<p>O que você digita nas caixas não fica guardado: ao recarregar a página ou sair dela, tudo volta ao original. Gostou de um código? Copie para o seu editor (aula <a href="editores.html">Editores e IDEs</a>) e salve num arquivo.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Cliquei em Rodar e nada aconteceu (ou ficou "Carregando…")</strong>
+<p><strong>O que aconteceu:</strong> o PHP ainda está sendo baixado (na primeira vez, cerca de 8 MB), ou a internet caiu no meio.</p>
+<p><strong>Como resolver:</strong> espere a barra chegar ao fim. Se aparecer <code>Não consegui carregar o PHP</code>, confira a conexão e clique em Rodar de novo. Navegadores muito antigos não executam WebAssembly; use uma versão atual do Chrome, Firefox, Edge ou Safari.</p>
+</div>
+
+<div class="cenario">
+<strong>A missão não fica "cumprida", mas a saída parece certa</strong>
+<p><strong>O que aconteceu:</strong> a conferência é exata. Uma letra maiúscula, um acento, um espaço ou um ponto a mais ou a menos fazem diferença. Também pode haver um aviso do PHP escondido no meio da saída.</p>
+<p><strong>Como resolver:</strong> leia a mensagem embaixo da caixa (ela diz se falta algo no código ou se há avisos) e compare a saída com o texto da missão, caractere por caractere.</p>
+</div>
+
+<div class="cenario">
+<strong>O programa ficou rodando e o botão diz "■ Parar"</strong>
+<p><strong>O que aconteceu:</strong> o programa está esperando você digitar algo (procure o campo de texto dentro do terminal da caixa) ou entrou num laço sem fim.</p>
+<p><strong>Como resolver:</strong> digite a resposta e aperte <kbd>Enter</kbd>, ou clique em <strong>■ Parar</strong>.</p>
+</div>
+
+<div class="cenario">
+<strong>Apaguei tudo sem querer</strong>
+<p><strong>Como resolver:</strong> clique em <strong>Restaurar</strong>. O <kbd>Ctrl</kbd>+<kbd>Z</kbd> (desfazer) também funciona dentro do editor.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Elemento</th><th>Para que serve</th></tr>
+<tr><td>▶ Rodar / ■ Parar</td><td>Executa o código / interrompe (código 130).</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Roda pelo teclado.</td></tr>
+<tr><td>Restaurar</td><td>Volta ao código original.</td></tr>
+<tr><td>Ver solução</td><td>Mostra uma solução da missão (pede confirmação).</td></tr>
+<tr><td>Argumentos</td><td>Valores para <code>$argv</code>.</td></tr>
+<tr><td>Entrada</td><td>Respostas prontas para <code>fgets(STDIN)</code>, uma por linha.</td></tr>
+<tr><td>Abas</td><td>Arquivos da caixa; o primeiro é o que roda.</td></tr>
+<tr><td><code>[código de saída: N]</code></td><td>0 = terminou bem; 255 = erro fatal; 130 = interrompido.</td></tr>
+<tr><td>Resultado / Código-fonte HTML</td><td>(modo web) A página desenhada / o HTML enviado e os cabeçalhos.</td></tr>
+<tr><td>← · ⟳ · barra de endereço</td><td>(modo web) Voltar, recarregar, pedir outro endereço do site.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. O que o editor do guia usa para rodar o seu código?</p>
+<label><input type="radio" name="q1"> Um servidor na internet que recebe o código.</label>
+<label><input type="radio" name="q1"> Uma imitação do PHP escrita em JavaScript.</label>
+<label><input type="radio" name="q1"> O PHP 8.5 oficial, compilado para WebAssembly, rodando no seu navegador.</label>
+<label><input type="radio" name="q1"> O PHP instalado no seu computador.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Uma caixa termina com <code>[código de saída: 255]</code>. O que provavelmente aconteceu?</p>
+<label><input type="radio" name="q2"> O programa terminou bem.</label>
+<label><input type="radio" name="q2"> Houve um erro fatal (ou de sintaxe).</label>
+<label><input type="radio" name="q2"> Você clicou em Parar.</label>
+<label><input type="radio" name="q2"> O PHP ainda está carregando.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. Qual destas coisas <strong>não</strong> funciona numa caixa Experimente?</p>
+<label><input type="radio" name="q3"> Criar um banco SQLite.</label>
+<label><input type="radio" name="q3"> Enviar um formulário com POST no modo web.</label>
+<label><input type="radio" name="q3"> Ler o teclado com <code>fgets(STDIN)</code>.</label>
+<label><input type="radio" name="q3"> Baixar uma página com <code>file_get_contents("https://www.php.net/")</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Numa caixa com as abas <code>programa.php</code> e <code>funcoes.php</code>, você está na aba <code>funcoes.php</code> e clica em Rodar. Qual arquivo é executado?</p>
+<label><input type="radio" name="q4"> <code>programa.php</code>, a primeira aba.</label>
+<label><input type="radio" name="q4"> <code>funcoes.php</code>, a aba aberta.</label>
+<label><input type="radio" name="q4"> Os dois, um depois do outro.</label>
+<label><input type="radio" name="q4"> Nenhum: dá erro.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>As caixas Experimente rodam o PHP 8.5.10 oficial, em WebAssembly, dentro do navegador; nada mexe no seu computador.</li>
+  <li>Na primeira vez, o PHP é baixado (cerca de 8 MB); depois, roda na hora.</li>
+  <li>Modo terminal: saída em texto, erros em destaque, <code>[código de saída: N]</code>; campos Argumentos e Entrada; <strong>■ Parar</strong> e limite de 30 segundos.</li>
+  <li>Abas = arquivos; a primeira é a que roda.</li>
+  <li>Modo web: a página <code>index.php</code> em <code>localhost:8000</code>, com Resultado, Código-fonte HTML e cabeçalhos; links, formulários, cookies e sessões funcionam.</li>
+  <li>Missões conferem o resultado; Restaurar volta ao original; Ver solução mostra uma resposta.</li>
+  <li>Sem internet, MySQL, comandos do sistema, <code>readline()</code> nem Composer: essas aulas usam saídas reais do laboratório.</li>
+  <li>Próximo passo: o Nível 1 começa de verdade em <a href="primeiro-script.html">Olá, Mundo</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
