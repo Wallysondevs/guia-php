@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Glossário — os termos do guia explicados em poucas palavras | Guia PHP</title>
+<meta name="description" content="Glossário do Guia PHP: variável, tipo, array associativo, função, closure, superglobal, sessão, cookie, XSS, CSRF, SQL injection, PDO, prepared statement, classe, objeto, interface, trait, enum, namespace, autoload, Composer, PSR e mais, em ordem alfabética, cada um com o link para a aula.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Glossário</span></h1>
+
+<p class="intro">Os termos que aparecem no guia, em ordem alfabética, explicados em uma ou duas frases. Cada um tem o link para a aula em que é explicado com calma. Termos em inglês aparecem com a tradução; quando o nome em inglês é o mais usado (como <em>closure</em> ou <em>trait</em>), ele é a entrada principal.</p>
+
+<div class="tip">
+<strong>Dica</strong>
+<p>Use <kbd>Ctrl</kbd>+<kbd>F</kbd> no navegador para achar um termo, ou o índice de letras abaixo. Para funções específicas, veja também as referências de <a href="ref-string.html">funções de string</a>, de <a href="ref-array.html">funções de array</a> e de <a href="ref-erros.html">mensagens de erro</a>.</p>
+</div>
+
+<p class="indice-letras"><a href="#g-A">A</a> · <a href="#g-B">B</a> · <a href="#g-C">C</a> · <a href="#g-D">D</a> · <a href="#g-E">E</a> · <a href="#g-F">F</a> · <a href="#g-G">G</a> · <a href="#g-H">H</a> · <a href="#g-I">I</a> · <a href="#g-J">J</a> · <a href="#g-L">L</a> · <a href="#g-M">M</a> · <a href="#g-N">N</a> · <a href="#g-O">O</a> · <a href="#g-P">P</a> · <a href="#g-R">R</a> · <a href="#g-S">S</a> · <a href="#g-T">T</a> · <a href="#g-U">U</a> · <a href="#g-V">V</a> · <a href="#g-X">X</a></p>
+
+<h2 id="g-A">A</h2>
+<dl class="glossario">
+<dt><strong>API</strong></dt>
+<dd>Um "cardápio" de endereços que outro programa pode chamar para pedir ou enviar dados, em vez de uma página para pessoas. Na web, as APIs costumam responder em JSON. Veja: <a href="api-json.html">Criar uma API JSON</a> e <a href="consumir-api.html">Consumir APIs</a>.</dd>
+<dt><strong>Argumento</strong></dt>
+<dd>O valor que você entrega a uma função quando a chama: em <code>strlen("Ana")</code>, o argumento é <code>"Ana"</code>. Do lado de dentro da função, ele chega num <strong>parâmetro</strong>. Veja: <a href="funcoes.html">Funções</a>.</dd>
+<dt><strong>Argumentos nomeados</strong> <span class="versao">PHP 8.0+</span></dt>
+<dd>Passar argumentos pelo nome do parâmetro, em qualquer ordem: <code>number_format(1234.5, decimals: 2)</code>. Permite pular parâmetros opcionais. Veja: <a href="parametros.html">Parâmetros</a>.</dd>
+<dt><strong>Array</strong></dt>
+<dd>Uma variável que guarda vários valores, cada um com uma chave: <code>$frutas = ['maçã', 'banana']</code>. No PHP, o mesmo tipo serve de lista e de "dicionário". Veja: <a href="arrays.html">Arrays Indexados</a>.</dd>
+<dt><strong>Array associativo</strong></dt>
+<dd>Array em que as chaves são textos escolhidos por você: <code>['nome' =&gt; 'Ana', 'idade' =&gt; 29]</code>. É como uma ficha com campos nomeados. Veja: <a href="arrays-associativos.html">Arrays Associativos</a>.</dd>
+<dt><strong>Array indexado</strong></dt>
+<dd>Array cujas chaves são os números 0, 1, 2…, criados automaticamente na ordem em que os valores entram. Veja: <a href="arrays.html">Arrays Indexados</a>.</dd>
+<dt><strong>Array multidimensional</strong></dt>
+<dd>Array que contém outros arrays, como uma tabela (linhas e colunas): <code>$alunos[0]['nome']</code>. Veja: <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>.</dd>
+<dt><strong>Arrow function</strong> (função seta)</dt>
+<dd>Forma curta de função anônima com uma expressão só: <code>fn($x) =&gt; $x * 2</code>. Enxerga sozinha as variáveis de fora. Veja: <a href="closures.html">Funções Anônimas e Arrow Functions</a>.</dd>
+<dt><strong>Atribuição</strong></dt>
+<dd>Guardar um valor numa variável com <code>=</code>. Os atalhos <code>+=</code>, <code>.=</code>, <code>??=</code> etc. fazem a conta e guardam de uma vez. Veja: <a href="operadores-atribuicao.html">Operadores de Atribuição</a>.</dd>
+<dt><strong>Atributo</strong> <span class="versao">PHP 8.0+</span></dt>
+<dd>Uma etiqueta com informação extra presa a uma classe, método ou função, escrita com <code>#[…]</code>, como <code>#[\Override]</code> e <code>#[\NoDiscard]</code>. Veja: <a href="atributos.html">Atributos</a>.</dd>
+<dt><strong>Autoload</strong> (carregamento automático)</dt>
+<dd>Mecanismo que carrega o arquivo de uma classe sozinho, na primeira vez que ela é usada, sem um <code>require</code> para cada arquivo. É feito com <code>spl_autoload_register</code> ou pelo Composer. Veja: <a href="autoload.html">Autoload e PSR-4</a>.</dd>
+<dt><strong>Aviso</strong> (<em>Warning</em>)</dt>
+<dd>Mensagem do PHP sobre algo errado que <strong>não</strong> para o programa, como <code>Warning: Undefined array key "a"</code>. O script continua, muitas vezes com um valor errado. Veja: <a href="tipos-erro.html">Tipos de Erro</a>.</dd>
+</dl>
+
+<h2 id="g-B">B</h2>
+<dl class="glossario">
+<dt><strong>Banco de dados</strong></dt>
+<dd>Programa (ou arquivo) que guarda dados em tabelas e permite buscá-los e alterá-los com SQL. No guia: SQLite e MySQL/MariaDB. Veja: <a href="banco-dados.html">Banco de Dados: o Básico</a>.</dd>
+<dt><strong>bcrypt</strong></dt>
+<dd>O algoritmo de hash de senhas que o <code>password_hash</code> usa por padrão; os hashes começam com <code>$2y$</code>. É lento de propósito, para dificultar quem tenta adivinhar senhas. Veja: <a href="senhas.html">Senhas</a>.</dd>
+<dt><strong>Booleano</strong> (<code>bool</code>)</dt>
+<dd>Tipo com só dois valores: <code>true</code> (verdadeiro) e <code>false</code> (falso). É o resultado de toda comparação. Veja: <a href="booleanos.html">Booleanos</a>.</dd>
+<dt><strong><code>break</code> e <code>continue</code></strong></dt>
+<dd><code>break</code> (quebrar) sai do laço na hora; <code>continue</code> (continuar) pula para a próxima volta. Veja: <a href="break-continue.html">break e continue</a>.</dd>
+</dl>
+
+<h2 id="g-C">C</h2>
+<dl class="glossario">
+<dt><strong>Cabeçalho HTTP</strong> (<em>header</em>)</dt>
+<dd>Informações que vão antes do conteúdo de uma resposta, como <code>Location</code> (redirecionar) e <code>Set-Cookie</code>. O PHP envia com <code>header()</code>, sempre antes de imprimir qualquer coisa. Veja: <a href="redirecionar.html">header e Redirecionamento</a>.</dd>
+<dt><strong>Callable</strong> (chamável)</dt>
+<dd>Qualquer coisa que pode ser chamada como função: o nome de uma função em texto, uma closure, <code>[$objeto, 'metodo']</code>. Funções como <code>array_map</code> recebem callables. Veja: <a href="callables.html">Callables de Primeira Classe</a>.</dd>
+<dt><strong>Callable de primeira classe</strong> <span class="versao">PHP 8.1+</span></dt>
+<dd>A sintaxe <code>strlen(...)</code> (com três pontos) que transforma uma função ou método num objeto <code>Closure</code> sem chamá-lo. Veja: <a href="callables.html">Callables de Primeira Classe</a>.</dd>
+<dt><strong>Classe</strong></dt>
+<dd>O "molde" de um tipo de objeto: diz que dados (propriedades) e que ações (métodos) cada objeto daquele tipo tem. <code>class Produto { … }</code>. Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong>Classe abstrata</strong></dt>
+<dd>Classe marcada com <code>abstract</code>: não pode virar objeto direto, só servir de base para outras, que completam os métodos abstratos. Veja: <a href="abstratas.html">Classes Abstratas</a>.</dd>
+<dt><strong>CLI</strong> (linha de comando)</dt>
+<dd>Rodar o PHP no terminal, como <code>php script.php</code>, em vez de num servidor web. A saída vai para o terminal, e os erros aparecem como texto. Veja: <a href="linha-comando.html">PHP na Linha de Comando</a>.</dd>
+<dt><strong>Closure</strong> (função anônima)</dt>
+<dd>Uma função sem nome, guardada numa variável ou passada como argumento: <code>function ($x) use ($taxa) { … }</code>. O <code>use</code> traz variáveis de fora. Veja: <a href="closures.html">Funções Anônimas e Arrow Functions</a>.</dd>
+<dt><strong>Comentário</strong></dt>
+<dd>Texto no código que o PHP ignora, para explicar o código a quem lê: <code>// uma linha</code>, <code># uma linha</code> e <code>/* várias */</code>. Veja: <a href="comentarios.html">Comentários</a>.</dd>
+<dt><strong>Composer</strong></dt>
+<dd>O gerenciador de pacotes do PHP: baixa bibliotecas de outras pessoas (do Packagist), anota as versões no <code>composer.json</code>/<code>composer.lock</code> e gera o autoload em <code>vendor/autoload.php</code>. Veja: <a href="composer.html">Composer</a>.</dd>
+<dt><strong>Concatenação</strong></dt>
+<dd>Juntar textos com o operador ponto: <code>"Olá, " . $nome</code>. Veja: <a href="operadores-string.html">Operadores de String</a>.</dd>
+<dt><strong>Constante</strong></dt>
+<dd>Um nome para um valor que não muda, criado com <code>const</code> ou <code>define</code>: <code>const TAXA = 0.05;</code>. Usada sem <code>$</code>. Veja: <a href="constantes.html">Constantes</a>.</dd>
+<dt><strong>Construtor</strong></dt>
+<dd>O método <code>__construct</code>, chamado automaticamente no <code>new</code>, que prepara o objeto. Com a "promoção de propriedades", os parâmetros viram propriedades direto. Veja: <a href="construtores.html">Construtores</a>.</dd>
+<dt><strong>Conversão de tipos</strong></dt>
+<dd>Transformar um valor de um tipo em outro: de propósito, com <code>(int)</code>, <code>(float)</code>, <code>(string)</code>; ou automática, quando o PHP faz isso sozinho numa conta ou comparação (<code>"10" + 5</code> é <code>15</code>). Veja: <a href="conversao-tipos.html">Conversão de Tipos</a>.</dd>
+<dt><strong>Cookie</strong></dt>
+<dd>Um pequeno texto que o site pede para o navegador guardar e devolver a cada visita. O PHP cria com <code>setcookie()</code> e lê em <code>$_COOKIE</code>. Fica no computador do visitante, que pode alterá-lo. Veja: <a href="cookies.html">Cookies</a>.</dd>
+<dt><strong>CRUD</strong></dt>
+<dd>Sigla para as quatro operações básicas com dados: <em>Create</em> (criar, <code>INSERT</code>), <em>Read</em> (ler, <code>SELECT</code>), <em>Update</em> (atualizar, <code>UPDATE</code>) e <em>Delete</em> (apagar, <code>DELETE</code>). Veja: <a href="crud.html">CRUD com PDO</a> e o <a href="projeto-tarefas.html">projeto Tarefas</a>.</dd>
+<dt><strong>CSRF</strong></dt>
+<dd><em>Cross-Site Request Forgery</em> (falsificação de pedido entre sites): outro site faz o navegador da vítima enviar um formulário para o seu, aproveitando o cookie de sessão dela. A defesa é um <strong>token</strong> secreto em cada formulário. Veja: <a href="csrf.html">CSRF e Segurança de Formulários</a>.</dd>
+<dt><strong>CSV</strong></dt>
+<dd>"Valores separados por vírgula": formato de planilha em texto puro, uma linha por registro. O PHP lê e escreve com <code>fgetcsv</code>/<code>fputcsv</code>. Veja: <a href="csv.html">CSV</a>.</dd>
+</dl>
+
+<h2 id="g-D">D</h2>
+<dl class="glossario">
+<dt><strong><code>declare(strict_types=1)</code></strong></dt>
+<dd>Primeira linha de um arquivo que liga a tipagem estrita: os tipos dos parâmetros passam a ser conferidos sem conversão automática (<code>"5"</code> não é aceito onde se pede <code>int</code>). Veja: <a href="tipos-retorno.html">Tipos e Retorno</a>.</dd>
+<dt><strong>Depurar</strong> (<em>debug</em>)</dt>
+<dd>Procurar e consertar um erro no programa: ler a mensagem, olhar os valores com <code>var_dump</code>, usar um depurador como o Xdebug. Veja: <a href="depuracao.html">Depurar</a>.</dd>
+<dt><strong>Deprecated</strong> (obsoleto)</dt>
+<dd>Aviso de que um recurso ainda funciona, mas vai mudar ou sumir numa versão futura, como <code>Deprecated: fputcsv(): the $escape parameter must be provided…</code>. Veja: <a href="tipos-erro.html">Tipos de Erro</a>.</dd>
+<dt><strong>Desestruturação</strong></dt>
+<dd>Tirar os valores de um array direto para variáveis: <code>[$nome, $idade] = $pessoa;</code> ou <code>['nome' =&gt; $n] = $ficha;</code>. Veja: <a href="desestruturacao.html">Desestruturação (list)</a>.</dd>
+</dl>
+
+<h2 id="g-E">E</h2>
+<dl class="glossario">
+<dt><strong><code>echo</code> e <code>print</code></strong></dt>
+<dd>Os comandos que mostram texto. <code>echo</code> ("ecoar") aceita vários valores separados por vírgula; <code>&lt;?= … ?&gt;</code> é o atalho de <code>echo</code> dentro do HTML. Veja: <a href="echo-print.html">echo e print</a>.</dd>
+<dt><strong>Enum</strong> (enumeração) <span class="versao">PHP 8.1+</span></dt>
+<dd>Um tipo com uma lista fechada de valores possíveis: <code>enum Status { case Pendente; case Pago; }</code>. Evita textos soltos como <code>'pago'</code> espalhados pelo código. Veja: <a href="enums.html">Enums</a>.</dd>
+<dt><strong>Erro fatal</strong> (<em>Fatal error</em>)</dt>
+<dd>Erro que para o programa na hora, como <code>Fatal error: Uncaught TypeError</code> ou <code>Call to undefined function</code>. Veja: <a href="tipos-erro.html">Tipos de Erro</a> e <a href="erros.html">Lendo Erros do PHP</a>.</dd>
+<dt><strong>Escapar</strong></dt>
+<dd>Transformar caracteres especiais para que sejam tratados como texto comum: <code>htmlspecialchars</code> escapa para HTML (<code>&lt;</code> vira <code>&amp;lt;</code>); <code>\"</code> escapa uma aspa dentro de string. Veja: <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</dd>
+<dt><strong>Escopo</strong></dt>
+<dd>A região do código em que uma variável existe. Variáveis de dentro de uma função não enxergam as de fora (e vice-versa), a não ser com parâmetros, <code>global</code> ou <code>use</code>. Veja: <a href="escopo.html">Escopo</a>.</dd>
+<dt><strong>Exceção</strong></dt>
+<dd>Um objeto que representa um erro e é "lançado" com <code>throw</code>. Se ninguém o pegar com <code>try</code>/<code>catch</code>, vira <code>Fatal error: Uncaught …</code>. Veja: <a href="excecoes.html">Exceções (try e catch)</a> e <a href="excecoes-proprias.html">Criar suas Exceções</a>.</dd>
+<dt><strong>Expressão</strong></dt>
+<dd>Qualquer pedaço de código que produz um valor: <code>2 + 3</code>, <code>$idade &gt;= 18</code>, <code>strlen($nome)</code>, um <code>match</code>. Veja: <a href="sintaxe.html">Sintaxe</a>.</dd>
+</dl>
+
+<h2 id="g-F">F</h2>
+<dl class="glossario">
+<dt><strong><code>float</code></strong></dt>
+<dd>Número com casas decimais (<code>3.14</code>), escrito sempre com ponto no código. Contas com <code>float</code> podem ter pequenos erros: <code>0.1 + 0.2 == 0.3</code> é <code>false</code>. Veja: <a href="numeros.html">int e float</a>.</dd>
+<dt><strong><code>for</code></strong></dt>
+<dd>Laço com contador: <code>for ($i = 1; $i &lt;= 10; $i++)</code>. Bom quando você sabe quantas voltas quer. Veja: <a href="for.html">for</a>.</dd>
+<dt><strong><code>foreach</code></strong></dt>
+<dd>Laço que passa por cada item de um array: <code>foreach ($precos as $produto =&gt; $preco)</code>. É o laço mais usado no PHP. Veja: <a href="foreach.html">foreach</a>.</dd>
+<dt><strong>Formulário</strong></dt>
+<dd>A parte da página (<code>&lt;form&gt;</code>) com campos que o usuário preenche e envia ao servidor, por GET ou POST. Veja: <a href="formularios.html">Formulários HTML</a>.</dd>
+<dt><strong>Função</strong></dt>
+<dd>Um bloco de código com nome, que recebe parâmetros, faz um trabalho e pode devolver um valor com <code>return</code>. Escreve-se uma vez e usa-se quantas vezes quiser. Veja: <a href="funcoes.html">Funções</a>.</dd>
+<dt><strong>Função anônima</strong></dt>
+<dd>Veja <em>Closure</em>.</dd>
+<dt><strong>Função variádica</strong></dt>
+<dd>Função que aceita qualquer quantidade de argumentos, recebidos num array com <code>...</code>: <code>function somar(int ...$numeros)</code>. Veja: <a href="variadicas.html">Funções Variádicas</a>.</dd>
+</dl>
+
+<h2 id="g-G">G</h2>
+<dl class="glossario">
+<dt><strong>GET</strong></dt>
+<dd>O método HTTP de "buscar": é o que o navegador usa ao abrir um endereço ou seguir um link. Os dados vão no endereço (<code>?busca=pão</code>) e chegam em <code>$_GET</code>. Não deve ser usado para mudar dados. Veja: <a href="get-post.html">$_GET e $_POST</a>.</dd>
+<dt><strong><code>$GLOBALS</code></strong></dt>
+<dd>Superglobal com todas as variáveis globais do script, acessíveis de dentro de funções. Funciona, mas deixa o código difícil de seguir: prefira parâmetros. Veja: <a href="escopo.html">Escopo</a>.</dd>
+</dl>
+
+<h2 id="g-H">H</h2>
+<dl class="glossario">
+<dt><strong>Hash</strong> (de senha)</dt>
+<dd>Resultado de uma conta de mão única: da senha se chega ao hash, mas do hash não se volta à senha. O banco guarda o hash (<code>password_hash</code>) e o login confere com <code>password_verify</code>. Veja: <a href="senhas.html">Senhas</a>.</dd>
+<dt><strong>Heredoc e nowdoc</strong></dt>
+<dd>Formas de escrever textos de várias linhas: heredoc (<code>&lt;&lt;&lt;FIM</code>) troca as variáveis como as aspas duplas; nowdoc (<code>&lt;&lt;&lt;'FIM'</code>) não troca nada, como as aspas simples. Veja: <a href="heredoc.html">Heredoc e Nowdoc</a>.</dd>
+<dt><strong>Herança</strong></dt>
+<dd>Uma classe que "estende" outra (<code>class Livro extends Produto</code>) recebe as propriedades e os métodos dela e pode mudá-los ou acrescentar novos. Veja: <a href="heranca.html">Herança</a>.</dd>
+<dt><strong><code>htmlspecialchars</code></strong></dt>
+<dd>A função que escapa <code>&lt; &gt; &amp; " '</code> antes de pôr um texto na página, impedindo XSS. Todo texto vindo do usuário deve passar por ela na saída. Veja: <a href="escapar-saida.html">Escapar a Saída</a>.</dd>
+<dt><strong>HTTP</strong></dt>
+<dd>O "idioma" que navegador e servidor usam: o navegador manda um pedido (método, endereço, cabeçalhos, corpo) e o servidor devolve uma resposta (código como 200 ou 404, cabeçalhos, conteúdo). Veja: <a href="como-funciona.html">Como o PHP Funciona</a>.</dd>
+</dl>
+
+<h2 id="g-I">I</h2>
+<dl class="glossario">
+<dt><strong><code>include</code> e <code>require</code></strong></dt>
+<dd>Trazem o código de outro arquivo para o atual. Se o arquivo faltar, <code>include</code> só avisa e <code>require</code> para tudo; as versões <code>_once</code> não incluem o mesmo arquivo duas vezes. Veja: <a href="include-require.html">include e require</a>.</dd>
+<dt><strong>Instância</strong></dt>
+<dd>Outro nome para objeto: "uma instância da classe <code>Produto</code>" é um objeto criado com <code>new Produto(…)</code>. Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong><code>int</code></strong></dt>
+<dd>Número inteiro, sem casas decimais: <code>42</code>, <code>-7</code>. Veja: <a href="numeros.html">int e float</a>.</dd>
+<dt><strong>Interface</strong></dt>
+<dd>Um "contrato": lista métodos que uma classe promete ter (<code>class Pix implements Pagamento</code>), sem dizer como. Permite tratar classes diferentes do mesmo jeito. Veja: <a href="interfaces.html">Interfaces</a>.</dd>
+<dt><strong>Interpolação</strong></dt>
+<dd>Pôr variáveis direto dentro de um texto entre aspas duplas: <code>"Olá, $nome"</code>, <code>"Total: {$pedido['total']}"</code>. Aspas simples não interpolam. Veja: <a href="interpolacao.html">Interpolação</a>.</dd>
+<dt><strong><code>isset</code></strong></dt>
+<dd>"Está definido?": devolve <code>true</code> se a variável ou a chave existe e não é <code>null</code>. Muito usado com <code>$_GET</code>, <code>$_POST</code> e <code>$_SESSION</code>. Veja: <a href="null.html">null</a>.</dd>
+</dl>
+
+<h2 id="g-J">J</h2>
+<dl class="glossario">
+<dt><strong>JSON</strong></dt>
+<dd>Formato de texto para trocar dados entre programas, parecido com os arrays do PHP: <code>{"nome": "Ana", "idade": 29}</code>. O PHP converte com <code>json_encode</code> e <code>json_decode</code>. Veja: <a href="json.html">JSON</a>.</dd>
+</dl>
+
+<h2 id="g-L">L</h2>
+<dl class="glossario">
+<dt><strong>Laço</strong> (<em>loop</em>)</dt>
+<dd>Código que se repete enquanto uma condição for verdadeira ou para cada item de uma lista: <code>while</code>, <code>do-while</code>, <code>for</code>, <code>foreach</code>. Veja: <a href="while.html">while e do-while</a>.</dd>
+</dl>
+
+<h2 id="g-M">M</h2>
+<dl class="glossario">
+<dt><strong><code>match</code></strong> <span class="versao">PHP 8.0+</span></dt>
+<dd>Expressão que escolhe um valor comparando com <code>===</code>: <code>$texto = match ($nota) { 10 =&gt; 'ótimo', default =&gt; 'ok' };</code>. Sem braço para o valor, dá <code>UnhandledMatchError</code>. Veja: <a href="match.html">match</a>.</dd>
+<dt><strong>mbstring</strong></dt>
+<dd>As funções <code>mb_*</code> (<code>mb_strlen</code>, <code>mb_strtoupper</code>…), que contam e mexem em <strong>letras</strong>, e não em bytes, e por isso funcionam com acentos em UTF-8. Veja: <a href="mbstring.html">Acentos e mbstring</a>.</dd>
+<dt><strong>Método</strong></dt>
+<dd>Uma função que pertence a uma classe e age sobre o objeto: <code>$carrinho-&gt;adicionar($produto)</code>. Dentro dele, <code>$this</code> é o próprio objeto. Veja: <a href="propriedades-metodos.html">Propriedades e Métodos</a>.</dd>
+<dt><strong>Métodos mágicos</strong></dt>
+<dd>Métodos com nomes começando por <code>__</code> que o PHP chama sozinho em certas situações: <code>__construct</code>, <code>__toString</code>, <code>__get</code>… Veja: <a href="metodos-magicos.html">Métodos Mágicos</a>.</dd>
+<dt><strong>MySQL e MariaDB</strong></dt>
+<dd>Bancos de dados servidores, muito usados em sites PHP. O PDO conversa com eles quase do mesmo jeito que com o SQLite; muda a conexão. Veja: <a href="mysql.html">MySQL e MariaDB</a>.</dd>
+</dl>
+
+<h2 id="g-N">N</h2>
+<dl class="glossario">
+<dt><strong>Namespace</strong> (espaço de nomes)</dt>
+<dd>Um "sobrenome" para classes e funções (<code>namespace Loja\Pagamentos;</code>), que evita conflito entre nomes iguais de bibliotecas diferentes. Usa-se <code>use</code> para importar. Veja: <a href="namespaces.html">Namespaces</a>.</dd>
+<dt><strong><code>never</code></strong> <span class="versao">PHP 8.1+</span></dt>
+<dd>Tipo de retorno de uma função que nunca volta: ela sempre termina o script (<code>exit</code>) ou lança uma exceção. Veja: <a href="tipos-avancados.html">Tipos Avançados</a>.</dd>
+<dt><strong><code>null</code></strong></dt>
+<dd>O valor "nada": uma variável sem valor. É o que uma função sem <code>return</code> devolve. Veja: <a href="null.html">null</a>.</dd>
+<dt><strong>Null coalescing</strong> (<code>??</code>)</dt>
+<dd>"Se não existir (ou for <code>null</code>), use este outro": <code>$_GET['nome'] ?? 'visitante'</code>. Não dá aviso de chave inexistente. Veja: <a href="null-coalescing.html">?? e ?-&gt;</a>.</dd>
+<dt><strong>Nullsafe</strong> (<code>?-&gt;</code>) <span class="versao">PHP 8.0+</span></dt>
+<dd>Chama um método ou lê uma propriedade só se o objeto não for <code>null</code>; se for, o resultado todo é <code>null</code>: <code>$pedido?-&gt;cliente?-&gt;nome</code>. Veja: <a href="null-coalescing.html">?? e ?-&gt;</a>.</dd>
+</dl>
+
+<h2 id="g-O">O</h2>
+<dl class="glossario">
+<dt><strong>Objeto</strong></dt>
+<dd>Um "exemplar" criado a partir de uma classe com <code>new</code>, com os seus próprios valores: <code>$p = new Produto('Café', 18.5);</code>. Veja: <a href="classes-objetos.html">Classes e Objetos</a>.</dd>
+<dt><strong>Operador</strong></dt>
+<dd>Símbolo que faz uma operação com valores: aritméticos (<code>+ - * / % **</code>), de comparação (<code>== === &lt; &gt;</code>), lógicos (<code>&amp;&amp; || !</code>), de texto (<code>.</code>). Veja: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a> e <a href="precedencia.html">Precedência</a>.</dd>
+<dt><strong>Operador pipe</strong> (<code>|&gt;</code>) <span class="versao">PHP 8.5+</span></dt>
+<dd>Passa o valor da esquerda para a função da direita, encadeando passos da esquerda para a direita: <code>$texto |&gt; trim(...) |&gt; strtoupper(...)</code>. Veja: <a href="pipe.html">Operador Pipe</a>.</dd>
+<dt><strong>Operador ternário</strong></dt>
+<dd>Um <code>if/else</code> numa expressão: <code>$idade &gt;= 18 ? 'adulto' : 'menor'</code>. Veja: <a href="ternario.html">Operador Ternário</a>.</dd>
+</dl>
+
+<h2 id="g-P">P</h2>
+<dl class="glossario">
+<dt><strong>Packagist</strong></dt>
+<dd>O site (packagist.org) onde ficam os pacotes que o Composer instala. Veja: <a href="composer.html">Composer</a>.</dd>
+<dt><strong>Parâmetro</strong></dt>
+<dd>A variável, na definição da função, que recebe um argumento: em <code>function saudar($nome)</code>, <code>$nome</code> é o parâmetro. Pode ter tipo e valor padrão. Veja: <a href="parametros.html">Parâmetros</a>.</dd>
+<dt><strong>PDO</strong></dt>
+<dd><em>PHP Data Objects</em>: o jeito padrão de conversar com bancos de dados no PHP, igual para SQLite, MySQL e outros. Veja: <a href="pdo.html">Conectar com PDO</a>.</dd>
+<dt><strong>PHP</strong></dt>
+<dd>Linguagem de programação feita para a web: roda no servidor, gera o HTML que o navegador recebe e também roda no terminal. O nome hoje significa <em>PHP: Hypertext Preprocessor</em>. Veja: <a href="introducao.html">O que é PHP</a>.</dd>
+<dt><strong><code>php -S</code></strong></dt>
+<dd>O servidor web embutido no PHP, para desenvolver: <code>php -S localhost:8000</code> serve a pasta atual. Não é para colocar sites no ar. Veja: <a href="servidor-embutido.html">O Servidor Embutido</a>.</dd>
+<dt><strong><code>php.ini</code></strong></dt>
+<dd>O arquivo de configuração do PHP: mostrar erros, fuso horário, tamanho máximo de upload… <code>php --ini</code> mostra onde ele está. Veja: <a href="instalar-linux.html">Instalar no Linux</a>.</dd>
+<dt><strong>PHPUnit</strong></dt>
+<dd>A ferramenta de testes automatizados mais usada no PHP: você escreve testes que conferem se o seu código dá os resultados esperados. Veja: <a href="phpunit.html">Testes com PHPUnit</a>.</dd>
+<dt><strong>POO</strong> (programação orientada a objetos)</dt>
+<dd>Forma de organizar o programa em classes e objetos que juntam dados e comportamento. Veja: <a href="poo.html">O que é POO</a>.</dd>
+<dt><strong>POST</strong></dt>
+<dd>O método HTTP de "enviar": usado por formulários <code>method="post"</code>. Os dados vão no corpo do pedido (não aparecem no endereço) e chegam em <code>$_POST</code>. É o método certo para ações que mudam dados. Veja: <a href="get-post.html">$_GET e $_POST</a>.</dd>
+<dt><strong>Post/Redirect/Get</strong> (PRG)</dt>
+<dd>Padrão em que, depois de processar um POST, o PHP redireciona (<code>header('Location: …')</code>) para uma página GET. Assim o <kbd>F5</kbd> não reenvia o formulário. Veja: <a href="redirecionar.html">header e Redirecionamento</a> e o <a href="projeto-contato.html">projeto de contato</a>.</dd>
+<dt><strong>Precedência</strong></dt>
+<dd>A ordem em que os operadores são calculados numa expressão: <code>2 + 3 * 4</code> é <code>14</code>, porque <code>*</code> vem antes de <code>+</code>. Parênteses mudam a ordem. Veja: <a href="precedencia.html">Precedência</a>.</dd>
+<dt><strong>Prepared statement</strong> (consulta preparada)</dt>
+<dd>SQL enviado ao banco com "buracos" (<code>?</code> ou <code>:nome</code>) e os valores mandados separados, com <code>prepare</code> + <code>execute</code>. Os valores nunca viram parte do comando, o que impede a injeção de SQL. Veja: <a href="prepared-statements.html">Prepared Statements e SQL Injection</a>.</dd>
+<dt><strong>Propriedade</strong></dt>
+<dd>Uma variável que pertence a um objeto: <code>$produto-&gt;preco</code>. Veja: <a href="propriedades-metodos.html">Propriedades e Métodos</a>.</dd>
+<dt><strong>Property hooks</strong> (ganchos de propriedade) <span class="versao">PHP 8.4+</span></dt>
+<dd>Código <code>get</code> e <code>set</code> preso a uma propriedade, que roda quando ela é lida ou alterada, sem precisar de métodos <code>getPreco()</code>/<code>setPreco()</code>. Veja: <a href="readonly-hooks.html">readonly e Property Hooks</a>.</dd>
+<dt><strong>PSR</strong></dt>
+<dd><em>PHP Standards Recommendations</em>: recomendações escritas pelo PHP-FIG para o código de projetos diferentes conversar bem, como a PSR-4 (autoload) e as regras de estilo de código. Veja: <a href="psr.html">Padrões PSR</a>.</dd>
+<dt><strong>PSR-4</strong></dt>
+<dd>A regra que liga namespaces a pastas: a classe <code>Loja\Produto</code> fica em <code>src/Produto.php</code>. É o que permite o autoload do Composer. Veja: <a href="autoload.html">Autoload e PSR-4</a>.</dd>
+</dl>
+
+<h2 id="g-R">R</h2>
+<dl class="glossario">
+<dt><strong><code>readonly</code></strong> <span class="versao">PHP 8.1+</span></dt>
+<dd>Propriedade que só pode receber valor uma vez (normalmente no construtor); depois disso, tentar mudar dá erro. Desde o 8.2 existe a classe inteira <code>readonly</code>. Veja: <a href="readonly-hooks.html">readonly e Property Hooks</a>.</dd>
+<dt><strong>Recursão</strong></dt>
+<dd>Uma função que chama a si mesma, resolvendo um problema grande com versões menores dele mesmo, até um caso simples que para. Veja: <a href="recursao.html">Recursão</a>.</dd>
+<dt><strong>Redirecionamento</strong></dt>
+<dd>Resposta que manda o navegador ir para outro endereço, com um código 3xx e o cabeçalho <code>Location</code>. No PHP: <code>header('Location: pagina.php'); exit;</code>. Veja: <a href="redirecionar.html">header e Redirecionamento</a>.</dd>
+<dt><strong><code>$_REQUEST</code></strong></dt>
+<dd>Superglobal que junta <code>$_GET</code>, <code>$_POST</code> (e, conforme a configuração, <code>$_COOKIE</code>). Como não diz de onde veio cada valor, prefira as específicas. Veja: <a href="superglobais.html">$_SERVER e Outras Superglobais</a>.</dd>
+<dt><strong><code>return</code></strong></dt>
+<dd>Termina a função e devolve um valor para quem a chamou. Veja: <a href="tipos-retorno.html">Tipos e Retorno</a>.</dd>
+</dl>
+
+<h2 id="g-S">S</h2>
+<dl class="glossario">
+<dt><strong>Script</strong></dt>
+<dd>Um arquivo de programa que roda do começo ao fim, como um <code>.php</code>. Veja: <a href="primeiro-script.html">Olá, Mundo</a>.</dd>
+<dt><strong><code>$_SERVER</code></strong></dt>
+<dd>Superglobal com informações do pedido e do servidor: <code>REQUEST_METHOD</code> (GET ou POST), <code>REQUEST_URI</code>, <code>HTTP_USER_AGENT</code>… Veja: <a href="superglobais.html">$_SERVER e Outras Superglobais</a> e a <a href="ref-superglobais.html">referência de superglobais</a>.</dd>
+<dt><strong>Sessão</strong></dt>
+<dd>Dados guardados <strong>no servidor</strong> para um visitante, entre uma página e outra (por exemplo, quem está logado). O navegador guarda só um cookie com o número da sessão (<code>PHPSESSID</code>). No PHP: <code>session_start()</code> e <code>$_SESSION</code>. Veja: <a href="sessoes.html">Sessões</a> e o <a href="projeto-login.html">projeto de login</a>.</dd>
+<dt><strong>Sintaxe</strong></dt>
+<dd>As regras de escrita da linguagem: <code>&lt;?php</code>, ponto e vírgula, chaves, <code>$</code> nas variáveis. Um erro de sintaxe vira <code>Parse error</code> e nada roda. Veja: <a href="sintaxe.html">Sintaxe</a>.</dd>
+<dt><strong>SQL</strong></dt>
+<dd>A linguagem dos bancos de dados: <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>CREATE TABLE</code>. Veja: <a href="banco-dados.html">Banco de Dados: o Básico</a>.</dd>
+<dt><strong>SQL injection</strong> (injeção de SQL)</dt>
+<dd>Ataque em que um texto digitado pelo usuário vira parte do comando SQL, porque foi colado nele: <code>id=0 OR 1=1</code> num <code>DELETE</code> apaga a tabela inteira. A defesa são os prepared statements. Veja: <a href="prepared-statements.html">Prepared Statements e SQL Injection</a>.</dd>
+<dt><strong>SQLite</strong></dt>
+<dd>Banco de dados que é um arquivo só, sem servidor para instalar. Ótimo para aprender e para sites pequenos; o PHP fala com ele pelo PDO. Veja: <a href="pdo.html">Conectar com PDO</a>.</dd>
+<dt><strong><code>static</code></strong></dt>
+<dd>Numa classe, marca propriedades e métodos que pertencem à classe, não a cada objeto (<code>Produto::$total</code>). Numa função, uma variável <code>static</code> guarda o valor entre uma chamada e outra. Veja: <a href="static.html">static</a> e <a href="escopo.html">Escopo</a>.</dd>
+<dt><strong>String</strong></dt>
+<dd>Texto: uma sequência de caracteres entre aspas, <code>'Ana'</code> ou <code>"Olá, $nome"</code>. Veja: <a href="strings.html">Strings</a> e <a href="funcoes-string.html">Funções de String</a>.</dd>
+<dt><strong>Superglobal</strong></dt>
+<dd>Variável especial que o PHP cria sozinho e que existe em qualquer lugar do código: <code>$_GET</code>, <code>$_POST</code>, <code>$_SERVER</code>, <code>$_FILES</code>, <code>$_COOKIE</code>, <code>$_SESSION</code>, <code>$_ENV</code>, <code>$_REQUEST</code> e <code>$GLOBALS</code>. Veja: <a href="superglobais.html">$_SERVER e Outras Superglobais</a>.</dd>
+<dt><strong><code>switch</code></strong></dt>
+<dd>Escolhe entre vários casos comparando com <code>==</code>; cada caso precisa de <code>break</code>, senão "cai" no seguinte. No PHP 8, o <code>match</code> costuma ser mais seguro. Veja: <a href="switch.html">switch</a>.</dd>
+</dl>
+
+<h2 id="g-T">T</h2>
+<dl class="glossario">
+<dt><strong>Tag do PHP</strong></dt>
+<dd><code>&lt;?php</code> abre o código PHP e <code>?&gt;</code> fecha; fora delas, o texto é enviado como está (HTML). <code>&lt;?= $x ?&gt;</code> é o atalho para mostrar um valor. Veja: <a href="php-e-html.html">PHP Dentro do HTML</a>.</dd>
+<dt><strong>Tipagem</strong> (declaração de tipo)</dt>
+<dd>Dizer o tipo esperado de parâmetros, retornos e propriedades: <code>function dobro(int $n): int</code>. O PHP confere e reclama se vier outra coisa. Veja: <a href="tipos-retorno.html">Tipos e Retorno</a>.</dd>
+<dt><strong>Tipo</strong></dt>
+<dd>A "espécie" de um valor: <code>int</code>, <code>float</code>, <code>string</code>, <code>bool</code>, <code>array</code>, <code>null</code>, objetos… <code>var_dump</code> mostra o tipo junto com o valor. Veja: <a href="tipos-dados.html">Tipos de Dados</a>.</dd>
+<dt><strong>Token</strong></dt>
+<dd>Um código secreto e aleatório (<code>bin2hex(random_bytes(32))</code>) usado para provar que um pedido é legítimo, como o token CSRF escondido nos formulários. Veja: <a href="csrf.html">CSRF</a>.</dd>
+<dt><strong>Trait</strong></dt>
+<dd>Um pacote de métodos que pode ser "colado" em várias classes com <code>use NomeDoTrait;</code>, para reaproveitar código sem herança. Veja: <a href="traits.html">Traits</a>.</dd>
+<dt><strong><code>try</code> / <code>catch</code></strong></dt>
+<dd>"Tente / pegue": o código que pode lançar uma exceção vai no <code>try</code>; o <code>catch</code> trata o erro em vez de deixar o programa parar; o <code>finally</code> roda sempre. Veja: <a href="excecoes.html">Exceções</a>.</dd>
+<dt><strong>TypeError</strong></dt>
+<dd>Erro lançado quando um valor do tipo errado chega onde um tipo foi exigido, como <code>trim(): Argument #1 ($string) must be of type string, array given</code>. Veja: <a href="tipos-retorno.html">Tipos e Retorno</a>.</dd>
+</dl>
+
+<h2 id="g-U">U</h2>
+<dl class="glossario">
+<dt><strong>Union type</strong> (tipo união) <span class="versao">PHP 8.0+</span></dt>
+<dd>Um tipo que aceita mais de uma opção: <code>int|float</code>, <code>string|null</code> (o mesmo que <code>?string</code>). Veja: <a href="tipos-avancados.html">Tipos Avançados</a>.</dd>
+<dt><strong>Upload</strong></dt>
+<dd>Enviar um arquivo pelo formulário (<code>enctype="multipart/form-data"</code> e <code>&lt;input type="file"&gt;</code>). O PHP recebe em <code>$_FILES</code> e o arquivo é guardado com <code>move_uploaded_file</code>. Veja: <a href="upload.html">Upload de Arquivos</a>.</dd>
+<dt><strong>UTF-8</strong></dt>
+<dd>A codificação de texto usada na web, que representa qualquer letra do mundo. Letras acentuadas ocupam 2 bytes, por isso <code>strlen('é')</code> é 2 e <code>mb_strlen('é')</code> é 1. Veja: <a href="mbstring.html">Acentos e mbstring</a>.</dd>
+</dl>
+
+<h2 id="g-V">V</h2>
+<dl class="glossario">
+<dt><strong>Validação</strong></dt>
+<dd>Conferir, no servidor, se o que o usuário enviou faz sentido (campo preenchido, e-mail válido, número no intervalo) antes de usar. A checagem do HTML ajuda, mas pode ser pulada. Veja: <a href="validacao.html">Validar Dados</a>.</dd>
+<dt><strong><code>var_dump</code> e <code>print_r</code></strong></dt>
+<dd>Funções para "ver por dentro" de uma variável: <code>var_dump</code> mostra tipo e valor (<code>string(3) "Ana"</code>); <code>print_r</code> mostra arrays de forma mais curta. Veja: <a href="var-dump.html">var_dump e print_r</a>.</dd>
+<dt><strong>Variável</strong></dt>
+<dd>Um nome que guarda um valor, sempre começando com <code>$</code>: <code>$nome = "Ana";</code>. O valor pode mudar ao longo do programa. Veja: <a href="variaveis.html">Variáveis</a>.</dd>
+<dt><strong>Visibilidade</strong></dt>
+<dd>Quem pode usar uma propriedade ou método: <code>public</code> (todos), <code>protected</code> (a classe e as filhas), <code>private</code> (só a própria classe). Veja: <a href="visibilidade.html">Visibilidade</a>.</dd>
+</dl>
+
+<h2 id="g-X">X</h2>
+<dl class="glossario">
+<dt><strong>XSS</strong></dt>
+<dd><em>Cross-Site Scripting</em>: ataque em que um texto enviado por alguém (um comentário, um nome) contém HTML ou JavaScript e é mostrado na página sem escapar, rodando no navegador de outras pessoas. A defesa é <code>htmlspecialchars</code> em toda saída. Veja: <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</dd>
+</dl>
+
+<div class="tip">
+<strong>Faltou algum termo?</strong>
+<p>Teste o que você sabe no <a href="quiz.html">Quiz</a>, ou volte aos <a href="projetos.html">Projetos</a> para ver estes termos trabalhando juntos.</p>
+</div>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
