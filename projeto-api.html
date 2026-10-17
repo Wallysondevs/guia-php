@@ -1,0 +1,1958 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projeto API REST — tarefas em JSON com SQLite, passo a passo | Guia PHP</title>
+<meta name="description" content="Projeto passo a passo: uma API REST de tarefas em PHP 8.5 que responde JSON, guarda no SQLite com prepared statements e usa GET, POST, PUT e DELETE com os códigos de status certos (200, 201, 204, 400, 404, 405, 422, 500). Testada com curl, com saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">API REST</span></h1>
+
+<p class="intro">Até aqui, seus programas PHP devolviam <strong>páginas HTML</strong> para pessoas. Uma <strong>API</strong> devolve <strong>dados</strong> (em JSON) para outros <strong>programas</strong>: um aplicativo de celular, um site em JavaScript, um script. Neste projeto você vai construir a API das tarefas da Ana: listar, criar, marcar como feita e apagar, cada ação com o verbo HTTP certo e o código de status certo. Tudo testado com o <code>curl</code>, o "navegador de terminal".</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li>Responder em <a href="json.html">JSON</a> com <code>header</code>, <code>json_encode</code> e <code>http_response_code</code>.</li>
+  <li>Guardar as tarefas no SQLite com <a href="pdo.html">PDO</a> e <a href="prepared-statements.html">prepared statements</a>.</li>
+  <li>Ler <code>$_SERVER["REQUEST_METHOD"]</code> e <code>$_SERVER["PATH_INFO"]</code> para escolher a ação (<a href="ref-superglobais.html#server">referência de $_SERVER</a>).</li>
+  <li>Ler um corpo JSON com <code>php://input</code> e <a href="validacao.html">validar</a> o que chegou.</li>
+  <li>Tratar erros: 404, 405, 422 e um 500 que não mostra as entranhas do servidor.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>Uma API com um único arquivo de entrada, <code>api.php</code>, que entende estes pedidos:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedido</th><th>O que faz</th><th>Responde</th></tr>
+<tr><td><code>GET /api.php/tarefas</code></td><td>Lista todas as tarefas</td><td>200 + a lista</td></tr>
+<tr><td><code>GET /api.php/tarefas/2</code></td><td>Mostra a tarefa 2</td><td>200 + a tarefa, ou 404</td></tr>
+<tr><td><code>POST /api.php/tarefas</code></td><td>Cria uma tarefa (o título vai no corpo)</td><td>201 + a tarefa criada, ou 422</td></tr>
+<tr><td><code>PUT /api.php/tarefas/2</code></td><td>Muda o título e/ou marca como feita</td><td>200 + a tarefa, 404 ou 422</td></tr>
+<tr><td><code>DELETE /api.php/tarefas/2</code></td><td>Apaga a tarefa 2</td><td>204 (sem corpo), ou 404</td></tr>
+</table>
+</div>
+<p>A API pronta, em uso (o servidor <code>php -S</code> roda em outro terminal):</p>
+<pre class="term" data-cwd="~/api">$ curl -s localhost:8000/api.php/tarefas
+[
+    {
+        "id": 1,
+        "titulo": "Comprar pão",
+        "feita": true
+    },
+    {
+        "id": 2,
+        "titulo": "Estudar PHP",
+        "feita": false
+    }
+]
+$ curl -s localhost:8000/api.php/tarefas -H 'Content-Type: application/json' -d '{"titulo": "Pagar a conta de luz"}'
+{
+    "id": 3,
+    "titulo": "Pagar a conta de luz",
+    "feita": false
+}
+$ curl -s -X PUT localhost:8000/api.php/tarefas/3 -H 'Content-Type: application/json' -d '{"feita": true}'
+{
+    "id": 3,
+    "titulo": "Pagar a conta de luz",
+    "feita": true
+}
+$ curl -si -X DELETE localhost:8000/api.php/tarefas/1 | head -1
+HTTP/1.1 204 No Content
+$ curl -s localhost:8000/api.php/tarefas/1
+{
+    "erro": "Tarefa 1 não encontrada"
+}</pre>
+<p>E o terminal do servidor registra cada pedido com o seu código de status:</p>
+<pre class="term" data-cwd="~/api">$ php -S localhost:8000
+[Fri Oct 16 21:04:58 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41336 Accepted
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41336 [200]: GET /api.php/tarefas
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41336 Closing
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41350 Accepted
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41350 [201]: POST /api.php/tarefas
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41350 Closing
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41366 Accepted
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41366 [200]: PUT /api.php/tarefas/3
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41366 Closing
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41370 Accepted
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41370 [204]: DELETE /api.php/tarefas/1
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41370 Closing
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41376 Accepted
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41376 [404]: GET /api.php/tarefas/1
+[Fri Oct 16 21:04:59 2026] 127.0.0.1:41376 Closing</pre>
+
+<ol class="passo">
+  <li><a href="#etapa1">Responder em JSON</a> (<code>header</code>, <code>json_encode</code>, <code>http_response_code</code>).</li>
+  <li><a href="#etapa2">O banco e as rotas GET</a> (SQLite, <code>PATH_INFO</code>, 404).</li>
+  <li><a href="#etapa3">Criar com POST</a> (<code>php://input</code>, validação, 201, 422).</li>
+  <li><a href="#etapa4">Atualizar com PUT e apagar com DELETE</a> (204, 405).</li>
+  <li><a href="#etapa5">Erros inesperados</a> (500 em JSON com <code>set_exception_handler</code>).</li>
+</ol>
+
+<h3>Antes de começar: a ideia do REST</h3>
+<p>Pense num balcão de atendimento. Você diz <strong>o que quer fazer</strong> (consultar, cadastrar, alterar, cancelar) e <strong>com o quê</strong> (a ficha número 2). No HTTP, o "o que fazer" é o <strong>método</strong> (ou verbo) e o "com o quê" é o <strong>endereço</strong> (o <em>recurso</em>). REST é só essa combinação, usada de um jeito previsível:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Significado</th><th>Tem corpo?</th></tr>
+<tr><td><code>GET</code></td><td>"me mostre" (nunca muda nada)</td><td>não</td></tr>
+<tr><td><code>POST</code></td><td>"crie um novo"</td><td>sim</td></tr>
+<tr><td><code>PUT</code></td><td>"altere este"</td><td>sim</td></tr>
+<tr><td><code>DELETE</code></td><td>"apague este"</td><td>não</td></tr>
+</table>
+</div>
+<p>E a resposta sempre traz um <strong>código de status</strong>, um número de três dígitos que o programa do outro lado lê antes de tudo:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Nome</th><th>Nesta API, quando</th></tr>
+<tr><td><code>200</code></td><td>OK</td><td>deu certo e há dados na resposta</td></tr>
+<tr><td><code>201</code></td><td>Created (criado)</td><td>um POST criou uma tarefa</td></tr>
+<tr><td><code>204</code></td><td>No Content (sem conteúdo)</td><td>apagou; não há nada para mostrar</td></tr>
+<tr><td><code>400</code></td><td>Bad Request (pedido mal feito)</td><td>o JSON enviado está quebrado</td></tr>
+<tr><td><code>404</code></td><td>Not Found (não encontrado)</td><td>a tarefa ou o endereço não existe</td></tr>
+<tr><td><code>405</code></td><td>Method Not Allowed</td><td>método que o endereço não aceita (<code>DELETE /tarefas</code>)</td></tr>
+<tr><td><code>422</code></td><td>Unprocessable Content (não processável)</td><td>o JSON está certo, mas os dados não (título vazio)</td></tr>
+<tr><td><code>500</code></td><td>Internal Server Error</td><td>um erro no <strong>nosso</strong> código</td></tr>
+</table>
+</div>
+<p>Regra para lembrar: <strong>2xx</strong> = deu certo; <strong>4xx</strong> = o cliente errou; <strong>5xx</strong> = o servidor errou.</p>
+
+<h3>O <code>curl</code></h3>
+<p>Navegadores só fazem GET pela barra de endereço. Para testar os outros métodos, usamos o <code>curl</code> no terminal (veja também <a href="servidor-embutido.html">O Servidor Embutido</a>):</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>O que faz</th></tr>
+<tr><td><code>-s</code></td><td><em>silent</em>: sem a barra de progresso</td></tr>
+<tr><td><code>-i</code></td><td>mostra também os <strong>cabeçalhos</strong> da resposta (a linha <code>HTTP/1.1 200 OK</code> e as seguintes)</td></tr>
+<tr><td><code>-X PUT</code></td><td>escolhe o método (sem <code>-X</code>: GET, ou POST se houver <code>-d</code>)</td></tr>
+<tr><td><code>-H 'Nome: valor'</code></td><td>manda um cabeçalho, como <code>Content-Type: application/json</code> ("o corpo é JSON")</td></tr>
+<tr><td><code>-d 'dados'</code></td><td>manda um corpo (e, sozinho, faz um POST)</td></tr>
+</table>
+</div>
+<p>A estrutura do projeto, na pasta <code>~/api</code>:</p>
+<pre class="term" data-cwd="~/api">$ ls
+api.php
+banco.php
+tarefas.sqlite        « criado sozinho na primeira requisição</pre>
+
+<div class="warning">
+<strong>As caixas "Experimente" e os métodos HTTP</strong>
+<p>O editor do guia roda o PHP de verdade em modo web, mas, como um formulário HTML, ele só sabe enviar <strong>GET</strong> (pelo endereço, <code>data-url</code>) e <strong>POST</strong> com campos de formulário. Por isso a API aceita também corpo de formulário, e na etapa 4 você vai ver o truque do campo <code>_method</code> para experimentar PUT e DELETE no editor. Todos os testes com JSON, PUT e DELETE desta página foram feitos com <code>curl</code> na máquina da Ana.</p>
+</div>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · Responder em JSON</h2>
+<p>A primeira versão é ingênua: monta um array e o transforma em texto JSON com <code>json_encode</code>.</p>
+<pre class="file" data-file="api.php">&lt;?php
+$tarefas = [
+    ["id" =&gt; 1, "titulo" =&gt; "Comprar pão", "feita" =&gt; true],
+    ["id" =&gt; 2, "titulo" =&gt; "Estudar PHP", "feita" =&gt; false],
+];
+echo json_encode($tarefas);
+</pre>
+<p>Com <code>curl -si</code>, olhe a resposta inteira, cabeçalhos incluídos:</p>
+<pre class="term" data-cwd="~/api">$ curl -si localhost:8000/api.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:08:25 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+[{"id":1,"titulo":"Comprar pão","feita":true},{"id":2,"titulo":"Estudar PHP","feita":false}]</pre>
+<p>Funciona, mas com três defeitos:</p>
+<ol>
+  <li><code>Content-type: text/html</code>: o PHP avisa ao cliente que mandou uma <strong>página HTML</strong>. Muitos programas confiam nesse cabeçalho para saber como ler a resposta.</li>
+  <li><code>pão</code>: por padrão, o <code>json_encode</code> troca letras acentuadas por códigos <code>\u…</code>. É JSON válido (qualquer programa entende), mas ilegível para nós.</li>
+  <li>Tudo numa linha só e sem quebra no fim: difícil de ler no terminal.</li>
+</ol>
+<p>A versão certa põe a resposta numa <strong>função</strong> que vai ser usada em todo o projeto:</p>
+<pre class="file" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+$tarefas = [
+    ["id" =&gt; 1, "titulo" =&gt; "Comprar pão", "feita" =&gt; true],
+    ["id" =&gt; 2, "titulo" =&gt; "Estudar PHP", "feita" =&gt; false],
+];
+responder(200, $tarefas);
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>function responder(int $status, mixed $dados = null): never</code></td><td>Recebe o código de status e os dados (de qualquer tipo: <code>mixed</code>). O tipo de retorno <code>never</code> <span class="versao">PHP 8.1+</span> diz "esta função nunca volta": ela sempre termina o programa. Veja <a href="tipos-retorno.html">Tipos e Retorno</a>.</td></tr>
+<tr><td><code>http_response_code($status);</code></td><td>Define o código de status da resposta (sem isto, é sempre 200).</td></tr>
+<tr><td><code>header("Content-Type: application/json; charset=utf-8");</code></td><td>Avisa que o corpo é JSON, em UTF-8. Cabeçalhos têm de sair <strong>antes</strong> de qualquer <code>echo</code> (<a href="redirecionar.html">header</a>).</td></tr>
+<tr><td><code>JSON_PRETTY_PRINT</code></td><td>Uma informação por linha, com recuo de 4 espaços.</td></tr>
+<tr><td><code>JSON_UNESCAPED_UNICODE</code></td><td>Mantém <code>ã</code> como <code>ã</code>.</td></tr>
+<tr><td><code>JSON_UNESCAPED_SLASHES</code></td><td>Mantém <code>/</code> como <code>/</code> (sem ele, <code>/tarefas</code> sairia <code>\/tarefas</code>).</td></tr>
+<tr><td><code>exit;</code></td><td>Termina o programa: nada depois de <code>responder(…)</code> roda. Assim, cada rota pode simplesmente "responder e acabar".</td></tr>
+</table>
+</div>
+<p>As opções do <code>json_encode</code> se somam com <code>|</code> (o "ou" de bits: liga as três). Veja <a href="json.html">JSON</a>.</p>
+<pre class="term" data-cwd="~/api">$ curl -si localhost:8000/api.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:02 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+[
+    {
+        "id": 1,
+        "titulo": "Comprar pão",
+        "feita": true
+    },
+    {
+        "id": 2,
+        "titulo": "Estudar PHP",
+        "feita": false
+    }
+]</pre>
+<p>Repare nos tipos: <code>1</code> sem aspas é número, <code>"Comprar pão"</code> é texto, <code>true</code>/<code>false</code> são booleanos. O <code>json_encode</code> converte cada tipo do PHP no tipo equivalente do JSON, e uma lista PHP (<code>[…, …]</code>) vira uma lista JSON.</p>
+
+<div class="tryphp" data-modo="web" data-url="/api.php" data-goal="out:&quot;Comprar pão&quot;">
+<p class="try-task"><strong>Missão (etapa 1):</strong> rode e veja <code>"Comprar pão"</code> no resultado. Acrescente as opções que faltam no <code>json_encode</code> para que apareça <code>"Comprar pão"</code>.</p>
+<pre class="script" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT), "\n";
+    }
+    exit;
+}
+
+$tarefas = [
+    ["id" =&gt; 1, "titulo" =&gt; "Comprar pão", "feita" =&gt; true],
+    ["id" =&gt; 2, "titulo" =&gt; "Estudar PHP", "feita" =&gt; false],
+];
+responder(200, $tarefas);
+</pre>
+<pre class="solucao" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+$tarefas = [
+    ["id" =&gt; 1, "titulo" =&gt; "Comprar pão", "feita" =&gt; true],
+    ["id" =&gt; 2, "titulo" =&gt; "Estudar PHP", "feita" =&gt; false],
+];
+responder(200, $tarefas);
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · O banco e as rotas GET</h2>
+<p>As tarefas agora vão para um banco SQLite (um arquivo só, sem servidor; veja <a href="banco-dados.html">Banco de Dados</a>). A conexão fica num arquivo separado, que o <code>api.php</code> inclui (<a href="include-require.html">include e require</a>):</p>
+<pre class="file" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>__DIR__ . "/tarefas.sqlite"</code></td><td>O arquivo do banco fica na mesma pasta do <code>banco.php</code>, não importa de onde o PHP foi chamado.</td></tr>
+<tr><td><code>$novo = !file_exists($arquivo);</code></td><td>Guarda se o banco ainda não existia (o SQLite cria o arquivo vazio ao conectar).</td></tr>
+<tr><td><code>PDO::FETCH_ASSOC</code></td><td>Cada linha do banco vem como array associativo: <code>["id" =&gt; 1, "titulo" =&gt; "Comprar pão", "feita" =&gt; 1]</code>.</td></tr>
+<tr><td><code>CREATE TABLE …</code></td><td>Só na primeira vez: cria a tabela. <code>AUTOINCREMENT</code> = o banco escolhe o próximo número. O SQLite não tem tipo booleano: <code>feita</code> é 0 ou 1.</td></tr>
+<tr><td><code>INSERT …</code></td><td>Duas tarefas de exemplo, para a API não começar vazia.</td></tr>
+<tr><td><code>return $pdo;</code></td><td>Um arquivo incluído pode devolver um valor: <code>$pdo = require __DIR__ . "/banco.php";</code>.</td></tr>
+</table>
+</div>
+
+<h3>Rotas: método + caminho</h3>
+<p>Como o <code>api.php</code> sabe se o pedido foi <code>/tarefas</code> ou <code>/tarefas/2</code>? Quando o endereço continua depois do nome do arquivo (<code>/api.php<strong>/tarefas/2</strong></code>), o PHP põe esse pedaço em <code>$_SERVER["PATH_INFO"]</code>. Junto com <code>$_SERVER["REQUEST_METHOD"]</code>, isso escolhe a <strong>rota</strong>:</p>
+<pre class="file" data-file="api.php (trecho novo)">$pdo = require __DIR__ . "/banco.php";
+$metodo = $_SERVER["REQUEST_METHOD"];
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "GET") {
+    $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+    responder(200, array_map("formatar", $tarefas));
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === "GET") {
+    $id = (int) $partes[1];
+    responder(200, formatar(buscar($pdo, $id)));
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$_SERVER["PATH_INFO"] ?? "/"</code></td><td>Em <code>/api.php/tarefas/2</code>, vale <code>"/tarefas/2"</code>. Em <code>/api.php</code> puro, não existe: usamos <code>"/"</code>.</td></tr>
+<tr><td><code>preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)</code></td><td>Confere se o caminho é <code>/tarefas/</code> seguido de dígitos (<code>\d+</code>) e nada mais (<code>^</code> = começo, <code>$</code> = fim). O que está entre parênteses é guardado em <code>$partes[1]</code>: <code>"2"</code>. O <code>#</code> é só o delimitador da expressão (no lugar da <code>/</code>, que aparece no caminho).</td></tr>
+<tr><td><code>(int) $partes[1]</code></td><td>Converte <code>"2"</code> em <code>2</code>. Como a expressão só aceita dígitos, <code>/tarefas/abc</code> nem chega aqui.</td></tr>
+<tr><td><code>responder(404, …)</code> no fim</td><td>Se nenhuma rota respondeu (lembre: <code>responder</code> termina o programa), o endereço não existe.</td></tr>
+</table>
+</div>
+<p>E duas funções novas:</p>
+<pre class="file" data-file="api.php (funções novas)">function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}</pre>
+<ul>
+  <li><code>formatar</code> converte a linha do banco no formato da API: <code>feita</code> sai como <code>true</code>/<code>false</code> em vez de <code>1</code>/<code>0</code>. Com <code>array_map("formatar", $tarefas)</code>, ela é aplicada a cada linha (<a href="ref-array.html#transformar">array_map</a>).</li>
+  <li><code>buscar</code> usa um <strong>prepared statement</strong>: o <code>?</code> é preenchido pelo <code>execute</code>, nunca colado no SQL. Mesmo que o id viesse do visitante sem conversão, não haveria SQL Injection (<a href="prepared-statements.html">aula</a>). <code>fetch()</code> devolve a linha ou <code>false</code> se não achou: aí respondemos 404.</li>
+</ul>
+
+<pre class="term" data-cwd="~/api">$ ls
+api.php
+banco.php
+$ curl -s localhost:8000/api.php/tarefas
+[
+    {
+        "id": 1,
+        "titulo": "Comprar pão",
+        "feita": true
+    },
+    {
+        "id": 2,
+        "titulo": "Estudar PHP",
+        "feita": false
+    }
+]
+$ ls
+api.php
+banco.php
+tarefas.sqlite
+$ curl -s localhost:8000/api.php/tarefas/2
+{
+    "id": 2,
+    "titulo": "Estudar PHP",
+    "feita": false
+}
+$ curl -si localhost:8000/api.php/tarefas/99
+HTTP/1.1 404 Not Found
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:03 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Tarefa 99 não encontrada"
+}
+$ curl -s localhost:8000/api.php/usuarios
+{
+    "erro": "Rota não encontrada: GET /usuarios"
+}</pre>
+<p>Repare: o <code>tarefas.sqlite</code> apareceu depois da primeira requisição. E um erro também é respondido em JSON, com o código certo: quem usa a API lê o <code>404</code> e a mensagem em <code>"erro"</code>.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: esquecer o caso "não achei"</strong>
+<p>Sem o <code>if ($tarefa === false)</code>, a função tenta devolver <code>false</code> onde prometeu um <code>array</code>:</p>
+<pre class="term" data-cwd="~/api">$ curl -si localhost:8000/api.php/tarefas/99
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:08:26 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: buscar(): Return value must be of type array, false returned in /home/ana/api/api.php:23
+Stack trace:
+#0 /home/ana/api/api.php(37): buscar(Object(PDO), 99)
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/api/api.php&lt;/b&gt; on line &lt;b&gt;23&lt;/b&gt;&lt;br /&gt;</pre>
+<p>O cliente esperava JSON e recebeu HTML com um erro, e ainda com status <code>200</code> (o <code>php -S</code> enviou a mensagem de erro como uma página normal). <strong>Como consertar:</strong> todo <code>fetch()</code> pode devolver <code>false</code>; trate esse caso. A mensagem está explicada na <a href="ref-erros.html#funcoes">referência de erros</a>.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/api.php/tarefas/99" data-goal="out:&quot;erro&quot;: &quot;Tarefa 99 não encontrada&quot;">
+<p class="try-task"><strong>Missão (etapa 2):</strong> a caixa pede <code>GET /api.php/tarefas/99</code> e a função <code>buscar</code> estoura. Faça-a responder <code>404</code> com <code>{"erro": "Tarefa 99 não encontrada"}</code>. Depois troque o endereço na barra do resultado para <code>/api.php/tarefas</code> e <code>/api.php/tarefas/2</code>.</p>
+<pre class="script" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    // e se a tarefa não existir? $st-&gt;fetch() devolve false…
+    return $tarefa;
+}
+
+$pdo = require __DIR__ . "/banco.php";
+$metodo = $_SERVER["REQUEST_METHOD"];
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "GET") {
+    $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+    responder(200, array_map("formatar", $tarefas));
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === "GET") {
+    $id = (int) $partes[1];
+    responder(200, formatar(buscar($pdo, $id)));
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<pre class="solucao" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+$pdo = require __DIR__ . "/banco.php";
+$metodo = $_SERVER["REQUEST_METHOD"];
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "GET") {
+    $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+    responder(200, array_map("formatar", $tarefas));
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === "GET") {
+    $id = (int) $partes[1];
+    responder(200, formatar(buscar($pdo, $id)));
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · Criar com POST</h2>
+<p>Para criar, o cliente manda um <code>POST /tarefas</code> com o título no <strong>corpo</strong>. APIs costumam receber o corpo em JSON (<code>{"titulo": "Lavar a louça"}</code>), e aí vem uma surpresa: o PHP só preenche <code>$_POST</code> para corpos de <strong>formulário</strong>. Um corpo JSON tem de ser lido "cru", de <code>php://input</code> (um arquivo especial com o corpo do pedido), e decodificado com <code>json_decode</code>:</p>
+<pre class="file" data-file="api.php (funções novas)">function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$_SERVER["CONTENT_TYPE"]</code></td><td>O cabeçalho <code>Content-Type</code> do pedido: diz em que formato está o corpo.</td></tr>
+<tr><td><code>file_get_contents("php://input")</code></td><td>O corpo inteiro, como texto.</td></tr>
+<tr><td><code>json_decode(…, true)</code></td><td>Texto JSON → array associativo (<code>true</code> = array, não objeto). JSON quebrado dá <code>null</code>; um JSON válido que não é objeto (<code>"oi"</code>, <code>42</code>) não é array. Os dois casos: <code>400</code>.</td></tr>
+<tr><td><code>return $_POST;</code></td><td>Se não é JSON, aceitamos um corpo de formulário (é o que o editor do guia e os formulários HTML enviam).</td></tr>
+<tr><td><code>!is_string($titulo) || trim($titulo) === ""</code></td><td>O título tem de ser texto (o cliente pode mandar <code>{"titulo": 42}</code> ou <code>{"titulo": ["a"]}</code>) e não pode ser só espaços.</td></tr>
+<tr><td><code>mb_strlen($titulo) &gt; 100</code></td><td>Um limite razoável, contando letras (não bytes; veja <a href="ref-string.html#bytes">bytes × letras</a>).</td></tr>
+</table>
+</div>
+<p>E a rota:</p>
+<pre class="file" data-file="api.php (trecho novo)">if ($caminho === "/tarefas" &amp;&amp; $metodo === "POST") {
+    $dados = lerCorpo();
+    $titulo = validarTitulo($dados["titulo"] ?? null);
+    $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+    $st-&gt;execute([$titulo]);
+    $id = (int) $pdo-&gt;lastInsertId();
+    header("Location: /api.php/tarefas/$id");
+    responder(201, formatar(buscar($pdo, $id)));
+}</pre>
+<p><code>lastInsertId()</code> devolve o id que o banco acabou de escolher (como texto; por isso o <code>(int)</code>). A resposta de criação segue a convenção do HTTP: código <code>201 Created</code>, o cabeçalho <code>Location</code> com o endereço da coisa nova, e a tarefa criada no corpo (o cliente fica sabendo o id sem perguntar de novo).</p>
+<pre class="term" data-cwd="~/api">$ curl -si localhost:8000/api.php/tarefas -H 'Content-Type: application/json' -d '{"titulo": "Lavar a louça"}'
+HTTP/1.1 201 Created
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:06 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Location: /api.php/tarefas/3
+Content-Type: application/json; charset=utf-8
+
+{
+    "id": 3,
+    "titulo": "Lavar a louça",
+    "feita": false
+}
+$ curl -s localhost:8000/api.php/tarefas/3
+{
+    "id": 3,
+    "titulo": "Lavar a louça",
+    "feita": false
+}
+$ curl -si localhost:8000/api.php/tarefas -H 'Content-Type: application/json' -d '{"titulo": "   "}'
+HTTP/1.1 422 Unknown Status Code
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:06 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "O título é obrigatório"
+}
+$ curl -s localhost:8000/api.php/tarefas -H 'Content-Type: application/json' -d '{titulo: Lavar}'
+{
+    "erro": "JSON inválido"
+}
+$ curl -s localhost:8000/api.php/tarefas -d 'titulo=Regar as plantas'
+{
+    "id": 4,
+    "titulo": "Regar as plantas",
+    "feita": false
+}
+$ sqlite3 tarefas.sqlite "SELECT * FROM tarefas"
+1|Comprar pão|1
+2|Estudar PHP|0
+3|Lavar a louça|0
+4|Regar as plantas|0</pre>
+<ul>
+  <li><code>422 Unknown Status Code</code>: o código chegou certo (<code>422</code>); só o <strong>nome</strong> ao lado é que o servidor de desenvolvimento do PHP não conhece. Programas olham o número, não o nome. Apache e nginx escrevem <code>Unprocessable Content</code>.</li>
+  <li><code>{titulo: Lavar}</code> não é JSON (faltam as aspas duplas): <code>400</code>.</li>
+  <li>O último POST mandou um corpo de formulário (<code>-d</code> sem <code>Content-Type</code> de JSON): caiu no <code>$_POST</code> e funcionou também.</li>
+  <li>O <code>sqlite3</code> (o programa de terminal do SQLite) confirma o que está gravado: <code>feita</code> é <code>1</code>/<code>0</code> no banco e <code>true</code>/<code>false</code> na API.</li>
+</ul>
+
+<div class="cenario">
+<strong>Quando dá errado: confiar no corpo sem validar</strong>
+<p>Sem <code>validarTitulo</code>, usando <code>$dados["titulo"] ?? ""</code> direto, a API aceita qualquer coisa, inclusive um título vazio ou um campo com o nome errado:</p>
+<pre class="term" data-cwd="~/api">$ curl -s localhost:8000/api.php/tarefas -H 'Content-Type: application/json' -d '{"titulo": ""}'
+{
+    "id": 3,
+    "titulo": "",
+    "feita": false
+}
+$ curl -s localhost:8000/api.php/tarefas -H 'Content-Type: application/json' -d '{"nome": "Lavar"}'
+{
+    "id": 4,
+    "titulo": "",
+    "feita": false
+}</pre>
+<p>O banco agora tem tarefas sem título. <strong>Uma API nunca confia no cliente</strong>: valide tipo, presença e tamanho de tudo o que chega, e responda <code>422</code> explicando o problema.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/api.php/tarefas" data-post="titulo=" data-goal="out:&quot;erro&quot;: &quot;O título é obrigatório&quot;">
+<p class="try-task"><strong>Missão (etapa 3):</strong> a caixa faz um POST com o título <strong>vazio</strong> (<code>titulo=</code>) e a API o aceita. Escreva a função <code>validarTitulo</code> (texto, sem ser só espaços, até 100 letras) e use-a na rota, para responder <code>422</code> com <code>{"erro": "O título é obrigatório"}</code>.</p>
+<pre class="script" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+$pdo = require __DIR__ . "/banco.php";
+$metodo = $_SERVER["REQUEST_METHOD"];
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "GET") {
+    $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+    responder(200, array_map("formatar", $tarefas));
+}
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "POST") {
+    $dados = lerCorpo();
+    $titulo = $dados["titulo"] ?? "";   // falta validar!
+    $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+    $st-&gt;execute([$titulo]);
+    $id = (int) $pdo-&gt;lastInsertId();
+    header("Location: /api.php/tarefas/$id");
+    responder(201, formatar(buscar($pdo, $id)));
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === "GET") {
+    $id = (int) $partes[1];
+    responder(200, formatar(buscar($pdo, $id)));
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<pre class="solucao" data-file="api.php">&lt;?php
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+$pdo = require __DIR__ . "/banco.php";
+$metodo = $_SERVER["REQUEST_METHOD"];
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "GET") {
+    $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+    responder(200, array_map("formatar", $tarefas));
+}
+
+if ($caminho === "/tarefas" &amp;&amp; $metodo === "POST") {
+    $dados = lerCorpo();
+    $titulo = validarTitulo($dados["titulo"] ?? null);
+    $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+    $st-&gt;execute([$titulo]);
+    $id = (int) $pdo-&gt;lastInsertId();
+    header("Location: /api.php/tarefas/$id");
+    responder(201, formatar(buscar($pdo, $id)));
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes) &amp;&amp; $metodo === "GET") {
+    $id = (int) $partes[1];
+    responder(200, formatar(buscar($pdo, $id)));
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Atualizar com PUT e apagar com DELETE</h2>
+<p>As duas ações agem sobre <strong>uma</strong> tarefa, então ficam na rota <code>/tarefas/{id}</code>. Para organizar, cada caminho testa os métodos que aceita e, no fim, responde <code>405</code> para os outros:</p>
+<pre class="file" data-file="api.php (trecho novo)">if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$tarefa = buscar($pdo, $id);</code> (no PUT e no DELETE)</td><td>Primeiro confere se a tarefa existe: se não, <code>buscar</code> já responde 404 e o programa para.</td></tr>
+<tr><td><code>array_key_exists("titulo", $dados) ? … : $tarefa["titulo"]</code></td><td>O cliente pode mandar só o que quer mudar. Campo ausente = mantém o valor atual (<a href="ternario.html">ternário</a>).</td></tr>
+<tr><td><code>(bool) $dados["feita"]</code></td><td>Aceita <code>true</code>/<code>false</code> do JSON e <code>"1"</code>/<code>"0"</code> de formulário.</td></tr>
+<tr><td><code>responder(204);</code></td><td>Sem dados: <code>204 No Content</code>, corpo vazio. (A nossa <code>responder</code> só escreve o JSON se <code>$dados</code> não for <code>null</code>.)</td></tr>
+<tr><td><code>header("Allow: …"); responder(405, …)</code></td><td>Método que este endereço não aceita. O cabeçalho <code>Allow</code> conta quais são aceitos. A rota <code>/tarefas</code> ganhou o mesmo final, com <code>Allow: GET, POST</code>.</td></tr>
+</table>
+</div>
+<div class="tip">
+<strong>PUT ou PATCH?</strong>
+<p>A rigor, <code>PUT</code> substitui o recurso inteiro e <code>PATCH</code> muda só uma parte, que é o que o nosso PUT faz. Muitas APIs aceitam os dois; aceitar <code>PATCH</code> também é um dos <a href="#desafios">desafios</a>.</p>
+</div>
+<pre class="term" data-cwd="~/api">$ curl -si -X PUT localhost:8000/api.php/tarefas/2 -H 'Content-Type: application/json' -d '{"feita": true}'
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:18 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "id": 2,
+    "titulo": "Estudar PHP",
+    "feita": true
+}
+$ curl -s -X PUT localhost:8000/api.php/tarefas/2 -H 'Content-Type: application/json' -d '{"titulo": "Estudar PHP e SQL"}'
+{
+    "id": 2,
+    "titulo": "Estudar PHP e SQL",
+    "feita": true
+}
+$ curl -si -X DELETE localhost:8000/api.php/tarefas/1
+HTTP/1.1 204 No Content
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:18 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+$ curl -s -X DELETE localhost:8000/api.php/tarefas/1
+{
+    "erro": "Tarefa 1 não encontrada"
+}
+$ curl -si -X PATCH localhost:8000/api.php/tarefas/2
+HTTP/1.1 405 Method Not Allowed
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:18 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Allow: GET, PUT, DELETE
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Método PATCH não permitido em /tarefas/2"
+}
+$ curl -s -X DELETE localhost:8000/api.php/tarefas
+{
+    "erro": "Método DELETE não permitido em /tarefas"
+}</pre>
+<p>Apagar duas vezes a mesma tarefa dá <code>404</code> na segunda: ela já não existe. (O <code>Content-type: text/html</code> do 204 é o padrão do PHP; como não há corpo, não faz diferença.)</p>
+
+<h3>O truque do <code>_method</code> (formulários e o editor do guia)</h3>
+<p>Formulários HTML só enviam GET e POST. Frameworks como Laravel resolvem isso com um campo oculto <code>_method</code>: um POST com <code>_method=PUT</code> é tratado como PUT. Três linhas, logo depois de ler o método:</p>
+<pre class="file" data-file="api.php (trecho novo)">$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}</pre>
+<pre class="term" data-cwd="~/api">$ curl -s localhost:8000/api.php/tarefas/2 -d '_method=PUT&amp;feita=0'
+{
+    "id": 2,
+    "titulo": "Estudar PHP e SQL",
+    "feita": false
+}
+$ curl -s localhost:8000/api.php/tarefas
+[
+    {
+        "id": 2,
+        "titulo": "Estudar PHP e SQL",
+        "feita": false
+    }
+]</pre>
+
+<div class="tryphp" data-modo="web" data-url="/api.php/tarefas/2" data-post="_method=PUT&amp;feita=1" data-goal="out:&quot;titulo&quot;: &quot;Estudar PHP&quot;,out:&quot;feita&quot;: true">
+<p class="try-task"><strong>Missão (etapa 4):</strong> a caixa envia <code>_method=PUT&amp;feita=1</code> para <code>/api.php/tarefas/2</code>, mas o PUT ainda não existe (a API responde 405). Escreva o bloco do PUT: busque a tarefa, leia o corpo, mantenha o que não veio, grave com <code>UPDATE</code> (prepared statement) e responda <code>200</code> com a tarefa atualizada (<code>"feita": true</code>).</p>
+<pre class="script" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    // PUT: atualize "titulo" e/ou "feita" e responda 200 com a tarefa atualizada
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<pre class="solucao" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Erros inesperados</h2>
+<p>Erros que <strong>nós</strong> prevemos já viram JSON (400, 404, 405, 422). Mas e um erro no nosso código, como um nome de tabela digitado errado (<code>tarefa</code> em vez de <code>tarefas</code>)?</p>
+<pre class="term" data-cwd="~/api">$ curl -si localhost:8000/api.php/tarefas/1
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:08:39 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: tarefa in /home/ana/api/api.php:46
+Stack trace:
+#0 /home/ana/api/api.php(46): PDO-&amp;gt;prepare('SELECT * FROM t...')
+#1 /home/ana/api/api.php(88): buscar(Object(PDO), 1)
+#2 {main}
+  thrown in &lt;b&gt;/home/ana/api/api.php&lt;/b&gt; on line &lt;b&gt;46&lt;/b&gt;&lt;br /&gt;</pre>
+<p>Três problemas: o cliente recebe HTML em vez de JSON, o status diz <code>200</code> (sucesso!) e a mensagem <strong>revela</strong> detalhes internos (caminhos de arquivos, o SQL, nomes de tabelas) que ajudam um atacante. O conserto é um "pega-tudo": <code>set_exception_handler</code> registra uma função que roda quando uma exceção não é capturada por nenhum <code>try/catch</code> (<a href="excecoes.html">Exceções</a>):</p>
+<pre class="file" data-file="api.php (trecho novo, antes das rotas)">set_exception_handler(function (Throwable $e) {
+    error_log($e-&gt;getMessage());
+    responder(500, ["erro" =&gt; "Erro interno no servidor"]);
+});</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>function (Throwable $e) { … }</code></td><td>Uma função anônima (<a href="closures.html">aula</a>) que recebe a exceção. <code>Throwable</code> pega exceções e erros (<code>TypeError</code>, <code>PDOException</code>…).</td></tr>
+<tr><td><code>error_log($e-&gt;getMessage());</code></td><td>Guarda a mensagem verdadeira <strong>no log do servidor</strong>, para você (no <code>php -S</code>, ela aparece no terminal dele).</td></tr>
+<tr><td><code>responder(500, …)</code></td><td>Para o cliente, só uma mensagem genérica, em JSON, com o status certo.</td></tr>
+</table>
+</div>
+<pre class="term" data-cwd="~/api">$ curl -si localhost:8000/api.php/tarefas/1
+HTTP/1.1 500 Internal Server Error
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:04:32 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{
+    "erro": "Erro interno no servidor"
+}</pre>
+<p>E, no terminal do servidor, a mensagem real, só para você:</p>
+<pre class="term" data-cwd="~/api">$ php -S localhost:8000
+[Fri Oct 16 21:04:31 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 21:04:31 2026] 127.0.0.1:59032 Accepted
+[Fri Oct 16 21:04:32 2026] SQLSTATE[HY000]: General error: 1 no such table: tarefa
+[Fri Oct 16 21:04:32 2026] 127.0.0.1:59032 [500]: GET /api.php/tarefas/1
+[Fri Oct 16 21:04:32 2026] 127.0.0.1:59032 Closing</pre>
+<p>Num servidor de verdade, além disso, <code>display_errors</code> fica desligado (<a href="depuracao.html">Depurar</a>), e nenhum erro vaza na resposta.</p>
+
+<div class="tryphp" data-modo="web" data-url="/api.php/tarefas/1" data-goal="out:&quot;erro&quot;: &quot;Erro interno no servidor&quot;,src:set_exception_handler">
+<p class="try-task"><strong>Missão (etapa 5):</strong> o <code>buscar</code> desta caixa tem o erro de digitação <strong>de propósito</strong> (<code>FROM tarefa</code>). Não conserte o SQL ainda: acrescente o <code>set_exception_handler</code> para que a resposta seja <code>{"erro": "Erro interno no servidor"}</code> com status 500. Depois, conserte o nome da tabela e veja a tarefa 1 aparecer.</p>
+<pre class="script" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefa WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<pre class="solucao" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefa WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- Erros inesperados viram 500 em JSON ----------
+
+set_exception_handler(function (Throwable $e) {
+    error_log($e-&gt;getMessage());
+    responder(500, ["erro" =&gt; "Erro interno no servidor"]);
+});
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+</div>
+
+<hr>
+
+<h2 id="completo">O código completo</h2>
+<p>Dois arquivos na pasta <code>~/api</code>. Para rodar: <code>php -S localhost:8000</code> nessa pasta e os comandos <code>curl</code> desta página em outro terminal.</p>
+<pre class="file" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<pre class="file" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- Erros inesperados viram 500 em JSON ----------
+
+set_exception_handler(function (Throwable $e) {
+    error_log($e-&gt;getMessage());
+    responder(500, ["erro" =&gt; "Erro interno no servidor"]);
+});
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+
+<div class="note">
+<strong>Por que o endereço tem <code>api.php</code> no meio?</strong>
+<p>Sem configurar nada, o <code>php -S</code> procura um arquivo para cada endereço; o <code>PATH_INFO</code> nos deixa usar um arquivo só. Em produção, o Apache ou o nginx são configurados para mandar <strong>todos</strong> os endereços para um <code>index.php</code> (o "front controller"), e a API fica com endereços limpos como <code>/tarefas/2</code>. No <code>php -S</code>, o mesmo se faz passando um "roteador": <code>php -S localhost:8000 api.php</code>, e lendo o caminho de <code>parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH)</code>. É um dos desafios.</p>
+</div>
+
+<h2 id="desafios">Desafios extras</h2>
+<ol>
+  <li><strong>Filtro.</strong> <code>GET /tarefas?feita=0</code> lista só as pendentes, <code>?feita=1</code> só as feitas (missão abaixo).</li>
+  <li><strong>PATCH.</strong> Aceite <code>PATCH</code> como sinônimo do PUT (<code>in_array($metodo, ["PUT", "PATCH"])</code>) e atualize o cabeçalho <code>Allow</code>.</li>
+  <li><strong>Data de criação.</strong> Uma coluna <code>criada_em TEXT</code> preenchida com <code>date("c")</code> no POST e devolvida no JSON (<a href="datas.html">Datas</a>).</li>
+  <li><strong>Paginação.</strong> <code>?pagina=2</code> com 10 por página: <code>LIMIT ? OFFSET ?</code> no SQL (como no <a href="projeto-blog.html">projeto do blog</a>).</li>
+  <li><strong>Senha da API.</strong> Exija um cabeçalho <code>X-Token</code> (<code>$_SERVER["HTTP_X_TOKEN"]</code>) igual a um valor guardado em <code>getenv("API_TOKEN")</code>; sem ele, <code>401</code>. Compare com <code>hash_equals</code>.</li>
+  <li><strong>Endereços limpos.</strong> Rode com <code>php -S localhost:8000 api.php</code> e troque <code>PATH_INFO</code> por <code>parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH)</code>, para atender <code>/tarefas/2</code>.</li>
+  <li><strong>Um cliente.</strong> Uma página HTML com JavaScript (<code>fetch</code>) ou um script PHP que use a API. Veja <a href="consumir-api.html">Consumir APIs</a>.</li>
+</ol>
+
+<div class="tryphp" data-modo="web" data-url="/api.php/tarefas?feita=0" data-goal="out:Estudar PHP,outre:^\[\s*\{\s*&quot;id&quot;: 2">
+<p class="try-task"><strong>Missão final:</strong> a caixa pede <code>GET /api.php/tarefas?feita=0</code>, mas a API devolve todas as tarefas. Quando <code>$_GET["feita"]</code> existir, liste só as tarefas com aquele valor (prepared statement com <code>WHERE feita = ?</code> e <code>(int) $_GET["feita"]</code>). Teste também <code>?feita=1</code> e sem filtro.</p>
+<pre class="script" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- Erros inesperados viram 500 em JSON ----------
+
+set_exception_handler(function (Throwable $e) {
+    error_log($e-&gt;getMessage());
+    responder(500, ["erro" =&gt; "Erro interno no servidor"]);
+});
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/tarefas.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE tarefas (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT    NOT NULL,
+        feita  INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo-&gt;exec("INSERT INTO tarefas (titulo, feita) VALUES ('Comprar pão', 1), ('Estudar PHP', 0)");
+}
+
+return $pdo;
+</pre>
+<pre class="solucao" data-file="api.php">&lt;?php
+// ---------- Funções de apoio ----------
+
+function responder(int $status, mixed $dados = null): never
+{
+    http_response_code($status);
+    if ($dados !== null) {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($dados, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
+    }
+    exit;
+}
+
+function lerCorpo(): array
+{
+    $tipo = $_SERVER["CONTENT_TYPE"] ?? "";
+    if (str_starts_with($tipo, "application/json")) {
+        $dados = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($dados)) {
+            responder(400, ["erro" =&gt; "JSON inválido"]);
+        }
+        return $dados;
+    }
+    return $_POST;
+}
+
+function validarTitulo(mixed $titulo): string
+{
+    if (!is_string($titulo) || trim($titulo) === "") {
+        responder(422, ["erro" =&gt; "O título é obrigatório"]);
+    }
+    $titulo = trim($titulo);
+    if (mb_strlen($titulo) &gt; 100) {
+        responder(422, ["erro" =&gt; "O título pode ter no máximo 100 caracteres"]);
+    }
+    return $titulo;
+}
+
+function formatar(array $t): array
+{
+    return ["id" =&gt; $t["id"], "titulo" =&gt; $t["titulo"], "feita" =&gt; (bool) $t["feita"]];
+}
+
+function buscar(PDO $pdo, int $id): array
+{
+    $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?");
+    $st-&gt;execute([$id]);
+    $tarefa = $st-&gt;fetch();
+    if ($tarefa === false) {
+        responder(404, ["erro" =&gt; "Tarefa $id não encontrada"]);
+    }
+    return $tarefa;
+}
+
+// ---------- Erros inesperados viram 500 em JSON ----------
+
+set_exception_handler(function (Throwable $e) {
+    error_log($e-&gt;getMessage());
+    responder(500, ["erro" =&gt; "Erro interno no servidor"]);
+});
+
+// ---------- A requisição ----------
+
+$pdo = require __DIR__ . "/banco.php";
+
+$metodo = $_SERVER["REQUEST_METHOD"];
+if ($metodo === "POST" &amp;&amp; isset($_POST["_method"])) {
+    $metodo = strtoupper($_POST["_method"]);   // formulários HTML só enviam GET e POST
+}
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
+
+// ---------- Rotas ----------
+
+if ($caminho === "/tarefas") {
+    if ($metodo === "GET") {
+        if (isset($_GET["feita"])) {
+            $st = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE feita = ? ORDER BY id");
+            $st-&gt;execute([(int) $_GET["feita"]]);
+            $tarefas = $st-&gt;fetchAll();
+        } else {
+            $tarefas = $pdo-&gt;query("SELECT * FROM tarefas ORDER BY id")-&gt;fetchAll();
+        }
+        responder(200, array_map("formatar", $tarefas));
+    }
+    if ($metodo === "POST") {
+        $dados = lerCorpo();
+        $titulo = validarTitulo($dados["titulo"] ?? null);
+        $st = $pdo-&gt;prepare("INSERT INTO tarefas (titulo) VALUES (?)");
+        $st-&gt;execute([$titulo]);
+        $id = (int) $pdo-&gt;lastInsertId();
+        header("Location: /api.php/tarefas/$id");
+        responder(201, formatar(buscar($pdo, $id)));
+    }
+    header("Allow: GET, POST");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+if (preg_match('#^/tarefas/(\d+)$#', $caminho, $partes)) {
+    $id = (int) $partes[1];
+    if ($metodo === "GET") {
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "PUT") {
+        $tarefa = buscar($pdo, $id);
+        $dados = lerCorpo();
+        $titulo = array_key_exists("titulo", $dados) ? validarTitulo($dados["titulo"]) : $tarefa["titulo"];
+        $feita = array_key_exists("feita", $dados) ? (bool) $dados["feita"] : (bool) $tarefa["feita"];
+        $st = $pdo-&gt;prepare("UPDATE tarefas SET titulo = ?, feita = ? WHERE id = ?");
+        $st-&gt;execute([$titulo, (int) $feita, $id]);
+        responder(200, formatar(buscar($pdo, $id)));
+    }
+    if ($metodo === "DELETE") {
+        buscar($pdo, $id);
+        $st = $pdo-&gt;prepare("DELETE FROM tarefas WHERE id = ?");
+        $st-&gt;execute([$id]);
+        responder(204);
+    }
+    header("Allow: GET, PUT, DELETE");
+    responder(405, ["erro" =&gt; "Método $metodo não permitido em $caminho"]);
+}
+
+responder(404, ["erro" =&gt; "Rota não encontrada: $metodo $caminho"]);
+</pre>
+</div>
+<pre class="term" data-cwd="~/api">$ curl -s 'localhost:8000/api.php/tarefas?feita=0'
+[
+    {
+        "id": 2,
+        "titulo": "Estudar PHP",
+        "feita": false
+    }
+]
+$ curl -s 'localhost:8000/api.php/tarefas?feita=1'
+[
+    {
+        "id": 1,
+        "titulo": "Comprar pão",
+        "feita": true
+    }
+]</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. Qual o método e o código de status certos para criar uma tarefa?</p>
+<label><input type="radio" name="q1"> <code>GET</code> e 200</label>
+<label><input type="radio" name="q1"> <code>PUT</code> e 204</label>
+<label><input type="radio" name="q1"> <code>POST</code> e 201</label>
+<label><input type="radio" name="q1"> <code>POST</code> e 404</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. O cliente manda <code>Content-Type: application/json</code> com <code>{"titulo": "Ler"}</code>. Onde o PHP coloca esse corpo?</p>
+<label><input type="radio" name="q2"> Em <code>$_POST["titulo"]</code>.</label>
+<label><input type="radio" name="q2"> Em nenhuma superglobal: lê-se com <code>file_get_contents("php://input")</code> e <code>json_decode</code>.</label>
+<label><input type="radio" name="q2"> Em <code>$_GET["titulo"]</code>.</label>
+<label><input type="radio" name="q2"> Em <code>$_SERVER["PATH_INFO"]</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. O título chegou vazio. Qual código a API responde?</p>
+<label><input type="radio" name="q3"> 200</label>
+<label><input type="radio" name="q3"> 404</label>
+<label><input type="radio" name="q3"> 500</label>
+<label><input type="radio" name="q3"> 422</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Por que o <code>set_exception_handler</code> responde só "Erro interno no servidor" e não a mensagem da exceção?</p>
+<label><input type="radio" name="q4"> Porque a mensagem real pode revelar caminhos, SQL e nomes de tabelas; ela vai para o log, não para o cliente.</label>
+<label><input type="radio" name="q4"> Porque o JSON não aceita mensagens longas.</label>
+<label><input type="radio" name="q4"> Porque a exceção não tem mensagem.</label>
+<label><input type="radio" name="q4"> Porque o status 500 não permite corpo.</label>
+</div>
+
+<div class="exercise">
+<p>Complete para definir o código de status da resposta:</p>
+<div class="ex-code"><input data-answer="http_response_code">(404);</div>
+</div>
+
+<div class="exercise">
+<p>Complete a opção do <code>json_encode</code> que mantém os acentos:</p>
+<div class="ex-code">json_encode($dados, JSON_<input data-answer="UNESCAPED_UNICODE">)</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma API responde <strong>dados</strong>: <code>header("Content-Type: application/json; charset=utf-8")</code> + <code>json_encode</code> (com <code>JSON_UNESCAPED_UNICODE</code>) + <code>http_response_code</code>.</li>
+  <li>A rota é o <strong>método</strong> (<code>REQUEST_METHOD</code>) + o <strong>caminho</strong> (<code>PATH_INFO</code>); <code>preg_match</code> extrai o id.</li>
+  <li>GET lê, POST cria (201 + <code>Location</code>), PUT altera (200), DELETE apaga (204). Erros do cliente: 400, 404, 405, 422; nossos: 500.</li>
+  <li>Corpo JSON não vai para <code>$_POST</code>: <code>json_decode(file_get_contents("php://input"), true)</code>. Valide tudo.</li>
+  <li>Banco sempre com prepared statements; <code>fetch()</code> pode dar <code>false</code>.</li>
+  <li><code>set_exception_handler</code> transforma qualquer erro inesperado num 500 em JSON, e a mensagem real vai para o log.</li>
+</ul>
+<p>O próximo passo natural é escrever um programa que <strong>usa</strong> uma API: veja <a href="consumir-api.html">Consumir APIs</a>. Para consultar códigos e funções, use a <a href="ref-superglobais.html">Referência</a>.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
