@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Formatar Números — number_format, R$ 1.234,56, round, ceil e floor | Guia PHP</title>
+<meta name="description" content="Como mostrar números no formato brasileiro no PHP: number_format(1234.5, 2, ',', '.') → 1.234,50, moeda em reais, arredondamento com round, ceil e floor, a diferença do printf, converter 1.234,56 de volta para número e o NumberFormatter da extensão intl. Saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Formatar Números</span></h1>
+
+<p class="intro">Para o PHP, mil duzentos e trinta e quatro reais e cinquenta centavos é <code>1234.5</code>: ponto decimal, sem separador de milhar. Para um brasileiro, é <code>R$ 1.234,50</code>. Esta aula mostra como fazer essa "tradução" na hora de mostrar o número, e como arredondar do jeito certo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li><code>number_format</code> com 1, 2 e 4 argumentos, e o formato brasileiro <code>1.234,56</code>.</li>
+  <li>Mostrar dinheiro: <code>"R$ " . number_format(…)</code>.</li>
+  <li>Arredondar: <code>round</code>, <code>ceil</code>, <code>floor</code>, e por que o <code>printf</code> às vezes arredonda diferente.</li>
+  <li>A regra de ouro: <strong>calcule com números, formate só no fim</strong>.</li>
+  <li>Converter <code>"1.234,56"</code> (digitado por um brasileiro) de volta para número.</li>
+  <li>O <code>NumberFormatter</code> da extensão intl, e quando ele está disponível.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o número e a "roupa" do número</h2>
+<p>Pense no valor guardado no caixa da lojinha da Ana: é um número, e o PHP faz contas com ele. Quando o valor vai para a etiqueta de preço, ele ganha uma "roupa": o <code>R$</code>, a vírgula, o ponto do milhar. A roupa é só para ser lida por pessoas. Ninguém faz conta com a etiqueta.</p>
+
+<p>Em PHP é igual: o número continua <code>1234.5</code> (um <code>float</code>; veja <a href="numeros.html">int e float</a>), e <code>number_format</code> produz um <strong>texto</strong> vestido para o leitor.</p>
+
+<hr>
+
+<h2><code>number_format</code></h2>
+
+<pre class="file" data-file="formatar.php">&lt;?php
+$valor = 1234.567;
+echo number_format($valor), "\n";
+echo number_format($valor, 2), "\n";
+echo number_format($valor, 2, ",", "."), "\n";
+</pre>
+
+<pre class="term">$ php formatar.php
+1,235          « 1 argumento: sem casas, arredondado, milhar com vírgula (formato americano)
+1,234.57       « 2 argumentos: 2 casas, ainda no formato americano
+1.234,57       « 4 argumentos: o formato brasileiro</pre>
+
+<dl class="anatomy">
+  <dt>number_format(</dt><dd>"Formatar número". Devolve um <strong>texto</strong>.</dd>
+  <dt>$valor,</dt><dd>1º: o número.</dd>
+  <dt>2,</dt><dd>2º: quantas casas decimais. O número é <strong>arredondado</strong> (1234.567 → 1234.57).</dd>
+  <dt>",",</dt><dd>3º: o separador decimal (no Brasil, a vírgula).</dd>
+  <dt>"."</dt><dd>4º: o separador de milhar (no Brasil, o ponto).</dd>
+</dl>
+
+<p>Decore esta linha, você vai usá-la a vida toda: <strong><code>number_format($valor, 2, ",", ".")</code></strong>.</p>
+
+<h3>Mais variações</h3>
+<pre class="file" data-file="variacoes.php">&lt;?php
+echo number_format(1234567.891, 2, ",", "."), "\n";
+echo number_format(1234.567, 0, ",", "."), "\n";
+echo number_format(1234.5, 2, ",", ""), "\n";
+echo number_format(1234.5, 2, ",", " "), "\n";
+echo number_format(-1234.5, 2, ",", "."), "\n";
+echo number_format(1234.5, -2), "\n";
+var_dump(number_format(1234.5, 2, ",", "."));
+</pre>
+
+<pre class="term">$ php variacoes.php
+1.234.567,89     « milhões também
+1.235            « 0 casas: inteiro, arredondado
+1234,50          « separador de milhar vazio: sem ponto
+1 234,50         « espaço como separador (usado em Portugal e na França)
+-1.234,50
+1,200            « casas negativas arredondam à esquerda (centenas) — PHP 8.3+
+string(8) "1.234,50"   « o resultado é um TEXTO (string), não um número</pre>
+
+<div class="tryphp" data-goal="out:R$ 1.234\,50,src:number_format">
+<p class="try-task"><strong>Missão:</strong> o caixa da Ana tem <code>$total = 1234.5</code>. Mostre <code>R$ 1.234,50</code>, juntando o texto <code>"R$ "</code> com o <code>number_format</code> no formato brasileiro.</p>
+<pre class="script">&lt;?php
+$total = 1234.5;
+echo "R$ " . $total;
+</pre>
+<pre class="solucao">&lt;?php
+$total = 1234.5;
+echo "R$ " . number_format($total, 2, ",", ".");
+</pre>
+</div>
+
+<hr>
+
+<h2 id="dinheiro">Dinheiro: <code>"R$ " . number_format(…)</code></h2>
+<p>O <code>number_format</code> não coloca o símbolo da moeda: você concatena. A lojinha da Ana calcula o total de uma compra e mostra o recibo:</p>
+
+<pre class="file" data-file="recibo.php">&lt;?php
+$maca = 3 * 4.5;
+$uva = 2 * 7.9;
+$total = $maca + $uva;
+echo "Maçã:  R$ " . number_format($maca, 2, ",", "."), "\n";
+echo "Uva:   R$ " . number_format($uva, 2, ",", "."), "\n";
+echo "Total: R$ " . number_format($total, 2, ",", "."), "\n";
+</pre>
+<pre class="term">$ php recibo.php
+Maçã:  R$ 13,50
+Uva:   R$ 15,80
+Total: R$ 29,30</pre>
+
+<p>Repare na ordem: primeiro <strong>todas as contas</strong> com os números (<code>$maca</code>, <code>$uva</code>, <code>$total</code>), e só na linha do <code>echo</code> o número ganha a "roupa". Para não repetir <code>number_format($x, 2, ",", ".")</code> em todo lugar, você vai criar a sua própria função <code>reais($x)</code> na aula de <a href="funcoes.html">Funções</a>.</p>
+
+<div class="warning">
+<strong>Não faça contas com o texto formatado</strong>
+<pre class="file" data-file="conta-texto.php">&lt;?php
+$total = "R$ " . number_format(10, 2, ",", ".");
+echo $total + 5;
+</pre>
+<pre class="term">$ php conta-texto.php
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + int in /home/ana/php/conta-texto.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/conta-texto.php on line 3</pre>
+<p>"Tipos de operando não suportados: string + int". <code>"R$ 10,00"</code> é um texto, não dá para somar. Mesmo sem o <code>R$</code>, <code>"1.234,50"</code> seria lido errado (veja abaixo). <strong>Guarde o número, formate só para mostrar.</strong></p>
+</div>
+
+<hr>
+
+<h2>Arredondar: <code>round</code>, <code>ceil</code> e <code>floor</code></h2>
+<p>O <code>number_format</code> já arredonda, mas devolve texto. Quando você precisa de um <strong>número</strong> arredondado (para continuar fazendo contas), use estas funções:</p>
+
+<pre class="file" data-file="arredondar.php">&lt;?php
+echo round(3.14159, 2), "\n";
+echo round(2.5), " ", round(3.5), " ", round(-2.5), "\n";
+echo round(1234.567, -2), "\n";
+echo ceil(4.1), " ", floor(4.9), " ", intval(4.9), "\n";
+var_dump(round(2.5));
+</pre>
+
+<pre class="term">$ php arredondar.php
+3.14               « round com 2 casas
+3 4 -3             « o meio (.5) vai para longe do zero, como na escola
+1200               « casas negativas: arredonda para a centena
+5 4 4              « ceil sobe, floor desce, intval corta
+float(3)           « round devolve float, mesmo sem casas</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Origem do nome</th><th>O que faz</th><th>4.1</th><th>4.5</th><th>4.9</th><th>-4.5</th></tr>
+<tr><td><code>round</code></td><td>"arredondar"</td><td>Para o mais próximo; o meio vai para longe do zero</td><td>4</td><td>5</td><td>5</td><td>-5</td></tr>
+<tr><td><code>ceil</code></td><td><em>ceiling</em>, "teto"</td><td>Sempre para cima</td><td>5</td><td>5</td><td>5</td><td>-4</td></tr>
+<tr><td><code>floor</code></td><td>"chão"</td><td>Sempre para baixo</td><td>4</td><td>4</td><td>4</td><td>-5</td></tr>
+<tr><td><code>intval</code></td><td><em>integer value</em></td><td>Corta as casas (vira <code>int</code>)</td><td>4</td><td>4</td><td>4</td><td>-4</td></tr>
+</table>
+</div>
+
+<p>Um uso clássico do <code>ceil</code>: a Ana tem 47 alunos e cada van leva 15. Quantas vans? <code>ceil(47 / 15)</code> dá <code>4</code>: não dá para alugar 3,13 vans, e 3 não bastam.</p>
+
+<div class="note">
+<strong>Outras formas de arredondar o meio</strong>
+<p>O <code>round</code> aceita um terceiro argumento com o "modo". <code>round(2.5, 0, PHP_ROUND_HALF_EVEN)</code> dá <code>2</code>: o meio vai para o <strong>par</strong> mais próximo (o "arredondamento bancário"). No PHP 8.4+, o modo também pode ser escrito com o enum <code>RoundingMode::HalfEven</code> <span class="versao">PHP 8.4+</span>, que tem ainda <code>RoundingMode::TowardsZero</code>, <code>AwayFromZero</code>, <code>PositiveInfinity</code>… (enums são assunto de <a href="enums.html">Enums</a>).</p>
+</div>
+
+<h3>Cuidado: o <code>printf</code> arredonda diferente</h3>
+<pre class="file" data-file="diferenca.php">&lt;?php
+echo round(2.25, 1), "\n";
+echo number_format(2.25, 1), "\n";
+printf("%.1f\n", 2.25);
+echo round(1.005, 2), " ", number_format(1.005, 2), " ", sprintf("%.2f", 1.005), "\n";
+</pre>
+<pre class="term">$ php diferenca.php
+2.3
+2.3
+2.2                « o printf foi para baixo!
+1.01 1.01 1.00     « de novo</pre>
+
+<p>Por quê? Números com casas decimais são guardados de forma <strong>aproximada</strong> (o famoso <code>0.1 + 0.2</code> que não dá exatamente <code>0.3</code>; veja <a href="numeros.html">int e float</a>). O número <code>1.005</code> na verdade está guardado como 1,00499999…, e o <code>printf</code> arredonda esse valor "verdadeiro". Já o <code>round</code> (e o <code>number_format</code>, que usa as mesmas regras) faz uma correção para dar o resultado que uma pessoa espera. Para dinheiro, prefira <strong><code>round</code> e <code>number_format</code></strong>.</p>
+
+<div class="tip">
+<strong>Dinheiro "sério": trabalhe em centavos</strong>
+<p>Sistemas de pagamento costumam guardar valores em <strong>centavos</strong>, como inteiros: R$ 10,50 vira <code>1050</code>. Inteiros não têm o problema de aproximação. Na hora de mostrar: <code>number_format($centavos / 100, 2, ",", ".")</code>. Para cálculos com muitas casas, existe a extensão BCMath (<code>bcadd</code>, <code>bcmul</code>…), que faz contas com números em forma de texto, sem aproximação.</p>
+</div>
+
+<hr>
+
+<h2 id="voltar">O caminho de volta: <code>"1.234,56"</code> para número</h2>
+<p>Quando um brasileiro digita um valor num formulário, ele vem como texto no formato brasileiro. Se você converter direto, o PHP lê só até onde entende:</p>
+
+<pre class="file" data-file="voltar.php">&lt;?php
+var_dump((float) "1.234,56");
+$brasileiro = "1.234,56";
+$semPonto = str_replace(".", "", $brasileiro);
+$comPonto = str_replace(",", ".", $semPonto);
+$numero = (float) $comPonto;
+var_dump($numero);
+</pre>
+
+<pre class="term">$ php voltar.php
+float(1.234)          « parou na vírgula: virou "um vírgula dois três quatro"!
+float(1234.56)        « certo</pre>
+
+<p>O <code>(float)</code> converte para número com casas (veja <a href="conversao-tipos.html">Conversão de Tipos</a>). O caminho certo tem dois passos, nesta ordem:</p>
+<ol class="passo">
+  <li><strong>Tirar os pontos</strong> de milhar: <code>"1.234,56"</code> → <code>"1234,56"</code>.</li>
+  <li><strong>Trocar a vírgula por ponto</strong>: <code>"1234,56"</code> → <code>"1234.56"</code>. Agora o PHP entende.</li>
+</ol>
+<p>Se você fizer na ordem inversa, a vírgula vira ponto e depois some junto com os outros pontos. Em código real, você ainda precisa <strong>validar</strong> o que foi digitado (e se a pessoa digitar "abc"?). Isso é assunto de <a href="validacao.html">Validar Dados</a>.</p>
+
+<hr>
+
+<h2><code>NumberFormatter</code>: a extensão intl</h2>
+<p>O PHP tem uma extensão chamada <strong>intl</strong> (de <em>internationalization</em>, "internacionalização") que sabe as regras de cada país: moeda, separadores, até números por extenso. A classe <code>NumberFormatter</code> formata direto no padrão de um idioma:</p>
+
+<pre class="file" data-file="intl.php">&lt;?php
+$moeda = new NumberFormatter("pt_BR", NumberFormatter::CURRENCY);
+echo $moeda-&gt;formatCurrency(1234.5, "BRL"), "\n";
+
+$decimal = new NumberFormatter("pt_BR", NumberFormatter::DECIMAL);
+echo $decimal-&gt;format(1234.567), "\n";
+</pre>
+
+<div class="warning">
+<strong>Exemplo ilustrativo: não roda no laboratório nem no editor do guia</strong>
+<p>A extensão intl é grande (carrega os dados de todos os idiomas) e não vem no PHP do laboratório da Ana nem no editor deste guia. Por isso a saída acima <strong>não foi conferida</strong> aqui. Num servidor com intl instalada (no Ubuntu: <code>sudo apt install php-intl</code>), a primeira linha mostra o valor como <code>R$ 1.234,50</code> (com um espaço especial, não separável, entre o <code>R$</code> e o número) e a segunda, <code>1.234,567</code>. No laboratório, o que aparece é isto:</p>
+<pre class="term">$ php -m | grep intl
+$ php intl.php
+
+Fatal error: Uncaught Error: Class "NumberFormatter" not found in /home/ana/php/intl.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/intl.php on line 2</pre>
+<p>O <code>php -m | grep intl</code> não mostrou nada: a extensão não está instalada. "Classe NumberFormatter não encontrada" é sempre esse o motivo.</p>
+</div>
+
+<p>Para um site em português, <code>number_format</code> resolve 99% dos casos e funciona em qualquer PHP. O <code>NumberFormatter</code> vale a pena quando o mesmo site atende vários países.</p>
+
+<hr>
+
+<h2>Qual usar?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th><th>Resultado</th></tr>
+<tr><td>Mostrar um valor no formato brasileiro</td><td><code>number_format($v, 2, ",", ".")</code></td><td>Texto <code>1.234,50</code></td></tr>
+<tr><td>Mostrar dinheiro</td><td><code>"R$ " . number_format($v, 2, ",", ".")</code></td><td>Texto <code>R$ 1.234,50</code></td></tr>
+<tr><td>Um número arredondado, para continuar calculando</td><td><code>round($v, 2)</code></td><td>Número <code>1234.57</code></td></tr>
+<tr><td>Sempre para cima / para baixo</td><td><code>ceil</code> / <code>floor</code></td><td>Número</td></tr>
+<tr><td>Ponto decimal garantido (CSV, JSON, APIs)</td><td><code>sprintf("%.2F", $v)</code> ou <code>number_format($v, 2, ".", "")</code></td><td>Texto <code>1234.50</code></td></tr>
+<tr><td>Zeros à esquerda, colunas alinhadas</td><td><a href="sprintf.html"><code>sprintf</code></a></td><td>Texto <code>00042</code></td></tr>
+<tr><td>Vários países e moedas</td><td><code>NumberFormatter</code> (intl)</td><td>Texto no padrão do país</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>number_format(): Argument #1 ($num) must be of type int|float, string given</strong>
+<pre class="file" data-file="virgula.php">&lt;?php
+echo number_format("1234,5", 2, ",", "."), "\n";
+</pre>
+<pre class="term">$ php virgula.php
+
+Fatal error: Uncaught TypeError: number_format(): Argument #1 ($num) must be of type int|float, string given in /home/ana/php/virgula.php:2
+Stack trace:
+#0 /home/ana/php/virgula.php(2): number_format('1234,5', 2, ',', '.')
+#1 {main}
+  thrown in /home/ana/php/virgula.php on line 2</pre>
+<p><strong>O que significa:</strong> o 1º argumento precisa ser um número (<code>int</code> ou <code>float</code>). Um texto como <code>"1234.5"</code> seria aceito (o PHP converte), mas <code>"1234,5"</code>, com vírgula, não é um número para o PHP.</p>
+<p><strong>Como consertar:</strong> converta antes, como em <a href="#voltar">o caminho de volta</a>: <code>(float) str_replace(",", ".", $valor)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O valor ficou mil vezes menor</strong>
+<pre class="term">$ php voltar.php
+float(1.234)
+float(1234.56)</pre>
+<p><strong>O que significa:</strong> um texto no formato brasileiro (<code>"1.234,56"</code>) foi convertido direto para número. O PHP leu o ponto do milhar como ponto decimal e parou na vírgula. Nenhum aviso aparece.</p>
+<p><strong>Como consertar:</strong> tire os pontos e troque a vírgula por ponto antes de converter. E nunca guarde o valor formatado: guarde o número.</p>
+</div>
+
+<div class="cenario">
+<strong>Unsupported operand types: string + int</strong>
+<p><strong>O que significa:</strong> você tentou fazer conta com o resultado do <code>number_format</code> (que é texto). Veja <a href="#dinheiro">o aviso na seção de dinheiro</a>.</p>
+<p><strong>Como consertar:</strong> faça as contas com a variável numérica e chame <code>number_format</code> só no <code>echo</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Class "NumberFormatter" not found</strong>
+<p><strong>O que significa:</strong> a extensão intl não está instalada.</p>
+<p><strong>Como consertar:</strong> instale (<code>sudo apt install php-intl</code> no Ubuntu; veja <a href="instalar-linux.html">Instalar no Linux</a>) e confira com <code>php -m</code>. Ou use <code>number_format</code>, que é do núcleo do PHP e está sempre disponível.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>number_format($n)</code></td><td>Inteiro, milhar com vírgula</td><td><code>number_format(1234.5)</code> → <code>"1,235"</code></td></tr>
+<tr><td><code>number_format($n, $casas)</code></td><td>Formato americano</td><td><code>number_format(1234.5, 2)</code> → <code>"1,234.50"</code></td></tr>
+<tr><td><code>number_format($n, $casas, $dec, $mil)</code></td><td>Você escolhe os separadores</td><td><code>number_format(1234.5, 2, ",", ".")</code> → <code>"1.234,50"</code></td></tr>
+<tr><td><code>round($n, $casas)</code></td><td>Arredonda (meio para longe do zero)</td><td><code>round(2.5)</code> → <code>3.0</code></td></tr>
+<tr><td><code>round($n, $casas, $modo)</code></td><td>Outro modo de arredondar</td><td><code>round(2.5, 0, PHP_ROUND_HALF_EVEN)</code> → <code>2.0</code></td></tr>
+<tr><td><code>ceil($n)</code></td><td>Para cima</td><td><code>ceil(4.1)</code> → <code>5.0</code></td></tr>
+<tr><td><code>floor($n)</code></td><td>Para baixo</td><td><code>floor(4.9)</code> → <code>4.0</code></td></tr>
+<tr><td><code>intval($n)</code></td><td>Corta as casas</td><td><code>intval(4.9)</code> → <code>4</code></td></tr>
+<tr><td><code>NumberFormatter</code> (intl)</td><td>Formata conforme o país</td><td>Precisa da extensão intl</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Formato brasileiro</h3>
+<p>Complete para mostrar <code>9.876,50</code>:</p>
+<div class="ex-code">echo number_format(9876.5, <input data-answer="2, &quot;,&quot;, &quot;.&quot;|2, ',', '.'|2,&quot;,&quot;,&quot;.&quot;|2,',','.'" aria-label="argumentos">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Vans para a excursão</h3>
+<p>Complete para calcular quantas vans de 15 lugares levam 47 alunos:</p>
+<div class="ex-code">$vans = <input data-answer="ceil" aria-label="função">(47 / 15);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Qual o <strong>tipo</strong> do resultado de <code>number_format(10, 2, ",", ".")</code>?</p>
+<label><input type="radio" name="q3"> <code>int</code></label>
+<label><input type="radio" name="q3"> <code>float</code></label>
+<label><input type="radio" name="q3"> <code>string</code></label>
+<label><input type="radio" name="q3"> <code>bool</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que <code>var_dump((float) "2.500,00")</code> mostra?</p>
+<label><input type="radio" name="q4"> <code>float(2500)</code></label>
+<label><input type="radio" name="q4"> <code>float(2.5)</code></label>
+<label><input type="radio" name="q4"> <code>float(0)</code></label>
+<label><input type="radio" name="q4"> Um erro</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que <code>floor(-4.5)</code> devolve?</p>
+<label><input type="radio" name="q5"> <code>-5</code></label>
+<label><input type="radio" name="q5"> <code>-4</code></label>
+<label><input type="radio" name="q5"> <code>4</code></label>
+<label><input type="radio" name="q5"> <code>-4.5</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Total: R$ 29\,30,out:Com desconto: R$ 26\,37,src:number_format">
+<p class="try-task"><strong>Missão final:</strong> a cliente comprou 3 kg de maçã (R$ 4,50 o kg) e 2 kg de uva (R$ 7,90 o kg) e tem 10% de desconto. Mostre:<br><code>Total: R$ 29,30</code><br><code>Com desconto: R$ 26,37</code><br>Faça as contas com os números e use <code>number_format</code> só na hora do <code>echo</code>.</p>
+<pre class="script">&lt;?php
+$total = 3 * 4.5 + 2 * 7.9;
+$comDesconto = $total * 0.9;
+echo "Total: R$ $total\n";
+echo "Com desconto: R$ $comDesconto\n";
+</pre>
+<pre class="solucao">&lt;?php
+$total = 3 * 4.5 + 2 * 7.9;
+$comDesconto = $total * 0.9;
+echo "Total: R$ " . number_format($total, 2, ",", "."), "\n";
+echo "Com desconto: R$ " . number_format($comDesconto, 2, ",", "."), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O número é para calcular; o texto formatado é para mostrar. <strong>Formate só no fim.</strong></li>
+  <li><code>number_format($v, 2, ",", ".")</code> → <code>1.234,50</code>. Para dinheiro, concatene o <code>"R$ "</code>.</li>
+  <li><code>number_format</code> devolve um <strong>texto</strong>: não faça contas com ele.</li>
+  <li><code>round</code> arredonda (o meio vai para longe do zero), <code>ceil</code> sobe, <code>floor</code> desce, <code>intval</code> corta.</li>
+  <li>O <code>printf</code> pode arredondar diferente nos "empates"; para dinheiro, use <code>round</code>/<code>number_format</code>, ou trabalhe em centavos.</li>
+  <li>Texto brasileiro para número: tire os pontos, troque a vírgula por ponto, converta com <code>(float)</code>.</li>
+  <li><code>NumberFormatter</code> precisa da extensão intl (não disponível no laboratório nem no editor do guia).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
