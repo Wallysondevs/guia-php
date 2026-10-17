@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Operador Pipe (|&gt;) — encadear funções da esquerda para a direita | Guia PHP</title>
+<meta name="description" content="O operador pipe |&gt; do PHP 8.5: passar um valor por uma sequência de funções da esquerda para a direita, com trim(...), mb_strtoupper(...), closures e arrow functions entre parênteses, as limitações (funções de um parâmetro, sem referência), a precedência e o antes × depois com código aninhado e variáveis temporárias.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Operador Pipe (|&gt;)</span> <span class="versao">PHP 8.5+</span></h1>
+
+<p class="intro">Transformar um valor em vários passos é o pão de cada dia: tirar espaços, passar para minúsculas, trocar espaços por hífens. Até o PHP 8.4, isso virava funções dentro de funções (lidas de dentro para fora) ou uma pilha de variáveis temporárias. O PHP 8.5 trouxe o <strong>operador pipe</strong> <code>|&gt;</code> ("cano"): o valor entra pela esquerda e passa por cada função, na ordem em que você lê.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que o <code>|&gt;</code> faz: <code>$x |&gt; f(...)</code> é o mesmo que <code>f($x)</code>.</li>
+  <li>A encadear vários passos: <code>"  Olá Mundo  " |&gt; trim(...) |&gt; mb_strtoupper(...)</code>.</li>
+  <li>A usar closures e arrow functions no meio do cano (com parênteses).</li>
+  <li>As limitações: só funções que recebem <strong>um</strong> argumento, nada de referência.</li>
+  <li>A precedência: quando o <code>|&gt;</code> precisa de parênteses em volta.</li>
+  <li>O mesmo código em três versões: aninhado, com variáveis temporárias e com pipe.</li>
+</ul>
+</div>
+
+<p>O pipe usa a sintaxe <code>trim(...)</code>, explicada em <a href="callables.html">Callables de Primeira Classe</a>. Vale ler aquela aula antes.</p>
+
+<div class="warning">
+<strong>Só no PHP 8.5 ou mais novo</strong>
+<p>Em versões anteriores, o PHP não conhece o <code>|&gt;</code> e o arquivo nem começa a rodar: dá <code>Parse error</code> (erro de sintaxe). Se o seu servidor ainda roda 8.4 ou menos, use as formas "antes" desta aula. Confira com <code>php -v</code> (veja <a href="versoes.html">Versões do PHP</a>).</p>
+</div>
+
+<hr>
+
+<h2>A ideia: a linha de montagem</h2>
+<p>Numa fábrica de bolos, a massa passa por uma esteira: primeiro a batedeira, depois o forno, depois a cobertura. Cada máquina recebe o que a anterior entregou. Ninguém descreve a fábrica como "cobertura de forno de batedeira de massa", mas é assim que o código aninhado se lê:</p>
+
+<pre class="file" data-file="aninhado">mb_strtoupper(trim($texto))       // primeiro trim, depois mb_strtoupper, mas lê-se ao contrário</pre>
+
+<p>O pipe é a esteira, escrita na ordem dos acontecimentos:</p>
+
+<pre class="file" data-file="pipe">$texto |&gt; trim(...) |&gt; mb_strtoupper(...)   // primeiro trim, depois mb_strtoupper</pre>
+
+<hr>
+
+<h2>O primeiro pipe</h2>
+
+<pre class="file" data-file="ola.php">&lt;?php
+$texto = "  Olá Mundo  ";
+
+$resultado = $texto |&gt; trim(...) |&gt; mb_strtoupper(...);
+var_dump($resultado);
+
+var_dump($texto |&gt; trim(...) |&gt; strtoupper(...));
+</pre>
+
+<dl class="anatomy">
+  <dt>$texto</dt><dd>O valor que entra no cano.</dd>
+  <dt>|&gt;</dt><dd>O operador pipe: "entregue o valor da esquerda para o callable da direita". Uma barra vertical e um sinal de maior, colados.</dd>
+  <dt>trim(...)</dt><dd>Um callable: a função <code>trim</code>, ainda não chamada. O pipe a chama com o valor: <code>trim("  Olá Mundo  ")</code> → <code>"Olá Mundo"</code>.</dd>
+  <dt>|&gt; mb_strtoupper(...)</dt><dd>O resultado do passo anterior entra no próximo: <code>mb_strtoupper("Olá Mundo")</code> → <code>"OLÁ MUNDO"</code>.</dd>
+</dl>
+
+<pre class="term">$ php ola.php
+string(10) "OLÁ MUNDO"
+string(10) "OLá MUNDO"        « strtoupper não converteu o "á"</pre>
+
+<p>O pipe funcionou nos dois casos; a diferença está na função. <code>strtoupper</code> só conhece as letras sem acento (ela trabalha byte a byte), e o <code>á</code> ficou minúsculo. <code>mb_strtoupper</code> entende UTF-8. Esse é o assunto de <a href="mbstring.html">Acentos e mbstring</a>. (Os dois textos têm 10 <strong>bytes</strong>, porque <code>á</code> e <code>Á</code> ocupam 2 bytes cada.)</p>
+
+<p>A regra do operador cabe numa linha:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita com pipe</th><th>É o mesmo que</th></tr>
+<tr><td><code>$x |&gt; f(...)</code></td><td><code>f($x)</code></td></tr>
+<tr><td><code>$x |&gt; f(...) |&gt; g(...)</code></td><td><code>g(f($x))</code></td></tr>
+<tr><td><code>$x |&gt; f(...) |&gt; g(...) |&gt; h(...)</code></td><td><code>h(g(f($x)))</code></td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-goal="out:OLÁ MUNDO,src:\|&gt;\s*mb_strtoupper\(\.\.\.\),semerro">
+<p class="try-task"><strong>Missão:</strong> rode e repare no <code>á</code> minúsculo em <code>OLá MUNDO</code>. Troque o último passo do cano por <code>mb_strtoupper(...)</code> para a saída ficar <code>OLÁ MUNDO</code>. Depois, por conta própria, acrescente mais um passo no fim: <code>|&gt; strrev(...)</code> (inverte o texto) e veja o que acontece com o acento.</p>
+<pre class="script">&lt;?php
+$texto = "  Olá Mundo  ";
+
+echo $texto |&gt; trim(...) |&gt; strtoupper(...), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$texto = "  Olá Mundo  ";
+
+echo $texto |&gt; trim(...) |&gt; mb_strtoupper(...), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Antes × depois: o mesmo código de três jeitos</h2>
+<p>A Ana quer transformar o título de um produto num <strong>slug</strong>, o pedaço de endereço usado nos links da loja (<code>/produtos/caneca-de-cafe-grande</code>). Três passos: tirar espaços das pontas, passar para minúsculas e trocar espaços por hífens.</p>
+
+<pre class="file" data-file="antes.php">&lt;?php
+$titulo = "  Caneca de Café GRANDE  ";
+
+// 1. aninhado: lê-se de dentro para fora
+$slug = str_replace(" ", "-", mb_strtolower(trim($titulo)));
+echo $slug, "\n";
+
+// 2. variáveis temporárias: uma linha por passo
+$passo1 = trim($titulo);
+$passo2 = mb_strtolower($passo1);
+$slug = str_replace(" ", "-", $passo2);
+echo $slug, "\n";
+
+// 3. pipe: lê-se da esquerda para a direita
+$slug = $titulo
+    |&gt; trim(...)
+    |&gt; mb_strtolower(...)
+    |&gt; (fn($s) =&gt; str_replace(" ", "-", $s));
+echo $slug, "\n";
+</pre>
+
+<pre class="term">$ php antes.php
+caneca-de-café-grande
+caneca-de-café-grande
+caneca-de-café-grande</pre>
+
+<p>O resultado é idêntico; muda a leitura:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Jeito</th><th>Vantagem</th><th>Desvantagem</th></tr>
+<tr><td>1. Aninhado</td><td>Curto</td><td>Lê-se de dentro para fora; os argumentos extras (<code>" ", "-"</code>) ficam longe da função a que pertencem; com 4 ou 5 passos, vira um amontoado de parênteses</td></tr>
+<tr><td>2. Variáveis temporárias</td><td>Funciona em qualquer versão do PHP; cada passo pode ser inspecionado com <code>var_dump</code></td><td>Nomes inventados (<code>$passo1</code>, <code>$passo2</code>) que só existem para passar o valor adiante</td></tr>
+<tr><td>3. Pipe <span class="versao">8.5+</span></td><td>Lê-se na ordem dos acontecimentos, um passo por linha, sem nomes inventados</td><td>Só PHP 8.5; funções com mais de um argumento precisam de uma arrow function</td></tr>
+</table>
+</div>
+
+<p>No jeito 3, repare na formatação: um passo por linha, cada linha começando com <code>|&gt;</code>. É o estilo recomendado quando há mais de dois passos.</p>
+
+<hr>
+
+<h2>Closures e arrow functions no cano</h2>
+<p>O lado direito do <code>|&gt;</code> pode ser <strong>qualquer callable</strong> que receba um argumento: uma função com <code>(...)</code>, um método, uma variável com uma closure, até a forma antiga de texto.</p>
+
+<pre class="file" data-file="outros.php">&lt;?php
+class Loja
+{
+    public function comTaxa(float $p): float { return $p * 1.1; }
+    public static function formatar(float $v): string { return "R$ " . number_format($v, 2, ",", "."); }
+}
+$loja = new Loja();
+
+echo 100 |&gt; $loja-&gt;comTaxa(...) |&gt; Loja::formatar(...), "\n";
+echo "caneca" |&gt; 'strtoupper', "\n";
+echo "caneca" |&gt; function (string $s): string { return ucfirst($s); }, "\n";
+$dobro = fn($n) =&gt; $n * 2;
+echo 21 |&gt; $dobro, "\n";
+</pre>
+
+<pre class="term">$ php outros.php
+R$ 110,00
+CANECA
+Caneca
+42</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Lado direito</th><th>Exemplo</th></tr>
+<tr><td>Função</td><td><code>|&gt; trim(...)</code></td></tr>
+<tr><td>Método de objeto</td><td><code>|&gt; $loja-&gt;comTaxa(...)</code></td></tr>
+<tr><td>Método estático</td><td><code>|&gt; Loja::formatar(...)</code></td></tr>
+<tr><td>Variável com closure</td><td><code>|&gt; $dobro</code> (sem <code>(...)</code>: ela já é um callable)</td></tr>
+<tr><td>Função anônima</td><td><code>|&gt; function ($s) { return …; }</code></td></tr>
+<tr><td>Arrow function</td><td><code>|&gt; (fn($s) =&gt; …)</code>, <strong>com parênteses</strong></td></tr>
+<tr><td>Texto (forma antiga)</td><td><code>|&gt; 'strtoupper'</code> (funciona, mas prefira <code>strtoupper(...)</code>)</td></tr>
+</table>
+</div>
+
+<h3>A arrow function precisa de parênteses</h3>
+<p>Uma arrow function "engole" tudo o que vem depois do <code>=&gt;</code>, inclusive os próximos <code>|&gt;</code>. Para evitar a confusão, o PHP exige os parênteses:</p>
+
+<pre class="file" data-file="sem-parenteses.php">&lt;?php
+$slug = "Caneca Grande"
+    |&gt; mb_strtolower(...)
+    |&gt; fn($s) =&gt; str_replace(" ", "-", $s)
+    |&gt; strrev(...);
+var_dump($slug);
+</pre>
+
+<pre class="term">$ php sem-parenteses.php
+
+Fatal error: Arrow functions on the right hand side of |&gt; must be parenthesized in /home/ana/pipe/sem-parenteses.php on line 2
+Stack trace:
+#0 {main}</pre>
+
+<p>"Arrow functions do lado direito de <code>|&gt;</code> precisam estar entre parênteses." O conserto é <code>|&gt; (fn($s) =&gt; str_replace(" ", "-", $s))</code>.</p>
+
+<h3>Exemplo com arrays</h3>
+<p>O pipe brilha quando os passos são funções de array. A Ana quer o total dos pedidos já pagos:</p>
+
+<pre class="file" data-file="arrays.php">&lt;?php
+$pedidos = [
+    ['cliente' =&gt; 'Bruno', 'total' =&gt; 69.8, 'pago' =&gt; true],
+    ['cliente' =&gt; 'Carla', 'total' =&gt; 120.0, 'pago' =&gt; false],
+    ['cliente' =&gt; 'Davi',  'total' =&gt; 35.5, 'pago' =&gt; true],
+];
+
+$totalPago = $pedidos
+    |&gt; (fn($lista) =&gt; array_filter($lista, fn($p) =&gt; $p['pago']))
+    |&gt; (fn($lista) =&gt; array_column($lista, 'total'))
+    |&gt; array_sum(...)
+    |&gt; (fn($v) =&gt; number_format($v, 2, ",", "."));
+
+echo "Total pago: R$ $totalPago\n";
+</pre>
+
+<pre class="term">$ php arrays.php
+Total pago: R$ 105,30</pre>
+
+<p>Lendo de cima para baixo: os pedidos → só os pagos (<code>array_filter</code>) → só a coluna <code>total</code> (<code>array_column</code>) → a soma (<code>array_sum</code>) → formatada. Sem o pipe, seriam quatro funções aninhadas ou quatro variáveis temporárias.</p>
+
+<hr>
+
+<h2>Limitações</h2>
+
+<h3>1. O valor entra como o <strong>único</strong> argumento</h3>
+<p>O pipe chama o callable com <strong>um</strong> argumento: o valor da esquerda. Funções que precisam de mais argumentos obrigatórios falham:</p>
+
+<pre class="term">$ php dois.php            « $partes = "a,b,c" |&gt; explode(...);
+
+Fatal error: Uncaught ArgumentCountError: explode() expects at least 2 arguments, 1 given in /home/ana/pipe/dois.php:2
+Stack trace:
+#0 /home/ana/pipe/dois.php(2): explode('a,b,c')
+#1 {main}
+  thrown in /home/ana/pipe/dois.php on line 2</pre>
+
+<p>O <code>explode</code> precisa do separador e do texto, e recebeu só o texto. E não dá para "pré-preencher" os outros argumentos com <code>...</code> no meio:</p>
+
+<pre class="term">$ php parcial.php         « "Caneca Grande" |&gt; str_replace(" ", "-", ...);
+
+Parse error: syntax error, unexpected token ")" in /home/ana/pipe/parcial.php on line 2</pre>
+
+<p>Os três pontos só funcionam <strong>sozinhos</strong> dentro dos parênteses. (Existe uma proposta para permitir isso, chamada "aplicação parcial", mas ela não faz parte do PHP 8.5.) A solução é a arrow function, que diz onde o valor entra:</p>
+
+<pre class="file" data-file="solucao">"a,b,c" |&gt; (fn($s) =&gt; explode(",", $s))
+"Caneca Grande" |&gt; (fn($s) =&gt; str_replace(" ", "-", $s))</pre>
+
+<p>Funções cujos argumentos extras são <strong>opcionais</strong> funcionam direto: <code>|&gt; round(...)</code> arredonda para inteiro, <code>|&gt; trim(...)</code> tira espaços.</p>
+
+<h3>2. Nada de passagem por referência</h3>
+<p>Funções que <strong>mudam</strong> a variável que recebem (por referência), como <code>sort</code>, não combinam com o pipe, porque o valor no meio do cano não é uma variável:</p>
+
+<pre class="term">$ php ref.php             « $ordenado = [3, 1, 2] |&gt; sort(...);
+
+Fatal error: Uncaught Error: sort(): Argument #1 ($array) could not be passed by reference in /home/ana/pipe/ref.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/pipe/ref.php on line 2</pre>
+
+<p>Mesmo que funcionasse, o <code>sort</code> devolve <code>true</code>, não o array ordenado. Para ordenar no meio do cano, use uma arrow function com uma cópia: <code>|&gt; (function ($l) { sort($l); return $l; })</code>, ou faça a ordenação fora do pipe.</p>
+
+<h3>3. A precedência: quando usar parênteses</h3>
+<p>Contas e concatenação acontecem <strong>antes</strong> do pipe. Veja o que acontece ao tentar somar 1 no fim do cano:</p>
+
+<pre class="term">$ php precedencia.php     « $r = "  3 " |&gt; trim(...) |&gt; intval(...) + 1;
+
+Fatal error: Uncaught TypeError: Unsupported operand types: Closure + int in /home/ana/pipe/precedencia.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/pipe/precedencia.php on line 2</pre>
+
+<p>O PHP leu <code>intval(...) + 1</code> primeiro: "somar 1 a um <code>Closure</code>", o que não existe. O mesmo acontece com o ponto (concatenação): <code>"abc" |&gt; strtoupper(...) . "!"</code> dá <code>Object of class Closure could not be converted to string</code>. Coloque o cano entre parênteses:</p>
+
+<pre class="term">$ php p3.php              « var_dump(("  3 " |&gt; trim(...) |&gt; intval(...)) + 1);
+int(4)</pre>
+
+<p>Comparações (<code>==</code>, <code>===</code>, <code>&lt;</code>) e o <code>??</code> ficam <strong>depois</strong> do pipe, então <code>"abc" |&gt; strlen(...) == 3</code> funciona e dá <code>true</code>. Na dúvida, parênteses. Veja <a href="precedencia.html">Precedência</a>.</p>
+
+<hr>
+
+<h2>Quando usar o pipe</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Melhor escolha</th></tr>
+<tr><td>Um passo só: <code>trim($nome)</code></td><td>A chamada normal. <code>$nome |&gt; trim(...)</code> não ganha nada</td></tr>
+<tr><td>Dois ou mais passos de transformação, cada um com um argumento</td><td><strong>Pipe</strong></td></tr>
+<tr><td>Passos que precisam de vários argumentos</td><td>Pipe com arrow functions, ou variáveis temporárias se ficar pesado</td></tr>
+<tr><td>Precisa inspecionar o valor no meio (depurar)</td><td>Variáveis temporárias; ou um passo <code>|&gt; (function ($x) { var_dump($x); return $x; })</code></td></tr>
+<tr><td>Funções que mudam por referência (<code>sort</code>, <code>array_push</code>)</td><td>Fora do pipe</td></tr>
+<tr><td>Código que precisa rodar em PHP 8.4 ou anterior</td><td>Aninhado ou variáveis temporárias</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Arrow functions on the right hand side of |&gt; must be parenthesized</strong>
+<p><strong>O que significa:</strong> você escreveu <code>|&gt; fn($x) =&gt; …</code> sem parênteses.</p>
+<p><strong>Como consertar:</strong> <code>|&gt; (fn($x) =&gt; …)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>ArgumentCountError: … expects at least 2 arguments, 1 given</strong>
+<p><strong>O que significa:</strong> a função do passo precisa de mais de um argumento; o pipe só passa um.</p>
+<p><strong>Como consertar:</strong> embrulhe numa arrow function que complete os outros: <code>|&gt; (fn($s) =&gt; explode(",", $s))</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Unsupported operand types: Closure + int / Object of class Closure could not be converted to string</strong>
+<p><strong>O que significa:</strong> uma conta ou concatenação no fim do cano foi feita antes do pipe, com o callable em vez do resultado.</p>
+<p><strong>Como consertar:</strong> parênteses em volta do cano inteiro: <code>($x |&gt; f(...)) + 1</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>could not be passed by reference</strong>
+<p><strong>O que significa:</strong> funções como <code>sort</code>, <code>shuffle</code>, <code>array_push</code> precisam de uma variável, e o pipe passa um valor.</p>
+<p><strong>Como consertar:</strong> faça esse passo fora do pipe, ou com uma função anônima que trabalha numa cópia e a devolve.</p>
+</div>
+
+<div class="cenario">
+<strong>Parse error na linha do <code>|&gt;</code>, num servidor mais antigo</strong>
+<p><strong>O que significa:</strong> o PHP é anterior ao 8.5 e não conhece o <code>|&gt;</code>. (A mensagem exata depende da versão; o laboratório deste guia só tem o 8.5.)</p>
+<p><strong>Como consertar:</strong> atualize o PHP ou reescreva com variáveis temporárias.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>$x |&gt; f(...)</code></td><td><code>f($x)</code></td></tr>
+<tr><td><code>$x |&gt; f(...) |&gt; g(...)</code></td><td><code>g(f($x))</code></td></tr>
+<tr><td><code>$x |&gt; $obj-&gt;m(...)</code> / <code>|&gt; Classe::m(...)</code></td><td><code>$obj-&gt;m($x)</code> / <code>Classe::m($x)</code></td></tr>
+<tr><td><code>$x |&gt; (fn($v) =&gt; f($v, 2))</code></td><td><code>f($x, 2)</code></td></tr>
+<tr><td><code>$x |&gt; $closure</code></td><td><code>$closure($x)</code></td></tr>
+<tr><td><code>($x |&gt; f(...)) + 1</code></td><td>Parênteses antes de contas e de <code>.</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Traduzir para pipe</h3>
+<p>Complete a versão com pipe de <code>strrev(trim($s))</code>:</p>
+<div class="ex-code">$s |&gt; trim(...) |&gt; <input data-answer="strrev(...)" aria-label="último passo"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Traduzir de volta</h3>
+<p>Escreva sem pipe, aninhado, o mesmo que <code>$nome |&gt; trim(...) |&gt; ucfirst(...)</code>:</p>
+<div class="ex-code">$r = <input data-answer="ucfirst(trim($nome))" aria-label="aninhado">;</div>
+</div>
+
+<div class="exercise">
+<h3>3. Dois argumentos</h3>
+<p>Complete o passo que troca vírgulas por pontos com <code>str_replace</code>:</p>
+<div class="ex-code">$valor = "19,90" |&gt; <input data-answer="(fn($s) =&gt; str_replace(&quot;,&quot;, &quot;.&quot;, $s))|(fn($s) =&gt; str_replace(',', '.', $s))" aria-label="arrow function">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que <code>"  ana  " |&gt; trim(...) |&gt; strtoupper(...)</code> devolve?</p>
+<label><input type="radio" name="q4"> <code>"  ANA  "</code></label>
+<label><input type="radio" name="q4"> <code>"ANA"</code></label>
+<label><input type="radio" name="q4"> <code>"ana"</code></label>
+<label><input type="radio" name="q4"> Um <code>Closure</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Por que <code>"a,b" |&gt; explode(...)</code> dá erro?</p>
+<label><input type="radio" name="q5"> <code>explode</code> não existe no PHP 8.5</label>
+<label><input type="radio" name="q5"> Falta <code>(...)</code></label>
+<label><input type="radio" name="q5"> O pipe não aceita funções do PHP</label>
+<label><input type="radio" name="q5"> O pipe passa só um argumento e <code>explode</code> precisa de dois</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Qual linha está correta?</p>
+<label><input type="radio" name="q6"> <code>$x |&gt; fn($v) =&gt; $v * 2</code></label>
+<label><input type="radio" name="q6"> <code>$x |&gt; str_replace("a", "b", ...)</code></label>
+<label><input type="radio" name="q6"> <code>$x |&gt; (fn($v) =&gt; $v * 2)</code></label>
+<label><input type="radio" name="q6"> <code>$x |&gt; sort(...)</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Olá\, Ana Maria!,src:\|&gt;\s*trim\(\.\.\.\),src:\|&gt;\s*\(fn,semerro">
+<p class="try-task"><strong>Missão final:</strong> reescreva a linha aninhada usando o pipe, um passo por linha: comece com <code>$entrada</code>, passe por <code>trim(...)</code>, depois por uma arrow function com <code>mb_convert_case($s, MB_CASE_TITLE)</code> (primeira letra de cada palavra maiúscula, entendendo acentos) e por fim por outra arrow function que monta <code>"Olá, …!"</code>. A saída deve continuar <code>Olá, Ana Maria!</code>.</p>
+<pre class="script">&lt;?php
+$entrada = "   ana MARIA   ";
+
+$saudacao = "Olá, " . mb_convert_case(trim($entrada), MB_CASE_TITLE) . "!";
+
+echo $saudacao, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$entrada = "   ana MARIA   ";
+
+$saudacao = $entrada
+    |&gt; trim(...)
+    |&gt; (fn($s) =&gt; mb_convert_case($s, MB_CASE_TITLE))
+    |&gt; (fn($s) =&gt; "Olá, $s!");
+
+echo $saudacao, "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><span class="versao">PHP 8.5+</span> <code>$x |&gt; f(...)</code> é <code>f($x)</code>; encadeado, lê-se da esquerda para a direita, na ordem dos passos.</li>
+  <li>O lado direito é um callable de um argumento: <code>trim(...)</code>, <code>$obj-&gt;m(...)</code>, <code>Classe::m(...)</code>, uma closure, ou <code>(fn($v) =&gt; …)</code> <strong>entre parênteses</strong>.</li>
+  <li>Funções com mais argumentos obrigatórios: embrulhe numa arrow function. <code>f(a, ...)</code> não existe.</li>
+  <li>Nada de funções por referência (<code>sort</code>).</li>
+  <li>Contas e <code>.</code> vêm antes do pipe: use <code>($x |&gt; f(...)) + 1</code>.</li>
+  <li>Use <code>mb_strtoupper</code>, e não <code>strtoupper</code>, para textos com acento.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
