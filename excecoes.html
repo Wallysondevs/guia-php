@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Exceções — throw, try, catch e finally | Guia PHP</title>
+<meta name="description" content="Exceções no PHP: lançar com throw, capturar com try e catch, finally, Throwable × Exception × Error, capturar vários tipos com |, getMessage, getCode, getLine e getTraceAsString, a exceção não tratada (Fatal error: Uncaught) e throw como expressão do PHP 8.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Exceções (try e catch)</span></h1>
+
+<p class="intro">Uma função descobre um problema que ela não sabe resolver: o cliente pediu 5 bolos e só há 2. Ela não deve mostrar mensagem nenhuma (talvez esteja num site, talvez num aplicativo), nem devolver um número mágico como <code>-1</code> que alguém vai esquecer de conferir. O jeito moderno é <strong>lançar uma exceção</strong>: "aconteceu isto, quem me chamou que decida". Quem chamou <strong>captura</strong> a exceção e trata o problema do jeito certo para aquele lugar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Lançar uma exceção com <code>throw new Exception("…")</code>.</li>
+  <li>O que acontece quando ninguém captura (o <code>Fatal error: Uncaught …</code>).</li>
+  <li>Capturar com <code>try</code>/<code>catch</code>, e o caminho que o programa percorre.</li>
+  <li><code>finally</code>: o código que roda sempre.</li>
+  <li><code>Throwable</code> × <code>Exception</code> × <code>Error</code>: quem captura o quê.</li>
+  <li>Vários <code>catch</code>, e vários tipos num <code>catch</code> só com <code>|</code>.</li>
+  <li>O que tem dentro de uma exceção: <code>getMessage</code>, <code>getCode</code>, <code>getLine</code>, <code>getTraceAsString</code>, <code>getPrevious</code>.</li>
+  <li><code>throw</code> como expressão (<span class="versao">PHP 8.0+</span>).</li>
+</ul>
+</div>
+
+<p>Antes, leia <a href="tipos-erro.html">Tipos de Erro</a>, onde você viu que muitos erros do PHP 8 já são exceções (<code>TypeError</code>, <code>DivisionByZeroError</code>…). Nesta aula, a lojinha da Ana lança e captura as suas.</p>
+
+<hr>
+
+<h2>A ideia: o alarme e quem atende</h2>
+<p>Pense na cozinha da lojinha. O ajudante vai buscar ovos e descobre que acabaram. Ele não sai da cozinha para ligar para o fornecedor, nem inventa uma receita sem ovos: ele <strong>avisa</strong> ("acabaram os ovos!") e quem coordena decide (comprar, trocar o pedido, avisar o cliente). Se ninguém ouvir o aviso, a cozinha para.</p>
+<ul>
+  <li><strong>Lançar</strong> (<code>throw</code>, "atirar") = dar o aviso.</li>
+  <li><strong>Capturar</strong> (<code>catch</code>, "pegar") = ouvir o aviso e decidir.</li>
+  <li><strong>Exceção</strong> = o aviso em si, um objeto com a mensagem e onde aconteceu.</li>
+</ul>
+
+<hr>
+
+<h2>Lançar: <code>throw</code></h2>
+<pre class="file" data-file="lancar.php">&lt;?php
+function vender(int $estoque, int $quantidade): int
+{
+    if ($quantidade &gt; $estoque) {
+        throw new Exception("Estoque insuficiente: pediu $quantidade, tem $estoque");
+    }
+    return $estoque - $quantidade;
+}
+
+$resto = vender(10, 3);
+echo "Restam $resto\n";
+$resto = vender(2, 5);
+echo "Restam $resto\n";
+echo "Fim\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>throw</dt><dd>"Lance". Interrompe a função na hora: nada depois do <code>throw</code> é executado, nem o <code>return</code>.</dd>
+  <dt>new Exception(…)</dt><dd>Cria o objeto exceção. <code>Exception</code> é a classe de exceção mais geral do PHP (na <a href="excecoes-proprias.html">próxima aula</a> você cria as suas).</dd>
+  <dt>"Estoque insuficiente: …"</dt><dd>A mensagem: escreva para quem vai ler o registro de erros, com os valores que ajudam a entender.</dd>
+</dl>
+
+<pre class="term">$ cd exc
+$ php lancar.php; echo "código: $?"
+Restam 7
+
+Fatal error: Uncaught Exception: Estoque insuficiente: pediu 5, tem 2 in /home/ana/exc/lancar.php:5
+Stack trace:
+#0 /home/ana/exc/lancar.php(12): vender(2, 5)
+#1 {main}
+  thrown in /home/ana/exc/lancar.php on line 5
+código: 255</pre>
+
+<p>A primeira venda funcionou. Na segunda, a exceção foi lançada e <strong>ninguém capturou</strong>. Uma exceção não capturada "sobe" por todas as funções até o topo do programa e, lá, o PHP a transforma num erro fatal. Lendo a mensagem:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pedaço</th><th>Significa</th></tr>
+<tr><td><code>Uncaught Exception</code></td><td>"Exceção não capturada", do tipo <code>Exception</code>.</td></tr>
+<tr><td><code>Estoque insuficiente: pediu 5, tem 2</code></td><td>A mensagem que você escreveu.</td></tr>
+<tr><td><code>in /home/ana/exc/lancar.php:5</code></td><td>Onde foi <strong>criada</strong> (a linha do <code>throw new</code>).</td></tr>
+<tr><td><code>Stack trace:</code></td><td>"Rastro da pilha": o caminho de chamadas até ali, do mais recente para o mais antigo.</td></tr>
+<tr><td><code>#0 /home/ana/exc/lancar.php(12): vender(2, 5)</code></td><td>A linha 12 chamou <code>vender</code> com os argumentos <code>2, 5</code>.</td></tr>
+<tr><td><code>#1 {main}</code></td><td>O programa principal (fora de funções).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Capturar: <code>try</code> e <code>catch</code></h2>
+<pre class="file" data-file="try.php">&lt;?php
+// … a mesma função vender …
+
+try {
+    $resto = vender(10, 3);
+    echo "Restam $resto\n";
+    $resto = vender(2, 5);
+    echo "Esta linha não roda\n";
+} catch (Exception $e) {
+    echo "Não deu: ", $e-&gt;getMessage(), "\n";
+}
+echo "Fim\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>try { … }</dt><dd>"Tente": o código que pode lançar uma exceção.</dd>
+  <dt>catch (Exception $e)</dt><dd>"Capture exceções do tipo <code>Exception</code> e guarde-a em <code>$e</code>". O nome <code>$e</code> é costume; pode ser qualquer um.</dd>
+  <dt>{ … }</dt><dd>O que fazer com o problema. Aqui, mostrar a mensagem.</dd>
+  <dt>$e-&gt;getMessage()</dt><dd>Devolve o texto passado ao <code>new Exception(…)</code>.</dd>
+</dl>
+
+<pre class="term">$ php try.php
+Restam 7
+Não deu: Estoque insuficiente: pediu 5, tem 2
+Fim                                  « o programa continuou depois do catch</pre>
+
+<p>Siga o caminho do programa:</p>
+<ol class="passo">
+  <li>Entra no <code>try</code>. A primeira venda dá certo e mostra <code>Restam 7</code>.</li>
+  <li>A segunda venda lança a exceção. O PHP <strong>abandona o resto do <code>try</code></strong> (a linha "Esta linha não roda" é pulada) e procura um <code>catch</code> que sirva.</li>
+  <li>O <code>catch (Exception $e)</code> serve: o bloco dele roda.</li>
+  <li>Depois do <code>catch</code>, o programa segue normalmente: <code>Fim</code>.</li>
+</ol>
+<p>Se nenhuma exceção acontecer, o <code>catch</code> é simplesmente ignorado.</p>
+
+<div class="tryphp" data-goal="out:Restam 7,out:Pedido recusado: Estoque insuficiente,out:Fim,exit:0">
+<p class="try-task"><strong>Missão:</strong> o programa morre na segunda venda. Envolva as vendas num <code>try</code>/<code>catch</code> que mostre <code>Pedido recusado: </code> seguido da mensagem da exceção, para que o <code>Fim</code> apareça.</p>
+<pre class="script">&lt;?php
+function vender(int $estoque, int $quantidade): int
+{
+    if ($quantidade &gt; $estoque) {
+        throw new Exception("Estoque insuficiente: pediu $quantidade, tem $estoque");
+    }
+    return $estoque - $quantidade;
+}
+
+$resto = vender(10, 3);
+echo "Restam $resto\n";
+$resto = vender(2, 5);
+echo "Restam $resto\n";
+echo "Fim\n";
+</pre>
+<pre class="solucao">&lt;?php
+function vender(int $estoque, int $quantidade): int
+{
+    if ($quantidade &gt; $estoque) {
+        throw new Exception("Estoque insuficiente: pediu $quantidade, tem $estoque");
+    }
+    return $estoque - $quantidade;
+}
+
+try {
+    $resto = vender(10, 3);
+    echo "Restam $resto\n";
+    $resto = vender(2, 5);
+    echo "Restam $resto\n";
+} catch (Exception $e) {
+    echo "Pedido recusado: " . $e-&gt;getMessage() . "\n";
+}
+echo "Fim\n";
+</pre>
+</div>
+
+<hr>
+
+<h2><code>finally</code>: o que roda sempre</h2>
+<p>Às vezes há uma "arrumação" que precisa acontecer <strong>com ou sem</strong> erro: fechar um arquivo, liberar uma trava, fechar o caixa. O bloco <code>finally</code> ("finalmente") roda sempre, depois do <code>try</code> e do <code>catch</code>:</p>
+
+<pre class="file" data-file="finally.php">&lt;?php
+function processar(int $qtd): void
+{
+    echo "Abrindo o caixa\n";
+    try {
+        if ($qtd &lt;= 0) {
+            throw new Exception("Quantidade inválida: $qtd");
+        }
+        echo "Vendidos: $qtd\n";
+    } catch (Exception $e) {
+        echo "Erro: ", $e-&gt;getMessage(), "\n";
+    } finally {
+        echo "Fechando o caixa\n";
+    }
+}
+processar(3);
+echo "---\n";
+processar(0);
+</pre>
+
+<pre class="term">$ php finally.php
+Abrindo o caixa
+Vendidos: 3
+Fechando o caixa           « sem erro: try → finally
+---
+Abrindo o caixa
+Erro: Quantidade inválida: 0
+Fechando o caixa           « com erro: try → catch → finally</pre>
+
+<p>O <code>finally</code> roda até quando o <code>try</code> faz <code>return</code>, e até quando a exceção <strong>não</strong> é capturada ali (ela continua subindo depois do <code>finally</code>):</p>
+
+<pre class="file" data-file="finally-return.php">&lt;?php
+function teste(): string
+{
+    try {
+        return "do try";
+    } finally {
+        echo "o finally roda mesmo com return\n";
+    }
+}
+echo teste(), "\n";
+</pre>
+
+<pre class="term">$ php finally-return.php
+o finally roda mesmo com return
+do try</pre>
+
+<p>Repare que esse <code>try</code> não tem <code>catch</code>: <code>try</code> + <code>finally</code> sozinhos também valem.</p>
+
+<div class="tryphp" data-goal="outre:(?s)Fechando o caixa.*Fechando o caixa.*Fechando o caixa,out:Erro: Quantidade inválida: -1,src:finally">
+<p class="try-task"><strong>Missão:</strong> hoje o caixa só é fechado quando a venda dá certo. Mova o <code>echo "Fechando o caixa\n";</code> para um bloco <code>finally</code>, para ele aparecer nas três chamadas.</p>
+<pre class="script">&lt;?php
+function processar(int $qtd): void
+{
+    echo "Abrindo o caixa\n";
+    try {
+        if ($qtd &lt;= 0) {
+            throw new Exception("Quantidade inválida: $qtd");
+        }
+        echo "Vendidos: $qtd\n";
+        echo "Fechando o caixa\n";
+    } catch (Exception $e) {
+        echo "Erro: ", $e-&gt;getMessage(), "\n";
+    }
+}
+processar(3);
+processar(0);
+processar(-1);
+</pre>
+<pre class="solucao">&lt;?php
+function processar(int $qtd): void
+{
+    echo "Abrindo o caixa\n";
+    try {
+        if ($qtd &lt;= 0) {
+            throw new Exception("Quantidade inválida: $qtd");
+        }
+        echo "Vendidos: $qtd\n";
+    } catch (Exception $e) {
+        echo "Erro: ", $e-&gt;getMessage(), "\n";
+    } finally {
+        echo "Fechando o caixa\n";
+    }
+}
+processar(3);
+processar(0);
+processar(-1);
+</pre>
+</div>
+
+<hr>
+
+<h2><code>Exception</code>, <code>Error</code> e <code>Throwable</code></h2>
+<p>Lembra da aula anterior? No PHP 8 há <strong>duas famílias</strong> de coisas que podem ser lançadas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Família</th><th>Quem lança</th><th>Exemplos</th></tr>
+<tr><td><code>Exception</code></td><td>O <strong>seu</strong> código e as bibliotecas, para problemas "esperados" (dado inválido, arquivo ruim, regra de negócio)</td><td><code>Exception</code>, <code>InvalidArgumentException</code>, <code>RuntimeException</code>, <code>JsonException</code></td></tr>
+<tr><td><code>Error</code></td><td>O <strong>próprio PHP</strong>, para erros de programação</td><td><code>TypeError</code>, <code>ValueError</code>, <code>DivisionByZeroError</code>, função inexistente</td></tr>
+</table>
+</div>
+
+<p>As duas são "filhas" da interface <code>Throwable</code> ("lançável"). E um <code>catch</code> só pega o tipo que ele nomeia <strong>e os filhos dele</strong>. Por isso, <code>catch (Exception $e)</code> <strong>não</strong> pega um <code>Error</code>:</p>
+
+<pre class="file" data-file="exception-error.php">&lt;?php
+try {
+    echo intdiv(10, 0);
+} catch (Exception $e) {
+    echo "Peguei: ", $e-&gt;getMessage(), "\n";
+}
+echo "Fim\n";
+</pre>
+
+<pre class="term">$ php exception-error.php
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/exc/exception-error.php:3
+Stack trace:
+#0 /home/ana/exc/exception-error.php(3): intdiv(10, 0)
+#1 {main}
+  thrown in /home/ana/exc/exception-error.php on line 3</pre>
+
+<p>O <code>catch</code> foi ignorado, porque <code>DivisionByZeroError</code> é da família <code>Error</code>. Para pegar <strong>qualquer coisa</strong>, capture <code>Throwable</code>:</p>
+
+<pre class="file" data-file="throwable.php">&lt;?php
+try {
+    echo intdiv(10, 0);
+} catch (Throwable $e) {
+    echo "Peguei ", get_class($e), ": ", $e-&gt;getMessage(), "\n";
+}
+var_dump($e instanceof Error, $e instanceof Exception, $e instanceof Throwable);
+</pre>
+
+<pre class="term">$ php throwable.php
+Peguei DivisionByZeroError: Division by zero
+bool(true)          « é um Error
+bool(false)         « não é uma Exception
+bool(true)          « e todo mundo é Throwable</pre>
+
+<p><code>get_class($e)</code> diz a classe exata da exceção; <code>instanceof</code> ("é instância de") pergunta se ela pertence a uma família.</p>
+
+<div class="tip">
+<strong>Qual capturar?</strong>
+<p>Capture o tipo <strong>mais específico</strong> que você sabe tratar (<code>JsonException</code>, <code>InvalidArgumentException</code>). Capturar <code>Throwable</code> esconde erros de programação, que deveriam aparecer e ser consertados. Ele é útil num ponto só, "lá no alto" do programa, para mostrar uma página de erro amigável e registrar o problema.</p>
+</div>
+
+<hr>
+
+<h2>Vários tipos de exceção</h2>
+
+<h3>Vários <code>catch</code></h3>
+<p>Um <code>try</code> pode ter vários <code>catch</code>, um para cada tipo, cada um com seu tratamento. O PHP testa de cima para baixo e usa o <strong>primeiro</strong> que servir:</p>
+
+<pre class="file" data-file="varios.php">&lt;?php
+function dividir_conta(float $total, int $pessoas): float
+{
+    if ($total &lt; 0) {
+        throw new InvalidArgumentException('Total negativo');
+    }
+    return $total / $pessoas;
+}
+foreach ([[90, 3], [-5, 2], [90, 0]] as [$t, $p]) {
+    try {
+        $parte = dividir_conta($t, $p);
+        echo "Cada um paga $parte\n";
+    } catch (InvalidArgumentException $e) {
+        echo "Valor errado: ", $e-&gt;getMessage(), "\n";
+    } catch (DivisionByZeroError $e) {
+        echo "Ninguém para pagar: ", $e-&gt;getMessage(), "\n";
+    } catch (Throwable $e) {
+        echo "Outro problema: ", $e-&gt;getMessage(), "\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php varios.php
+Cada um paga 30
+Valor errado: Total negativo
+Ninguém para pagar: Division by zero</pre>
+
+<p>Como o primeiro que serve ganha, ponha os tipos <strong>específicos primeiro</strong> e os gerais depois. Ao contrário, o geral "rouba" tudo:</p>
+
+<pre class="file" data-file="ordem.php">&lt;?php
+try {
+    throw new InvalidArgumentException('x');
+} catch (Exception $e) {
+    echo "Caiu no catch de Exception\n";
+} catch (InvalidArgumentException $e) {
+    echo "Caiu no catch específico\n";
+}
+</pre>
+
+<pre class="term">$ php ordem.php
+Caiu no catch de Exception        « InvalidArgumentException é filha de Exception: o primeiro serviu</pre>
+
+<h3>Vários tipos num <code>catch</code> só: <code>|</code></h3>
+<p>Quando o tratamento é o mesmo para tipos diferentes, junte-os com <code>|</code> ("ou"):</p>
+
+<pre class="file" data-file="multi.php">&lt;?php
+function ler_pedido(string $json): array
+{
+    $dados = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+    if (!isset($dados['quantidade'])) {
+        throw new InvalidArgumentException('Falta a quantidade');
+    }
+    return $dados;
+}
+
+foreach (['{"quantidade": 2}', '{"quantidade": ', '{"produto": "bolo"}', '[1, 2]'] as $json) {
+    try {
+        $p = ler_pedido($json);
+        echo "OK: {$p['quantidade']} unidade(s)\n";
+    } catch (JsonException | InvalidArgumentException $e) {
+        echo "Pedido recusado (", get_class($e), "): ", $e-&gt;getMessage(), "\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php multi.php
+OK: 2 unidade(s)
+Pedido recusado (JsonException): Syntax error                       « o JSON quebrado (aula JSON)
+Pedido recusado (InvalidArgumentException): Falta a quantidade
+Pedido recusado (InvalidArgumentException): Falta a quantidade</pre>
+
+<h3>As exceções prontas do PHP</h3>
+<p>Antes de criar as suas (próxima aula), saiba que o PHP já tem várias, com nomes que explicam o problema. As mais usadas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Classe</th><th>Use quando…</th></tr>
+<tr><td><code>InvalidArgumentException</code></td><td>Um argumento recebido é inválido (quantidade negativa, e-mail vazio).</td></tr>
+<tr><td><code>DomainException</code></td><td>O valor não faz sentido no assunto do programa (um desconto de 150%).</td></tr>
+<tr><td><code>LengthException</code></td><td>Tamanho errado (CPF com 9 dígitos).</td></tr>
+<tr><td><code>RangeException</code> / <code>OutOfRangeException</code></td><td>Valor fora da faixa permitida (nota 11) / índice que não existe.</td></tr>
+<tr><td><code>RuntimeException</code></td><td>Algo deu errado durante a execução e não é culpa do código (disco cheio, serviço fora do ar).</td></tr>
+<tr><td><code>LogicException</code></td><td>Erro de lógica do programa, que deveria ser consertado no código.</td></tr>
+<tr><td><code>UnexpectedValueException</code></td><td>Uma função devolveu um valor inesperado.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>O que tem dentro de uma exceção</h2>
+<p>A exceção é um objeto com bastante informação. Os métodos (todos começam com <code>get</code>, "pegar"):</p>
+
+<pre class="file" data-file="metodos.php">&lt;?php
+function validar(int $nota): void
+{
+    if ($nota &lt; 0 || $nota &gt; 10) {
+        throw new RangeException("Nota fora da faixa: $nota", 42);
+    }
+}
+function lancar_notas(array $notas): void
+{
+    foreach ($notas as $n) {
+        validar($n);
+    }
+}
+try {
+    lancar_notas([7, 9, 11]);
+} catch (RangeException $e) {
+    echo "Mensagem: ", $e-&gt;getMessage(), "\n";
+    echo "Código:   ", $e-&gt;getCode(), "\n";
+    echo "Arquivo:  ", $e-&gt;getFile(), "\n";
+    echo "Linha:    ", $e-&gt;getLine(), "\n";
+    echo "Rastro:\n", $e-&gt;getTraceAsString(), "\n";
+}
+</pre>
+
+<pre class="term">$ php metodos.php
+Mensagem: Nota fora da faixa: 11
+Código:   42                         « o 2º argumento do new (padrão: 0)
+Arquivo:  /home/ana/exc/metodos.php
+Linha:    5                          « onde a exceção foi criada
+Rastro:
+#0 /home/ana/exc/metodos.php(11): validar(11)
+#1 /home/ana/exc/metodos.php(15): lancar_notas(Array)
+#2 {main}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Método</th><th>Devolve</th></tr>
+<tr><td><code>getMessage()</code></td><td>A mensagem.</td></tr>
+<tr><td><code>getCode()</code></td><td>Um código numérico opcional (o 2º argumento do construtor).</td></tr>
+<tr><td><code>getFile()</code> / <code>getLine()</code></td><td>Arquivo e linha onde a exceção foi criada.</td></tr>
+<tr><td><code>getTraceAsString()</code></td><td>O rastro de chamadas, como texto (ótimo para o registro de erros).</td></tr>
+<tr><td><code>getTrace()</code></td><td>O mesmo rastro, como array.</td></tr>
+<tr><td><code>getPrevious()</code></td><td>A exceção "anterior", que causou esta (ou <code>null</code>).</td></tr>
+</table>
+</div>
+
+<p>E se você der <code>echo</code> na exceção inteira, o PHP mostra tudo junto, no mesmo formato do erro fatal:</p>
+
+<pre class="term">$ php tostring.php      « catch (LogicException $e) { echo $e, "\n"; }
+LogicException: Desconto maior que o preço in /home/ana/exc/tostring.php:3
+Stack trace:
+#0 {main}</pre>
+
+<h3>Uma exceção causada por outra: <code>getPrevious</code></h3>
+<p>Às vezes você captura uma exceção "técnica" e lança outra com uma mensagem mais útil, guardando a original como <strong>causa</strong> (o 3º argumento do construtor):</p>
+
+<pre class="file" data-file="previous.php">&lt;?php
+function carregar_config(string $arquivo): array
+{
+    try {
+        return json_decode(file_get_contents($arquivo), true, flags: JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        throw new RuntimeException("Configuração inválida em $arquivo", 0, $e);
+    }
+}
+file_put_contents('config.json', '{"frete": 12,5}');
+try {
+    carregar_config('config.json');
+} catch (RuntimeException $e) {
+    echo $e-&gt;getMessage(), "\n";
+    echo "Causa: ", $e-&gt;getPrevious()-&gt;getMessage(), "\n";
+}
+</pre>
+
+<pre class="term">$ php previous.php
+Configuração inválida em config.json
+Causa: Syntax error                   « 12,5 não é número em JSON</pre>
+
+<h3>Capturar, anotar e relançar</h3>
+<p>Um <code>catch</code> pode fazer alguma coisa (como registrar) e lançar a mesma exceção de novo com <code>throw $e;</code>, para quem estiver acima decidir:</p>
+
+<pre class="file" data-file="rethrow.php">&lt;?php
+function salvar(): void
+{
+    try {
+        throw new RuntimeException('Disco cheio');
+    } catch (RuntimeException $e) {
+        error_log('Falha ao salvar: ' . $e-&gt;getMessage());
+        throw $e;
+    }
+}
+salvar();
+</pre>
+
+<pre class="term">$ php rethrow.php
+Falha ao salvar: Disco cheio         « o error_log (no terminal, sem arquivo de log, sai na tela)
+
+Fatal error: Uncaught RuntimeException: Disco cheio in /home/ana/exc/rethrow.php:5
+Stack trace:
+#0 /home/ana/exc/rethrow.php(11): salvar()
+#1 {main}
+  thrown in /home/ana/exc/rethrow.php on line 5</pre>
+
+<hr>
+
+<h2>Novidades do PHP 8</h2>
+
+<h3><code>throw</code> como expressão <span class="versao">PHP 8.0+</span></h3>
+<p>Antes, <code>throw</code> era uma instrução e só podia ficar sozinho numa linha. Desde o PHP 8.0 ele é uma <strong>expressão</strong>, e cabe em lugares como depois do <code>??</code>, num ternário ou numa arrow function:</p>
+
+<pre class="file" data-file="expressao.php">&lt;?php
+function preco(array $produto): float
+{
+    return $produto['preco'] ?? throw new InvalidArgumentException("Produto {$produto['nome']} sem preço");
+}
+echo preco(['nome' =&gt; 'Bolo', 'preco' =&gt; 35.0]), "\n";
+try {
+    echo preco(['nome' =&gt; 'Torta']), "\n";
+} catch (InvalidArgumentException $e) {
+    echo $e-&gt;getMessage(), "\n";
+}
+$desconto = fn(float $p) =&gt; $p &gt; 0 ? $p * 0.9 : throw new ValueError('Preço deve ser positivo');
+echo $desconto(10), "\n";
+</pre>
+
+<pre class="term">$ php expressao.php
+35
+Produto Torta sem preço
+9</pre>
+
+<p>Lê-se: "devolva o preço; se não houver (<code>??</code>), lance a exceção". Em versões antigas, seria um <code>if (!isset(…)) { throw …; }</code> antes do <code>return</code>.</p>
+
+<h3><code>catch</code> sem variável <span class="versao">PHP 8.0+</span></h3>
+<p>Se você não vai usar o <code>$e</code>, pode omiti-lo:</p>
+
+<pre class="file" data-file="semvar.php">&lt;?php
+try {
+    $dados = json_decode('{x}', flags: JSON_THROW_ON_ERROR);
+} catch (JsonException) {
+    echo "JSON inválido, usando valores padrão\n";
+    $dados = [];
+}
+</pre>
+
+<pre class="term">$ php semvar.php
+JSON inválido, usando valores padrão</pre>
+
+<hr>
+
+<h2>Exceção × devolver <code>false</code></h2>
+<p>Muitas funções antigas do PHP avisam o erro devolvendo <code>false</code> (como <code>file_get_contents</code>). Por que as funções novas, e as suas, preferem exceções?</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Devolver <code>false</code>/<code>null</code></th><th>Lançar exceção</th></tr>
+<tr><td>Se quem chamou esquecer de conferir</td><td>O programa segue com um valor errado e quebra longe dali</td><td>O programa para com uma mensagem clara, na linha certa</td></tr>
+<tr><td>Explicar o motivo</td><td>Não dá (é só <code>false</code>)</td><td>Mensagem, código, tipo, causa</td></tr>
+<tr><td>Tratar em outro lugar</td><td>Cada nível de função precisa repassar o <code>false</code></td><td>A exceção sobe sozinha até quem tiver um <code>catch</code></td></tr>
+<tr><td>Quando usar</td><td>Quando "não achei" é um resultado normal (procurar um item numa lista)</td><td>Quando é um problema de verdade</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Fatal error: Uncaught …"</strong>
+<pre class="term">Fatal error: Uncaught Exception: Estoque insuficiente: pediu 5, tem 2 in /home/ana/exc/lancar.php:5</pre>
+<p><strong>O que significa:</strong> uma exceção foi lançada e nenhum <code>catch</code> no caminho a capturou.</p>
+<p><strong>Como consertar:</strong> veja no <code>Stack trace</code> qual chamada levou ao problema e coloque um <code>try</code>/<code>catch</code> no nível que sabe o que fazer (mostrar uma mensagem ao cliente, por exemplo). Ou conserte a causa, se for erro de programação.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>catch</code> não pegou a exceção</strong>
+<p><strong>O que significa:</strong> o tipo no <code>catch</code> não é o da exceção nem um "pai" dela. O caso clássico: <code>catch (Exception $e)</code> com um <code>TypeError</code> ou <code>DivisionByZeroError</code>, que são da família <code>Error</code>.</p>
+<p><strong>Como consertar:</strong> capture o tipo certo (a mensagem de erro diz qual: <code>Uncaught DivisionByZeroError</code>), ou <code>Throwable</code> se for mesmo para pegar tudo.</p>
+</div>
+
+<div class="cenario">
+<strong>"Can only throw objects"</strong>
+<pre class="term">$ php throwstring.php      « throw "Estoque insuficiente";
+
+Fatal error: Uncaught Error: Can only throw objects in /home/ana/exc/throwstring.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/exc/throwstring.php on line 2</pre>
+<p><strong>O que significa:</strong> "só é possível lançar objetos". Um texto não é uma exceção.</p>
+<p><strong>Como consertar:</strong> <code>throw new Exception("Estoque insuficiente");</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Um <code>catch</code> vazio "engolindo" erros</strong>
+<p><code>try { … } catch (Throwable $e) { }</code> faz qualquer problema sumir sem deixar rastro. O programa continua com dados pela metade e ninguém sabe por quê.</p>
+<p><strong>Como consertar:</strong> todo <code>catch</code> deve <strong>fazer</strong> algo: tratar, registrar (<code>error_log($e)</code>) ou relançar.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintaxe</th><th>O que faz</th></tr>
+<tr><td><code>throw new Exception($msg, $codigo, $anterior);</code></td><td>Lança uma exceção.</td></tr>
+<tr><td><code>try { … } catch (Tipo $e) { … }</code></td><td>Captura exceções do tipo (e filhos).</td></tr>
+<tr><td><code>catch (TipoA | TipoB $e)</code></td><td>Captura qualquer um dos tipos.</td></tr>
+<tr><td><code>catch (Tipo)</code> <span class="versao">8.0+</span></td><td>Captura sem guardar em variável.</td></tr>
+<tr><td><code>finally { … }</code></td><td>Roda sempre, com ou sem exceção.</td></tr>
+<tr><td><code>throw $e;</code></td><td>Relança a exceção capturada.</td></tr>
+<tr><td><code>$x ?? throw new …</code> <span class="versao">8.0+</span></td><td><code>throw</code> como expressão.</td></tr>
+<tr><td><code>Throwable</code> → <code>Exception</code> / <code>Error</code></td><td>As duas famílias.</td></tr>
+<tr><td><code>getMessage</code>, <code>getCode</code>, <code>getFile</code>, <code>getLine</code>, <code>getTraceAsString</code>, <code>getPrevious</code></td><td>Informações da exceção.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Lançar</h3>
+<p>Complete para lançar uma exceção com a mensagem "Sem estoque":</p>
+<div class="ex-code"><input data-answer="throw new Exception" aria-label="código">("Sem estoque");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Pegar tudo</h3>
+<p>Complete para capturar exceções <strong>e</strong> erros do PHP:</p>
+<div class="ex-code">} catch (<input data-answer="Throwable" aria-label="tipo"> $e) {</div>
+</div>
+
+<div class="exercise">
+<h3>3. A mensagem</h3>
+<p>Complete para mostrar a mensagem da exceção:</p>
+<div class="ex-code">echo $e-&gt;<input data-answer="getMessage()|getMessage" aria-label="método">;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Num <code>try</code>, a linha 2 lança uma exceção que é capturada. O que acontece com a linha 3 do <code>try</code>?</p>
+<label><input type="radio" name="q4"> Roda depois do <code>catch</code>.</label>
+<label><input type="radio" name="q4"> Roda antes do <code>catch</code>.</label>
+<label><input type="radio" name="q4"> Não roda: o PHP pula direto para o <code>catch</code>.</label>
+<label><input type="radio" name="q4"> Roda só se houver <code>finally</code>.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. <code>catch (Exception $e)</code> captura um <code>TypeError</code>?</p>
+<label><input type="radio" name="q5"> Sim, toda exceção é <code>Exception</code>.</label>
+<label><input type="radio" name="q5"> Não: <code>TypeError</code> é da família <code>Error</code>; use <code>TypeError</code> ou <code>Throwable</code>.</label>
+<label><input type="radio" name="q5"> Só no PHP 7.</label>
+<label><input type="radio" name="q5"> Só se houver <code>finally</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Quando o bloco <code>finally</code> roda?</p>
+<label><input type="radio" name="q6"> Sempre: com exceção, sem exceção, e até depois de um <code>return</code> no <code>try</code>.</label>
+<label><input type="radio" name="q6"> Só quando há exceção.</label>
+<label><input type="radio" name="q6"> Só quando não há exceção.</label>
+<label><input type="radio" name="q6"> Só quando a exceção não é capturada.</label>
+</div>
+
+<div class="tryphp" data-goal="out:bolo: 3 unidade(s),out:Linha 2 recusada: Quantidade inválida: abc,out:Linha 3 recusada: Quantidade inválida: -2,out:Linha 4 recusada: Falta a quantidade,out:Total: 8 unidade(s),src:throw">
+<p class="try-task"><strong>Missão final:</strong> complete a função <code>ler_linha</code>. Ela recebe um texto como <code>"bolo;3"</code> e devolve <code>['bolo', 3]</code>. Se faltar a quantidade, lance <code>InvalidArgumentException</code> com <code>Falta a quantidade</code>; se a quantidade não for um número inteiro positivo, lance <code>InvalidArgumentException</code> com <code>Quantidade inválida: …</code>. No laço, capture e mostre <code>Linha N recusada: mensagem</code>, e no fim mostre o total das linhas válidas (<code>Total: 8 unidade(s)</code>). Dica: <code>ctype_digit('3')</code> é <code>true</code>; <code>ctype_digit('-2')</code> e <code>ctype_digit('abc')</code> são <code>false</code>.</p>
+<pre class="script">&lt;?php
+function ler_linha(string $linha): array
+{
+    $partes = explode(';', $linha);
+    // seu código aqui
+}
+
+$pedido = ['bolo;3', 'torta;abc', 'brigadeiro;-2', 'pudim', 'cocada;5'];
+$total = 0;
+foreach ($pedido as $i =&gt; $linha) {
+    [$produto, $qtd] = ler_linha($linha);
+    echo "$produto: $qtd unidade(s)\n";
+    $total += $qtd;
+}
+echo "Total: $total unidade(s)\n";
+</pre>
+<pre class="solucao">&lt;?php
+function ler_linha(string $linha): array
+{
+    $partes = explode(';', $linha);
+    $qtd = $partes[1] ?? throw new InvalidArgumentException('Falta a quantidade');
+    if (!ctype_digit($qtd) || (int) $qtd === 0) {
+        throw new InvalidArgumentException("Quantidade inválida: $qtd");
+    }
+    return [$partes[0], (int) $qtd];
+}
+
+$pedido = ['bolo;3', 'torta;abc', 'brigadeiro;-2', 'pudim', 'cocada;5'];
+$total = 0;
+foreach ($pedido as $i =&gt; $linha) {
+    try {
+        [$produto, $qtd] = ler_linha($linha);
+        echo "$produto: $qtd unidade(s)\n";
+        $total += $qtd;
+    } catch (InvalidArgumentException $e) {
+        echo "Linha " . ($i + 1) . " recusada: " . $e-&gt;getMessage() . "\n";
+    }
+}
+echo "Total: $total unidade(s)\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>throw new Exception("mensagem")</code> interrompe a função e "sobe" até um <code>catch</code>; sem nenhum, vira <code>Fatal error: Uncaught …</code>.</li>
+  <li><code>try { … } catch (Tipo $e) { … }</code>: se algo no <code>try</code> lançar, o resto do <code>try</code> é pulado e o <code>catch</code> que servir roda.</li>
+  <li><code>finally</code> roda sempre.</li>
+  <li><code>Throwable</code> é a raiz; <code>Exception</code> é do seu código, <code>Error</code> é do PHP. <code>catch (Exception)</code> não pega <code>Error</code>.</li>
+  <li>Vários <code>catch</code> (do específico ao geral) ou <code>catch (A | B $e)</code>.</li>
+  <li><code>getMessage</code>, <code>getCode</code>, <code>getLine</code>, <code>getTraceAsString</code>, <code>getPrevious</code> contam o que houve.</li>
+  <li>No PHP 8, <code>throw</code> é expressão (<code>?? throw …</code>) e o <code>catch</code> pode vir sem variável.</li>
+</ul>
+
+<p>Próxima aula: <a href="excecoes-proprias.html">Criar suas Exceções</a>, como a <code>EstoqueInsuficienteException</code> da lojinha.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
