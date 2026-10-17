@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP CRUD com PDO — criar, listar, atualizar e apagar registros | Guia PHP</title>
+<meta name="description" content="CRUD com PDO e SQLite para quem está começando: cadastrar (INSERT e lastInsertId), listar e buscar (SELECT, fetch, fetchAll), atualizar (UPDATE e rowCount) e apagar (DELETE) os produtos da lojinha da Ana, e uma página web de cadastro. Saídas reais do PHP 8.5 e missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">CRUD com PDO</span></h1>
+
+<p class="intro">Quase todo sistema que guarda dados faz só quatro coisas com eles: <strong>cria</strong>, <strong>lê</strong>, <strong>atualiza</strong> e <strong>apaga</strong>. Em inglês, <em>Create, Read, Update, Delete</em>: as iniciais formam <strong>CRUD</strong>, a palavra que todo programador usa para isso. Nesta aula, a Ana vai montar o cadastro de produtos da lojinha com PDO e SQLite: um programa para cada uma das quatro operações e, no fim, uma página web de cadastro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é CRUD e qual comando SQL faz cada letra.</li>
+  <li>Como cadastrar com <code>INSERT</code> e descobrir o id novo com <code>lastInsertId()</code>.</li>
+  <li>Como listar com <code>fetchAll()</code> e buscar um registro só com <code>fetch()</code> (e o que fazer quando ele não existe).</li>
+  <li>Como atualizar com <code>UPDATE</code> e apagar com <code>DELETE</code>, conferindo com <code>rowCount()</code> quantas linhas mudaram.</li>
+  <li>Por que o <code>WHERE</code> é a parte mais importante do <code>UPDATE</code> e do <code>DELETE</code>.</li>
+  <li>Como juntar tudo numa página web com formulário.</li>
+</ul>
+</div>
+
+<p>Antes, veja <a href="banco-dados.html">Banco de Dados: o Básico</a> (o que são tabelas e SQL) e <a href="pdo.html">Conectar com PDO</a> (<code>new PDO</code>, <code>query</code>, <code>exec</code>, <code>fetch</code>). Os programas foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/loja</code>, e cada sessão de terminal continua a anterior: o banco vai mudando ao longo da aula.</p>
+
+<hr>
+
+<h2>A ideia: o fichário da loja</h2>
+<p>Antes do computador, a Ana tinha um <strong>fichário</strong> com uma ficha por produto. O que ela fazia com ele?</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Letra</th><th>Inglês</th><th>No fichário</th><th>No SQL</th><th>No PDO</th></tr>
+<tr><td><strong>C</strong></td><td>Create (criar)</td><td>Escrever uma ficha nova e numerá-la</td><td><code>INSERT</code></td><td><code>prepare</code> + <code>execute</code>, <code>lastInsertId()</code></td></tr>
+<tr><td><strong>R</strong></td><td>Read (ler)</td><td>Folhear todas, ou puxar a ficha nº 3</td><td><code>SELECT</code></td><td><code>query</code>/<code>execute</code> + <code>fetchAll()</code>/<code>fetch()</code></td></tr>
+<tr><td><strong>U</strong></td><td>Update (atualizar)</td><td>Riscar o preço e escrever o novo</td><td><code>UPDATE</code></td><td><code>prepare</code> + <code>execute</code>, <code>rowCount()</code></td></tr>
+<tr><td><strong>D</strong></td><td>Delete (apagar)</td><td>Tirar a ficha do fichário</td><td><code>DELETE</code></td><td><code>prepare</code> + <code>execute</code>, <code>rowCount()</code></td></tr>
+</table>
+</div>
+
+<p>O número da ficha é o <strong>id</strong>, a chave primária: é por ele que a Ana diz "a ficha <strong>3</strong>", sem confusão, mesmo que existam dois produtos com nomes parecidos.</p>
+
+<hr>
+
+<h2>Preparando: a conexão e a tabela</h2>
+<p>Os quatro programas precisam do banco. Em vez de repetir a conexão em cada um, a Ana a guardou num arquivo e o inclui com <code>require</code> (veja <a href="include-require.html">include e require</a>):</p>
+
+<pre class="file" data-file="conexao.php">&lt;?php
+// Abre (ou cria) o arquivo loja.db, na mesma pasta deste arquivo.
+$pdo = new PDO("sqlite:" . __DIR__ . "/loja.db", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+</pre>
+
+<dl class="anatomy">
+  <dt>__DIR__</dt><dd>Constante mágica com a pasta <strong>deste arquivo</strong> (aqui, <code>/home/ana/loja</code>). Assim o banco é sempre o <code>loja.db</code> ao lado dos programas, de qualquer pasta que você os rode. O <a href="#cenarios">cenário</a> do fim da aula mostra o que acontece sem isso.</dd>
+  <dt>options: [...]</dt><dd>As opções da conexão, passadas pelo nome do parâmetro (<a href="parametros.html">argumento nomeado</a>, <span class="versao">PHP 8.0+</span>), porque o SQLite não usa usuário e senha. É o mesmo que <code>new PDO($dsn, null, null, [...])</code>.</dd>
+  <dt>ERRMODE_EXCEPTION</dt><dd>Erro de SQL vira exceção (o padrão desde o PHP 8.0).</dd>
+  <dt>FETCH_ASSOC</dt><dd>Cada linha volta como array associativo: <code>$p["nome"]</code>.</dd>
+</dl>
+
+<p>A tabela é criada uma vez, por um programa só para isso:</p>
+
+<pre class="file" data-file="criar-tabela.php">&lt;?php
+require "conexao.php";
+
+$pdo-&gt;exec("CREATE TABLE IF NOT EXISTS produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+
+echo "Tabela produtos pronta.\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>IF NOT EXISTS</code></td><td>"Se ainda não existir": rodar o programa de novo não dá erro nem apaga nada.</td></tr>
+<tr><td><code>id INTEGER PRIMARY KEY</code></td><td>O número da ficha. O SQLite preenche sozinho (1, 2, 3…) quando você não informa.</td></tr>
+<tr><td><code>NOT NULL</code></td><td>A coluna é obrigatória.</td></tr>
+<tr><td><code>DEFAULT 0</code></td><td>Se o estoque não for informado, vale 0.</td></tr>
+</table>
+</div>
+
+<pre class="term" data-cwd="~/loja">$ php criar-tabela.php
+Tabela produtos pronta.
+$ ls -l loja.db
+-rw-r--r-- 1 ana ana 8192 out 16 20:58 loja.db        « o arquivo do banco foi criado
+$ php criar-tabela.php
+Tabela produtos pronta.                                « de novo: sem erro, graças ao IF NOT EXISTS</pre>
+
+<hr>
+
+<h2>C: cadastrar (<code>INSERT</code>)</h2>
+<p>Para cadastrar, a Ana passa o nome, o preço e o estoque na linha de comando (<code>$argv</code>, veja <a href="linha-comando.html">PHP na Linha de Comando</a>). Num site, os valores viriam de um formulário; você vai ver isso no fim da aula.</p>
+
+<pre class="file" data-file="cadastrar.php">&lt;?php
+require "conexao.php";
+
+$nome    = $argv[1];
+$preco   = (float) $argv[2];
+$estoque = (int) $argv[3];
+
+$stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)");
+$stmt-&gt;execute([$nome, $preco, $estoque]);
+
+echo "Produto cadastrado com o id ", $pdo-&gt;lastInsertId(), ".\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>(float), (int)</dt><dd>Tudo o que chega de fora é texto. A Ana converte para número antes de gravar (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</dd>
+  <dt>INSERT INTO produtos (nome, preco, estoque)</dt><dd>"Insira na tabela <code>produtos</code>, nestas colunas…". O <code>id</code> fica de fora: o banco escolhe.</dd>
+  <dt>VALUES (?, ?, ?)</dt><dd>Três lacunas, uma para cada coluna, na mesma ordem.</dd>
+  <dt>$pdo-&gt;prepare(...)</dt><dd>Prepara o comando com as lacunas.</dd>
+  <dt>$stmt-&gt;execute([$nome, $preco, $estoque])</dt><dd>Executa, pondo os três valores nas lacunas, na ordem.</dd>
+  <dt>$pdo-&gt;lastInsertId()</dt><dd>"Último id inserido": o número que o banco acabou de dar ao produto. Vem como <strong>texto</strong> (<code>"1"</code>).</dd>
+</dl>
+
+<div class="warning">
+<strong>Por que <code>?</code> e não <code>'$nome'</code> direto no SQL?</strong>
+<p>Os valores vêm de fora (aqui, do terminal; num site, de qualquer visitante). Colados no SQL, um simples apóstrofo (<code>copo d'água</code>) quebra o comando, e alguém mal-intencionado pode reescrevê-lo. Com <code>prepare</code> e <code>?</code>, o valor nunca vira SQL. Por enquanto, siga a regra: <strong>todo valor variável entra por um <code>?</code></strong>. A aula <a href="prepared-statements.html">Prepared Statements e SQL Injection</a> mostra o ataque e explica tudo em detalhe.</p>
+</div>
+
+<pre class="term" data-cwd="~/loja">$ php cadastrar.php Caderno 15.90 30
+Produto cadastrado com o id 1.
+$ php cadastrar.php "Caneta azul" 2.50 100            « aspas: o nome tem espaço
+Produto cadastrado com o id 2.
+$ php cadastrar.php Mochila 89.90 5
+Produto cadastrado com o id 3.</pre>
+
+<p>Cada execução é um programa novo, mas os produtos ficam: estão gravados no arquivo <code>loja.db</code>. E cada um ganhou o próximo número livre.</p>
+
+<p>No editor do guia, o banco é criado <strong>na memória</strong> a cada vez que você clica em Rodar (veja a aba <code>banco.php</code>): ele já vem com cinco produtos, ids 1 a 5.</p>
+
+<div class="tryphp" data-goal="out:Cadastrado com o id 6,out:#6 Borracha,src:lastInsertId,semerro">
+<p class="try-task"><strong>Missão:</strong> o comando já está preparado. Execute-o com os valores <code>"Borracha"</code>, <code>0.90</code> e <code>50</code> e, logo depois, mostre <code>Cadastrado com o id</code> seguido do id novo (use <code>lastInsertId()</code>). A lista do fim deve mostrar a Borracha com o id 6.</p>
+<pre class="script" data-file="cadastrar.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)");
+// 1. execute o $stmt com "Borracha", 0.90 e 50
+// 2. mostre "Cadastrado com o id " e o id novo
+
+foreach ($pdo-&gt;query("SELECT id, nome FROM produtos") as $p) {
+    echo "#", $p["id"], " ", $p["nome"], "\n";
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30),
+    ('Caneta azul', 2.50, 100),
+    ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200),
+    ('Estojo', 9.90, 12)");
+</pre>
+<pre class="solucao" data-file="cadastrar.php">&lt;?php
+require "banco.php";
+
+$stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)");
+$stmt-&gt;execute(["Borracha", 0.90, 50]);
+echo "Cadastrado com o id ", $pdo-&gt;lastInsertId(), "\n";
+
+foreach ($pdo-&gt;query("SELECT id, nome FROM produtos") as $p) {
+    echo "#", $p["id"], " ", $p["nome"], "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>R: listar e buscar (<code>SELECT</code>)</h2>
+
+<h3>Listar todos: <code>fetchAll()</code></h3>
+<p>Para a lista, não há nenhum valor de fora no SQL, então um <code>query</code> simples basta:</p>
+
+<pre class="file" data-file="listar.php">&lt;?php
+require "conexao.php";
+
+$produtos = $pdo-&gt;query("SELECT id, nome, preco, estoque FROM produtos ORDER BY nome")-&gt;fetchAll();
+
+echo "Produtos cadastrados: ", count($produtos), "\n";
+foreach ($produtos as $p) {
+    echo "#", $p["id"], " ", $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."),
+        " (", $p["estoque"], " em estoque)\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>SELECT id, nome, preco, estoque</dt><dd>As colunas que você quer (melhor que <code>*</code>: fica claro o que o programa usa).</dd>
+  <dt>ORDER BY nome</dt><dd>Em ordem alfabética do nome.</dd>
+  <dt>-&gt;fetchAll()</dt><dd>Busca <strong>todas</strong> as linhas de uma vez: um array de arrays (veja <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>). Se não houver nenhuma, um array vazio.</dd>
+  <dt>count($produtos)</dt><dd>Quantos produtos vieram.</dd>
+  <dt>number_format(…, 2, ",", ".")</dt><dd>Preço no formato brasileiro (veja <a href="number-format.html">Formatar Números</a>).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/loja">$ php listar.php
+Produtos cadastrados: 3
+#1 Caderno: R$ 15,90 (30 em estoque)
+#2 Caneta azul: R$ 2,50 (100 em estoque)
+#3 Mochila: R$ 89,90 (5 em estoque)</pre>
+
+<h3>Buscar um só: <code>fetch()</code></h3>
+<p>Para ver um produto pelo id, o id vem de fora, então volta o <code>prepare</code>. E como o resultado é <strong>uma</strong> linha (ou nenhuma), usa-se <code>fetch()</code>:</p>
+
+<pre class="file" data-file="ver.php">&lt;?php
+require "conexao.php";
+
+$id = (int) $argv[1];
+
+$stmt = $pdo-&gt;prepare("SELECT * FROM produtos WHERE id = ?");
+$stmt-&gt;execute([$id]);
+$produto = $stmt-&gt;fetch();
+
+if ($produto === false) {
+    echo "Não existe produto com o id $id.\n";
+} else {
+    echo $produto["nome"], " custa R$ ", number_format($produto["preco"], 2, ",", "."), "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php ver.php 3
+Mochila custa R$ 89,90
+$ php ver.php 42
+Não existe produto com o id 42.</pre>
+
+<dl class="anatomy">
+  <dt>WHERE id = ?</dt><dd>Só a linha com aquele id. Como o id é a chave primária, vem no máximo uma.</dd>
+  <dt>$stmt-&gt;fetch()</dt><dd>Pega a <strong>próxima</strong> linha do resultado, como array. Se não houver mais linhas (ou nenhuma), devolve <code>false</code>.</dd>
+  <dt>$produto === false</dt><dd>Sempre confira antes de usar: "não achei" é um caso normal, não um erro do banco (veja o <a href="#cenarios">cenário</a> do <code>Trying to access array offset on false</code>).</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quero…</th><th>Use</th><th>Devolve</th></tr>
+<tr><td>Todas as linhas</td><td><code>fetchAll()</code></td><td>Array de linhas (vazio se nada)</td></tr>
+<tr><td>Uma linha (por id, por e-mail…)</td><td><code>fetch()</code></td><td>A linha, ou <code>false</code></td></tr>
+<tr><td>Um valor só (uma contagem, um preço)</td><td><code>fetchColumn()</code></td><td>O valor da 1ª coluna, ou <code>false</code></td></tr>
+<tr><td>Percorrer muitas linhas sem guardar todas</td><td><code>foreach ($stmt as $linha)</code></td><td>Uma linha por volta</td></tr>
+</table>
+</div>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque o <code>$id</code> por outros números (de 1 a 5, e depois um que não existe). Depois, mude o SQL para buscar pelo nome: <code>WHERE nome = ?</code> e <code>execute(["Mochila"])</code>.</p>
+<pre class="script" data-file="ver.php">&lt;?php
+require "banco.php";
+
+$id = 2;
+
+$stmt = $pdo-&gt;prepare("SELECT * FROM produtos WHERE id = ?");
+$stmt-&gt;execute([$id]);
+$produto = $stmt-&gt;fetch();
+
+if ($produto === false) {
+    echo "Não existe produto com o id $id.\n";
+} else {
+    print_r($produto);
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30),
+    ('Caneta azul', 2.50, 100),
+    ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200),
+    ('Estojo', 9.90, 12)");
+</pre>
+</div>
+
+<hr>
+
+<h2>U: atualizar (<code>UPDATE</code>)</h2>
+<p>O Caderno subiu de preço. O programa recebe o id e o preço novo:</p>
+
+<pre class="file" data-file="atualizar-preco.php">&lt;?php
+require "conexao.php";
+
+$id    = (int) $argv[1];
+$preco = (float) $argv[2];
+
+$stmt = $pdo-&gt;prepare("UPDATE produtos SET preco = ? WHERE id = ?");
+$stmt-&gt;execute([$preco, $id]);
+
+echo $stmt-&gt;rowCount(), " produto(s) atualizado(s).\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>UPDATE produtos</dt><dd>"Altere a tabela <code>produtos</code>…"</dd>
+  <dt>SET preco = ?</dt><dd>"…pondo este valor na coluna <code>preco</code>…". Para mudar várias colunas: <code>SET preco = ?, estoque = ?</code>.</dd>
+  <dt>WHERE id = ?</dt><dd>"…<strong>só</strong> na linha com este id." Sem o <code>WHERE</code>, seriam <strong>todas</strong> as linhas.</dd>
+  <dt>[$preco, $id]</dt><dd>Os valores na ordem em que os <code>?</code> aparecem: primeiro o do <code>SET</code>, depois o do <code>WHERE</code>.</dd>
+  <dt>$stmt-&gt;rowCount()</dt><dd>"Contagem de linhas": quantas linhas o comando mudou.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/loja">$ php atualizar-preco.php 1 17.50
+1 produto(s) atualizado(s).
+$ php atualizar-preco.php 42 1.00
+0 produto(s) atualizado(s).                « não existe o id 42: não é erro, só não mudou nada
+$ php listar.php
+Produtos cadastrados: 3
+#1 Caderno: R$ 17,50 (30 em estoque)
+#2 Caneta azul: R$ 2,50 (100 em estoque)
+#3 Mochila: R$ 89,90 (5 em estoque)</pre>
+
+<p>Repare: um <code>UPDATE</code> que não encontra nenhuma linha <strong>não dá erro</strong>. Para o banco, "mudar zero linhas" é um resultado válido. Se isso importa para você (e quase sempre importa: o usuário quer saber se deu certo), confira o <code>rowCount()</code>.</p>
+
+<div class="tip">
+<strong>Contas dentro do SQL</strong>
+<p>O <code>SET</code> pode usar o valor que já está na coluna: <code>SET estoque = estoque - 1</code> (vendeu um) ou <code>SET preco = preco * 1.10</code> (10% mais caro). O banco faz a conta linha por linha.</p>
+</div>
+
+<div class="tryphp" data-goal="out:2 produto(s) reajustado(s),out:Lápis: R$ 1\,32,out:Caneta azul: R$ 2\,75,src:rowCount,semerro">
+<p class="try-task"><strong>Missão:</strong> reajuste em 10% o preço dos produtos que custam <strong>menos</strong> que <code>$limite</code> (use <code>preco = preco * 1.10</code> e <code>WHERE preco &lt; ?</code>) e mostre quantos foram alterados com <code>rowCount()</code>. A saída deve começar assim:</p>
+<pre class="out">2 produto(s) reajustado(s)
+Lápis: R$ 1,32
+Caneta azul: R$ 2,75
+Estojo: R$ 9,90
+…</pre>
+<pre class="script" data-file="reajuste.php">&lt;?php
+require "banco.php";
+
+$limite = 5.00;
+// reajuste aqui os produtos que custam menos que $limite
+// e mostre "N produto(s) reajustado(s)"
+
+foreach ($pdo-&gt;query("SELECT nome, preco FROM produtos ORDER BY preco") as $p) {
+    echo $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Cria a lojinha da Ana na memória, com 5 produtos.
+$pdo = new PDO("sqlite::memory:", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+$pdo-&gt;exec("CREATE TABLE produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30),
+    ('Caneta azul', 2.50, 100),
+    ('Mochila', 89.90, 5),
+    ('Lápis', 1.20, 200),
+    ('Estojo', 9.90, 12)");
+</pre>
+<pre class="solucao" data-file="reajuste.php">&lt;?php
+require "banco.php";
+
+$limite = 5.00;
+$stmt = $pdo-&gt;prepare("UPDATE produtos SET preco = preco * 1.10 WHERE preco &lt; ?");
+$stmt-&gt;execute([$limite]);
+echo $stmt-&gt;rowCount(), " produto(s) reajustado(s)\n";
+
+foreach ($pdo-&gt;query("SELECT nome, preco FROM produtos ORDER BY preco") as $p) {
+    echo $p["nome"], ": R$ ", number_format($p["preco"], 2, ",", "."), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>D: apagar (<code>DELETE</code>)</h2>
+<p>A Caneta azul saiu de linha:</p>
+
+<pre class="file" data-file="apagar.php">&lt;?php
+require "conexao.php";
+
+$id = (int) $argv[1];
+
+$stmt = $pdo-&gt;prepare("DELETE FROM produtos WHERE id = ?");
+$stmt-&gt;execute([$id]);
+
+if ($stmt-&gt;rowCount() === 0) {
+    echo "Nada apagado: não existe produto com o id $id.\n";
+} else {
+    echo "Produto $id apagado.\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>DELETE FROM produtos</dt><dd>"Apague linhas da tabela <code>produtos</code>…"</dd>
+  <dt>WHERE id = ?</dt><dd>"…só a que tem este id." Mais uma vez: sem <code>WHERE</code>, apaga <strong>todas</strong>.</dd>
+  <dt>rowCount() === 0</dt><dd>Nenhuma linha apagada: o id não existia (ou já tinha sido apagado).</dd>
+</dl>
+
+<pre class="term" data-cwd="~/loja">$ php apagar.php 2
+Produto 2 apagado.
+$ php apagar.php 2
+Nada apagado: não existe produto com o id 2.            « já tinha sido apagado
+$ php listar.php
+Produtos cadastrados: 2
+#1 Caderno: R$ 17,50 (30 em estoque)
+#3 Mochila: R$ 89,90 (5 em estoque)
+$ php cadastrar.php Lápis 1.20 200
+Produto cadastrado com o id 4.                          « o 2 não foi reaproveitado
+$ php listar.php
+Produtos cadastrados: 3
+#1 Caderno: R$ 17,50 (30 em estoque)
+#4 Lápis: R$ 1,20 (200 em estoque)
+#3 Mochila: R$ 89,90 (5 em estoque)</pre>
+
+<p>Um buraco na numeração (não existe mais o 2) é normal e desejável: se alguém guardou "o produto 2" num pedido antigo, ele não vai, de repente, apontar para o Lápis. Não tente "arrumar" os ids.</p>
+
+<div class="note">
+<strong>Apagar de verdade ou só esconder?</strong>
+<p>Muitos sistemas não apagam: marcam o registro como inativo (uma coluna <code>ativo</code> com 0 ou 1, ou <code>apagado_em</code> com a data) e filtram com <code>WHERE ativo = 1</code>. Isso se chama <em>soft delete</em> ("apagar suave") e permite desfazer e manter o histórico de vendas. Para a lojinha, o <code>DELETE</code> basta; em sistemas com pedidos e notas fiscais, pense nisso antes.</p>
+</div>
+
+<hr>
+
+<h2>Juntando tudo: uma página web de cadastro</h2>
+<p>Agora o CRUD vai para o navegador: um formulário para cadastrar e a lista dos produtos logo abaixo, na mesma página. Tudo o que aparece aqui foi visto em aulas anteriores: <a href="php-e-html.html">PHP dentro do HTML</a>, <a href="get-post.html">$_POST</a>, <a href="validacao.html">validação</a> e <a href="escapar-saida.html"><code>htmlspecialchars</code></a>.</p>
+
+<pre class="file" data-file="web/index.php">&lt;?php
+$pdo = new PDO("sqlite:" . __DIR__ . "/loja.db", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+$pdo-&gt;exec("CREATE TABLE IF NOT EXISTS produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+
+$mensagem = "";
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nome    = trim($_POST["nome"] ?? "");
+    $preco   = (float) str_replace(",", ".", $_POST["preco"] ?? "");
+    $estoque = (int) ($_POST["estoque"] ?? 0);
+
+    if ($nome === "" || $preco &lt;= 0) {
+        $mensagem = "Preencha o nome e um preço maior que zero.";
+    } else {
+        $stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)");
+        $stmt-&gt;execute([$nome, $preco, $estoque]);
+        $mensagem = "Produto nº " . $pdo-&gt;lastInsertId() . " cadastrado: " . $nome;
+    }
+}
+
+$produtos = $pdo-&gt;query("SELECT * FROM produtos ORDER BY nome")-&gt;fetchAll();
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Lojinha da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Cadastro de produtos&lt;/h1&gt;
+
+&lt;?php if ($mensagem !== ""): ?&gt;
+&lt;p&gt;&lt;strong&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;label&gt;Nome: &lt;input name="nome"&gt;&lt;/label&gt;
+  &lt;label&gt;Preço: &lt;input name="preco"&gt;&lt;/label&gt;
+  &lt;label&gt;Estoque: &lt;input name="estoque" type="number" value="0"&gt;&lt;/label&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;h2&gt;Produtos (&lt;?= count($produtos) ?&gt;)&lt;/h2&gt;
+&lt;ul&gt;
+&lt;?php foreach ($produtos as $p): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($p["nome"]) ?&gt;: R$ &lt;?= number_format($p["preco"], 2, ",", ".") ?&gt; (&lt;?= $p["estoque"] ?&gt; un.)&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>O que faz</th></tr>
+<tr><td>Conexão + <code>CREATE TABLE IF NOT EXISTS</code></td><td>Na primeira visita, cria o banco e a tabela; nas outras, não faz nada.</td></tr>
+<tr><td><code>if ($_SERVER["REQUEST_METHOD"] === "POST")</code></td><td>Só cadastra quando o formulário foi <strong>enviado</strong>; uma visita normal (GET) só mostra a página.</td></tr>
+<tr><td><code>trim</code>, <code>str_replace(",", ".", …)</code>, <code>(float)</code>, <code>(int)</code></td><td>Limpa o nome e aceita preço com vírgula (<code>0,90</code>), como os brasileiros digitam.</td></tr>
+<tr><td><code>if ($nome === "" || $preco &lt;= 0)</code></td><td>Validação: nada de produto sem nome ou de graça.</td></tr>
+<tr><td><code>prepare</code> + <code>execute</code> + <code>lastInsertId</code></td><td>O <strong>C</strong> do CRUD, igual ao do terminal.</td></tr>
+<tr><td><code>query(...)-&gt;fetchAll()</code></td><td>O <strong>R</strong>: a lista, depois do cadastro (então o produto novo já aparece).</td></tr>
+<tr><td><code>htmlspecialchars(...)</code></td><td>Todo texto que veio do usuário (o nome, a mensagem) é escapado antes de ir para o HTML.</td></tr>
+</table>
+</div>
+
+<p>A Ana rodou a página com o servidor embutido (veja <a href="servidor-embutido.html">O Servidor Embutido</a>) e, em outro terminal, enviou o formulário com o <code>curl</code> (o <code>-d</code> manda os campos por POST, como o navegador faz ao clicar em Cadastrar):</p>
+
+<pre class="term" data-cwd="~/loja" data-title="Terminal 1 — servidor">$ php -S localhost:8000 -t web
+[Fri Oct 16 21:01:35 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 21:01:36 2026] 127.0.0.1:54646 Accepted
+[Fri Oct 16 21:01:36 2026] 127.0.0.1:54646 [200]: POST /
+[Fri Oct 16 21:01:36 2026] 127.0.0.1:54646 Closing
+[Fri Oct 16 21:01:36 2026] 127.0.0.1:54650 Accepted
+[Fri Oct 16 21:01:37 2026] 127.0.0.1:54650 [200]: POST /
+[Fri Oct 16 21:01:37 2026] 127.0.0.1:54650 Closing
+[Fri Oct 16 21:01:37 2026] 127.0.0.1:54652 Accepted
+[Fri Oct 16 21:01:37 2026] 127.0.0.1:54652 [200]: POST /
+[Fri Oct 16 21:01:37 2026] 127.0.0.1:54652 Closing</pre>
+
+<pre class="term" data-cwd="~/loja" data-title="Terminal 2 — cliente">$ curl -s -d "nome=Borracha&amp;preco=0,90&amp;estoque=50" localhost:8000/
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Lojinha da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Cadastro de produtos&lt;/h1&gt;
+
+&lt;p&gt;&lt;strong&gt;Produto nº 1 cadastrado: Borracha&lt;/strong&gt;&lt;/p&gt;
+
+&lt;form method="post"&gt;
+  &lt;label&gt;Nome: &lt;input name="nome"&gt;&lt;/label&gt;
+  &lt;label&gt;Preço: &lt;input name="preco"&gt;&lt;/label&gt;
+  &lt;label&gt;Estoque: &lt;input name="estoque" type="number" value="0"&gt;&lt;/label&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;h2&gt;Produtos (1)&lt;/h2&gt;
+&lt;ul&gt;
+  &lt;li&gt;Borracha: R$ 0,90 (50 un.)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+$ curl -s -d "nome=&lt;b&gt;Régua&lt;/b&gt;&amp;preco=4.50&amp;estoque=20" localhost:8000/ | grep -E "&lt;p&gt;|&lt;li&gt;"
+&lt;p&gt;&lt;strong&gt;Produto nº 2 cadastrado: &amp;lt;b&amp;gt;Régua&amp;lt;/b&amp;gt;&lt;/strong&gt;&lt;/p&gt;
+  &lt;li&gt;&amp;lt;b&amp;gt;Régua&amp;lt;/b&amp;gt;: R$ 4,50 (20 un.)&lt;/li&gt;
+  &lt;li&gt;Borracha: R$ 0,90 (50 un.)&lt;/li&gt;
+$ curl -s -d "nome=&amp;preco=" localhost:8000/ | grep "&lt;p&gt;"
+&lt;p&gt;&lt;strong&gt;Preencha o nome e um preço maior que zero.&lt;/strong&gt;&lt;/p&gt;</pre>
+
+<p>Três envios: um cadastro normal (o <code>0,90</code> com vírgula virou <code>0.90</code>); um nome com tags HTML, que foi <strong>gravado como veio</strong>, mas <strong>mostrado escapado</strong> (<code>&amp;lt;b&amp;gt;</code>), então o navegador exibe o texto <code>&lt;b&gt;Régua&lt;/b&gt;</code> em vez de pôr a palavra em negrito; e um envio vazio, barrado pela validação. O servidor registra cada pedido no Terminal 1: três conexões (<code>Accepted</code>), três <code>POST /</code> respondidos com <code>[200]</code> ("OK"). Encerre o servidor com <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+
+<div class="tryphp" data-modo="web" data-post="nome=Borracha&amp;preco=0,90&amp;estoque=50" data-goal="html:cadastrado: Borracha,html:Borracha: R$ 0\,90,src:INSERT,src:lastInsertId,semerro">
+<p class="try-task"><strong>Missão:</strong> a página já valida o formulário, mas não grava nada. No lugar do comentário, grave o produto com <code>prepare</code> + <code>execute</code> e ponha em <code>$mensagem</code> o texto <code>Produto nº … cadastrado: …</code> (com o <code>lastInsertId()</code> e o nome). O editor já envia a Borracha na primeira execução; depois, use o formulário da aba Resultado para cadastrar outros produtos.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$pdo = new PDO("sqlite:" . __DIR__ . "/loja.db", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+$pdo-&gt;exec("CREATE TABLE IF NOT EXISTS produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+
+$mensagem = "";
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nome    = trim($_POST["nome"] ?? "");
+    $preco   = (float) str_replace(",", ".", $_POST["preco"] ?? "");
+    $estoque = (int) ($_POST["estoque"] ?? 0);
+
+    if ($nome === "" || $preco &lt;= 0) {
+        $mensagem = "Preencha o nome e um preço maior que zero.";
+    } else {
+        // grave o produto aqui e preencha $mensagem
+    }
+}
+
+$produtos = $pdo-&gt;query("SELECT * FROM produtos ORDER BY nome")-&gt;fetchAll();
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Lojinha da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Cadastro de produtos&lt;/h1&gt;
+
+&lt;?php if ($mensagem !== ""): ?&gt;
+&lt;p&gt;&lt;strong&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;label&gt;Nome: &lt;input name="nome"&gt;&lt;/label&gt;
+  &lt;label&gt;Preço: &lt;input name="preco"&gt;&lt;/label&gt;
+  &lt;label&gt;Estoque: &lt;input name="estoque" type="number" value="0"&gt;&lt;/label&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;h2&gt;Produtos (&lt;?= count($produtos) ?&gt;)&lt;/h2&gt;
+&lt;ul&gt;
+&lt;?php foreach ($produtos as $p): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($p["nome"]) ?&gt;: R$ &lt;?= number_format($p["preco"], 2, ",", ".") ?&gt; (&lt;?= $p["estoque"] ?&gt; un.)&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$pdo = new PDO("sqlite:" . __DIR__ . "/loja.db", options: [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+$pdo-&gt;exec("CREATE TABLE IF NOT EXISTS produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL DEFAULT 0
+)");
+
+$mensagem = "";
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nome    = trim($_POST["nome"] ?? "");
+    $preco   = (float) str_replace(",", ".", $_POST["preco"] ?? "");
+    $estoque = (int) ($_POST["estoque"] ?? 0);
+
+    if ($nome === "" || $preco &lt;= 0) {
+        $mensagem = "Preencha o nome e um preço maior que zero.";
+    } else {
+        $stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)");
+        $stmt-&gt;execute([$nome, $preco, $estoque]);
+        $mensagem = "Produto nº " . $pdo-&gt;lastInsertId() . " cadastrado: " . $nome;
+    }
+}
+
+$produtos = $pdo-&gt;query("SELECT * FROM produtos ORDER BY nome")-&gt;fetchAll();
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Lojinha da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Cadastro de produtos&lt;/h1&gt;
+
+&lt;?php if ($mensagem !== ""): ?&gt;
+&lt;p&gt;&lt;strong&gt;&lt;?= htmlspecialchars($mensagem) ?&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;label&gt;Nome: &lt;input name="nome"&gt;&lt;/label&gt;
+  &lt;label&gt;Preço: &lt;input name="preco"&gt;&lt;/label&gt;
+  &lt;label&gt;Estoque: &lt;input name="estoque" type="number" value="0"&gt;&lt;/label&gt;
+  &lt;button&gt;Cadastrar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;h2&gt;Produtos (&lt;?= count($produtos) ?&gt;)&lt;/h2&gt;
+&lt;ul&gt;
+&lt;?php foreach ($produtos as $p): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($p["nome"]) ?&gt;: R$ &lt;?= number_format($p["preco"], 2, ",", ".") ?&gt; (&lt;?= $p["estoque"] ?&gt; un.)&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<div class="tip">
+<strong>E editar e apagar pela página?</strong>
+<p>Seguem a mesma receita: um link ou botão por produto que envia o id (<code>&lt;form method="post"&gt;</code> com um <code>&lt;input type="hidden" name="apagar" value="3"&gt;</code>), e o PHP faz o <code>UPDATE</code> ou o <code>DELETE</code> com <code>WHERE id = ?</code>. Apagar e alterar sempre por <strong>POST</strong>, nunca por um link GET (um robô de busca que siga os links apagaria tudo). O projeto <a href="projeto-tarefas.html">Tarefas com SQLite</a> monta o CRUD completo na web, e a aula <a href="csrf.html">CSRF</a> mostra como proteger esses formulários.</p>
+</div>
+
+<hr>
+
+<h2 id="cenarios">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Esqueceu o <code>WHERE</code> no <code>UPDATE</code> (ou no <code>DELETE</code>)</strong>
+<pre class="file" data-file="zerar-estoque.php">&lt;?php
+require "conexao.php";
+
+// A Ana queria zerar o estoque só da Mochila (id 3)... e esqueceu o WHERE.
+$afetados = $pdo-&gt;exec("UPDATE produtos SET estoque = 0");
+echo $afetados, " produto(s) com estoque zerado.\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php zerar-estoque.php
+3 produto(s) com estoque zerado.
+$ php listar.php
+Produtos cadastrados: 3
+#1 Caderno: R$ 17,50 (0 em estoque)
+#4 Lápis: R$ 1,20 (0 em estoque)
+#3 Mochila: R$ 89,90 (0 em estoque)</pre>
+<p><strong>O que significa:</strong> nenhuma mensagem de erro, porque o SQL estava <strong>certo</strong>: "zere o estoque de todos". O banco obedeceu. (O <code>exec</code> devolve, como o <code>rowCount</code>, quantas linhas mudaram.) Com <code>DELETE FROM produtos</code> sem <code>WHERE</code>, seria a tabela inteira apagada.</p>
+<p><strong>Como evitar:</strong> escreva o <code>WHERE</code> <strong>primeiro</strong>. Antes de um <code>UPDATE</code> ou <code>DELETE</code> importante, rode um <code>SELECT</code> com o mesmo <code>WHERE</code> para ver quais linhas seriam atingidas. Confira o <code>rowCount()</code>: se você esperava 1 e veio 3, algo está errado. Use <a href="prepared-statements.html">transações</a> para poder desfazer. E tenha cópia de segurança do <code>loja.db</code> (é só copiar o arquivo).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Trying to access array offset on false</code></strong>
+<pre class="file" data-file="ver-sem-teste.php">&lt;?php
+require "conexao.php";
+
+$stmt = $pdo-&gt;prepare("SELECT * FROM produtos WHERE id = ?");
+$stmt-&gt;execute([42]);
+$produto = $stmt-&gt;fetch();
+
+echo $produto["nome"], " custa R$ ", $produto["preco"], "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php ver-sem-teste.php
+
+Warning: Trying to access array offset on false in /home/ana/loja/ver-sem-teste.php on line 8
+ custa R$
+Warning: Trying to access array offset on false in /home/ana/loja/ver-sem-teste.php on line 8
+</pre>
+<p><strong>O que significa:</strong> "tentando acessar uma posição de array em <code>false</code>". Não existe produto 42, então o <code>fetch()</code> devolveu <code>false</code>, e o programa tentou ler <code>$produto["nome"]</code> como se fosse um array. O PHP avisa duas vezes (uma para <code>["nome"]</code>, outra para <code>["preco"]</code>) e continua, mostrando um texto pela metade.</p>
+<p><strong>Como consertar:</strong> confira o resultado antes de usar: <code>if ($produto === false) { … }</code>, como em <code>ver.php</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>NOT NULL constraint failed: produtos.preco</code></strong>
+<pre class="file" data-file="cadastrar-sem-preco.php">&lt;?php
+require "conexao.php";
+
+$stmt = $pdo-&gt;prepare("INSERT INTO produtos (nome, estoque) VALUES (?, ?)");
+$stmt-&gt;execute(["Borracha", 50]);
+</pre>
+<pre class="term" data-cwd="~/loja">$ php cadastrar-sem-preco.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 NOT NULL constraint failed: produtos.preco in /home/ana/loja/cadastrar-sem-preco.php:5
+Stack trace:
+#0 /home/ana/loja/cadastrar-sem-preco.php(5): PDOStatement-&gt;execute(Array)
+#1 {main}
+  thrown in /home/ana/loja/cadastrar-sem-preco.php on line 5</pre>
+<p><strong>O que significa:</strong> "violação de restrição de integridade: a restrição NOT NULL falhou em <code>produtos.preco</code>". A coluna <code>preco</code> é obrigatória e o <code>INSERT</code> não a preencheu. O código <code>23000</code> é o de "regra da tabela violada".</p>
+<p><strong>Como consertar:</strong> inclua a coluna no <code>INSERT</code>. Num formulário, valide no PHP <strong>antes</strong> (como a página web faz com <code>$preco &lt;= 0</code>) para mostrar uma mensagem amigável em vez de um erro.</p>
+</div>
+
+<div class="cenario">
+<strong><code>no such table: produto</code></strong>
+<pre class="file" data-file="errou-tabela.php">&lt;?php
+require "conexao.php";
+
+$produtos = $pdo-&gt;query("SELECT * FROM produto")-&gt;fetchAll();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php errou-tabela.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: produto in /home/ana/loja/errou-tabela.php:4
+Stack trace:
+#0 /home/ana/loja/errou-tabela.php(4): PDO-&gt;query('SELECT * FROM p...')
+#1 {main}
+  thrown in /home/ana/loja/errou-tabela.php on line 4</pre>
+<p><strong>O que significa:</strong> "não existe a tabela <code>produto</code>": faltou o <strong>s</strong>. Com um nome de coluna errado, a mensagem é parecida: <code>no such column: …</code>.</p>
+<p><strong>Como consertar:</strong> confira a grafia. Se o nome está certo, a tabela realmente não existe <strong>neste</strong> banco: rodou o <code>criar-tabela.php</code>? Está abrindo o arquivo certo? (Veja o próximo cenário.)</p>
+</div>
+
+<div class="cenario">
+<strong><code>no such table: produtos</code> só quando roda de outra pasta</strong>
+<pre class="file" data-file="listar-relativo.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");   // caminho relativo: depende da pasta em que você está
+
+$produtos = $pdo-&gt;query("SELECT nome FROM produtos")-&gt;fetchAll();
+echo count($produtos), " produtos\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ cd ~
+$ php loja/listar-relativo.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: produtos in /home/ana/loja/listar-relativo.php:4
+Stack trace:
+#0 /home/ana/loja/listar-relativo.php(4): PDO-&gt;query('SELECT nome FRO...')
+#1 {main}
+  thrown in /home/ana/loja/listar-relativo.php on line 4
+$ ls -l loja.db
+-rw-r--r-- 1 ana ana 0 out 16 20:58 loja.db           « um banco novo e vazio, criado na pasta errada
+$ rm loja.db</pre>
+<p><strong>O que significa:</strong> <code>sqlite:loja.db</code> é um caminho <strong>relativo</strong>: é procurado na pasta em que você <strong>está</strong>, não na pasta do programa. Rodando de <code>~</code>, o PDO não achou <code>~/loja.db</code> e, sem avisar, <strong>criou um arquivo vazio</strong> ali (0 bytes). Num banco vazio, não existe tabela nenhuma. Num site, a "pasta em que você está" depende do servidor, e o erro aparece só lá.</p>
+<p><strong>Como consertar:</strong> use <code>"sqlite:" . __DIR__ . "/loja.db"</code>, como em <code>conexao.php</code>, e apague o arquivo vazio criado por engano.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação</th><th>SQL</th><th>PHP</th><th>Para conferir</th></tr>
+<tr><td><strong>C</strong>riar</td><td><code>INSERT INTO produtos (nome, preco) VALUES (?, ?)</code></td><td><code>$stmt-&gt;execute([$nome, $preco])</code></td><td><code>$pdo-&gt;lastInsertId()</code> (o id novo, como texto)</td></tr>
+<tr><td><strong>R</strong>: todos</td><td><code>SELECT … FROM produtos ORDER BY nome</code></td><td><code>$pdo-&gt;query($sql)-&gt;fetchAll()</code></td><td><code>count($lista)</code></td></tr>
+<tr><td><strong>R</strong>: um</td><td><code>SELECT … WHERE id = ?</code></td><td><code>$stmt-&gt;execute([$id]); $stmt-&gt;fetch()</code></td><td><code>=== false</code> se não achou</td></tr>
+<tr><td><strong>R</strong>: um valor</td><td><code>SELECT COUNT(*) FROM produtos</code></td><td><code>-&gt;fetchColumn()</code></td><td></td></tr>
+<tr><td><strong>U</strong>pdate</td><td><code>UPDATE produtos SET preco = ? WHERE id = ?</code></td><td><code>$stmt-&gt;execute([$preco, $id])</code></td><td><code>$stmt-&gt;rowCount()</code></td></tr>
+<tr><td><strong>D</strong>elete</td><td><code>DELETE FROM produtos WHERE id = ?</code></td><td><code>$stmt-&gt;execute([$id])</code></td><td><code>$stmt-&gt;rowCount()</code></td></tr>
+<tr><td>SQL fixo, sem resultado</td><td><code>CREATE TABLE …</code>, <code>UPDATE …</code> sem variáveis</td><td><code>$pdo-&gt;exec($sql)</code></td><td>devolve as linhas afetadas</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O id novo</h3>
+<p>Complete para mostrar o id do produto que acabou de ser cadastrado:</p>
+<div class="ex-code">echo "Novo id: ", $pdo-&gt;<input data-answer="lastInsertId()" aria-label="método">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Atualizar o estoque</h3>
+<p>Complete o SQL para mudar o estoque do produto de um certo id:</p>
+<div class="ex-code">UPDATE produtos SET estoque = ? <input data-answer="WHERE id = ?|where id = ?|WHERE id=?|where id=?" aria-label="condição"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Apagar</h3>
+<p>Complete o SQL para apagar o produto de um certo id:</p>
+<div class="ex-code"><input data-answer="DELETE FROM|delete from" aria-label="comando" size="12"> produtos WHERE id = ?</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que <code>$stmt-&gt;fetch()</code> devolve quando o <code>SELECT … WHERE id = ?</code> não encontra nada?</p>
+<label><input type="radio" name="q4"> <code>null</code></label>
+<label><input type="radio" name="q4"> <code>false</code></label>
+<label><input type="radio" name="q4"> Um array vazio</label>
+<label><input type="radio" name="q4"> Lança uma <code>PDOException</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Um <code>UPDATE … WHERE id = ?</code> com um id que não existe…</p>
+<label><input type="radio" name="q5"> lança uma exceção "no such id".</label>
+<label><input type="radio" name="q5"> cria uma linha nova com esse id.</label>
+<label><input type="radio" name="q5"> roda sem erro e o <code>rowCount()</code> devolve 0.</label>
+<label><input type="radio" name="q5"> atualiza a última linha da tabela.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O que acontece com <code>$pdo-&gt;exec("DELETE FROM produtos")</code>?</p>
+<label><input type="radio" name="q6"> Dá erro, porque falta o <code>WHERE</code>.</label>
+<label><input type="radio" name="q6"> Apaga só a primeira linha.</label>
+<label><input type="radio" name="q6"> Apaga a tabela inteira, inclusive a estrutura.</label>
+<label><input type="radio" name="q6"> Apaga todas as linhas; a tabela continua existindo, vazia.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Por que <code>conexao.php</code> usa <code>__DIR__</code> no caminho do banco?</p>
+<label><input type="radio" name="q7"> Para o banco ser sempre o arquivo ao lado do programa, de qualquer pasta que ele seja rodado.</label>
+<label><input type="radio" name="q7"> Porque o SQLite não aceita caminhos relativos.</label>
+<label><input type="radio" name="q7"> Para o banco ficar mais rápido.</label>
+<label><input type="radio" name="q7"> Para proteger o banco com senha.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>CRUD</strong> = Create, Read, Update, Delete = <code>INSERT</code>, <code>SELECT</code>, <code>UPDATE</code>, <code>DELETE</code>.</li>
+  <li>Guarde a conexão num arquivo (<code>conexao.php</code>) e use <code>"sqlite:" . __DIR__ . "/loja.db"</code>.</li>
+  <li>Todo valor que vem de fora entra por <code>?</code>: <code>prepare</code> + <code>execute([...])</code>.</li>
+  <li>Depois do <code>INSERT</code>, <code>$pdo-&gt;lastInsertId()</code> dá o id novo.</li>
+  <li><code>fetchAll()</code> para listas; <code>fetch()</code> para um registro, conferindo se veio <code>false</code>.</li>
+  <li><code>UPDATE</code> e <code>DELETE</code> <strong>sempre</strong> com <code>WHERE</code>; confira com <code>rowCount()</code>. Zero linhas não é erro.</li>
+  <li>Na web: cadastre só no POST, valide antes de gravar e use <code>htmlspecialchars</code> ao mostrar.</li>
+</ul>
+
+<p>Próxima aula: <a href="prepared-statements.html">Prepared Statements e SQL Injection</a>, para entender por que o <code>?</code> é obrigatório e como agrupar comandos com transações.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
