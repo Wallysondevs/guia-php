@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP break e continue — sair do laço e pular uma volta | Guia PHP</title>
+<meta name="description" content="break e continue em PHP para iniciantes: parar a busca quando achar, pular itens inválidos, while (true) com break, break 2 e continue 2 em laços dentro de laços, break dentro de switch, o laço infinito do continue no while e as mensagens de erro reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">break e continue</span></h1>
+
+<p class="intro">Um laço repete até a condição dele mandar parar. Mas às vezes você quer <strong>parar antes</strong> (achei o que procurava, não preciso olhar o resto) ou <strong>pular só esta volta</strong> (este item está estragado, passe para o próximo). Para isso o PHP tem duas palavras: <code>break</code> ("quebrar", sair do laço) e <code>continue</code> ("continuar", ir direto para a próxima volta).</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li><code>break</code>: sair do laço na hora, em <code>foreach</code>, <code>for</code> e <code>while</code>.</li>
+  <li>O padrão <code>while (true)</code> + <code>break</code>.</li>
+  <li><code>continue</code>: pular o resto da volta atual.</li>
+  <li><code>break 2</code> e <code>continue 2</code>: controlar o laço de fora quando há um laço dentro de outro.</li>
+  <li>Por que, dentro de um <code>switch</code>, o <code>break</code> não sai do laço.</li>
+  <li>O laço infinito clássico do <code>continue</code> num <code>while</code>, e as mensagens de erro reais.</li>
+</ul>
+</div>
+
+<p>Você precisa conhecer os laços <a href="while.html">while</a>, <a href="for.html">for</a> e <a href="foreach.html">foreach</a>. Os exemplos usam as frutas e as notas da Ana e rodam na pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia antes do código: a fruteira</h2>
+<p>A Ana pede: "pegue uma laranja na fruteira". Você olha as frutas uma por uma. Quando achar a laranja, você <strong>para</strong>; não faz sentido continuar olhando o resto. Isso é o <code>break</code>.</p>
+<p>Agora ela pede: "lave todas as frutas, menos as que estiverem estragadas". Você pega uma por uma; quando uma está estragada, você a <strong>deixa de lado e pega a próxima</strong>, sem lavar. Você não parou o trabalho, só pulou aquela. Isso é o <code>continue</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Palavra</th><th>O que faz</th><th>Na fruteira</th></tr>
+<tr><td><code>break</code></td><td>Sai do laço imediatamente. O programa segue na primeira linha <strong>depois</strong> do laço.</td><td>Achei a laranja, parei de procurar.</td></tr>
+<tr><td><code>continue</code></td><td>Abandona o resto <strong>desta volta</strong> e começa a próxima.</td><td>Esta está estragada, próxima.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2><code>break</code>: parar quando achar</h2>
+
+<pre class="file" data-file="procurar.php">&lt;?php
+$frutas = ["banana", "maçã", "laranja", "banana", "uva", "maçã", "banana"];
+
+foreach ($frutas as $posicao =&gt; $fruta) {
+    echo "Olhando a posição $posicao: $fruta\n";
+    if ($fruta === "laranja") {
+        echo "Achei a laranja!\n";
+        break;
+    }
+}
+echo "Fim da busca.\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>foreach ($frutas as $posicao =&gt; $fruta)</dt><dd>Percorre as frutas; <code>$posicao</code> é o índice (0, 1, 2…).</dd>
+  <dt>if ($fruta === "laranja")</dt><dd>A condição de parada: "é esta?"</dd>
+  <dt>break;</dt><dd>Sai do <code>foreach</code> na hora. As frutas das posições 3 a 6 nem são olhadas.</dd>
+  <dt>echo "Fim da busca.\n";</dt><dd>A primeira linha depois do laço: é aqui que o programa continua.</dd>
+</dl>
+
+<pre class="term">$ php procurar.php
+Olhando a posição 0: banana
+Olhando a posição 1: maçã
+Olhando a posição 2: laranja
+Achei a laranja!
+Fim da busca.            « as posições 3 a 6 foram puladas</pre>
+
+<p>Sem o <code>break</code>, o laço olharia as 7 frutas. Com 7 itens não faz diferença, mas com uma lista de 100 mil clientes, parar no primeiro que interessa economiza muito trabalho.</p>
+
+<div class="tryphp" data-goal="out:Primeira maçã na posição 1,src:\bbreak\b,semerro">
+<p class="try-task"><strong>Missão:</strong> o programa deveria mostrar a posição da <strong>primeira</strong> maçã, mas mostra a da última (5), porque continua olhando depois de achar. Acrescente um <code>break</code> no lugar certo para aparecer <code>Primeira maçã na posição 1</code>.</p>
+<pre class="script">&lt;?php
+$frutas = ["banana", "maçã", "laranja", "banana", "uva", "maçã", "banana"];
+$achou = null;
+
+foreach ($frutas as $posicao =&gt; $fruta) {
+    if ($fruta === "maçã") {
+        $achou = $posicao;
+    }
+}
+echo "Primeira maçã na posição $achou\n";
+</pre>
+<pre class="solucao">&lt;?php
+$frutas = ["banana", "maçã", "laranja", "banana", "uva", "maçã", "banana"];
+$achou = null;
+
+foreach ($frutas as $posicao =&gt; $fruta) {
+    if ($fruta === "maçã") {
+        $achou = $posicao;
+        break;
+    }
+}
+echo "Primeira maçã na posição $achou\n";
+</pre>
+</div>
+
+<h3><code>while (true)</code> + <code>break</code>: quando a parada está no meio</h3>
+<p>Às vezes é mais fácil decidir se o laço deve parar <strong>no meio</strong> da volta do que no começo. Um jeito comum é escrever um laço que, sozinho, nunca pararia (<code>while (true)</code>, "enquanto verdadeiro") e colocar o <code>break</code> onde a decisão acontece:</p>
+
+<pre class="file" data-file="dobrar.php">&lt;?php
+$valor = 1;
+$dias = 0;
+while (true) {
+    $valor *= 2;
+    $dias++;
+    if ($valor &gt; 1000) {
+        break;
+    }
+}
+echo "Dobrando todo dia, passa de 1000 em $dias dias (vale $valor).\n";
+</pre>
+
+<pre class="term">$ php dobrar.php
+Dobrando todo dia, passa de 1000 em 10 dias (vale 1024).</pre>
+
+<p>O uso mais famoso desse padrão é ler o que o usuário digita até ele mandar parar. A Ana fez uma lista de compras no terminal (a leitura do teclado com <code>fgets(STDIN)</code> está em <a href="linha-comando.html">PHP na Linha de Comando</a>):</p>
+
+<pre class="file" data-file="ate-fim.php">&lt;?php
+$compras = [];
+while (true) {
+    echo "Item (ou 'fim'): ";
+    $linha = fgets(STDIN);
+    if ($linha === false) {
+        break;                  // a entrada acabou
+    }
+    $item = trim($linha);
+    if ($item === "fim") {
+        break;
+    }
+    if ($item === "") {
+        continue;               // linha vazia: pergunta de novo
+    }
+    $compras[] = $item;
+}
+echo "\nLista: ", implode(", ", $compras), "\n";
+</pre>
+
+<p>Para não precisar digitar, a Ana mandou as respostas pelo <code>printf</code> (uma por linha, com uma linha vazia no meio). As perguntas saem coladas porque as respostas não aparecem na tela, só são lidas:</p>
+
+<pre class="term">$ printf "pão\n\nleite\ncafé\nfim\n" | php ate-fim.php
+Item (ou 'fim'): Item (ou 'fim'): Item (ou 'fim'): Item (ou 'fim'): Item (ou 'fim'):
+Lista: pão, leite, café</pre>
+
+<p>Repare nos dois <code>break</code>: um para quando a pessoa digita <code>fim</code>, outro para quando a entrada <strong>acaba</strong> (<code>fgets</code> devolve <code>false</code>). Sem o segundo, se a entrada acabasse sem um "fim", o laço nunca terminaria. Todo <code>while (true)</code> precisa de uma saída garantida.</p>
+
+<div class="warning">
+<strong><code>while (true)</code> sem <code>break</code> alcançável é um laço infinito</strong>
+<p>Se a condição do <code>break</code> nunca for verdadeira, o programa fica preso para sempre. No terminal, interrompa com <kbd>Ctrl</kbd>+<kbd>C</kbd>. Veja os detalhes em <a href="while.html">while e do-while</a>.</p>
+</div>
+
+<hr>
+
+<h2><code>continue</code>: pular esta volta</h2>
+<p>A Ana digitou as notas de um aluno e errou duas: uma negativa e uma maior que 10. Para a média, ela quer <strong>ignorar</strong> as inválidas e usar as outras:</p>
+
+<pre class="file" data-file="pular.php">&lt;?php
+$notas = [9.5, -1, 8.0, 12, 7.5];
+
+$soma = 0;
+$validas = 0;
+foreach ($notas as $nota) {
+    if ($nota &lt; 0 || $nota &gt; 10) {
+        echo "Ignorando nota inválida: $nota\n";
+        continue;
+    }
+    $soma += $nota;
+    $validas++;
+}
+echo "Notas válidas: $validas\n";
+echo "Média: ", $soma / $validas, "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>if ($nota &lt; 0 || $nota &gt; 10)</dt><dd>"A nota é menor que zero <strong>ou</strong> maior que dez?" (veja <a href="operadores-logicos.html">Operadores Lógicos</a>).</dd>
+  <dt>continue;</dt><dd>Pula o resto desta volta: as duas linhas de baixo (<code>$soma += …</code> e <code>$validas++</code>) não rodam para essa nota. O <code>foreach</code> passa para a próxima.</dd>
+</dl>
+
+<pre class="term">$ php pular.php
+Ignorando nota inválida: -1
+Ignorando nota inválida: 12
+Notas válidas: 3
+Média: 8.3333333333333</pre>
+
+<p>Repare que, diferente do <code>break</code>, o laço foi <strong>até o fim</strong>: a nota 7.5, que vem depois do 12, foi somada. (Para mostrar a média com uma casa, use <a href="number-format.html">number_format</a>.)</p>
+
+<p>O <code>continue</code> funciona igual no <code>for</code>. Aqui ele pula os números pares (o resto da divisão por 2 é zero; veja <a href="operadores-aritmeticos.html">o operador %</a>):</p>
+
+<pre class="file" data-file="impares.php">&lt;?php
+for ($i = 1; $i &lt;= 10; $i++) {
+    if ($i % 2 === 0) {
+        continue;
+    }
+    echo $i, " ";
+}
+echo "\n";
+</pre>
+
+<pre class="term">$ php impares.php
+1 3 5 7 9 </pre>
+
+<p>No <code>for</code>, o <code>continue</code> pula para o <strong>passo</strong> (<code>$i++</code>) e depois testa a condição. Isso é importante: no <code>while</code> a história é outra (veja <a href="#erros">Quando dá errado</a>).</p>
+
+<div class="tip">
+<strong><code>continue</code> ou <code>if</code>/<code>else</code>?</strong>
+<p>Todo <code>continue</code> pode ser trocado por um <code>if</code> que envolve o resto do corpo. O <code>continue</code> é preferido quando o caso a pular é uma <strong>exceção</strong> e o resto do corpo é grande: você trata o caso estranho no começo ("se for inválida, pula") e o código principal fica sem recuo extra. Esse estilo se chama <em>guard clause</em> ("cláusula de guarda").</p>
+</div>
+
+<hr>
+
+<h2>Laço dentro de laço: <code>break 2</code> e <code>continue 2</code></h2>
+<p>A Ana tem as notas da turma: cada aluno tem várias notas. Ela quer achar <strong>o primeiro aluno</strong> que tirou um 10. São dois laços: um pelos alunos, outro pelas notas de cada um. Veja o que o <code>break</code> simples faz:</p>
+
+<pre class="file" data-file="dez.php">&lt;?php
+$turma = [
+    "Ana"   =&gt; [9.5, 10, 8.0],
+    "Bruno" =&gt; [7.0, 6.5, 10],
+    "Carla" =&gt; [10, 9.0, 8.5],
+];
+
+foreach ($turma as $aluno =&gt; $notas) {
+    foreach ($notas as $nota) {
+        if ($nota == 10) {
+            echo "Primeiro 10 encontrado: $aluno\n";
+            break;
+        }
+    }
+}
+</pre>
+
+<pre class="term">$ php dez.php
+Primeiro 10 encontrado: Ana
+Primeiro 10 encontrado: Bruno      « ué? o laço de fora continuou
+Primeiro 10 encontrado: Carla</pre>
+
+<p>O <code>break</code> sai <strong>só do laço em que está</strong>, o de dentro (as notas). O de fora (os alunos) continua, passa para o Bruno e acha outro 10. Para sair dos dois de uma vez, diga <strong>quantos níveis</strong> quebrar: <code>break 2</code>.</p>
+
+<pre class="file" data-file="dez2.php">&lt;?php
+$turma = [
+    "Ana"   =&gt; [9.5, 10, 8.0],
+    "Bruno" =&gt; [7.0, 6.5, 10],
+    "Carla" =&gt; [10, 9.0, 8.5],
+];
+
+foreach ($turma as $aluno =&gt; $notas) {
+    foreach ($notas as $nota) {
+        if ($nota == 10) {
+            echo "Primeiro 10 encontrado: $aluno\n";
+            break 2;
+        }
+    }
+}
+echo "Busca encerrada.\n";
+</pre>
+
+<pre class="term">$ php dez2.php
+Primeiro 10 encontrado: Ana
+Busca encerrada.</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Sai de</th></tr>
+<tr><td><code>break;</code> (o mesmo que <code>break 1;</code>)</td><td>O laço onde ele está.</td></tr>
+<tr><td><code>break 2;</code></td><td>O laço onde está <strong>e</strong> o de fora dele.</td></tr>
+<tr><td><code>break 3;</code></td><td>Três níveis (se existirem três laços, um dentro do outro).</td></tr>
+</table>
+</div>
+
+<p>O <code>continue 2</code> faz o mesmo raciocínio: abandona o laço de dentro e vai para a <strong>próxima volta do laço de fora</strong>. A Ana quer listar os alunos que não têm nenhuma nota vermelha (abaixo de 6). Assim que acha uma nota vermelha, não adianta olhar as outras notas daquele aluno: passa para o próximo.</p>
+
+<pre class="file" data-file="continue2.php">&lt;?php
+$turma = [
+    "Ana"   =&gt; [9.5, 10, 8.0],
+    "Bruno" =&gt; [7.0, 4.5, 10],
+    "Carla" =&gt; [10, 9.0, 8.5],
+    "Diego" =&gt; [6.0, 5.5, 3.0],
+];
+
+foreach ($turma as $aluno =&gt; $notas) {
+    foreach ($notas as $nota) {
+        if ($nota &lt; 6) {
+            continue 2;     // tem nota vermelha: pula para o próximo aluno
+        }
+    }
+    echo "$aluno não tem nenhuma nota abaixo de 6\n";
+}
+</pre>
+
+<pre class="term">$ php continue2.php
+Ana não tem nenhuma nota abaixo de 6
+Carla não tem nenhuma nota abaixo de 6</pre>
+
+<p>Para o Bruno, o <code>continue 2</code> aconteceu na nota 4.5: o laço das notas foi abandonado <strong>e</strong> a linha do <code>echo</code> (que fica no laço de fora) foi pulada.</p>
+
+<div class="tip">
+<strong>Muitos <code>break 2</code>? Considere uma função</strong>
+<p>Dentro de uma <a href="funcoes.html">função</a>, <code>return</code> sai de <strong>todos</strong> os laços de uma vez (e da função). A busca do primeiro 10 fica mais clara assim:</p>
+<pre class="file" data-file="funcao-return.php">&lt;?php
+function primeiraComDez(array $turma): ?string
+{
+    foreach ($turma as $aluno =&gt; $notas) {
+        foreach ($notas as $nota) {
+            if ($nota == 10) {
+                return $aluno;
+            }
+        }
+    }
+    return null;
+}
+</pre>
+<p>E, para buscas simples num array, o PHP já tem funções prontas: <code>in_array("laranja", $frutas)</code> responde <code>true</code>/<code>false</code> e <code>array_search("laranja", $frutas)</code> devolve a posição (<code>2</code>). Veja <a href="funcoes-array.html">Funções de Array</a>.</p>
+</div>
+
+<hr>
+
+<h2><code>break</code> dentro de <code>switch</code></h2>
+<p>O <a href="switch.html">switch</a> também usa <code>break</code>, para terminar cada <code>case</code>. Para o PHP, um <code>switch</code> conta como um nível, como se fosse um laço. Por isso, um <code>break</code> dentro de um <code>switch</code> sai <strong>do switch</strong>, não do laço em volta:</p>
+
+<pre class="file" data-file="switch.php">&lt;?php
+$pedidos = ["bolo", "pudim", "sair", "torta"];
+
+foreach ($pedidos as $pedido) {
+    switch ($pedido) {
+        case "sair":
+            echo "Fechando a loja.\n";
+            break;
+        default:
+            echo "Preparando $pedido\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php switch.php
+Preparando bolo
+Preparando pudim
+Fechando a loja.
+Preparando torta          « a loja "fechou", mas o laço continuou</pre>
+
+<p>O <code>break</code> terminou só o <code>case "sair"</code>. Para sair também do <code>foreach</code>, use <code>break 2</code> (nível 1 = o switch, nível 2 = o laço):</p>
+
+<pre class="term">$ php switch2.php          « o mesmo código, com break 2 no case "sair"
+Preparando bolo
+Preparando pudim
+Fechando a loja.</pre>
+
+<p>Com o <a href="match.html">match</a>, que não usa <code>break</code>, essa confusão não existe.</p>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O programa travou: <code>continue</code> num <code>while</code> pulou o <code>$i++</code></strong>
+<pre class="file" data-file="continua.php">&lt;?php
+$i = 0;
+while ($i &lt; 5) {
+    if ($i === 2) {
+        continue;
+    }
+    echo $i, "\n";
+    $i++;
+}
+echo "Fim\n";
+</pre>
+<pre class="term">$ timeout 3 php continua.php; echo "[código $?]"
+0
+1
+[código 124]             « depois do 1, nada: o timeout matou o PHP após 3 segundos</pre>
+<p><strong>O que aconteceu:</strong> quando <code>$i</code> chega a 2, o <code>continue</code> pula o resto da volta, <strong>inclusive o <code>$i++</code></strong>. Na volta seguinte <code>$i</code> ainda é 2, o <code>continue</code> acontece de novo… para sempre. O processador fica ocupado sem mostrar nada; a Ana usou o comando <code>timeout 3</code> para o terminal desistir sozinho depois de 3 segundos (o código 124 quer dizer "parado pelo timeout"). Sem ele, interrompa com <kbd>Ctrl</kbd>+<kbd>C</kbd>. No <code>for</code> isso não acontece, porque o <code>$i++</code> fica no cabeçalho e roda mesmo depois de um <code>continue</code>.</p>
+<p>Num site, o PHP desiste depois de um tempo (30 segundos, por padrão, na web). No terminal não há limite, mas dá para impor um com <code>-d max_execution_time</code>:</p>
+<pre class="term">$ php -d max_execution_time=2 continua.php
+0
+1
+
+Fatal error: Maximum execution time of 2 seconds exceeded in /home/ana/site/continua.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>Como consertar:</strong> atualize o contador <strong>antes</strong> do <code>continue</code> (<code>$i++; continue;</code>) ou troque o <code>while</code> por um <code>for</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>'break' not in the 'loop' or 'switch' context</code></strong>
+<pre class="file" data-file="fora-laco.php">&lt;?php
+$nota = 5;
+if ($nota &lt; 6) {
+    echo "Recuperação\n";
+    break;
+}
+echo "Fim\n";
+</pre>
+<pre class="term">$ php fora-laco.php
+
+Fatal error: 'break' not in the 'loop' or 'switch' context in /home/ana/site/fora-laco.php on line 5
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "'break' fora de um laço ou switch". Um <code>if</code> não é laço: não há do que sair. Nenhuma linha rodou (nem o "Recuperação"), porque o PHP recusa o arquivo antes de começar.</p>
+<p><strong>Como consertar:</strong> para sair de um <code>if</code>, use <code>else</code>. Para parar uma função, <code>return</code>. Para encerrar o script inteiro, <code>exit</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Cannot 'break' 2 levels</code></strong>
+<pre class="file" data-file="niveis.php">&lt;?php
+foreach ([1, 2, 3] as $n) {
+    if ($n === 2) {
+        break 2;
+    }
+    echo $n, "\n";
+}
+</pre>
+<pre class="term">$ php niveis.php
+
+Fatal error: Cannot 'break' 2 levels in /home/ana/site/niveis.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> "não é possível quebrar 2 níveis": só existe um laço. Acontece muito depois de apagar o laço de fora e esquecer o <code>2</code>.</p>
+<p><strong>Como consertar:</strong> use o número de laços que realmente existem em volta (aqui, <code>break;</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>'break' operator accepts only positive integers</code> e <code>non-integer operand</code></strong>
+<pre class="term">$ php zero.php            « break 0;
+
+Fatal error: 'break' operator accepts only positive integers in /home/ana/site/zero.php on line 3
+Stack trace:
+#0 {main}
+$ php variavel.php        « $niveis = 2; … break $niveis;
+
+Fatal error: 'break' operator with non-integer operand is no longer supported in /home/ana/site/variavel.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> o número depois de <code>break</code> (ou <code>continue</code>) precisa ser um inteiro <strong>escrito direto no código</strong>, 1 ou mais. Uma variável não serve: o PHP precisa saber o destino antes de rodar ("is no longer supported" = "não é mais aceito"; versões muito antigas aceitavam).</p>
+<p><strong>Como consertar:</strong> escreva o número: <code>break 2;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>"continue" targeting switch is equivalent to "break"</code></strong>
+<pre class="file" data-file="switchcont.php">&lt;?php
+$pedidos = ["bolo", "", "pudim"];
+
+foreach ($pedidos as $pedido) {
+    switch ($pedido) {
+        case "":
+            continue;
+        default:
+            echo "Preparando $pedido\n";
+    }
+}
+</pre>
+<pre class="term">$ php switchcont.php
+
+Warning: "continue" targeting switch is equivalent to "break". Did you mean to use "continue 2"? in /home/ana/site/switchcont.php on line 7
+Preparando bolo
+Preparando pudim</pre>
+<p><strong>O que significa:</strong> "um continue cujo alvo é o switch equivale a um break. Você quis usar continue 2?". Como o <code>switch</code> conta como um nível, o <code>continue</code> ali dentro apontaria para ele, e o PHP avisa que isso provavelmente não é o que você queria. O aviso aparece antes de qualquer saída, porque o PHP o detecta ao ler o arquivo.</p>
+<p><strong>Como consertar:</strong> como a própria mensagem sugere, <code>continue 2;</code> (pula para o próximo pedido do <code>foreach</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>break;</code></td><td>Sai do laço (ou <code>switch</code>) atual. O programa segue depois dele.</td></tr>
+<tr><td><code>break N;</code></td><td>Sai de N níveis de laço/switch de uma vez. N é um inteiro fixo, 1 ou mais.</td></tr>
+<tr><td><code>continue;</code></td><td>Pula o resto desta volta e vai para a próxima (no <code>for</code>, passa pelo passo <code>$i++</code>).</td></tr>
+<tr><td><code>continue N;</code></td><td>Vai para a próxima volta do laço N níveis acima.</td></tr>
+<tr><td><code>while (true) { … break; … }</code></td><td>Laço cuja saída está no meio do corpo.</td></tr>
+<tr><td><code>return</code></td><td>Dentro de uma função: sai de todos os laços e da função.</td></tr>
+<tr><td><code>in_array()</code> / <code>array_search()</code></td><td>Buscas prontas, sem laço nem <code>break</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Parar a busca</h3>
+<p>Complete para o laço parar assim que achar a uva:</p>
+<div class="ex-code">if ($fruta === "uva") { echo "Achei!"; <input data-answer="break;|break" aria-label="instrução"> }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Pular as bananas</h3>
+<p>Complete para mostrar todas as frutas, menos as bananas:</p>
+<div class="ex-code">foreach ($frutas as $f) { if ($f === "banana") { <input data-answer="continue;|continue" aria-label="instrução"> } echo $f, "\n"; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Dois níveis</h3>
+<p>Dentro de um <code>foreach</code> que está dentro de outro <code>foreach</code>, complete para sair dos dois:</p>
+<div class="ex-code"><input data-answer="break 2;|break 2" aria-label="instrução"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que mostra? <code>for ($i = 1; $i &lt;= 5; $i++) { if ($i === 3) break; echo $i; }</code></p>
+<label><input type="radio" name="q4"> 1245</label>
+<label><input type="radio" name="q4"> 12</label>
+<label><input type="radio" name="q4"> 123</label>
+<label><input type="radio" name="q4"> 12345</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que mostra? <code>for ($i = 1; $i &lt;= 5; $i++) { if ($i === 3) continue; echo $i; }</code></p>
+<label><input type="radio" name="q5"> 1245</label>
+<label><input type="radio" name="q5"> 12</label>
+<label><input type="radio" name="q5"> 123</label>
+<label><input type="radio" name="q5"> Nada: laço infinito</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Um <code>foreach</code> tem um <code>switch</code> dentro. Num <code>case</code>, você quer parar o <code>foreach</code>. O que escrever?</p>
+<label><input type="radio" name="q6"> <code>break;</code></label>
+<label><input type="radio" name="q6"> <code>continue;</code></label>
+<label><input type="radio" name="q6"> <code>break 2;</code></label>
+<label><input type="radio" name="q6"> <code>exit 2;</code></label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:Preparando torta,out:Total: 3 pedidos,src:\bcontinue\b,src:\bbreak\b,semerro">
+<p class="try-task"><strong>Missão:</strong> a lista de pedidos da lojinha tem linhas vazias (pedidos apagados) e, no meio, a palavra <code>fechar</code>: o que vem depois dela fica para amanhã. Use <code>continue</code> para pular os pedidos vazios e <code>break</code> para parar no <code>fechar</code>. A saída deve ter só bolo, pudim e torta, e terminar com <code>Total: 3 pedidos</code>.</p>
+<pre class="script">&lt;?php
+$pedidos = ["bolo", "", "pudim", "", "torta", "fechar", "brigadeiro"];
+$feitos = 0;
+
+foreach ($pedidos as $pedido) {
+    echo "Preparando $pedido\n";
+    $feitos++;
+}
+echo "Total: $feitos pedidos\n";
+</pre>
+<pre class="solucao">&lt;?php
+$pedidos = ["bolo", "", "pudim", "", "torta", "fechar", "brigadeiro"];
+$feitos = 0;
+
+foreach ($pedidos as $pedido) {
+    if ($pedido === "fechar") {
+        break;
+    }
+    if ($pedido === "") {
+        continue;
+    }
+    echo "Preparando $pedido\n";
+    $feitos++;
+}
+echo "Total: $feitos pedidos\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>break</code> sai do laço na hora; o programa segue depois dele. Use para parar uma busca quando achar.</li>
+  <li><code>continue</code> pula o resto da volta atual e vai para a próxima. Use para ignorar itens inválidos.</li>
+  <li><code>while (true)</code> + <code>break</code> serve quando a decisão de parar fica no meio do corpo; garanta que o <code>break</code> sempre possa acontecer.</li>
+  <li>Em laços dentro de laços, <code>break 2</code> e <code>continue 2</code> agem no laço de fora. Um <code>switch</code> conta como um nível.</li>
+  <li>Num <code>while</code>, um <code>continue</code> antes do <code>$i++</code> cria um laço infinito.</li>
+  <li>Dentro de funções, <code>return</code> costuma ser mais claro que <code>break 2</code>; para buscas simples, <code>in_array</code> e <code>array_search</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

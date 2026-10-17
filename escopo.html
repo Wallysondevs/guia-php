@@ -390,11 +390,11 @@ contarVisita();
 echo "Você é o visitante nº ", contarVisita(), "\n";
 </pre>
 
-<pre class="term">$ php -S localhost:8080 &gt; /tmp/servidor.log 2&gt;&amp;1 &amp;     « o servidor, em segundo plano
-[1] 474310
-$ curl -s localhost:8080/visitas.php
+<pre class="term">$ php -S localhost:8000 &gt; /tmp/servidor.log 2&gt;&amp;1 &amp;     « o servidor, em segundo plano
+[1] 477837
+$ curl -s localhost:8000/visitas.php
 Você é o visitante nº 2            « duas chamadas na mesma página: a static funcionou
-$ curl -s localhost:8080/visitas.php
+$ curl -s localhost:8000/visitas.php
 Você é o visitante nº 2            « página aberta de novo: tudo recomeçou
 $ kill %1                          « desliga o servidor</pre>
 
