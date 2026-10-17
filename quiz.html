@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Quiz — 65 perguntas com código, do básico ao avançado | Guia PHP</title>
+<meta name="description" content="Quiz do Guia PHP: 65 perguntas sobre PHP 8.5 nos três níveis, a maioria do tipo &quot;o que este código imprime?&quot;, com correção na hora, explicação e link para revisar. Todas as respostas foram conferidas num PHP 8.5 real.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Quiz</span></h1>
+
+<p class="intro">65 perguntas sobre o que você estudou no guia, divididas nos três níveis. A maioria mostra um trecho de código e pergunta <strong>o que ele imprime</strong>: tente responder de cabeça, sem rodar. Cada resposta foi conferida num PHP 8.5 de verdade. A correção é na hora; abra "Explicação" para entender o porquê, e o link "Revise" leva à aula do assunto.</p>
+
+<p>Acertos: <strong id="placar">0 de 65</strong></p>
+
+<div class="note">
+<strong>Como os trechos funcionam</strong>
+<p>Para economizar espaço, os trechos não mostram o <code>&lt;?php</code> do começo: imagine-o na primeira linha de cada um. Quando a resposta é a saída de um <code>var_dump</code>, ela aparece exatamente como o PHP mostra.</p>
+</div>
+
+<p>Ir para: <a href="#nivel1">Nível 1</a> · <a href="#nivel2">Nível 2</a> · <a href="#nivel3">Nível 3</a> · <a href="#conferir">Conferir no editor</a></p>
+
+<h2 id="nivel1">Nível 1 · Iniciante</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. O que este código imprime?</p>
+<pre class="file">echo 10 / 3;</pre>
+<label><input type="radio" name="q1"> 3</label>
+<label><input type="radio" name="q1"> 3.33</label>
+<label><input type="radio" name="q1"> 3.3333333333333</label>
+<label><input type="radio" name="q1"> 3.0</label>
+<details><summary>Explicação</summary><p>No PHP, <code>/</code> sempre faz a divisão "de verdade": 10/3 dá um <code>float</code>, mostrado com até 14 algarismos significativos. Para a divisão inteira, use <code>intdiv(10, 3)</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. O que este código imprime?</p>
+<pre class="file">echo 10 % 3;</pre>
+<label><input type="radio" name="q2"> 3</label>
+<label><input type="radio" name="q2"> 1</label>
+<label><input type="radio" name="q2"> 0</label>
+<label><input type="radio" name="q2"> 3.33</label>
+<details><summary>Explicação</summary><p><code>%</code> é o resto da divisão inteira: 10 = 3 × 3 + <strong>1</strong>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O que este código imprime?</p>
+<pre class="file">echo "5" + "3";</pre>
+<label><input type="radio" name="q3"> 53</label>
+<label><input type="radio" name="q3"> 8</label>
+<label><input type="radio" name="q3"> "5""3"</label>
+<label><input type="radio" name="q3"> Erro: não dá para somar textos</label>
+<details><summary>Explicação</summary><p>O <code>+</code> é sempre soma. Textos numéricos como <code>"5"</code> e <code>"3"</code> são convertidos para número: 5 + 3 = 8.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="conversao-tipos.html">Conversão de Tipos</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que este código imprime?</p>
+<pre class="file">echo "5" . "3";</pre>
+<label><input type="radio" name="q4"> 8</label>
+<label><input type="radio" name="q4"> 5 3</label>
+<label><input type="radio" name="q4"> 53</label>
+<label><input type="radio" name="q4"> Erro</label>
+<details><summary>Explicação</summary><p>O <code>.</code> é o operador de concatenação: junta os textos sem espaço. No PHP, <code>+</code> soma e <code>.</code> junta; nunca se confundem.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-string.html">Operadores de String</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que este código imprime?</p>
+<pre class="file">var_dump(0.1 + 0.2 == 0.3);</pre>
+<label><input type="radio" name="q5"> bool(true)</label>
+<label><input type="radio" name="q5"> bool(false)</label>
+<label><input type="radio" name="q5"> 0.3</label>
+<label><input type="radio" name="q5"> float(0.3)</label>
+<details><summary>Explicação</summary><p>0.1 e 0.2 não têm representação exata em binário; a soma dá 0.30000000000000004. Nunca compare <code>float</code> com <code>==</code>: use <code>abs($a - $b) &lt; 0.00001</code> ou arredonde.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="numeros.html">int e float</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. O que este código imprime?</p>
+<pre class="file">var_dump(0 == "a");</pre>
+<label><input type="radio" name="q6"> bool(true)</label>
+<label><input type="radio" name="q6"> bool(false)</label>
+<label><input type="radio" name="q6"> Warning e bool(true)</label>
+<label><input type="radio" name="q6"> int(0)</label>
+<details><summary>Explicação</summary><p>No PHP 8, comparar número com um texto <strong>não numérico</strong> compara como texto: <code>"0"</code> é diferente de <code>"a"</code>. (No PHP 7 isso dava <code>true</code>!)</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-comparacao.html">Comparação (== e ===)</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">7. O que este código imprime?</p>
+<pre class="file">$nome = "Ana";
+echo 'Olá, $nome';</pre>
+<label><input type="radio" name="q7"> Olá, Ana</label>
+<label><input type="radio" name="q7"> Olá, $nome</label>
+<label><input type="radio" name="q7"> Olá, </label>
+<label><input type="radio" name="q7"> Erro: variável dentro de aspas</label>
+<details><summary>Explicação</summary><p>Aspas simples não trocam variáveis: o texto sai exatamente como foi escrito. Para interpolar, use aspas duplas: <code>"Olá, $nome"</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="interpolacao.html">Interpolação</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">8. O que este código imprime?</p>
+<pre class="file">echo strlen("Ação"), " ", mb_strlen("Ação");</pre>
+<label><input type="radio" name="q8"> 4 4</label>
+<label><input type="radio" name="q8"> 6 4</label>
+<label><input type="radio" name="q8"> 4 6</label>
+<label><input type="radio" name="q8"> 6 6</label>
+<details><summary>Explicação</summary><p><code>strlen</code> conta <strong>bytes</strong>; em UTF-8, "ç" e "ã" ocupam 2 bytes cada: 6. <code>mb_strlen</code> conta letras: 4.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="mbstring.html">Acentos e mbstring</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">9. O que este código imprime?</p>
+<pre class="file">echo 2 + 3 * 4;</pre>
+<label><input type="radio" name="q9"> 20</label>
+<label><input type="radio" name="q9"> 14</label>
+<label><input type="radio" name="q9"> 24</label>
+<label><input type="radio" name="q9"> 9</label>
+<details><summary>Explicação</summary><p>Multiplicação vem antes da soma: 3 × 4 = 12, mais 2 = 14. Para somar primeiro: <code>(2 + 3) * 4</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="precedencia.html">Precedência</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">10. O que este código imprime?</p>
+<pre class="file">echo 2 ** 3 ** 2;</pre>
+<label><input type="radio" name="q10"> 64</label>
+<label><input type="radio" name="q10"> 512</label>
+<label><input type="radio" name="q10"> 36</label>
+<label><input type="radio" name="q10"> 12</label>
+<details><summary>Explicação</summary><p>O <code>**</code> (potência) é associativo à direita: <code>2 ** (3 ** 2)</code> = 2<sup>9</sup> = 512.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="precedencia.html">Precedência</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">11. O que este código imprime?</p>
+<pre class="file">$i = 5;
+echo $i++ + ++$i;</pre>
+<label><input type="radio" name="q11"> 11</label>
+<label><input type="radio" name="q11"> 12</label>
+<label><input type="radio" name="q11"> 10</label>
+<label><input type="radio" name="q11"> 13</label>
+<details><summary>Explicação</summary><p><code>$i++</code> devolve 5 e depois faz <code>$i</code> virar 6; <code>++$i</code> soma antes de devolver: 7. Resultado: 5 + 7 = 12. Código assim é difícil de ler: evite.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-aritmeticos.html">Operadores Aritméticos</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">12. O que este código imprime?</p>
+<pre class="file">for ($i = 0; $i &lt; 3; $i++) {
+    echo $i;
+}</pre>
+<label><input type="radio" name="q12"> 123</label>
+<label><input type="radio" name="q12"> 0123</label>
+<label><input type="radio" name="q12"> 012</label>
+<label><input type="radio" name="q12"> 01</label>
+<details><summary>Explicação</summary><p>Começa em 0 e repete enquanto <code>$i &lt; 3</code>: 0, 1, 2. O <code>echo</code> não pula linha, então sai tudo junto.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="for.html">for</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">13. O que este código imprime?</p>
+<pre class="file">$a = [3, 1, 2];
+sort($a);
+echo implode(",", $a);</pre>
+<label><input type="radio" name="q13"> 3,1,2</label>
+<label><input type="radio" name="q13"> 1,2,3</label>
+<label><input type="radio" name="q13"> 3,2,1</label>
+<label><input type="radio" name="q13"> Array</label>
+<details><summary>Explicação</summary><p><code>sort</code> ordena o próprio array (não devolve um novo) em ordem crescente; <code>implode</code> junta com vírgulas.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ordenar-arrays.html">Ordenar Arrays</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">14. O que este código imprime (resumindo a saída do <code>print_r</code>)?</p>
+<pre class="file">$x = ["x" =&gt; 1];
+$x[] = 5;
+print_r($x);</pre>
+<label><input type="radio" name="q14"> [x] =&gt; 1 e [1] =&gt; 5</label>
+<label><input type="radio" name="q14"> [0] =&gt; 1 e [1] =&gt; 5</label>
+<label><input type="radio" name="q14"> [x] =&gt; 1 e [0] =&gt; 5</label>
+<label><input type="radio" name="q14"> Erro: não dá para misturar chaves</label>
+<details><summary>Explicação</summary><p><code>$x[] = 5</code> usa a próxima chave numérica livre. Como ainda não havia nenhuma chave numérica, ela é 0.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="arrays-associativos.html">Arrays Associativos</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">15. O que este código imprime?</p>
+<pre class="file">$nota = 7;
+echo match (true) {
+    $nota &gt;= 9 =&gt; "A",
+    $nota &gt;= 6 =&gt; "B",
+    default    =&gt; "C",
+};</pre>
+<label><input type="radio" name="q15"> A</label>
+<label><input type="radio" name="q15"> B</label>
+<label><input type="radio" name="q15"> C</label>
+<label><input type="radio" name="q15"> UnhandledMatchError</label>
+<details><summary>Explicação</summary><p><code>match (true)</code> devolve o primeiro braço cuja condição é <code>true</code>: 7 &gt;= 9 é falso; 7 &gt;= 6 é verdadeiro, então "B".</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="match.html">match</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">16. O que este código imprime?</p>
+<pre class="file">$n = 1;
+switch ($n) {
+    case 1:
+        echo "um ";
+    case 2:
+        echo "dois ";
+        break;
+    default:
+        echo "outro";
+}</pre>
+<label><input type="radio" name="q16"> um </label>
+<label><input type="radio" name="q16"> um dois </label>
+<label><input type="radio" name="q16"> um dois outro</label>
+<label><input type="radio" name="q16"> dois </label>
+<details><summary>Explicação</summary><p>Sem <code>break</code> no <code>case 1</code>, o <code>switch</code> "cai" no caso seguinte e só para no <code>break</code> do <code>case 2</code>. É o motivo de o <code>match</code> existir.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="switch.html">switch</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">17. O que este código imprime?</p>
+<pre class="file">var_dump((int) "12abc");</pre>
+<label><input type="radio" name="q17"> int(0)</label>
+<label><input type="radio" name="q17"> int(12)</label>
+<label><input type="radio" name="q17"> Fatal error: TypeError</label>
+<label><input type="radio" name="q17"> string(5) "12abc"</label>
+<details><summary>Explicação</summary><p>A conversão forçada <code>(int)</code> pega os algarismos do começo e ignora o resto, sem aviso. (Numa conta, <code>"12abc" + 1</code> daria <code>Warning: A non-numeric value encountered</code>.)</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="conversao-tipos.html">Conversão de Tipos</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">18. O que este código imprime?</p>
+<pre class="file">var_dump((bool) "0");</pre>
+<label><input type="radio" name="q18"> bool(true)</label>
+<label><input type="radio" name="q18"> bool(false)</label>
+<label><input type="radio" name="q18"> int(0)</label>
+<label><input type="radio" name="q18"> string(1) "0"</label>
+<details><summary>Explicação</summary><p>O texto <code>"0"</code> é um dos valores que viram <code>false</code>, junto com <code>""</code>, <code>0</code>, <code>0.0</code>, <code>[]</code> e <code>null</code>. Já <code>"0.0"</code> e <code>" "</code> são <code>true</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="booleanos.html">Booleanos</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">19. O que este código imprime?</p>
+<pre class="file">echo number_format(1234.567, 2, ",", ".");</pre>
+<label><input type="radio" name="q19"> 1,234.57</label>
+<label><input type="radio" name="q19"> 1.234,57</label>
+<label><input type="radio" name="q19"> 1.234,56</label>
+<label><input type="radio" name="q19"> 1234,57</label>
+<details><summary>Explicação</summary><p>Os argumentos são: casas decimais (2), separador decimal (<code>,</code>) e separador de milhar (<code>.</code>). O número é arredondado: .567 vira ,57.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="number-format.html">Formatar Números</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">20. O que este código imprime?</p>
+<pre class="file">printf("%05.1f", 3.14159);</pre>
+<label><input type="radio" name="q20"> 3.1</label>
+<label><input type="radio" name="q20"> 003.1</label>
+<label><input type="radio" name="q20"> 00003</label>
+<label><input type="radio" name="q20"> 3,1</label>
+<details><summary>Explicação</summary><p><code>%05.1f</code>: número com 1 casa decimal, ocupando no mínimo 5 caracteres, completado com zeros à esquerda. "3.1" tem 3 caracteres, então ganha dois zeros. O <code>printf</code> sempre usa ponto, não importa o idioma.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="sprintf.html">printf e sprintf</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">21. O que este código imprime?</p>
+<pre class="file">[$a, $b] = [1, 2];
+[$a, $b] = [$b, $a];
+echo $a, $b;</pre>
+<label><input type="radio" name="q21"> 12</label>
+<label><input type="radio" name="q21"> 21</label>
+<label><input type="radio" name="q21"> 11</label>
+<label><input type="radio" name="q21"> 22</label>
+<details><summary>Explicação</summary><p>A segunda linha troca os valores de lugar: o array <code>[$b, $a]</code> (2, 1) é montado antes de ser desestruturado em <code>$a</code> e <code>$b</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="desestruturacao.html">Desestruturação (list)</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">22. O que este código imprime?</p>
+<pre class="file">var_dump(null ?? "padrão");</pre>
+<label><input type="radio" name="q22"> NULL</label>
+<label><input type="radio" name="q22"> string(6) "padrão"</label>
+<label><input type="radio" name="q22"> string(7) "padrão"</label>
+<label><input type="radio" name="q22"> bool(false)</label>
+<details><summary>Explicação</summary><p>O <code>??</code> devolve o lado direito porque o esquerdo é <code>null</code>. E o <code>var_dump</code> conta <strong>bytes</strong>: "padrão" tem 6 letras, mas o "ã" ocupa 2 bytes em UTF-8, então 7.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="null-coalescing.html">?? e ?-&gt;</a> · <a href="var-dump.html">var_dump e print_r</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">23. O que este código imprime?</p>
+<pre class="file">$total = 0;
+$i = 10;
+while ($i &gt; 0) {
+    $total += $i;
+    $i -= 4;
+}
+echo $total;</pre>
+<label><input type="radio" name="q23"> 10</label>
+<label><input type="radio" name="q23"> 18</label>
+<label><input type="radio" name="q23"> 20</label>
+<label><input type="radio" name="q23"> 16</label>
+<details><summary>Explicação</summary><p>O laço soma 10, depois 6, depois 2 (e para, porque o próximo seria -2): 10 + 6 + 2 = 18.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="while.html">while e do-while</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">24. O que este código imprime?</p>
+<pre class="file">var_dump("abc" == 0, "1" == "01", "10" == "1e1");</pre>
+<label><input type="radio" name="q24"> true, true, true</label>
+<label><input type="radio" name="q24"> false, true, true</label>
+<label><input type="radio" name="q24"> false, false, true</label>
+<label><input type="radio" name="q24"> true, false, false</label>
+<details><summary>Explicação</summary><p>(As respostas resumem os três <code>bool(…)</code>.) <code>"abc" == 0</code> é falso no PHP 8. Dois textos numéricos são comparados como números: <code>"1" == "01"</code> e <code>"10" == "1e1"</code> (1×10¹) são verdadeiros. Com <code>===</code>, os três seriam falsos.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="operadores-comparacao.html">Comparação (== e ===)</a></p>
+</div>
+
+
+<h2 id="nivel2">Nível 2 · Intermediário</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">25. O que este código imprime?</p>
+<pre class="file">function somar(int ...$n): int {
+    return array_sum($n);
+}
+echo somar(1, 2, 3);</pre>
+<label><input type="radio" name="q25"> 123</label>
+<label><input type="radio" name="q25"> 6</label>
+<label><input type="radio" name="q25"> Array</label>
+<label><input type="radio" name="q25"> Erro: muitos argumentos</label>
+<details><summary>Explicação</summary><p>Os <code>...</code> juntam todos os argumentos num array: <code>[1, 2, 3]</code>; <code>array_sum</code> soma: 6.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="variadicas.html">Funções Variádicas</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">26. O que este código imprime?</p>
+<pre class="file">function area($largura = 2, $altura = 3) {
+    return $largura * $altura;
+}
+echo area(altura: 10);</pre>
+<label><input type="radio" name="q26"> 6</label>
+<label><input type="radio" name="q26"> 30</label>
+<label><input type="radio" name="q26"> 20</label>
+<label><input type="radio" name="q26"> Erro: falta o primeiro argumento</label>
+<details><summary>Explicação</summary><p>Com argumentos nomeados, você passa só o que quer: <code>$largura</code> fica no padrão 2 e <code>$altura</code> vale 10: 2 × 10 = 20.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="parametros.html">Parâmetros</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">27. O que este código imprime?</p>
+<pre class="file">$x = 1;
+function teste() {
+    return isset($x) ? "sim" : "não";
+}
+echo teste();</pre>
+<label><input type="radio" name="q27"> sim</label>
+<label><input type="radio" name="q27"> não</label>
+<label><input type="radio" name="q27"> Warning: Undefined variable $x</label>
+<label><input type="radio" name="q27"> 1</label>
+<details><summary>Explicação</summary><p>Dentro da função, <code>$x</code> é outra variável, local e inexistente: as funções não enxergam as variáveis de fora. O <code>isset</code> não dá aviso; só responde <code>false</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="escopo.html">Escopo</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">28. O que este código imprime?</p>
+<pre class="file">function contar() {
+    static $n = 0;
+    return ++$n;
+}
+contar();
+contar();
+echo contar();</pre>
+<label><input type="radio" name="q28"> 1</label>
+<label><input type="radio" name="q28"> 3</label>
+<label><input type="radio" name="q28"> 0</label>
+<label><input type="radio" name="q28"> 2</label>
+<details><summary>Explicação</summary><p>Uma variável <code>static</code> guarda o valor entre as chamadas: 1, 2 e, na terceira, 3.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="escopo.html">Escopo (global e static)</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">29. O que este código imprime?</p>
+<pre class="file">$taxa = 1;
+$f = function () use ($taxa) {
+    return $taxa;
+};
+$taxa = 2;
+echo $f();</pre>
+<label><input type="radio" name="q29"> 2</label>
+<label><input type="radio" name="q29"> 1</label>
+<label><input type="radio" name="q29"> NULL</label>
+<label><input type="radio" name="q29"> Warning: Undefined variable $taxa</label>
+<details><summary>Explicação</summary><p>O <code>use ($taxa)</code> copia o valor <strong>no momento em que a função é criada</strong> (1). Mudar <code>$taxa</code> depois não afeta a cópia. Para acompanhar as mudanças, seria <code>use (&amp;$taxa)</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="closures.html">Funções Anônimas e Arrow Functions</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">30. O que este código imprime?</p>
+<pre class="file">echo implode(",", array_map(fn($n) =&gt; $n * 2, [1, 2, 3]));</pre>
+<label><input type="radio" name="q30"> 1,2,3</label>
+<label><input type="radio" name="q30"> 2,4,6</label>
+<label><input type="radio" name="q30"> 6</label>
+<label><input type="radio" name="q30"> Array</label>
+<details><summary>Explicação</summary><p><code>array_map</code> aplica a função em cada item e devolve um array novo: [2, 4, 6].</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-array.html">Funções de Array</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">31. O que este código imprime?</p>
+<pre class="file">$r = array_filter([1, 0, 2, null, 3]);
+echo implode(",", array_keys($r));</pre>
+<label><input type="radio" name="q31"> 0,1,2</label>
+<label><input type="radio" name="q31"> 0,2,4</label>
+<label><input type="radio" name="q31"> 1,2,3</label>
+<label><input type="radio" name="q31"> 1,3,5</label>
+<details><summary>Explicação</summary><p>Sem função, <code>array_filter</code> remove os valores "falsos" (0 e <code>null</code>) mas <strong>mantém as chaves</strong> originais: 0, 2 e 4. Para renumerar: <code>array_values</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-array.html">Funções de Array</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">32. O que este código imprime (o texto enviado, não o que o navegador mostra)?</p>
+<pre class="file">echo htmlspecialchars("&lt;b&gt;Ana &amp; Bia&lt;/b&gt;");</pre>
+<label><input type="radio" name="q32"> &lt;b&gt;Ana &amp; Bia&lt;/b&gt; (em negrito)</label>
+<label><input type="radio" name="q32"> &amp;lt;b&amp;gt;Ana &amp;amp; Bia&amp;lt;/b&amp;gt;</label>
+<label><input type="radio" name="q32"> Ana &amp;amp; Bia</label>
+<label><input type="radio" name="q32"> &amp;lt;b&amp;gt;Ana &amp; Bia&amp;lt;/b&amp;gt;</label>
+<details><summary>Explicação</summary><p>O <code>htmlspecialchars</code> troca <code>&lt;</code>, <code>&gt;</code> e <code>&amp;</code> pelas entidades. No navegador, isso aparece como o texto <code>&lt;b&gt;Ana &amp; Bia&lt;/b&gt;</code>, sem virar negrito: é a proteção contra XSS.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="escapar-saida.html">Escapar a Saída (XSS)</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">33. O que este código imprime?</p>
+<pre class="file">echo json_encode(["nome" =&gt; "Zé", "idade" =&gt; 30]);</pre>
+<label><input type="radio" name="q33"> {"nome":"Zé","idade":30}</label>
+<label><input type="radio" name="q33"> {"nome":"Z\u00e9","idade":30}</label>
+<label><input type="radio" name="q33"> {nome:"Zé",idade:30}</label>
+<label><input type="radio" name="q33"> ["Zé",30]</label>
+<details><summary>Explicação</summary><p>Por padrão, o <code>json_encode</code> escreve letras acentuadas como <code>\u00e9</code> (é JSON válido). Para manter o "é", use a opção <code>JSON_UNESCAPED_UNICODE</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="json.html">JSON</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">34. O que este código imprime?</p>
+<pre class="file">try {
+    echo "A";
+    throw new Exception("ops");
+    echo "B";
+} catch (Exception $e) {
+    echo "C";
+} finally {
+    echo "D";
+}</pre>
+<label><input type="radio" name="q34"> AB</label>
+<label><input type="radio" name="q34"> ACD</label>
+<label><input type="radio" name="q34"> ABCD</label>
+<label><input type="radio" name="q34"> AC</label>
+<details><summary>Explicação</summary><p>"A" sai; o <code>throw</code> pula direto para o <code>catch</code> (o "B" nunca roda), que imprime "C"; o <code>finally</code> roda sempre: "D".</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="excecoes.html">Exceções (try e catch)</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">35. O que este código imprime?</p>
+<pre class="file">try {
+    echo 1 % 0;
+} catch (DivisionByZeroError $e) {
+    echo $e-&gt;getMessage();
+}</pre>
+<label><input type="radio" name="q35"> 0</label>
+<label><input type="radio" name="q35"> Division by zero</label>
+<label><input type="radio" name="q35"> Modulo by zero</label>
+<label><input type="radio" name="q35"> Fatal error</label>
+<details><summary>Explicação</summary><p>Resto por zero lança <code>DivisionByZeroError</code> com a mensagem "Modulo by zero" (a divisão <code>/</code> por zero usa "Division by zero"). Como ele foi pego pelo <code>catch</code>, o programa não para.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="excecoes.html">Exceções (try e catch)</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">36. O que este código imprime?</p>
+<pre class="file">function fat(int $n): int {
+    return $n &lt;= 1 ? 1 : $n * fat($n - 1);
+}
+echo fat(5);</pre>
+<label><input type="radio" name="q36"> 15</label>
+<label><input type="radio" name="q36"> 120</label>
+<label><input type="radio" name="q36"> 24</label>
+<label><input type="radio" name="q36"> 5</label>
+<details><summary>Explicação</summary><p>fat(5) = 5 × fat(4) = 5 × 4 × 3 × 2 × 1 = 120. O caso <code>$n &lt;= 1</code> é o que faz a recursão parar.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="recursao.html">Recursão</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">37. O que este código imprime?</p>
+<pre class="file">echo date("d/m/Y", mktime(0, 0, 0, 2, 30, 2026));</pre>
+<label><input type="radio" name="q37"> 30/02/2026</label>
+<label><input type="radio" name="q37"> 02/03/2026</label>
+<label><input type="radio" name="q37"> 28/02/2026</label>
+<label><input type="radio" name="q37"> false</label>
+<details><summary>Explicação</summary><p>O <code>mktime</code> não reclama de datas impossíveis: ele "transborda". 30 de fevereiro de 2026 (ano com 28 dias em fevereiro) vira 2 de março. Para validar uma data, use <code>checkdate</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="datas.html">Datas e Horas</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">38. O que este código imprime?</p>
+<pre class="file">echo count(explode(",", "a,,b"));</pre>
+<label><input type="radio" name="q38"> 2</label>
+<label><input type="radio" name="q38"> 3</label>
+<label><input type="radio" name="q38"> 1</label>
+<label><input type="radio" name="q38"> 4</label>
+<details><summary>Explicação</summary><p>Entre as duas vírgulas há um texto vazio, que também vira um item: <code>["a", "", "b"]</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-string.html">Funções de String</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">39. O que este código imprime?</p>
+<pre class="file">var_dump(str_contains("Guia PHP", "php"));</pre>
+<label><input type="radio" name="q39"> bool(true)</label>
+<label><input type="radio" name="q39"> bool(false)</label>
+<label><input type="radio" name="q39"> int(5)</label>
+<label><input type="radio" name="q39"> string(3) "PHP"</label>
+<details><summary>Explicação</summary><p><code>str_contains</code> diferencia maiúsculas de minúsculas: "php" não está em "Guia PHP". Para ignorar: <code>str_contains(mb_strtolower($t), "php")</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-string.html">Funções de String</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">40. O que este código imprime?</p>
+<pre class="file">$frutas = ["banana", "Abacaxi", "abacate"];
+sort($frutas);
+echo implode(" ", $frutas);</pre>
+<label><input type="radio" name="q40"> abacate Abacaxi banana</label>
+<label><input type="radio" name="q40"> Abacaxi abacate banana</label>
+<label><input type="radio" name="q40"> banana abacate Abacaxi</label>
+<label><input type="radio" name="q40"> abacate banana Abacaxi</label>
+<details><summary>Explicação</summary><p>O <code>sort</code> compara os bytes: as maiúsculas vêm antes de todas as minúsculas. Para ignorar a diferença: <code>sort($frutas, SORT_FLAG_CASE | SORT_STRING)</code> ou <code>natcasesort</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="ordenar-arrays.html">Ordenar Arrays</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">41. O que este código imprime?</p>
+<pre class="file">echo gettype(json_decode('{"a": 1}')), " ", gettype(json_decode('{"a": 1}', true));</pre>
+<label><input type="radio" name="q41"> array array</label>
+<label><input type="radio" name="q41"> object array</label>
+<label><input type="radio" name="q41"> object object</label>
+<label><input type="radio" name="q41"> string array</label>
+<details><summary>Explicação</summary><p>Sem o segundo argumento, <code>json_decode</code> devolve um objeto (<code>stdClass</code>, lido com <code>-&gt;</code>); com <code>true</code>, um array associativo.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="json.html">JSON</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">42. O que este código imprime?</p>
+<pre class="file">$texto = "a-b-c";
+echo str_replace("-", "", $texto), " ", ucfirst("ana"), " ", strrev("ana");</pre>
+<label><input type="radio" name="q42"> a b c Ana ana</label>
+<label><input type="radio" name="q42"> abc Ana ana</label>
+<label><input type="radio" name="q42"> abc ANA ana</label>
+<label><input type="radio" name="q42"> abc Ana Ana</label>
+<details><summary>Explicação</summary><p><code>str_replace</code> tira os hífens; <code>ucfirst</code> põe só a primeira letra em maiúscula; <code>strrev</code> inverte o texto, e "ana" de trás para frente é "ana".</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="funcoes-string.html">Funções de String</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">43. O endereço é <code>index.php?nome=Ana&amp;nome=Bia</code>. O que <code>echo $_GET["nome"];</code> mostra?</p>
+<label><input type="radio" name="q43"> Ana</label>
+<label><input type="radio" name="q43"> Bia</label>
+<label><input type="radio" name="q43"> AnaBia</label>
+<label><input type="radio" name="q43"> Array</label>
+<details><summary>Explicação</summary><p>Quando o mesmo nome aparece duas vezes, o último vence: "Bia" (conferido com <code>php -S</code> e <code>curl</code>). Para receber vários valores, o nome precisa de colchetes: <code>nome[]=Ana&amp;nome[]=Bia</code> vira um array.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="get-post.html">$_GET e $_POST</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">44. Um formulário de login salva o usuário e mostra "Bem-vinda!". Depois, a pessoa aperta F5. Sem o padrão Post/Redirect/Get, o que acontece?</p>
+<label><input type="radio" name="q44"> A página só é recarregada</label>
+<label><input type="radio" name="q44"> O navegador pergunta se deve reenviar o formulário e, se a pessoa aceitar, o POST é repetido</label>
+<label><input type="radio" name="q44"> O PHP percebe e ignora o segundo envio</label>
+<label><input type="radio" name="q44"> A sessão é apagada</label>
+<details><summary>Explicação</summary><p>A página atual é a resposta de um POST, e recarregar repete o POST. Redirecionando depois de processar (<code>header("Location: …"); exit;</code>), a página final vem de um GET.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="redirecionar.html">header e Redirecionamento</a> · <a href="projeto-contato.html">Projeto Formulário de Contato</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">45. Qual destas consultas é segura contra injeção de SQL?</p>
+<label><input type="radio" name="q45"> <code>$pdo-&gt;query("SELECT * FROM tarefas WHERE id = " . $_GET["id"])</code></label>
+<label><input type="radio" name="q45"> <code>$pdo-&gt;query("SELECT * FROM tarefas WHERE id = '{$_GET["id"]}'")</code></label>
+<label><input type="radio" name="q45"> <code>$sql = $pdo-&gt;prepare("SELECT * FROM tarefas WHERE id = ?"); $sql-&gt;execute([$_GET["id"]]);</code></label>
+<label><input type="radio" name="q45"> <code>$pdo-&gt;query("SELECT * FROM tarefas WHERE id = " . htmlspecialchars($_GET["id"]))</code></label>
+<details><summary>Explicação</summary><p>Só o prepared statement envia o valor separado do comando. Pôr aspas em volta não resolve (basta enviar uma aspa), e o <code>htmlspecialchars</code> protege o HTML, não o SQL.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="prepared-statements.html">Prepared Statements e SQL Injection</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">46. Como guardar a senha de um usuário no banco?</p>
+<label><input type="radio" name="q46"> Em texto puro, porque o banco já é protegido</label>
+<label><input type="radio" name="q46"> <code>md5($senha)</code></label>
+<label><input type="radio" name="q46"> <code>password_hash($senha, PASSWORD_DEFAULT)</code>, e conferir com <code>password_verify</code></label>
+<label><input type="radio" name="q46"> <code>base64_encode($senha)</code></label>
+<details><summary>Explicação</summary><p><code>password_hash</code> usa um algoritmo lento de propósito (bcrypt) e um sal aleatório. <code>md5</code> é rápido demais e já tem tabelas prontas de senhas; <code>base64</code> nem é hash, é só outra forma de escrever.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="senhas.html">Senhas (password_hash)</a></p>
+</div>
+
+
+<h2 id="nivel3">Nível 3 · Avançado</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">47. O que este código imprime?</p>
+<pre class="file">class Pessoa {
+    public function __construct(public string $nome = "Ana") {}
+}
+echo (new Pessoa)-&gt;nome;</pre>
+<label><input type="radio" name="q47"> nada</label>
+<label><input type="radio" name="q47"> Ana</label>
+<label><input type="radio" name="q47"> Erro: falta o argumento</label>
+<label><input type="radio" name="q47"> Pessoa</label>
+<details><summary>Explicação</summary><p>Com a promoção no construtor, <code>public string $nome = "Ana"</code> cria a propriedade e a preenche. Sem argumento, vale o padrão.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="construtores.html">Construtores</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">48. O que este código imprime?</p>
+<pre class="file">class A {
+    public static function criar(): static {
+        return new static();
+    }
+}
+class B extends A {}
+echo get_class(B::criar());</pre>
+<label><input type="radio" name="q48"> A</label>
+<label><input type="radio" name="q48"> B</label>
+<label><input type="radio" name="q48"> static</label>
+<label><input type="radio" name="q48"> Erro</label>
+<details><summary>Explicação</summary><p><code>new static()</code> cria um objeto da classe usada na chamada (<code>B::criar()</code>), não da classe onde o método foi escrito. É o "late static binding"; com <code>new self()</code>, seria A.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="static.html">static</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">49. O que acontece?</p>
+<pre class="file">abstract class Forma {}
+$f = new Forma();</pre>
+<label><input type="radio" name="q49"> Cria um objeto Forma vazio</label>
+<label><input type="radio" name="q49"> Fatal error: Uncaught Error: Cannot instantiate abstract class Forma</label>
+<label><input type="radio" name="q49"> Warning e $f fica null</label>
+<label><input type="radio" name="q49"> Nada</label>
+<details><summary>Explicação</summary><p>Classe abstrata não vira objeto: ela só serve de base para outras (<code>class Circulo extends Forma</code>).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="abstratas.html">Classes Abstratas</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">50. O que acontece na última linha?</p>
+<pre class="file">class Produto {
+    public function __construct(public readonly float $preco) {}
+}
+$p = new Produto(10);
+$p-&gt;preco = 20;</pre>
+<label><input type="radio" name="q50"> O preço vira 20</label>
+<label><input type="radio" name="q50"> O preço continua 10, sem erro</label>
+<label><input type="radio" name="q50"> Fatal error: Uncaught Error: Cannot modify readonly property Produto::$preco</label>
+<label><input type="radio" name="q50"> Warning: readonly</label>
+<details><summary>Explicação</summary><p>Uma propriedade <code>readonly</code> recebe valor uma única vez (no construtor). Para "mudar", crie outro objeto (ou use <code>clone</code> com as novidades do PHP 8.5, quando a classe permite).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="readonly-hooks.html">readonly e Property Hooks</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">51. O que este código imprime?</p>
+<pre class="file">enum Status: string {
+    case Pago = "pago";
+    case Pendente = "pendente";
+}
+echo Status::from("pago")-&gt;name;
+var_dump(Status::tryFrom("cancelado"));</pre>
+<label><input type="radio" name="q51"> pagoNULL</label>
+<label><input type="radio" name="q51"> PagoNULL</label>
+<label><input type="radio" name="q51"> Pagofalse</label>
+<label><input type="radio" name="q51"> Pago e um Fatal error</label>
+<details><summary>Explicação</summary><p><code>from("pago")</code> acha o caso pelo valor; <code>-&gt;name</code> é o nome do caso: "Pago". <code>tryFrom</code> com um valor que não existe devolve <code>null</code> (o <code>from</code> lançaria <code>ValueError</code>).</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="enums.html">Enums</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">52. O que este código imprime?</p>
+<pre class="file">echo match ("1") {
+    1   =&gt; "int",
+    "1" =&gt; "string",
+};</pre>
+<label><input type="radio" name="q52"> int</label>
+<label><input type="radio" name="q52"> string</label>
+<label><input type="radio" name="q52"> intstring</label>
+<label><input type="radio" name="q52"> UnhandledMatchError</label>
+<details><summary>Explicação</summary><p>O <code>match</code> compara com <code>===</code>: o texto <code>"1"</code> não é idêntico ao número <code>1</code>, então o primeiro braço não serve.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="match.html">match</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">53. O que este código imprime?</p>
+<pre class="file">trait Saudacao {
+    public function oi(): string {
+        return "Oi de " . static::class;
+    }
+}
+class Loja {
+    use Saudacao;
+}
+echo (new Loja)-&gt;oi();</pre>
+<label><input type="radio" name="q53"> Oi de Saudacao</label>
+<label><input type="radio" name="q53"> Oi de Loja</label>
+<label><input type="radio" name="q53"> Oi de static</label>
+<label><input type="radio" name="q53"> Erro: trait não tem classe</label>
+<details><summary>Explicação</summary><p>O código do trait é "colado" na classe que o usa; dentro dele, <code>static::class</code> é a classe do objeto: <code>Loja</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="traits.html">Traits</a></p>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">54. O que este código imprime?</p>
+<pre class="file">$pedido = null;
+var_dump($pedido?-&gt;cliente?-&gt;nome);</pre>
+<label><input type="radio" name="q54"> NULL</label>
+<label><input type="radio" name="q54"> Warning: Attempt to read property "cliente" on null</label>
+<label><input type="radio" name="q54"> Fatal error</label>
+<label><input type="radio" name="q54"> string(0) ""</label>
+<details><summary>Explicação</summary><p>O <code>?-&gt;</code> (nullsafe) para a cadeia ao encontrar <code>null</code> e devolve <code>null</code>, sem aviso.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="null-coalescing.html">?? e ?-&gt;</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">55. O que este código imprime?</p>
+<pre class="file">echo "  ana  " |&gt; trim(...) |&gt; ucfirst(...);</pre>
+<label><input type="radio" name="q55">   ana  </label>
+<label><input type="radio" name="q55"> Ana</label>
+<label><input type="radio" name="q55"> ANA</label>
+<label><input type="radio" name="q55"> Parse error</label>
+<details><summary>Explicação</summary><p>O pipe <code>|&gt;</code> <span class="versao">PHP 8.5+</span> passa o valor para a próxima função: <code>trim</code> tira os espaços e <code>ucfirst</code> põe a inicial maiúscula. É o mesmo que <code>ucfirst(trim("  ana  "))</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="pipe.html">Operador Pipe (|&gt;)</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">56. O que este código imprime?</p>
+<pre class="file">echo array_first([3, 1, 2]), array_last([3, 1, 2]);</pre>
+<label><input type="radio" name="q56"> 12</label>
+<label><input type="radio" name="q56"> 32</label>
+<label><input type="radio" name="q56"> 13</label>
+<label><input type="radio" name="q56"> 31</label>
+<details><summary>Explicação</summary><p><code>array_first</code> e <code>array_last</code> <span class="versao">PHP 8.5+</span> devolvem o primeiro e o último valor, sem ordenar: 3 e 2.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="novidades.html">Novidades do 8.0 ao 8.5</a> · <a href="funcoes-array.html">Funções de Array</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">57. O que este código imprime?</p>
+<pre class="file">$f = strtoupper(...);
+echo $f("oi");</pre>
+<label><input type="radio" name="q57"> oi</label>
+<label><input type="radio" name="q57"> OI</label>
+<label><input type="radio" name="q57"> strtoupper</label>
+<label><input type="radio" name="q57"> Erro</label>
+<details><summary>Explicação</summary><p><code>strtoupper(...)</code> não chama a função: cria um objeto <code>Closure</code> que aponta para ela. Depois, <code>$f("oi")</code> chama.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="callables.html">Callables de Primeira Classe</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">58. O que este código imprime?</p>
+<pre class="file">class Conta {
+    public int $saldo = 0 {
+        set =&gt; max(0, $value);
+    }
+}
+$c = new Conta;
+$c-&gt;saldo = -50;
+echo $c-&gt;saldo;</pre>
+<label><input type="radio" name="q58"> -50</label>
+<label><input type="radio" name="q58"> 0</label>
+<label><input type="radio" name="q58"> 50</label>
+<label><input type="radio" name="q58"> Erro: valor inválido</label>
+<details><summary>Explicação</summary><p>O gancho <code>set</code> <span class="versao">PHP 8.4+</span> roda a cada atribuição; na forma curta (<code>=&gt;</code>), o resultado da expressão é o que fica guardado: <code>max(0, -50)</code> = 0.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="readonly-hooks.html">readonly e Property Hooks</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">59. O que este código imprime?</p>
+<pre class="file">namespace Loja;
+class Produto {}
+echo Produto::class;</pre>
+<label><input type="radio" name="q59"> Produto</label>
+<label><input type="radio" name="q59"> Loja\Produto</label>
+<label><input type="radio" name="q59"> \Produto</label>
+<label><input type="radio" name="q59"> Loja.Produto</label>
+<details><summary>Explicação</summary><p><code>::class</code> dá o nome completo da classe, com o namespace.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="namespaces.html">Namespaces</a></p>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">60. O que acontece?</p>
+<pre class="file">declare(strict_types=1);
+function dobro(int $n): int {
+    return $n * 2;
+}
+echo dobro("5");</pre>
+<label><input type="radio" name="q60"> Imprime 10</label>
+<label><input type="radio" name="q60"> Imprime 55</label>
+<label><input type="radio" name="q60"> Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given…</label>
+<label><input type="radio" name="q60"> Warning e imprime 10</label>
+<details><summary>Explicação</summary><p>Com <code>strict_types=1</code>, o PHP não converte <code>"5"</code> em <code>5</code> para você: o tipo tem que ser exatamente <code>int</code>. Sem essa linha, imprimiria 10.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="tipos-retorno.html">Tipos e Retorno</a></p>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">61. O que este código imprime?</p>
+<pre class="file">interface Pagavel {}
+class Pix implements Pagavel {}
+var_dump(new Pix instanceof Pagavel);</pre>
+<label><input type="radio" name="q61"> bool(true)</label>
+<label><input type="radio" name="q61"> bool(false)</label>
+<label><input type="radio" name="q61"> Pix</label>
+<label><input type="radio" name="q61"> Erro: interface não pode ser usada com instanceof</label>
+<details><summary>Explicação</summary><p><code>instanceof</code> vale para a classe, as classes-mãe e as interfaces que ela implementa.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="interfaces.html">Interfaces</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">62. O que este código imprime?</p>
+<pre class="file">final class Ponto {
+    public function __construct(public int $x = 0, public int $y = 0) {}
+}
+$a = new Ponto(1, 2);
+$b = clone($a, ["y" =&gt; 9]);
+echo $a-&gt;y, $b-&gt;y;</pre>
+<label><input type="radio" name="q62"> 22</label>
+<label><input type="radio" name="q62"> 29</label>
+<label><input type="radio" name="q62"> 99</label>
+<label><input type="radio" name="q62"> Erro</label>
+<details><summary>Explicação</summary><p>O <code>clone</code> com um array de propriedades <span class="versao">PHP 8.5+</span> ("clone with") cria a cópia já com <code>y</code> = 9. O original não muda: 2 e 9.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="novidades.html">Novidades do 8.0 ao 8.5</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">63. O que este código imprime?</p>
+<pre class="file">class Item {
+    public function __toString(): string {
+        return "Café";
+    }
+}
+echo "Produto: " . new Item;</pre>
+<label><input type="radio" name="q63"> Produto: Item</label>
+<label><input type="radio" name="q63"> Produto: Café</label>
+<label><input type="radio" name="q63"> Produto: Object</label>
+<label><input type="radio" name="q63"> Error: Object of class Item could not be converted to string</label>
+<details><summary>Explicação</summary><p>Ao usar um objeto como texto, o PHP chama o método mágico <code>__toString</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="metodos-magicos.html">Métodos Mágicos</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">64. O que este código imprime?</p>
+<pre class="file">$a = [1, 2, 3];
+foreach ($a as &amp;$v) {
+    $v *= 2;
+}
+unset($v);
+echo implode(",", $a);</pre>
+<label><input type="radio" name="q64"> 1,2,3</label>
+<label><input type="radio" name="q64"> 2,4,6</label>
+<label><input type="radio" name="q64"> 2,4,3</label>
+<label><input type="radio" name="q64"> 1,2,6</label>
+<details><summary>Explicação</summary><p>Com <code>&amp;$v</code>, o <code>foreach</code> trabalha com o próprio item do array, não com uma cópia. O <code>unset($v)</code> depois do laço é um bom hábito: desfaz a ligação com o último item.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="foreach.html">foreach</a></p>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">65. A classe <code>App\Modelo\Usuario</code> segue a PSR-4, com <code>"App\\": "src/"</code> no <code>composer.json</code>. Em que arquivo ela fica?</p>
+<label><input type="radio" name="q65"> <code>src/App/Modelo/Usuario.php</code></label>
+<label><input type="radio" name="q65"> <code>src/Modelo/Usuario.php</code></label>
+<label><input type="radio" name="q65"> <code>Modelo/Usuario.class.php</code></label>
+<label><input type="radio" name="q65"> <code>vendor/App/Modelo/Usuario.php</code></label>
+<details><summary>Explicação</summary><p>O prefixo <code>App\</code> corresponde à pasta <code>src/</code>; o resto do nome vira o caminho: <code>Modelo\Usuario</code> → <code>src/Modelo/Usuario.php</code>.</p></details>
+<p class="mc-q" style="font-weight:400;font-size:14px">Revise: <a href="autoload.html">Autoload e PSR-4</a> · <a href="composer.html">Composer</a></p>
+</div>
+
+
+<h2 id="conferir">Conferir no editor</h2>
+<p>Ficou em dúvida numa resposta? Cole o trecho na caixa abaixo (com o <code>&lt;?php</code> na primeira linha) e rode: é o mesmo PHP 8.5 que conferiu as respostas.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Caixa livre:</strong> as perguntas 10 e 11, para você conferir (e brincar: troque <code>++$i</code> por <code>$i++</code> e veja o resultado mudar).</p>
+<pre class="script">&lt;?php
+echo 2 ** 3 ** 2, "\n";
+
+$i = 5;
+echo $i++ + ++$i, "\n";
+</pre>
+</div>
+
+<div class="tryphp" data-goal="out:0,1,2">
+<p class="try-task"><strong>Missão:</strong> na pergunta 31, o <code>array_filter</code> deixou "buracos" nas chaves (0, 2, 4). Faça a saída ser <code>0,1,2</code>, renumerando as chaves com <code>array_values</code>.</p>
+<pre class="script">&lt;?php
+$r = array_filter([1, 0, 2, null, 3]);
+echo implode(",", array_keys($r));
+</pre>
+<pre class="solucao">&lt;?php
+$r = array_values(array_filter([1, 0, 2, null, 3]));
+echo implode(",", array_keys($r));
+</pre>
+</div>
+
+<div class="tryphp" data-goal="out:10,semerro">
+<p class="try-task"><strong>Missão:</strong> o código da pergunta 60 para com um <code>TypeError</code>. Sem tirar o <code>strict_types</code>, faça-o imprimir <code>10</code>: converta o texto para número na chamada.</p>
+<pre class="script">&lt;?php
+declare(strict_types=1);
+
+function dobro(int $n): int {
+    return $n * 2;
+}
+
+echo dobro("5");
+</pre>
+<pre class="solucao">&lt;?php
+declare(strict_types=1);
+
+function dobro(int $n): int {
+    return $n * 2;
+}
+
+echo dobro((int) "5");
+</pre>
+</div>
+
+<div class="tip">
+<strong>Terminou?</strong>
+<p>Role até o topo para ver o placar. Errou alguma? A explicação e o link "Revise" levam direto ao assunto. Para consultar rápido, use o <a href="glossario.html">Glossário</a> e as referências de <a href="ref-string.html">strings</a>, <a href="ref-array.html">arrays</a> e <a href="ref-erros.html">mensagens de erro</a>. E, para juntar tudo, faça os <a href="projetos.html">Projetos</a>.</p>
+</div>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
