@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP header e Redirecionamento — Location, Post/Redirect/Get e códigos HTTP | Guia PHP</title>
+<meta name="description" content="Como redirecionar em PHP com header('Location: …') e exit, o padrão Post/Redirect/Get contra o F5 que reenvia formulários, os códigos 301, 302 e 303, http_response_code, outros cabeçalhos como Content-Type para JSON e texto, e o erro headers already sent.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">header e Redirecionamento</span></h1>
+
+<p class="intro">Depois de salvar um cadastro, o site leva você para a página "Obrigado!". Uma página antiga mudou de endereço e o site manda você para a nova. Uma área restrita manda quem não fez login para a tela de entrar. Tudo isso é <strong>redirecionamento</strong>: em vez de uma página, o servidor responde "vá para outro endereço". Em PHP, ele é feito com a função <code>header</code>, que também serve para mandar outros <strong>cabeçalhos</strong> da resposta, como "isto é JSON" ou "isto é um arquivo para baixar".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que são os cabeçalhos de uma resposta HTTP e o código de status.</li>
+  <li>Como redirecionar com <code>header('Location: …')</code>, e por que o <code>exit</code> logo depois é obrigatório.</li>
+  <li>O problema do <kbd>F5</kbd> que reenvia um formulário, e a solução: o padrão <strong>Post/Redirect/Get</strong>.</li>
+  <li>Os códigos 301, 302 e 303 (e 307/308), e quando usar cada um.</li>
+  <li>Como mudar o código da resposta com <code>http_response_code</code> (o 404, por exemplo).</li>
+  <li>Outros cabeçalhos: <code>Content-Type</code> para JSON e texto puro, e <code>Content-Disposition</code> para downloads.</li>
+  <li>De novo, o erro <em>headers already sent</em>, agora com <code>header</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: "mudou-se para…"</h2>
+<p>Quando alguém se muda, deixa um aviso no correio: "toda carta para a Rua A, entregue na Rua B". O carteiro chega na Rua A, vê o aviso e vai até a Rua B, sem o remetente precisar fazer nada.</p>
+<p>O redirecionamento é esse aviso. O navegador pede <code>velho.php</code>; o PHP responde, em vez de uma página, com um cabeçalho <code>Location: novo.php</code> ("localização: novo.php"). O navegador lê o aviso e faz, sozinho, um <strong>segundo pedido</strong> para <code>novo.php</code>. A barra de endereço muda para o endereço novo.</p>
+
+<figure>
+<pre class="file" data-file="um redirecionamento são dois pedidos">  NAVEGADOR                                    SERVIDOR
+ 1. GET /velho.php         ──────────────▶   header('Location: novo.php'); exit;
+                           ◀──────────────   302 Found
+                                             Location: novo.php
+ 2. GET /novo.php          ──────────────▶   (roda o novo.php)
+                           ◀──────────────   200 OK + a página</pre>
+<figcaption>O primeiro pedido recebe só um "vá para lá" (código 302 e o cabeçalho <code>Location</code>). O navegador faz o segundo pedido sozinho.</figcaption>
+</figure>
+
+<h2>Cabeçalhos e código de status</h2>
+<p>Toda resposta HTTP tem duas partes: os <strong>cabeçalhos</strong> (informações sobre a resposta, uma por linha) e, depois de uma linha em branco, o <strong>corpo</strong> (a página). A primeira linha traz o <strong>código de status</strong>: um número que resume o resultado. Você já viu alguns nas aulas anteriores com o <code>curl -i</code>:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Faixa</th><th>Significa</th><th>Exemplos</th></tr>
+<tr><td><code>2xx</code></td><td>Deu certo</td><td><code>200 OK</code></td></tr>
+<tr><td><code>3xx</code></td><td>Vá para outro lugar (redirecionamento)</td><td><code>301</code>, <code>302</code>, <code>303</code></td></tr>
+<tr><td><code>4xx</code></td><td>Erro de quem pediu</td><td><code>404 Not Found</code> (não encontrado), <code>403 Forbidden</code> (proibido)</td></tr>
+<tr><td><code>5xx</code></td><td>Erro do servidor</td><td><code>500 Internal Server Error</code></td></tr>
+</table>
+</div>
+
+<p>A função <code>header</code> acrescenta um cabeçalho à resposta. Como os cabeçalhos viajam <strong>antes</strong> do corpo, ela só funciona antes de qualquer saída, a mesma regra do <code>setcookie</code> e do <code>session_start</code> (<a href="cookies.html">Cookies</a>).</p>
+
+<hr>
+
+<h2>Redirecionar: <code>header('Location: …')</code> + <code>exit</code></h2>
+<pre class="file" data-file="velho.php">&lt;?php
+header('Location: novo.php');
+exit;
+</pre>
+<pre class="file" data-file="novo.php">&lt;?php
+echo "Você está na página nova.\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>header(</dt><dd>"Cabeçalho": acrescenta uma linha aos cabeçalhos da resposta.</dd>
+  <dt>'Location: novo.php'</dt><dd>O cabeçalho, no formato <code>Nome: valor</code>. <code>Location</code> diz para onde ir: um arquivo do mesmo site (<code>novo.php</code>, <code>/loja/carrinho.php</code>, <code>obrigado.php?id=5</code>) ou outro site (<code>https://exemplo.com/</code>). Ao ver um <code>Location</code>, o PHP muda o código da resposta para <code>302</code> sozinho.</dd>
+  <dt>exit;</dt><dd>"Sair": termina o programa aqui. Sem ele, o PHP continua rodando o resto do arquivo (veja logo abaixo por que isso é perigoso).</dd>
+</dl>
+
+<pre class="term">$ curl -si localhost:8000/velho.php
+HTTP/1.1 302 Found
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:10:57 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Location: novo.php
+Content-type: text/html; charset=UTF-8
+
+$ curl -sL localhost:8000/velho.php
+Você está na página nova.</pre>
+
+<p>O primeiro <code>curl</code> mostra a resposta crua: código <code>302 Found</code> ("encontrado", em outro lugar), o <code>Location</code> e o corpo vazio. O segundo usa <code>-L</code> (<em>location</em>), que faz o <code>curl</code> seguir o aviso como um navegador. No terminal do <code>php -S</code>, dá para ver os dois pedidos:</p>
+
+<pre class="term">[Fri Oct 16 21:10:57 2026] 127.0.0.1:44274 [302]: GET /velho.php
+[Fri Oct 16 21:10:57 2026] 127.0.0.1:44282 [200]: GET /novo.php</pre>
+
+<h3>Por que o <code>exit</code> é obrigatório</h3>
+<p>O <code>header</code> só <strong>anota</strong> o cabeçalho; ele não para o programa. Veja uma "área restrita" que manda para o login quem não está logado, mas esqueceu o <code>exit</code>:</p>
+
+<pre class="file" data-file="semexit.php">&lt;?php
+$logado = false;
+if (!$logado) {
+    header('Location: login.php');
+}
+echo "Saldo do caixa: R$ 1.234,00\n";
+</pre>
+
+<pre class="term">$ curl -si localhost:8000/semexit.php
+HTTP/1.1 302 Found
+…
+Location: login.php
+Content-type: text/html; charset=UTF-8
+
+Saldo do caixa: R$ 1.234,00          « o segredo foi enviado junto!</pre>
+
+<p>O navegador obedece ao <code>Location</code> tão rápido que a pessoa nem vê o corpo. Mas ele <strong>foi enviado</strong>: qualquer um que use <code>curl</code> (ou desligue o redirecionamento) lê o saldo. E se depois do <code>header</code> houvesse um código que apaga ou salva algo, ele rodaria também. Regra: <strong><code>header('Location: …')</code> e <code>exit</code> andam sempre juntos.</strong></p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task">Dois arquivos nesta caixa: <code>index.php</code> (o que roda) e <code>novo.php</code>. Rode: o editor segue o redirecionamento, como um navegador, e mostra a página nova. Depois apague a linha do <code>header</code>, ou troque o destino para <code>novo.php?de=index</code>, e veja a diferença.</p>
+<pre class="script" data-file="index.php">&lt;?php
+header('Location: novo.php');
+exit;
+</pre>
+<pre class="script" data-file="novo.php">&lt;?php
+echo "&lt;p&gt;Você está na página nova.&lt;/p&gt;";
+echo "&lt;p&gt;Endereço pedido: " . htmlspecialchars($_SERVER['REQUEST_URI']) . "&lt;/p&gt;";
+</pre>
+</div>
+
+<hr>
+
+<h2>O problema do <kbd>F5</kbd> e o padrão Post/Redirect/Get</h2>
+<p>A Ana fez um mural de recados para a equipe da padaria. O formulário envia por POST, o PHP grava o recado num arquivo (com <code>file_put_contents</code>, de <a href="arquivos.html">Ler e Escrever Arquivos</a>) e mostra a lista:</p>
+
+<pre class="file" data-file="recados.php">&lt;?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $texto = trim($_POST['recado'] ?? '');
+    file_put_contents('recados.txt', $texto . "\n", FILE_APPEND);
+    echo "Recado salvo!\n";
+}
+echo "Recados:\n", file_get_contents('recados.txt');
+</pre>
+
+<p>A funcionária envia "Bolo pronto às 15h" e vê a confirmação. Depois aperta <kbd>F5</kbd> para atualizar a página. O navegador avisa: <em>"Para exibir esta página, o navegador precisa reenviar as informações. Deseja continuar?"</em>. Muita gente clica em "Reenviar" sem ler, e o navegador repete <strong>o mesmo POST</strong>. É o que este segundo <code>curl</code> igualzinho faz:</p>
+
+<pre class="term">$ curl -s localhost:8000/recados.php -d "recado=Bolo+pronto+às+15h"
+Recado salvo!
+Recados:
+Bolo pronto às 15h
+$ curl -s localhost:8000/recados.php -d "recado=Bolo+pronto+às+15h"
+Recado salvo!
+Recados:
+Bolo pronto às 15h
+Bolo pronto às 15h          « duplicado pelo "F5"</pre>
+
+<p>Num mural, é só um recado repetido. Numa loja, é um pedido em dobro; num banco, uma transferência em dobro. O problema: a página que a pessoa está vendo <strong>é o resultado de um POST</strong>, e atualizar uma página é repetir o pedido que a gerou.</p>
+
+<h3>A solução: Post/Redirect/Get (PRG)</h3>
+<p>Nunca responda um POST com uma página. Responda com um <strong>redirecionamento</strong>, e mostre a página num GET:</p>
+<ol class="passo">
+  <li><strong>Post:</strong> o formulário envia por POST. O PHP processa (grava o recado).</li>
+  <li><strong>Redirect:</strong> em vez de mostrar algo, o PHP responde <code>303</code> + <code>Location: mural.php</code>.</li>
+  <li><strong>Get:</strong> o navegador pede <code>mural.php</code> por GET, e mostra a lista.</li>
+</ol>
+<p>Agora a página na tela é resultado de um <strong>GET</strong>. O <kbd>F5</kbd> repete o GET, que só lê: nada é gravado de novo, e o navegador nem pergunta nada.</p>
+
+<p>E a mensagem "Recado salvo!"? Ela precisa sobreviver ao redirecionamento, então vai para a <strong>sessão</strong> (<a href="sessoes.html">Sessões</a>) e é apagada assim que mostrada (a "mensagem de uma vez só", ou <em>flash</em>):</p>
+
+<pre class="file" data-file="mural.php">&lt;?php
+session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $texto = trim($_POST['recado'] ?? '');
+    file_put_contents('mural.txt', $texto . "\n", FILE_APPEND);
+    $_SESSION['aviso'] = 'Recado salvo!';
+    header('Location: mural.php', true, 303);
+    exit;
+}
+if (isset($_SESSION['aviso'])) {
+    echo $_SESSION['aviso'], "\n";
+    unset($_SESSION['aviso']);
+}
+echo "Recados:\n", file_get_contents('mural.txt');
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>if (… === 'POST') { … }</code></td><td>Parte do <strong>Post</strong>: grava e guarda o aviso. Não mostra nada.</td></tr>
+<tr><td><code>header('Location: mural.php', true, 303)</code></td><td>Parte do <strong>Redirect</strong>. O segundo argumento (<code>true</code>) substitui um cabeçalho igual, se já houver; o terceiro escolhe o código: <code>303 See Other</code> ("veja outro"), que diz explicitamente "agora peça com GET".</td></tr>
+<tr><td><code>exit;</code></td><td>Para aqui. O resto do arquivo é a parte do GET.</td></tr>
+<tr><td><code>$_SESSION['aviso']</code> + <code>unset</code></td><td>Mostra o aviso uma vez só e o apaga.</td></tr>
+<tr><td><code>echo "Recados:…"</code></td><td>Parte do <strong>Get</strong>: só lê e mostra.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl -si -c pote -b pote localhost:8000/mural.php -d "recado=Bolo+pronto+às+15h"
+HTTP/1.1 303 See Other
+…
+Set-Cookie: PHPSESSID=57e6e0e639ce571ca8e543cf1fe6f167; path=/
+…
+Location: mural.php
+Content-type: text/html; charset=UTF-8
+
+$ curl -s -c pote -b pote localhost:8000/mural.php        « o GET que o navegador faria
+Recado salvo!
+Recados:
+Bolo pronto às 15h
+$ curl -s -c pote -b pote localhost:8000/mural.php        « o "F5"
+Recados:
+Bolo pronto às 15h          « nada duplicado, e o aviso não se repete</pre>
+
+<p>Com <code>curl -L</code>, que segue o redirecionamento sozinho como o navegador, o envio inteiro fica numa linha. O log do servidor mostra o par POST → GET:</p>
+<pre class="term">$ curl -sL -c pote2 -b pote2 localhost:8000/mural.php -d "recado=Pão+saindo"
+Recado salvo!
+Recados:
+Bolo pronto às 15h
+Pão saindo</pre>
+<pre class="term">[Fri Oct 16 21:10:57 2026] 127.0.0.1:44358 [303]: POST /mural.php
+[Fri Oct 16 21:10:57 2026] 127.0.0.1:44366 [200]: GET /mural.php</pre>
+
+<div class="tip"><strong>Regra prática:</strong> todo formulário POST que <strong>muda algo</strong> (grava, apaga, compra, envia) termina com um redirecionamento quando dá certo. Quando há erro de validação (<a href="validacao.html">Validar Dados</a>), aí sim mostre o formulário de novo, com as mensagens: nada foi gravado, então reenviar não duplica nada.</div>
+
+<hr>
+
+<h2>Os códigos de redirecionamento</h2>
+<p>Há vários códigos <code>3xx</code>, e a diferença entre eles importa para navegadores e buscadores (Google):</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>Nome</th><th>Significa</th><th>O próximo pedido</th><th>Use para</th></tr>
+<tr><td><code>301</code></td><td>Moved Permanently</td><td>Mudou-se <strong>para sempre</strong>. Navegadores e buscadores guardam o novo endereço.</td><td>GET (na prática)</td><td>Página que trocou de endereço de vez (<code>contato.html</code> → <code>contato.php</code>)</td></tr>
+<tr><td><code>302</code></td><td>Found</td><td>Está em outro lugar <strong>por agora</strong>. O padrão do <code>header('Location: …')</code>.</td><td>GET (na prática)</td><td>Redirecionamentos temporários: "faça login primeiro"</td></tr>
+<tr><td><code>303</code></td><td>See Other</td><td>"Veja outra página", sempre com GET.</td><td>Sempre GET</td><td>Depois de um POST (o PRG)</td></tr>
+<tr><td><code>307</code></td><td>Temporary Redirect</td><td>Como o 302, mas o navegador repete o <strong>mesmo método</strong> (um POST continua POST).</td><td>O mesmo método</td><td>Raro em páginas; usado em APIs</td></tr>
+<tr><td><code>308</code></td><td>Permanent Redirect</td><td>Como o 301, mantendo o método.</td><td>O mesmo método</td><td>Raro em páginas; usado em APIs</td></tr>
+</table>
+</div>
+
+<div class="warning"><strong>Cuidado com o 301.</strong> Como ele é "para sempre", o navegador guarda e nem pergunta mais ao servidor. Se você errar o destino de um 301, as pessoas que já visitaram continuam indo para o lugar errado mesmo depois de você corrigir. Na dúvida, use 302 (ou 303 depois de POST).</div>
+
+<p>Duas formas de escolher o código, com o mesmo resultado:</p>
+<pre class="file" data-file="codigos.php">&lt;?php
+header('Location: novo.php', true, 301);
+exit;
+</pre>
+<pre class="file" data-file="codigos2.php">&lt;?php
+http_response_code(301);
+header('Location: novo.php');
+exit;
+</pre>
+<pre class="term">$ curl -si localhost:8000/codigos.php | head -1
+HTTP/1.1 301 Moved Permanently
+$ curl -si localhost:8000/codigos2.php | head -1
+HTTP/1.1 301 Moved Permanently</pre>
+
+<hr>
+
+<h2><code>http_response_code</code>: o código de qualquer resposta</h2>
+<p>O código de status não serve só para redirecionar. Quando um produto não existe, a página deve responder <code>404</code>, e não <code>200</code> com a frase "não encontrado": assim buscadores não guardam a página de erro, e programas que leem o seu site sabem que deu errado. A função <code>http_response_code</code> muda o código (e, sem argumentos, diz qual é o atual):</p>
+
+<pre class="file" data-file="naoachou.php">&lt;?php
+$id = (int) ($_GET['id'] ?? 0);
+$produtos = [1 =&gt; 'Bolo de cenoura', 2 =&gt; 'Pão de queijo'];
+if (!isset($produtos[$id])) {
+    http_response_code(404);
+    echo "Produto não encontrado.\n";
+    exit;
+}
+echo $produtos[$id], "\n";
+</pre>
+
+<pre class="term">$ curl -si "localhost:8000/naoachou.php?id=9" | sed -n '1p;$p'
+HTTP/1.1 404 Not Found
+Produto não encontrado.
+$ curl -s "localhost:8000/naoachou.php?id=1"
+Bolo de cenoura</pre>
+<p>(O <code>sed -n '1p;$p'</code> mostra só a primeira e a última linha da resposta.) Outros códigos comuns que você mesmo vai mandar: <code>403</code> (proibido: logado, mas sem permissão), <code>400</code> (pedido malformado), <code>500</code> (erro no servidor).</p>
+
+<hr>
+
+<h2>Outros cabeçalhos</h2>
+
+<h3><code>Content-Type</code>: que tipo de conteúdo é este</h3>
+<p>Por padrão, o PHP avisa que a resposta é uma página HTML (<code>Content-type: text/html; charset=UTF-8</code>, que você viu em todo <code>curl -i</code>). Quando o seu PHP devolve outra coisa, diga o tipo certo:</p>
+
+<pre class="file" data-file="api.php">&lt;?php
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode(['produto' =&gt; 'Bolo de cenoura', 'preco' =&gt; 25.9]);
+</pre>
+<pre class="term">$ curl -si localhost:8000/api.php | grep -v "^Date\|^Host\|^Conn"
+HTTP/1.1 200 OK
+X-Powered-By: PHP/8.5.8
+Content-Type: application/json; charset=utf-8
+
+{"produto":"Bolo de cenoura","preco":25.9}</pre>
+
+<p>Com <code>application/json</code>, o JavaScript que pediu os dados (e o navegador, ao abrir o endereço) sabe que a resposta é JSON (veja <a href="json.html">JSON</a>). Para texto puro, sem HTML:</p>
+
+<pre class="file" data-file="texto.php">&lt;?php
+header('Content-Type: text/plain; charset=utf-8');
+echo "&lt;b&gt;Isto não vira negrito&lt;/b&gt;\n";
+</pre>
+<pre class="term">$ curl -si localhost:8000/texto.php | grep -i "content-type"
+Content-Type: text/plain; charset=utf-8</pre>
+<p>No navegador, essa página aparece com os <code>&lt;b&gt;</code> à mostra, em letra de máquina de escrever: com <code>text/plain</code>, o navegador não interpreta HTML.</p>
+
+<h3><code>Content-Disposition</code>: baixar em vez de mostrar</h3>
+<pre class="file" data-file="baixar.php">&lt;?php
+header('Content-Type: text/csv; charset=utf-8');
+header('Content-Disposition: attachment; filename="pedidos.csv"');
+echo "cliente,produto\nBia,Bolo de cenoura\n";
+</pre>
+<pre class="term">$ curl -si localhost:8000/baixar.php | grep -iv "^Date\|^Host\|^Conn"
+HTTP/1.1 200 OK
+X-Powered-By: PHP/8.5.8
+Content-Type: text/csv; charset=utf-8
+Content-Disposition: attachment; filename="pedidos.csv"
+
+cliente,produto
+Bia,Bolo de cenoura</pre>
+<p><code>attachment</code> ("anexo") faz o navegador abrir a janela de download, com o nome sugerido em <code>filename</code>. É assim que se gera uma planilha para baixar (veja <a href="csv.html">CSV</a>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Cabeçalho</th><th>Exemplo</th><th>Para quê</th></tr>
+<tr><td><code>Location</code></td><td><code>header('Location: obrigado.php')</code></td><td>Redirecionar</td></tr>
+<tr><td><code>Content-Type</code></td><td><code>application/json; charset=utf-8</code>, <code>text/plain; charset=utf-8</code>, <code>text/csv</code></td><td>Dizer o tipo do conteúdo</td></tr>
+<tr><td><code>Content-Disposition</code></td><td><code>attachment; filename="x.csv"</code></td><td>Forçar download com um nome</td></tr>
+<tr><td><code>Cache-Control</code></td><td><code>no-store</code></td><td>Pedir para não guardar a página em cache</td></tr>
+<tr><td><code>Refresh</code></td><td><code>header('Refresh: 5; url=index.php')</code></td><td>Redirecionar depois de 5 segundos (os navegadores entendem; prefira o <code>Location</code> sempre que possível)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>"Headers already sent", de novo</h2>
+<pre class="file" data-file="erro.php">&lt;!doctype html&gt;
+&lt;?php
+header('Location: novo.php');
+exit;
+</pre>
+<pre class="term">$ curl -si localhost:8000/erro.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:10:57 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+&lt;!doctype html&gt;
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/site/r/erro.php:1) in &lt;b&gt;/home/ana/site/r/erro.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+
+<p>A resposta saiu como <code>200 OK</code>, sem <code>Location</code>: o redirecionamento <strong>não aconteceu</strong>. O <code>&lt;!doctype html&gt;</code> da linha 1 (fora do <code>&lt;?php</code>) é saída, e os cabeçalhos foram enviados ali. Tudo o que você aprendeu em <a href="cookies.html">Cookies</a> vale igual: a pista é o "output started at"; culpados comuns são HTML antes do PHP, <code>echo</code>, linhas em branco, o BOM e avisos.</p>
+
+<div class="note"><strong>A organização que evita o problema:</strong> em cada página, primeiro um bloco <code>&lt;?php … ?&gt;</code> que <strong>decide</strong> (lê o formulário, valida, grava, redireciona, define cookies e cabeçalhos); depois o HTML que <strong>mostra</strong>. Se precisar conferir, <code>headers_sent()</code> diz se já é tarde demais.</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O redirecionamento não acontece e aparece <code>Cannot modify header information</code></strong>
+<p><strong>O que aconteceu:</strong> alguma saída antes do <code>header</code>. Veja o exemplo logo acima.</p>
+<p><strong>Como resolver:</strong> vá ao arquivo e linha do "output started at" e remova a saída, ou mova o <code>header</code> para antes dela.</p>
+</div>
+
+<div class="cenario">
+<strong>Redirecionou, mas o código de depois rodou</strong>
+<pre class="term">Location: login.php
+…
+Saldo do caixa: R$ 1.234,00</pre>
+<p><strong>O que aconteceu:</strong> faltou o <code>exit</code> depois do <code>header('Location: …')</code>. O programa continuou, e o resto da página foi enviado no corpo do 302.</p>
+<p><strong>Como resolver:</strong> <code>header('Location: …');</code> sempre seguido de <code>exit;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Esta página não está redirecionando corretamente" / <code>ERR_TOO_MANY_REDIRECTS</code></strong>
+<p><strong>O que aconteceu:</strong> um laço de redirecionamentos: <code>login.php</code> manda para <code>painel.php</code>, que manda de volta para <code>login.php</code>… (por exemplo, o painel exige login e o login acha que a pessoa já está logada). Ou a página redireciona para ela mesma sem condição. O navegador desiste depois de umas 20 voltas.</p>
+<p><strong>Como resolver:</strong> confira as condições de cada <code>header('Location')</code>. O <code>curl -sIL endereço</code> mostra cada salto (<code>-I</code> pede só os cabeçalhos), e o log do <code>php -S</code> também.</p>
+</div>
+
+<div class="cenario">
+<strong>Atualizei a página e o pedido foi duplicado</strong>
+<p><strong>O que aconteceu:</strong> o formulário POST respondeu com uma página, e o <kbd>F5</kbd> repetiu o POST.</p>
+<p><strong>Como resolver:</strong> Post/Redirect/Get: depois de processar o POST com sucesso, <code>header('Location: …', true, 303); exit;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O JSON aparece como texto corrido, ou o JavaScript não o reconhece</strong>
+<p><strong>O que aconteceu:</strong> a resposta saiu com o <code>Content-Type</code> padrão (<code>text/html</code>).</p>
+<p><strong>Como resolver:</strong> <code>header('Content-Type: application/json; charset=utf-8');</code> antes do <code>echo json_encode(…)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>header('Location: x.php'); exit;</code></td><td>Redireciona (302)</td></tr>
+<tr><td><code>header('Location: x.php', true, 303); exit;</code></td><td>Redireciona com outro código (aqui, 303, o do PRG)</td></tr>
+<tr><td><code>http_response_code(404)</code></td><td>Define o código da resposta</td></tr>
+<tr><td><code>http_response_code()</code></td><td>Diz o código atual</td></tr>
+<tr><td><code>header('Content-Type: application/json; charset=utf-8')</code></td><td>Resposta JSON</td></tr>
+<tr><td><code>header('Content-Type: text/plain; charset=utf-8')</code></td><td>Resposta em texto puro</td></tr>
+<tr><td><code>header('Content-Disposition: attachment; filename="x.csv"')</code></td><td>Força o download</td></tr>
+<tr><td><code>headers_sent()</code></td><td><code>true</code> se os cabeçalhos já saíram</td></tr>
+<tr><td><code>headers_list()</code></td><td>Lista os cabeçalhos preparados até agora</td></tr>
+<tr><td><code>curl -si</code> / <code>curl -sL</code> / <code>curl -sIL</code></td><td>Ver cabeçalhos / seguir redirecionamentos / só cabeçalhos de cada salto</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Redirecionar</h3>
+<p>Complete para mandar o visitante para <code>login.php</code>:</p>
+<div class="ex-code">header('<input data-answer="Location: login.php" aria-label="cabeçalho">');<br>exit;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Depois do POST</h3>
+<p>Complete com o código de status do padrão Post/Redirect/Get:</p>
+<div class="ex-code">header('Location: mural.php', true, <input data-answer="303" aria-label="código">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Não encontrado</h3>
+<p>Complete para a resposta sair com o código 404:</p>
+<div class="ex-code"><input data-answer="http_response_code" aria-label="função">(404);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que acontece se você esquecer o <code>exit</code> depois de <code>header('Location: login.php')</code>?</p>
+<label><input type="radio" name="q4"> O redirecionamento não funciona.</label>
+<label><input type="radio" name="q4"> O resto do arquivo roda e é enviado no corpo da resposta.</label>
+<label><input type="radio" name="q4"> O PHP mostra um erro fatal.</label>
+<label><input type="radio" name="q4"> Nada: o <code>header</code> já para o programa.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. A página de contato mudou de <code>contato.html</code> para <code>contato.php</code>, de vez. Qual código usar no redirecionamento?</p>
+<label><input type="radio" name="q5"> <code>301</code></label>
+<label><input type="radio" name="q5"> <code>302</code></label>
+<label><input type="radio" name="q5"> <code>303</code></label>
+<label><input type="radio" name="q5"> <code>404</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Por que o Post/Redirect/Get impede pedidos duplicados no <kbd>F5</kbd>?</p>
+<label><input type="radio" name="q6"> Porque o 303 apaga o formulário.</label>
+<label><input type="radio" name="q6"> Porque o navegador desliga o <kbd>F5</kbd>.</label>
+<label><input type="radio" name="q6"> Porque a página na tela passa a ser resultado de um GET, e atualizar repete só o GET.</label>
+<label><input type="radio" name="q6"> Porque a sessão bloqueia o segundo POST.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="recado=Bolo+pronto+%C3%A0s+15h" data-goal="src:header\(\s*['&quot;]Location,src:303,src:exit,html:Bolo pronto às 15h,semerro">
+<p class="try-task"><strong>Missão:</strong> aplique o Post/Redirect/Get no mural. A página foi aberta com o envio de um recado. Depois de gravar, em vez de mostrar a mensagem, guarde <code>'Recado salvo!'</code> em <code>$_SESSION['aviso']</code>, redirecione para <code>index.php</code> com o código <code>303</code> e pare com <code>exit</code>. Na parte de mostrar, exiba o aviso (se houver) e apague-o. Teste enviando recados na aba <strong>Resultado</strong>.</p>
+<pre class="script">&lt;?php
+session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $texto = trim($_POST['recado'] ?? '');
+    file_put_contents('mural.txt', $texto . "\n", FILE_APPEND);
+    echo "&lt;p&gt;Recado salvo!&lt;/p&gt;";
+}
+$recados = is_file('mural.txt') ? file('mural.txt', FILE_IGNORE_NEW_LINES) : [];
+?&gt;
+&lt;form method="post"&gt;
+  &lt;input name="recado"&gt; &lt;button&gt;Publicar&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul&gt;
+&lt;?php foreach ($recados as $r): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($r) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+</pre>
+<pre class="solucao">&lt;?php
+session_start();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $texto = trim($_POST['recado'] ?? '');
+    file_put_contents('mural.txt', $texto . "\n", FILE_APPEND);
+    $_SESSION['aviso'] = 'Recado salvo!';
+    header('Location: index.php', true, 303);
+    exit;
+}
+if (isset($_SESSION['aviso'])) {
+    echo "&lt;p&gt;" . htmlspecialchars($_SESSION['aviso']) . "&lt;/p&gt;";
+    unset($_SESSION['aviso']);
+}
+$recados = is_file('mural.txt') ? file('mural.txt', FILE_IGNORE_NEW_LINES) : [];
+?&gt;
+&lt;form method="post"&gt;
+  &lt;input name="recado"&gt; &lt;button&gt;Publicar&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul&gt;
+&lt;?php foreach ($recados as $r): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($r) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="out:{&quot;produto&quot;:&quot;Bolo de cenoura&quot;,src:Content-Type:\s*application/json,semerro">
+<p class="try-task"><strong>Missão:</strong> transforme a página numa pequena API: mande o cabeçalho <code>Content-Type: application/json; charset=utf-8</code> e troque o <code>print_r</code> por <code>echo json_encode($produto)</code>.</p>
+<pre class="script">&lt;?php
+$produto = ['produto' =&gt; 'Bolo de cenoura', 'preco' =&gt; 25.9, 'disponivel' =&gt; true];
+print_r($produto);
+</pre>
+<pre class="solucao">&lt;?php
+header('Content-Type: application/json; charset=utf-8');
+$produto = ['produto' =&gt; 'Bolo de cenoura', 'preco' =&gt; 25.9, 'disponivel' =&gt; true];
+echo json_encode($produto);
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma resposta HTTP = código de status + cabeçalhos + corpo. <code>header()</code> acrescenta cabeçalhos, sempre antes de qualquer saída.</li>
+  <li>Redirecionar: <code>header('Location: destino.php'); exit;</code>. O <code>exit</code> é obrigatório.</li>
+  <li>Códigos: <code>301</code> mudou para sempre; <code>302</code> temporário (o padrão); <code>303</code> depois de POST; <code>307</code>/<code>308</code> mantêm o método.</li>
+  <li>Post/Redirect/Get: processe o POST, redirecione com 303, mostre num GET. O <kbd>F5</kbd> deixa de duplicar pedidos. Mensagens de confirmação vão pela sessão.</li>
+  <li><code>http_response_code(404)</code> para respostas de erro de verdade.</li>
+  <li><code>Content-Type</code> diz o que é a resposta (<code>application/json</code>, <code>text/plain</code>); <code>Content-Disposition: attachment</code> força o download.</li>
+  <li>Redirecionamento que não acontece + <code>Cannot modify header information</code> = saída antes do <code>header</code>: siga o "output started at".</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
