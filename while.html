@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP while e do-while — repetir enquanto for verdade | Guia PHP</title>
+<meta name="description" content="Os laços while e do-while em PHP para quem nunca programou: repetir enquanto a condição for verdadeira, contador, juntar dinheiro até a meta, fila de atendimento, do-while que roda pelo menos uma vez, pedir a senha, laço infinito (como parar, Ctrl+C, Maximum execution time) e a sintaxe alternativa endwhile.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">while e do-while</span></h1>
+
+<p class="intro">Até agora, cada linha do seu programa rodava uma vez, de cima para baixo. Com um <strong>laço</strong> (ou "loop", ou "repetição"), um pedaço de código roda <strong>várias vezes</strong>. O mais simples de todos é o <code>while</code> ("enquanto"): repita isto <strong>enquanto</strong> uma condição for verdadeira. Nesta aula você vai conhecê-lo, junto com o irmão dele, o <code>do-while</code>, e aprender a reconhecer (e parar) um laço que nunca termina.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o <code>while</code> funciona: testar, repetir, testar de novo.</li>
+  <li>As três peças de um laço com contador: início, condição e mudança.</li>
+  <li>Laços que não sabem quantas voltas vão dar: juntar dinheiro até a meta, atender uma fila.</li>
+  <li>O <code>do-while</code>, que roda <strong>pelo menos uma vez</strong>, e quando usá-lo.</li>
+  <li>O que é um <strong>laço infinito</strong>, como pará-lo (<kbd>Ctrl</kbd>+<kbd>C</kbd>) e o limite de tempo do PHP.</li>
+  <li>A sintaxe alternativa <code>while (…): … endwhile;</code> dentro do HTML.</li>
+</ul>
+</div>
+
+<p>Você vai usar <a href="operadores-comparacao.html">comparações</a> (<code>&lt;</code>, <code>&lt;=</code>, <code>!==</code>…) e o <a href="if-else.html">if</a>, que são a base das condições. Os exemplos rodam na pasta <code>~/site</code> da Ana.</p>
+
+<hr>
+
+<h2>A ideia antes do código: lavar a louça</h2>
+<p>Depois do almoço, a Ana segue uma regra simples: <strong>enquanto</strong> houver louça na pia, ela pega um prato e lava. Ela não sabe de antemão quantos pratos são; só olha a pia antes de cada um. Quando olha e a pia está vazia, para.</p>
+<p>Repare na ordem: primeiro ela <strong>olha</strong> (a condição), depois <strong>lava</strong> (o corpo do laço), depois <strong>olha de novo</strong>. Se a pia já estiver vazia logo no começo, ela não lava nada. É exatamente assim que o <code>while</code> funciona.</p>
+
+<hr>
+
+<h2>O <code>while</code> mais simples: contar até 5</h2>
+
+<pre class="file" data-file="contador.php">&lt;?php
+$i = 1;
+while ($i &lt;= 5) {
+    echo "Volta $i\n";
+    $i++;
+}
+echo "Fim. \$i vale $i\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>$i = 1;</dt><dd><strong>Início</strong>: cria o contador <strong>antes</strong> do laço. (<code>$i</code> é um nome tradicional para contadores, de "índice".)</dd>
+  <dt>while</dt><dd>"Enquanto". Começa o laço.</dd>
+  <dt>($i &lt;= 5)</dt><dd>A <strong>condição</strong>, entre parênteses: "<code>$i</code> é menor ou igual a 5?". Testada <strong>antes de cada volta</strong>. Se for verdadeira, o corpo roda; se for falsa, o laço termina.</dd>
+  <dt>{ … }</dt><dd>O <strong>corpo</strong>: o código repetido.</dd>
+  <dt>$i++;</dt><dd>A <strong>mudança</strong>: soma 1 ao contador (veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>). Sem ela, <code>$i</code> ficaria em 1 para sempre.</dd>
+</dl>
+
+<pre class="term">$ php contador.php
+Volta 1
+Volta 2
+Volta 3
+Volta 4
+Volta 5
+Fim. $i vale 6</pre>
+
+<p>Seguindo o PHP passo a passo:</p>
+<ol class="passo">
+  <li><code>$i</code> vale 1. <code>1 &lt;= 5</code>? Sim: mostra "Volta 1", <code>$i</code> vira 2.</li>
+  <li><code>2 &lt;= 5</code>? Sim: "Volta 2", <code>$i</code> vira 3. E assim por diante…</li>
+  <li><code>5 &lt;= 5</code>? Sim (é "menor <strong>ou igual</strong>"): "Volta 5", <code>$i</code> vira 6.</li>
+  <li><code>6 &lt;= 5</code>? <strong>Não.</strong> O laço termina e o programa segue para a linha depois da <code>}</code>.</li>
+</ol>
+
+<p>Por isso <code>$i</code> termina valendo <strong>6</strong>: foi o valor que fez a condição falhar. Cada repetição do corpo se chama uma <strong>volta</strong> (ou <strong>iteração</strong>).</p>
+
+<div class="tryphp" data-goal="outre:10\s+8\s+6\s+4\s+2\s+0,src:\bwhile\s*\(,semerro">
+<p class="try-task"><strong>Missão:</strong> usando <code>while</code>, mostre <code>10 8 6 4 2 0</code> (de 10 até 0, descendo de 2 em 2, separados por espaço). Dica: a condição é <code>$n &gt;= 0</code> e a mudança é <code>$n -= 2</code>. Se a tela começar a encher sem parar, você criou um laço infinito: confira a mudança.</p>
+<pre class="script">&lt;?php
+$n = 10;
+
+// escreva o while aqui
+
+echo "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$n = 10;
+while ($n &gt;= 0) {
+    echo $n, " ";
+    $n -= 2;
+}
+echo "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando você não sabe quantas voltas serão</h2>
+<p>Para contar de 1 a 5, existe um laço mais prático, o <a href="for.html">for</a> (próxima aula). O <code>while</code> brilha quando o número de voltas <strong>depende do que acontece</strong> dentro do laço. A Ana quer juntar R$ 1.000: deposita R$ 150 por mês, e a poupança rende 1% ao mês. Em quantos meses ela chega lá?</p>
+
+<pre class="file" data-file="poupanca.php">&lt;?php
+$saldo = 0;
+$meta = 1000;
+$meses = 0;
+
+while ($saldo &lt; $meta) {
+    $saldo = $saldo + 150;      // depósito do mês
+    $saldo = $saldo * 1.01;     // rendimento de 1%
+    $meses++;
+    echo "Mês $meses: R$ ", number_format($saldo, 2, ",", "."), "\n";
+}
+echo "A Ana chegou à meta em $meses meses.\n";
+</pre>
+
+<pre class="term">$ php poupanca.php
+Mês 1: R$ 151,50
+Mês 2: R$ 304,52
+Mês 3: R$ 459,06
+Mês 4: R$ 615,15
+Mês 5: R$ 772,80
+Mês 6: R$ 932,03
+Mês 7: R$ 1.092,85
+A Ana chegou à meta em 7 meses.</pre>
+
+<p>Ninguém escreveu "7" no programa: o laço descobriu sozinho. A condição <code>$saldo &lt; $meta</code> é testada todo mês, e o que a faz ficar falsa é o próprio <code>$saldo</code> crescendo lá dentro. (O <code>number_format</code> mostra o dinheiro no formato brasileiro; veja <a href="number-format.html">Formatar Números</a>.)</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> mude a meta para <code>5000</code> e o depósito para <code>300</code>. Quantos meses agora? Depois coloque uma meta já batida (<code>$saldo = 2000;</code> no começo) e veja que o corpo não roda nenhuma vez.</p>
+<pre class="script">&lt;?php
+$saldo = 0;
+$meta = 1000;
+$meses = 0;
+
+while ($saldo &lt; $meta) {
+    $saldo = $saldo + 150;      // depósito do mês
+    $saldo = $saldo * 1.01;     // rendimento de 1%
+    $meses++;
+    echo "Mês $meses: R$ ", number_format($saldo, 2, ",", "."), "\n";
+}
+echo "A Ana chegou à meta em $meses meses.\n";
+</pre>
+</div>
+
+<h3>A fila de atendimento</h3>
+<p>Outro caso clássico: tratar itens de uma lista <strong>até ela acabar</strong>. <code>array_shift</code> tira o primeiro elemento de um array e o devolve, como chamar o primeiro da fila:</p>
+
+<pre class="file" data-file="fila.php">&lt;?php
+$fila = ["Ana", "Bruno", "Carla"];
+
+while (count($fila) &gt; 0) {
+    $cliente = array_shift($fila);
+    echo "Atendendo $cliente. Ainda na fila: ", count($fila), "\n";
+}
+echo "Fila vazia!\n";
+</pre>
+
+<pre class="term">$ php fila.php
+Atendendo Ana. Ainda na fila: 2
+Atendendo Bruno. Ainda na fila: 1
+Atendendo Carla. Ainda na fila: 0
+Fila vazia!</pre>
+
+<p>Aqui a "mudança" que leva ao fim do laço é o <code>array_shift</code>: cada volta tira uma pessoa, até <code>count($fila)</code> (o tamanho da fila) chegar a zero. O mesmo padrão aparece ao ler um arquivo linha por linha, até o fim (veja <a href="arquivos.html">Ler e Escrever Arquivos</a>).</p>
+
+<hr>
+
+<h2><code>do-while</code>: primeiro faz, depois pergunta</h2>
+<p>O <code>while</code> testa <strong>antes</strong> de cada volta. Se a condição já for falsa no começo, o corpo <strong>nunca</strong> roda. O <code>do-while</code> ("faça… enquanto") inverte a ordem: roda o corpo <strong>primeiro</strong> e só depois testa. Por isso ele sempre roda <strong>pelo menos uma vez</strong>.</p>
+
+<pre class="file" data-file="nunca.php">&lt;?php
+$saldo = 2000;
+$meta = 1000;
+
+while ($saldo &lt; $meta) {
+    echo "Guardando dinheiro...\n";
+    $saldo += 150;
+}
+echo "Fim (saldo: $saldo)\n";
+
+do {
+    echo "Guardando dinheiro (do-while)...\n";
+    $saldo += 150;
+} while ($saldo &lt; $meta);
+echo "Fim (saldo: $saldo)\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>do {</dt><dd>"Faça". Abre o corpo, sem condição nenhuma ainda.</dd>
+  <dt>} while ($saldo &lt; $meta);</dt><dd>A condição vem <strong>no fim</strong>, depois da chave. Atenção ao <strong>ponto e vírgula</strong> no final: aqui ele é obrigatório.</dd>
+</dl>
+
+<pre class="term">$ php nunca.php
+Fim (saldo: 2000)                       « o while não rodou nenhuma vez
+Guardando dinheiro (do-while)...        « o do-while rodou uma vez antes de testar
+Fim (saldo: 2150)</pre>
+
+<p>Com o saldo já acima da meta, o <code>while</code> olhou a condição, viu que era falsa e pulou o corpo. O <code>do-while</code> rodou o corpo, só então olhou a condição, e parou.</p>
+
+<h3>O uso típico: perguntar até a resposta servir</h3>
+<p>O <code>do-while</code> é perfeito quando você precisa fazer algo <strong>antes</strong> de ter o que testar. Para conferir uma senha, primeiro é preciso <strong>pedir</strong> a senha. A Ana fez um programa de terminal que dá três chances (ler o teclado com <code>fgets(STDIN)</code> é assunto de <a href="linha-comando.html">PHP na Linha de Comando</a>):</p>
+
+<pre class="file" data-file="senha.php">&lt;?php
+$tentativas = 0;
+
+do {
+    echo "Senha: ";
+    $senha = trim(fgets(STDIN));
+    $tentativas++;
+} while ($senha !== "1234" &amp;&amp; $tentativas &lt; 3);
+
+if ($senha === "1234") {
+    echo "Acesso liberado após $tentativas tentativa(s).\n";
+} else {
+    echo "Bloqueado: 3 tentativas erradas.\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>fgets(STDIN)</code></td><td>Lê uma linha digitada no teclado.</td></tr>
+<tr><td><code>trim(…)</code></td><td>Tira o Enter (a quebra de linha) do fim do que foi digitado.</td></tr>
+<tr><td><code>$senha !== "1234" &amp;&amp; $tentativas &lt; 3</code></td><td>Repete enquanto a senha estiver errada <strong>e</strong> ainda houver chances (veja <a href="operadores-logicos.html">Operadores Lógicos</a>). Duas formas de sair: acertar, ou gastar as 3 chances.</td></tr>
+</table>
+</div>
+
+<p>Para testar sem digitar, a Ana mandou as respostas pelo <code>printf</code>, uma por linha. As perguntas "Senha:" saem coladas porque as respostas não aparecem na tela, só são lidas:</p>
+
+<pre class="term">$ printf "abc\n1234\n" | php senha.php
+Senha: Senha: Acesso liberado após 2 tentativa(s).
+$ printf "a\nb\nc\n" | php senha.php
+Senha: Senha: Senha: Bloqueado: 3 tentativas erradas.</pre>
+
+<p>Com o <code>while</code> comum, a primeira pergunta teria de ficar repetida <strong>antes</strong> do laço (ou a variável <code>$senha</code> nem existiria no primeiro teste). A missão no fim da aula mostra esse problema.</p>
+
+<h3><code>while</code> ou <code>do-while</code>?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>while</code></th><th><code>do-while</code></th></tr>
+<tr><td>Quando testa</td><td>Antes de cada volta</td><td>Depois de cada volta</td></tr>
+<tr><td>Mínimo de voltas</td><td>0</td><td>1</td></tr>
+<tr><td>Ponto e vírgula no fim</td><td>Não</td><td>Sim: <code>} while (…);</code></td></tr>
+<tr><td>Use quando…</td><td>Pode não ser preciso fazer nada (fila vazia, meta já batida). É o caso mais comum.</td><td>Precisa fazer uma vez para ter o que testar (pedir uma resposta, mostrar um menu).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>O laço infinito</h2>
+<p>Se a condição <strong>nunca</strong> ficar falsa, o laço nunca termina. É o erro mais comum com <code>while</code>, e quase sempre a causa é a mesma: esquecer a linha que muda a variável da condição.</p>
+
+<pre class="file" data-file="esqueceu.php">&lt;?php
+$i = 1;
+while ($i &lt;= 5) {
+    echo "Volta $i\n";
+}
+</pre>
+
+<pre class="term">$ php esqueceu.php | head -4
+Volta 1
+Volta 1
+Volta 1
+Volta 1                 « o head mostrou 4 linhas e encerrou; sem ele, isto nunca para</pre>
+
+<p>Sem o <code>$i++</code>, <code>$i</code> vale 1 para sempre, e <code>1 &lt;= 5</code> é sempre verdade. No terminal, sem o <code>| head</code>, a tela se encheria de "Volta 1" sem parar.</p>
+
+<div class="warning">
+<strong>Como parar um programa preso: <kbd>Ctrl</kbd>+<kbd>C</kbd></strong>
+<p>No terminal, segure <kbd>Ctrl</kbd> e aperte <kbd>C</kbd>: o programa é interrompido e o prompt volta. Isso vale para qualquer programa, não só para o PHP. Num laço infinito que não escreve nada, o terminal parece "travado", sem mostrar nada; o <kbd>Ctrl</kbd>+<kbd>C</kbd> resolve do mesmo jeito.</p>
+</div>
+
+<h3 id="erros-tempo">O limite de tempo do PHP</h3>
+<p>Num site, o PHP não deixa uma página rodar para sempre: depois de <strong>30 segundos</strong> (o padrão da configuração <code>max_execution_time</code>, "tempo máximo de execução"), ele interrompe o script com um erro fatal. No terminal, esse limite vem desligado, mas dá para ligá-lo com <code>-d</code>. A Ana testou um laço infinito que não escreve nada, com limite de 1 segundo:</p>
+
+<pre class="file" data-file="silencioso.php">&lt;?php
+$i = 1;
+$total = 0;
+while ($i &lt;= 5) {
+    $total += $i;
+}
+echo "Total: $total\n";
+</pre>
+
+<pre class="term">$ php -d max_execution_time=1 silencioso.php
+
+Fatal error: Maximum execution time of 1 second exceeded in /home/ana/site/silencioso.php on line 5
+Stack trace:
+#0 {main}</pre>
+
+<p>"Tempo máximo de execução de 1 segundo excedido". Num site, você veria a mesma mensagem com <code>30 seconds</code>, depois de esperar meio minuto com a página carregando. Se aparecer, procure um laço cuja condição nunca fica falsa.</p>
+
+<h3>Laços infinitos de propósito</h3>
+<p>Às vezes você <strong>quer</strong> um laço sem fim na condição, com a saída no meio do corpo: <code>while (true) { … if (…) break; … }</code>. O <code>break</code> ("quebrar") sai do laço na hora. Esse padrão, junto com o <code>continue</code>, está em <a href="break-continue.html">break e continue</a>.</p>
+
+<hr>
+
+<h2>A sintaxe alternativa: <code>while (…): … endwhile;</code></h2>
+<p>Dentro do HTML (veja <a href="php-e-html.html">PHP Dentro do HTML</a>), as chaves somem no meio das tags. Por isso existe uma forma com dois-pontos e <code>endwhile;</code> ("fim do while"):</p>
+
+<pre class="file" data-file="alt.php">&lt;?php $i = 1; ?&gt;
+&lt;ul&gt;
+&lt;?php while ($i &lt;= 3): ?&gt;
+    &lt;li&gt;Item &lt;?= $i ?&gt;&lt;/li&gt;
+&lt;?php $i++; endwhile; ?&gt;
+&lt;/ul&gt;
+</pre>
+
+<pre class="term">$ php alt.php
+&lt;ul&gt;
+    &lt;li&gt;Item 1&lt;/li&gt;
+    &lt;li&gt;Item 2&lt;/li&gt;
+    &lt;li&gt;Item 3&lt;/li&gt;
+&lt;/ul&gt;</pre>
+
+<p>O <code>:</code> substitui o <code>{</code>, e o <code>endwhile;</code> substitui o <code>}</code>. O mesmo existe para <code>for</code> (<code>endfor</code>), <code>foreach</code> (<code>endforeach</code>) e <code>if</code> (<code>endif</code>). Na prática, para gerar listas no HTML, o <a href="foreach.html">foreach</a> e o <a href="for.html">for</a> são mais usados que o <code>while</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A tela se enche da mesma linha: faltou mudar a variável</strong>
+<pre class="term">$ php esqueceu.php | head -4
+Volta 1
+Volta 1
+Volta 1
+Volta 1</pre>
+<p><strong>O que aconteceu:</strong> a condição depende de <code>$i</code>, mas nada dentro do laço muda <code>$i</code>.</p>
+<p><strong>Como consertar:</strong> interrompa com <kbd>Ctrl</kbd>+<kbd>C</kbd> e acrescente a mudança (<code>$i++;</code>) dentro do corpo. Regra: <strong>toda variável da condição precisa mudar dentro do laço</strong>, na direção que leva a condição a ficar falsa.</p>
+</div>
+
+<div class="cenario">
+<strong>Nada aparece e o programa não termina: ponto e vírgula depois do <code>while</code></strong>
+<pre class="file" data-file="pv.php">&lt;?php
+$i = 1;
+while ($i &lt;= 5); {
+    echo "Volta $i\n";
+    $i++;
+}
+</pre>
+<pre class="term">$ timeout 2 php pv.php
+$ echo $?
+124                      « 124: o timeout teve de parar o PHP depois de 2 segundos</pre>
+<p><strong>O que aconteceu:</strong> o <code>;</code> logo depois de <code>while (…)</code> é um corpo <strong>vazio</strong>. O PHP fica repetindo "nada" enquanto <code>$i &lt;= 5</code>, e o bloco <code>{ … }</code> de baixo (que tem o <code>$i++</code>) nunca é alcançado. Não aparece erro, nem saída: o programa só fica preso. (A Ana usou o comando <code>timeout 2</code> para o terminal desistir sozinho; sem ele, seria <kbd>Ctrl</kbd>+<kbd>C</kbd>.)</p>
+<p><strong>Como consertar:</strong> apague o <code>;</code>. No <code>while</code>, nada vai entre o <code>)</code> e a <code>{</code>. (O ponto e vírgula depois do <code>while</code> só existe no fim do <code>do-while</code>.)</p>
+</div>
+
+<div class="cenario">
+<strong>O laço não rodou nenhuma vez (sem erro)</strong>
+<pre class="term">$ php nunca.php
+Fim (saldo: 2000)
+…</pre>
+<p><strong>O que aconteceu:</strong> a condição já era falsa no primeiro teste. Pode ser o certo (não havia o que fazer) ou um erro no valor inicial ou na comparação (<code>&gt;</code> no lugar de <code>&lt;</code>).</p>
+<p><strong>Como consertar:</strong> confira os valores antes do laço com <code>var_dump</code> (veja <a href="var-dump.html">var_dump e print_r</a>). Se o corpo precisa rodar pelo menos uma vez, use <code>do-while</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined variable</code> na condição</strong>
+<pre class="term">$ printf "abc\n1234\n" | php senha0.php
+
+Warning: Undefined variable $senha in /home/ana/site/senha0.php on line 4
+Senha: Senha: Acesso liberado após 2 tentativa(s).</pre>
+<p><strong>O que aconteceu:</strong> um <code>while ($senha !== "1234" …)</code> testa <code>$senha</code> antes de ela ser criada (ela só nasce dentro do corpo). O programa até funcionou, porque a variável inexistente vale <code>null</code>, que é diferente de <code>"1234"</code>, mas o aviso mostra que o código está torto.</p>
+<p><strong>Como consertar:</strong> crie a variável antes do laço (<code>$senha = "";</code>) ou, melhor, use <code>do-while</code>, que pergunta antes de testar.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Maximum execution time of 30 seconds exceeded</code></strong>
+<p><strong>O que aconteceu:</strong> na web, um script rodou por mais de 30 segundos, quase sempre por causa de um laço infinito (ou de um laço com dados demais). Veja <a href="#erros-tempo">o limite de tempo do PHP</a>, acima.</p>
+<p><strong>Como consertar:</strong> procure o laço cuja condição nunca fica falsa. Aumentar o limite (<code>set_time_limit</code>) só faz sentido para tarefas longas de verdade, nunca para esconder um laço infinito.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>while (condição) { … }</code></td><td>Testa; se verdadeira, roda o corpo e testa de novo. Pode rodar 0 vezes.</td></tr>
+<tr><td><code>do { … } while (condição);</code></td><td>Roda o corpo, depois testa. Roda pelo menos 1 vez. Ponto e vírgula no fim.</td></tr>
+<tr><td><code>while (condição): … endwhile;</code></td><td>Sintaxe alternativa, para templates HTML.</td></tr>
+<tr><td><code>while (true) { … break; … }</code></td><td>Laço com a saída no meio (veja <a href="break-continue.html">break e continue</a>).</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrompe um programa preso no terminal.</td></tr>
+<tr><td><code>max_execution_time</code></td><td>Tempo máximo de um script: 30 s na web, sem limite no terminal. <code>php -d max_execution_time=N</code> muda para N segundos.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A condição</h3>
+<p>Complete para repetir enquanto <code>$i</code> for menor que 10:</p>
+<div class="ex-code">while (<input data-answer="$i &lt; 10|$i&lt;10|10 &gt; $i" aria-label="condição">) { echo $i; $i++; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. A peça que falta</h3>
+<p>Este laço nunca termina. Complete a linha que falta dentro dele:</p>
+<div class="ex-code">$n = 1; while ($n &lt;= 3) { echo $n; <input data-answer="$n++;|$n++|$n += 1;|$n = $n + 1;|++$n;" aria-label="instrução"> }</div>
+</div>
+
+<div class="exercise">
+<h3>3. O fim do do-while</h3>
+<p>Complete a última linha de um <code>do-while</code> que repete enquanto <code>$opcao</code> for diferente de <code>"sair"</code>:</p>
+<div class="ex-code">do { … } <input data-answer="while ($opcao !== &quot;sair&quot;);|while ($opcao != &quot;sair&quot;);|while ($opcao !== 'sair');|while ($opcao != 'sair');" aria-label="final"></div>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Quantas vezes "oi" aparece? <code>$x = 10; while ($x &lt; 5) { echo "oi"; $x++; }</code></p>
+<label><input type="radio" name="q4"> Nenhuma</label>
+<label><input type="radio" name="q4"> Uma</label>
+<label><input type="radio" name="q4"> Cinco</label>
+<label><input type="radio" name="q4"> Infinitas</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. E agora? <code>$x = 10; do { echo "oi"; $x++; } while ($x &lt; 5);</code></p>
+<label><input type="radio" name="q5"> Nenhuma</label>
+<label><input type="radio" name="q5"> Uma</label>
+<label><input type="radio" name="q5"> Cinco</label>
+<label><input type="radio" name="q5"> Infinitas</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Seu programa de terminal ficou preso, sem mostrar nada. O que fazer primeiro?</p>
+<label><input type="radio" name="q6"> Desligar o computador.</label>
+<label><input type="radio" name="q6"> Esperar 30 segundos, que o PHP para sozinho.</label>
+<label><input type="radio" name="q6"> Apertar <kbd>Ctrl</kbd>+<kbd>C</kbd> e procurar o laço cuja condição nunca fica falsa.</label>
+<label><input type="radio" name="q6"> Rodar o programa de novo.</label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-stdin="abc\n1234" data-goal="out:Acesso liberado após 2 tentativa(s).,src:\bdo\s*\{,semerro">
+<p class="try-task"><strong>Missão:</strong> este programa de senha usa <code>while</code> e testa <code>$senha</code> antes de ela existir: rode e veja o <code>Warning</code>. Transforme o laço num <code>do-while</code> (o <code>do {</code> no começo, o <code>} while (…);</code> no fim) para o aviso sumir. As respostas digitadas já estão prontas na caixa: <code>abc</code> e depois <code>1234</code>.</p>
+<pre class="script">&lt;?php
+$tentativas = 0;
+
+while ($senha !== "1234" &amp;&amp; $tentativas &lt; 3) {
+    echo "Senha: ";
+    $senha = trim(fgets(STDIN));
+    $tentativas++;
+}
+
+if ($senha === "1234") {
+    echo "Acesso liberado após $tentativas tentativa(s).\n";
+} else {
+    echo "Bloqueado: 3 tentativas erradas.\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$tentativas = 0;
+
+do {
+    echo "Senha: ";
+    $senha = trim(fgets(STDIN));
+    $tentativas++;
+} while ($senha !== "1234" &amp;&amp; $tentativas &lt; 3);
+
+if ($senha === "1234") {
+    echo "Acesso liberado após $tentativas tentativa(s).\n";
+} else {
+    echo "Bloqueado: 3 tentativas erradas.\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>while (condição) { … }</code> repete o corpo enquanto a condição for verdadeira, testando <strong>antes</strong> de cada volta. Pode não rodar nenhuma vez.</li>
+  <li>Com contador, são três peças: o início antes do laço, a condição no <code>while</code> e a mudança dentro do corpo.</li>
+  <li>O <code>while</code> é ideal quando você não sabe quantas voltas serão: até bater a meta, até a fila acabar.</li>
+  <li><code>do { … } while (condição);</code> testa <strong>depois</strong>: roda pelo menos uma vez. Ideal para pedir algo e repetir enquanto não servir.</li>
+  <li>Laço infinito: a condição nunca fica falsa (quase sempre faltou a mudança). Pare com <kbd>Ctrl</kbd>+<kbd>C</kbd>; na web, o PHP para em 30 segundos com <code>Maximum execution time … exceeded</code>.</li>
+  <li>No HTML, existe <code>while (…): … endwhile;</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
