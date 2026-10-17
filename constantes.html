@@ -258,7 +258,7 @@ b                        « PHP_EOL é a quebra de linha</pre>
 <tr><td><code>PHP_VERSION</code></td><td><code>"8.5.8"</code> (no laboratório)</td><td>Saber qual PHP está rodando (veja <a href="versoes.html">Versões do PHP</a>). No editor do guia aparece a versão do PHP do navegador.</td></tr>
 <tr><td><code>PHP_MAJOR_VERSION</code>, <code>PHP_MINOR_VERSION</code></td><td><code>8</code>, <code>5</code></td><td>Comparar versões</td></tr>
 <tr><td><code>PHP_EOL</code></td><td>A quebra de linha do sistema (<code>"\n"</code> no Linux e no macOS, <code>"\r\n"</code> no Windows)</td><td>Escrever arquivos de texto e saídas de terminal</td></tr>
-<tr><td><code>PHP_OS_FAMILY</code></td><td><code>"Linux"</code>, <code>"Windows"</code>, <code>"Darwin"</code> (macOS)</td><td>Saber o sistema</td></tr>
+<tr><td><code>PHP_OS_FAMILY</code></td><td><code>"Linux"</code>, <code>"Windows"</code>, <code>"Darwin"</code> (macOS)</td><td>Saber o sistema. No editor do guia, que roda dentro do navegador, aparece <code>"Unknown"</code> ("desconhecido").</td></tr>
 <tr><td><code>PHP_INT_MAX</code>, <code>PHP_INT_MIN</code>, <code>PHP_FLOAT_EPSILON</code></td><td>Limites dos números</td><td>Aula <a href="numeros.html">int e float</a></td></tr>
 <tr><td><code>M_PI</code></td><td>π = 3,14159…</td><td>Geometria (área do círculo: <code>M_PI * $r ** 2</code>)</td></tr>
 <tr><td><code>E_ALL</code>, <code>E_WARNING</code>…</td><td>Números que representam tipos de erro</td><td>Aula <a href="tipos-erro.html">Tipos de Erro</a></td></tr>
@@ -272,7 +272,7 @@ b                        « PHP_EOL é a quebra de linha</pre>
 </div>
 
 <div class="tryphp">
-<p class="try-task"><strong>Experimente:</strong> rode e veja a versão e o sistema do PHP que roda no seu navegador. Depois calcule a área de um círculo de raio 3 com <code>M_PI * 3 ** 2</code>.</p>
+<p class="try-task"><strong>Experimente:</strong> rode e veja a versão e o sistema do PHP que roda no seu navegador (o sistema aparece como <code>Unknown</code>: o PHP do guia não está num Linux nem num Windows, e sim dentro do navegador). Depois calcule a área de um círculo de raio 3 com <code>M_PI * 3 ** 2</code>.</p>
 <pre class="script">&lt;?php
 echo "PHP ", PHP_VERSION, " em ", PHP_OS_FAMILY, PHP_EOL;
 echo "Linha atual: ", __LINE__, PHP_EOL;
