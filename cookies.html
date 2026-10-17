@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Cookies — setcookie, $_COOKIE e "headers already sent" | Guia PHP</title>
+<meta name="description" content="O que é um cookie e como ele vai e volta entre navegador e servidor, setcookie com expiração, path, httponly, secure e samesite (com o array de opções), ler $_COOKIE, apagar um cookie, o erro real headers already sent e por que acontece, limites e privacidade.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Cookies</span></h1>
+
+<p class="intro">Cada pedido que chega ao PHP é um recomeço: o programa roda, responde e esquece tudo. Se a Ana escolhe o tema escuro no site da padaria, como o site vai lembrar disso na próxima página? Uma das respostas é o <strong>cookie</strong>: um pequeno texto que o servidor pede ao navegador para guardar e devolver em todos os pedidos seguintes. Nesta aula você cria, lê e apaga cookies, entende cada opção do <code>setcookie</code> e conhece o erro mais famoso dessa área: <em>headers already sent</em>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um cookie e o caminho que ele faz (servidor → navegador → servidor).</li>
+  <li>Como criar um cookie com <code>setcookie</code> e definir quanto tempo ele dura.</li>
+  <li>Como ler cookies em <code>$_COOKIE</code>, e por que o cookie novo só aparece no pedido seguinte.</li>
+  <li>As opções <code>path</code>, <code>domain</code>, <code>secure</code>, <code>httponly</code> e <code>samesite</code>, com o array de opções.</li>
+  <li>Como apagar um cookie.</li>
+  <li>O erro <code>Cannot modify header information - headers already sent</code>: o que é e como evitar.</li>
+  <li>Limites de tamanho, o que nunca guardar num cookie e o lado da privacidade.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: a comanda do restaurante</h2>
+<p>Num restaurante movimentado, o garçom não decora o que cada mesa pediu. Na primeira visita, ele deixa uma <strong>comanda</strong> na mesa com um número. Toda vez que você chama, ele olha a comanda e sabe quem você é.</p>
+<p>O cookie é essa comanda: quem escreve é o <strong>servidor</strong>, quem guarda é o <strong>navegador</strong>, e o navegador a mostra, sozinho, em <strong>todo pedido</strong> seguinte para o mesmo site.</p>
+
+<figure>
+<pre class="file" data-file="o caminho de um cookie">  NAVEGADOR                                         SERVIDOR (PHP)
+
+ 1. GET /tema.php  ─────────────────────────────▶  setcookie('tema', 'escuro')
+                   ◀─────────────────────────────  Set-Cookie: tema=escuro; …
+    guarda: tema=escuro                             (o PHP esquece tudo)
+
+ 2. GET /ler.php
+    Cookie: tema=escuro ────────────────────────▶  $_COOKIE['tema'] → 'escuro'
+                   ◀─────────────────────────────  página com o tema escuro
+
+ 3. (todo pedido seguinte ao mesmo site leva "Cookie: tema=escuro", até expirar)</pre>
+<figcaption>O cookie viaja em <strong>cabeçalhos</strong> HTTP: <code>Set-Cookie</code> na resposta (o servidor pede para guardar) e <code>Cookie</code> no pedido (o navegador devolve).</figcaption>
+</figure>
+
+<p>Dois detalhes desse desenho explicam quase tudo o que vem a seguir:</p>
+<ul>
+  <li>O cookie vai num <strong>cabeçalho</strong>, que viaja <strong>antes</strong> do conteúdo da página. Por isso existe o erro <em>headers already sent</em>.</li>
+  <li>O cookie criado no passo 1 só volta no passo 2. No mesmo pedido em que você o cria, ele <strong>ainda não está</strong> em <code>$_COOKIE</code>.</li>
+</ul>
+
+<hr>
+
+<h2>Criar um cookie: <code>setcookie</code></h2>
+<pre class="file" data-file="tema.php">&lt;?php
+setcookie('tema', 'escuro', time() + 60 * 60 * 24 * 30);
+echo "Cookie enviado.\n";
+echo "O que chegou neste pedido: ";
+var_dump($_COOKIE);
+</pre>
+
+<dl class="anatomy">
+  <dt>setcookie(</dt><dd>"Definir cookie": pede ao navegador para guardar um cookie.</dd>
+  <dt>'tema',</dt><dd>O nome do cookie (será a chave em <code>$_COOKIE</code>).</dd>
+  <dt>'escuro',</dt><dd>O valor. Sempre texto.</dd>
+  <dt>time() + 60 * 60 * 24 * 30</dt><dd>Até quando ele vale (a <strong>expiração</strong>). <code>time()</code> é o "agora", em segundos (veja <a href="datas.html">Datas e Horas</a>); somamos 60 segundos × 60 minutos × 24 horas × 30 dias. Sem esse argumento (ou com <code>0</code>), é um <strong>cookie de sessão</strong>: some quando o navegador é fechado.</dd>
+</dl>
+
+<p>O <code>-i</code> do <code>curl</code> mostra os cabeçalhos da resposta. Olhe a linha <code>Set-Cookie</code>, e o <code>$_COOKIE</code> vazio:</p>
+
+<pre class="term">$ curl -si localhost:8000/tema.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:05:00 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Set-Cookie: tema=escuro; expires=Mon, 16 Nov 2026 00:05:00 GMT; Max-Age=2592000
+Content-type: text/html; charset=UTF-8
+
+Cookie enviado.
+O que chegou neste pedido: array(0) {
+}</pre>
+
+<p>O PHP traduziu o <code>time() + …</code> em duas formas: <code>expires</code> (a data, no fuso de Greenwich, por isso 00:05 e não 21:05) e <code>Max-Age=2592000</code> (os segundos que faltam: 30 dias). E o <code>$_COOKIE</code> está vazio, porque o navegador ainda nem recebeu o cookie.</p>
+
+<h3>O pedido seguinte</h3>
+<p>Para o <code>curl</code> se comportar como navegador e guardar os cookies, usamos um "pote de cookies": <code>-c pote</code> grava os cookies recebidos num arquivo, <code>-b pote</code> envia os cookies do arquivo.</p>
+
+<pre class="term">$ curl -s -c pote localhost:8000/tema.php &gt; /dev/null
+$ cat pote
+# Netscape HTTP Cookie File
+# https://curl.se/docs/http-cookies.html
+# This file was generated by libcurl! Edit at your own risk.
+
+localhost	FALSE	/	FALSE	1794787500	tema	escuro
+$ curl -s -b pote localhost:8000/tema.php
+Cookie enviado.
+O que chegou neste pedido: array(1) {
+  ["tema"]=&gt;
+  string(6) "escuro"         « agora sim: veio no cabeçalho Cookie do pedido
+}</pre>
+
+<p>O arquivo <code>pote</code> é parecido com o que o navegador guarda: o site (<code>localhost</code>), o caminho (<code>/</code>), a expiração (em segundos desde 1970), o nome e o valor.</p>
+
+<hr>
+
+<h2>Ler um cookie: <code>$_COOKIE</code></h2>
+<p><code>$_COOKIE</code> é uma superglobal como <code>$_GET</code> (veja <a href="superglobais.html">Superglobais</a>): um array com os cookies que o navegador mandou neste pedido. Leia sempre com um valor padrão, porque o cookie pode não existir (primeira visita, cookie expirado, pessoa que apagou os cookies):</p>
+
+<pre class="file" data-file="ler.php">&lt;?php
+$tema = $_COOKIE['tema'] ?? 'claro';
+echo "Tema: $tema\n";
+</pre>
+<pre class="term">$ curl -s -b pote localhost:8000/ler.php
+Tema: escuro</pre>
+
+<div class="warning"><strong>Cookie é dado do visitante.</strong> Ele fica no computador da pessoa, e ela pode editar, apagar ou inventar cookies (no navegador, <kbd>F12</kbd> → Armazenamento; no <code>curl</code>, <code>-b "nome=valor"</code>). Trate <code>$_COOKIE</code> como <code>$_GET</code>: valide e escape. Nunca guarde num cookie algo como <code>usuario=ana</code> ou <code>admin=1</code> para controlar acesso: basta a pessoa trocar o valor. Para isso existem as <a href="sessoes.html">Sessões</a>.</div>
+
+<h3>Exemplo: contador de visitas</h3>
+<pre class="file" data-file="visitas.php">&lt;?php
+$visitas = (int) ($_COOKIE['visitas'] ?? 0) + 1;
+setcookie('visitas', (string) $visitas, time() + 60 * 60 * 24 * 365);
+echo "Esta é a sua visita número $visitas.\n";
+</pre>
+
+<pre class="term">$ curl -s -b potev -c potev localhost:8000/visitas.php
+Esta é a sua visita número 1.
+$ curl -s -b potev -c potev localhost:8000/visitas.php
+Esta é a sua visita número 2.
+$ curl -s -b potev -c potev localhost:8000/visitas.php
+Esta é a sua visita número 3.
+$ curl -s -b "visitas=99" localhost:8000/visitas.php
+Esta é a sua visita número 100.          « o visitante escolheu o valor do cookie</pre>
+
+<dl class="anatomy">
+  <dt>$_COOKIE['visitas'] ?? 0</dt><dd>O número que o navegador devolveu, ou 0 na primeira visita.</dd>
+  <dt>(int) ( … ) + 1</dt><dd>Converte para inteiro (o cookie é texto; um valor estranho como <code>"abc"</code> vira 0) e soma a visita atual.</dd>
+  <dt>setcookie('visitas', (string) $visitas, …)</dt><dd>Grava o número novo, que vai voltar no próximo pedido. O valor precisa ser texto, daí o <code>(string)</code>.</dd>
+</dl>
+
+<p>A última linha mostra o aviso acima na prática: com <code>-b "visitas=99"</code>, o "visitante" inventou o cookie. Para um contador de brincadeira, tudo bem. Para qualquer coisa que importe, não.</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task">O contador de visitas. Rode e clique em <strong>Visitar de novo</strong> várias vezes na aba <strong>Resultado</strong>: o editor guarda os cookies entre um pedido e outro desta caixa, como um navegador. Depois clique em <strong>Esquecer</strong>, que apaga o cookie (veja como na próxima seção).</p>
+<pre class="script">&lt;?php
+if (isset($_GET['esquecer'])) {
+    setcookie('visitas', '', time() - 3600);
+    echo "&lt;p&gt;Cookie apagado. Na próxima visita, a contagem recomeça.&lt;/p&gt;";
+} else {
+    $visitas = (int) ($_COOKIE['visitas'] ?? 0) + 1;
+    setcookie('visitas', (string) $visitas, time() + 60 * 60 * 24 * 365);
+    echo "&lt;p&gt;Esta é a sua visita número $visitas.&lt;/p&gt;";
+}
+?&gt;
+&lt;form&gt;&lt;button&gt;Visitar de novo&lt;/button&gt;&lt;/form&gt;
+&lt;form&gt;&lt;button name="esquecer" value="1"&gt;Esquecer&lt;/button&gt;&lt;/form&gt;
+&lt;p&gt;$_COOKIE neste pedido:&lt;/p&gt;
+&lt;pre&gt;&lt;?php print_r($_COOKIE); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>As opções: o array de opções</h2>
+<p>O <code>setcookie</code> aceita mais configurações além de nome, valor e expiração. A forma moderna (desde o PHP 7.3) é passar um <strong>array de opções</strong> no terceiro argumento:</p>
+
+<pre class="file" data-file="opcoes.php">&lt;?php
+setcookie('tema', 'escuro', [
+    'expires'  =&gt; time() + 60 * 60 * 24 * 30,
+    'path'     =&gt; '/',
+    'secure'   =&gt; true,
+    'httponly' =&gt; true,
+    'samesite' =&gt; 'Lax',
+]);
+setcookie('aviso', 'Ana Souza');
+echo "ok\n";
+</pre>
+
+<pre class="term">$ curl -si localhost:8000/opcoes.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:05:00 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Set-Cookie: tema=escuro; expires=Mon, 16 Nov 2026 00:05:00 GMT; Max-Age=2592000; path=/; secure; HttpOnly; SameSite=Lax
+Set-Cookie: aviso=Ana%20Souza
+Content-type: text/html; charset=UTF-8
+
+ok</pre>
+
+<p>Cada opção virou um pedaço do cabeçalho <code>Set-Cookie</code>. Repare também no segundo cookie: o espaço de <code>Ana Souza</code> viajou como <code>%20</code>. O <code>setcookie</code> codifica o valor sozinho, e o PHP decodifica ao montar <code>$_COOKIE</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Opção</th><th>Exemplo</th><th>O que faz</th></tr>
+<tr><td><code>expires</code></td><td><code>time() + 3600</code></td><td>Quando o cookie vence (em segundos desde 1970). <code>0</code> ou ausente: some ao fechar o navegador.</td></tr>
+<tr><td><code>path</code></td><td><code>'/'</code></td><td>Em quais caminhos do site o navegador devolve o cookie. <code>'/'</code> = o site todo. Sem essa opção, vale a pasta da página que criou o cookie (um cookie criado em <code>/loja/carrinho.php</code> não volta em <code>/index.php</code>).</td></tr>
+<tr><td><code>domain</code></td><td><code>'padaria.com.br'</code></td><td>Para qual site. Ausente: só o site exato que criou. Com o domínio, vale também para os subdomínios (<code>loja.padaria.com.br</code>).</td></tr>
+<tr><td><code>secure</code></td><td><code>true</code></td><td>O navegador só devolve o cookie em conexões <code>https://</code>. (Os navegadores abrem uma exceção para <code>localhost</code>, para testes.)</td></tr>
+<tr><td><code>httponly</code></td><td><code>true</code></td><td>O JavaScript da página não consegue ler o cookie (<code>document.cookie</code> não o mostra). Se um ataque XSS passar (<a href="escapar-saida.html">Escapar a Saída</a>), ele não rouba esse cookie.</td></tr>
+<tr><td><code>samesite</code></td><td><code>'Lax'</code></td><td>Se o cookie vai junto em pedidos que <strong>começam em outro site</strong>. <code>'Strict'</code>: nunca. <code>'Lax'</code>: só quando a pessoa clica num link para o seu site (não em formulários POST nem imagens de outros sites). <code>'None'</code>: sempre (exige <code>secure</code>). Protege contra ataques em que outro site faz o navegador da vítima enviar pedidos para o seu.</td></tr>
+</table>
+</div>
+
+<div class="tip"><strong>Receita para cookies importantes:</strong> <code>'path' =&gt; '/'</code>, <code>'secure' =&gt; true</code> (com o site em HTTPS), <code>'httponly' =&gt; true</code> e <code>'samesite' =&gt; 'Lax'</code>. Só deixe o <code>httponly</code> de fora se o seu JavaScript realmente precisar ler o cookie.</div>
+
+<p>A forma antiga, com tudo em argumentos separados, ainda funciona e aparece muito em códigos mais velhos:</p>
+<pre class="file" data-file="trecho.php">// setcookie(nome, valor, expires, path, domain, secure, httponly)
+setcookie('tema', 'escuro', time() + 3600, '/', '', true, true);</pre>
+<p>Ela não tem lugar para o <code>samesite</code>, e é fácil errar a ordem. Prefira o array.</p>
+
+<hr>
+
+<h2>Apagar um cookie</h2>
+<p>Não existe "apagar" no protocolo: o servidor pede para o navegador <strong>substituir</strong> o cookie por um já vencido. O jeito clássico é uma data no passado:</p>
+
+<pre class="file" data-file="apagar.php">&lt;?php
+setcookie('tema', '', time() - 3600);
+echo "Cookie apagado.\n";
+</pre>
+
+<pre class="term">$ curl -si -b pote -c pote localhost:8000/apagar.php
+HTTP/1.1 200 OK
+…
+Set-Cookie: tema=deleted; expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0
+Content-type: text/html; charset=UTF-8
+
+Cookie apagado.
+$ curl -s -b pote localhost:8000/ler.php
+Tema: claro          « o cookie sumiu do pote, e voltou o valor padrão</pre>
+
+<p>O PHP, ao ver um valor vazio, mandou <code>tema=deleted</code> com vencimento em 1970 e <code>Max-Age=0</code>: o navegador descarta na hora. Dois cuidados:</p>
+<ul>
+  <li>Use o <strong>mesmo <code>path</code> e <code>domain</code></strong> com que o cookie foi criado. Para o navegador, <code>tema</code> com <code>path=/</code> e <code>tema</code> com <code>path=/loja</code> são cookies diferentes.</li>
+  <li>O <code>$_COOKIE['tema']</code> do pedido atual continua lá (ele veio no pedido). Se o resto da página usa o valor, faça também <code>unset($_COOKIE['tema'])</code>.</li>
+</ul>
+
+<hr>
+
+<h2>"Headers already sent": o erro mais famoso</h2>
+<p>A Ana escreveu uma saudação antes de criar o cookie:</p>
+
+<pre class="file" data-file="erro.php">&lt;?php
+echo "Bem-vinda!\n";
+setcookie('tema', 'escuro');
+</pre>
+
+<pre class="term">$ curl -si localhost:8000/erro.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:05:00 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8
+
+Bem-vinda!
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/site/c/erro.php:2) in &lt;b&gt;/home/ana/site/c/erro.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+
+<p>Não há <code>Set-Cookie</code> nos cabeçalhos: o cookie <strong>não foi criado</strong>. Lembre do desenho: uma resposta HTTP é <strong>cabeçalhos primeiro, conteúdo depois</strong>, como uma carta em que o envelope é fechado antes de o carteiro sair. No momento em que o <code>echo</code> da linha 2 escreveu a primeira letra do conteúdo, o PHP precisou mandar os cabeçalhos (o envelope) pela rede. Quando a linha 3 tentou acrescentar um <code>Set-Cookie</code>, o envelope já tinha saído.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte da mensagem</th><th>Significa</th></tr>
+<tr><td><code>Cannot modify header information</code></td><td>"Não consigo mudar os cabeçalhos" (o <code>setcookie</code> é um cabeçalho)</td></tr>
+<tr><td><code>headers already sent</code></td><td>"os cabeçalhos já foram enviados"</td></tr>
+<tr><td><code>(output started at …/erro.php:2)</code></td><td><strong>A pista mais importante:</strong> o arquivo e a linha que escreveram a primeira saída. É lá que está o problema.</td></tr>
+<tr><td><code>in …/erro.php on line 3</code></td><td>Onde está o <code>setcookie</code> que falhou.</td></tr>
+</table>
+</div>
+
+<h3>A saída invisível</h3>
+<p>O caso mais traiçoeiro é quando você <strong>não vê</strong> nenhum <code>echo</code>. Este arquivo tem só uma linha em branco antes do <code>&lt;?php</code> (a linha 1 está vazia; o <code>&lt;?php</code> está na linha 2):</p>
+<pre class="file" data-file="erro2.php">
+
+&lt;?php
+setcookie("tema", "escuro");
+echo "ok\n";
+</pre>
+<pre class="term">$ curl -si localhost:8000/erro2.php
+…
+Content-type: text/html; charset=UTF-8
+
+
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/site/c/erro2.php:1) in &lt;b&gt;/home/ana/site/c/erro2.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+ok</pre>
+<p>Tudo o que está <strong>fora</strong> de <code>&lt;?php … ?&gt;</code> é saída, inclusive uma linha vazia ou um espaço. O "output started at …:1" aponta a linha 1: a linha em branco. Outros culpados comuns:</p>
+<ul>
+  <li>Um arquivo incluído (<a href="include-require.html">include e require</a>) que termina com <code>?&gt;</code> seguido de uma linha em branco. Por isso a recomendação: em arquivos só de PHP, <strong>não feche</strong> o <code>?&gt;</code> no final.</li>
+  <li>O <strong>BOM</strong>: três bytes invisíveis que alguns editores (o Bloco de Notas antigo do Windows) colocam no começo de arquivos UTF-8. Salve como "UTF-8 sem BOM".</li>
+  <li>Um <code>Warning</code> ou <code>Notice</code> anterior: a própria mensagem de aviso é saída.</li>
+</ul>
+
+<div class="note"><strong>A regra:</strong> <code>setcookie</code>, <code>session_start</code> e <code>header</code> vêm <strong>antes de qualquer saída</strong>. Organize a página assim: primeiro todo o PHP que decide coisas (ler formulário, validar, cookies, redirecionar), depois o HTML. Você vai encontrar o mesmo erro com <code>header()</code> em <a href="redirecionar.html">header e Redirecionamento</a>.</div>
+
+<p>Alguns servidores ligam a configuração <code>output_buffering</code> no <code>php.ini</code>: o PHP guarda a saída num "buffer" (área de espera) antes de mandar, e o erro só aparece depois de alguns kilobytes de saída. É por isso que um código com esse problema às vezes "funciona no servidor e não no meu computador" (ou o contrário). Não conte com isso: siga a regra.</p>
+
+<hr>
+
+<h2>Limites e privacidade</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Limite</th><th>Valor aproximado</th><th>Consequência</th></tr>
+<tr><td>Tamanho de um cookie</td><td>cerca de 4 KB (nome + valor + opções)</td><td>Maior que isso, o navegador ignora o cookie em silêncio</td></tr>
+<tr><td>Cookies por site</td><td>pelo menos 50 nos navegadores atuais</td><td>Os mais antigos são descartados</td></tr>
+<tr><td>Tráfego</td><td>Todos os cookies do site vão em <strong>todo</strong> pedido</td><td>Cookies grandes deixam cada imagem, CSS e página mais lentos</td></tr>
+</table>
+</div>
+
+<p><strong>O que guardar:</strong> preferências pequenas e sem segredo (tema, idioma, "já viu o aviso"), e o identificador da sessão (que o PHP cria sozinho, em <a href="sessoes.html">Sessões</a>).</p>
+<p><strong>O que nunca guardar:</strong> senhas, números de cartão, CPF, nada que dê acesso ("logado=sim", "admin=1"), nada que você não queira que a pessoa leia ou mude.</p>
+<p><strong>Privacidade:</strong> cookies também servem para seguir pessoas. Os "cookies de terceiros" (de anúncios e rastreadores embutidos em vários sites) contam a uma empresa por onde você passou. Por isso leis como a LGPD (no Brasil) e a GDPR (na Europa) exigem que o site informe que cookies usa e peça consentimento para os que não são essenciais, e os navegadores vêm bloqueando cookies de terceiros. Cookies essenciais para o site funcionar (sessão de login, carrinho) não precisam de consentimento, mas precisam ser informados na política de privacidade.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Cannot modify header information - headers already sent by (output started at …)</code></strong>
+<pre class="term">&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/site/c/erro.php:2) in &lt;b&gt;/home/ana/site/c/erro.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> algo foi escrito antes do <code>setcookie</code>. O cookie não foi criado.</p>
+<p><strong>Como resolver:</strong> vá ao arquivo e à linha do "output started at" e tire a saída de lá (um <code>echo</code>, HTML, linha em branco, BOM, um aviso). Mova o <code>setcookie</code> para o topo, antes de qualquer HTML.</p>
+</div>
+
+<div class="cenario">
+<strong>Criei o cookie, mas <code>$_COOKIE</code> está vazio</strong>
+<pre class="term">O que chegou neste pedido: array(0) {
+}</pre>
+<p><strong>O que aconteceu:</strong> é o comportamento normal: o cookie só volta no <strong>próximo</strong> pedido.</p>
+<p><strong>Como resolver:</strong> no pedido que cria o cookie, use a variável que você acabou de gravar (<code>$tema = $_GET['tema'] ?? $_COOKIE['tema'] ?? 'claro';</code>), e não o <code>$_COOKIE</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O cookie não volta em outra página do site</strong>
+<p><strong>O que aconteceu:</strong> sem <code>path</code>, o cookie vale só para a pasta da página que o criou (e as de dentro). Criado em <code>/loja/carrinho.php</code>, ele não é enviado para <code>/index.php</code>.</p>
+<p><strong>Como resolver:</strong> <code>'path' =&gt; '/'</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Mandei apagar, e o cookie continua lá</strong>
+<p><strong>O que aconteceu:</strong> o <code>path</code> (ou <code>domain</code>) do "apagar" é diferente do usado na criação, então o navegador entende que é outro cookie. Ou o <code>setcookie</code> de apagar caiu no erro de <em>headers already sent</em>.</p>
+<p><strong>Como resolver:</strong> apague com as mesmas opções da criação: <code>setcookie('tema', '', ['expires' =&gt; time() - 3600, 'path' =&gt; '/'])</code>, antes de qualquer saída.</p>
+</div>
+
+<div class="cenario">
+<strong>O cookie <code>secure</code> não volta</strong>
+<p><strong>O que aconteceu:</strong> o site está em <code>http://</code> (sem S). Com <code>secure</code>, o navegador só devolve o cookie em <code>https://</code> (fora a exceção do <code>localhost</code>).</p>
+<p><strong>Como resolver:</strong> use HTTPS no site (o certo) ou, só em testes num endereço que não seja <code>localhost</code>, tire o <code>secure</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>setcookie('n', 'v')</code></td><td>Cookie que some ao fechar o navegador</td></tr>
+<tr><td><code>setcookie('n', 'v', time() + 3600)</code></td><td>Cookie que dura 1 hora</td></tr>
+<tr><td><code>setcookie('n', 'v', ['expires' =&gt; …, 'path' =&gt; '/', 'secure' =&gt; true, 'httponly' =&gt; true, 'samesite' =&gt; 'Lax'])</code></td><td>Forma moderna, com todas as opções</td></tr>
+<tr><td><code>$_COOKIE['n'] ?? 'padrão'</code></td><td>Lê o cookie (que veio neste pedido)</td></tr>
+<tr><td><code>setcookie('n', '', time() - 3600)</code></td><td>Apaga (com o mesmo <code>path</code>/<code>domain</code> da criação)</td></tr>
+<tr><td><code>headers_sent()</code></td><td><code>true</code> se os cabeçalhos já foram enviados (dá para conferir antes do <code>setcookie</code>)</td></tr>
+<tr><td><code>curl -c pote -b pote</code></td><td>Guarda e devolve cookies nos testes</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Uma semana</h3>
+<p>Complete para o cookie durar 7 dias:</p>
+<div class="ex-code">setcookie('idioma', 'pt', time() + 60 * 60 * 24 * <input data-answer="7" aria-label="dias">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Longe do JavaScript</h3>
+<p>Complete a opção que impede o JavaScript da página de ler o cookie:</p>
+<div class="ex-code">setcookie('id', $id, ['<input data-answer="httponly" aria-label="opção">' =&gt; true]);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Ler com padrão</h3>
+<p>Complete para ler o cookie <code>idioma</code>, com <code>'pt'</code> se ele não existir:</p>
+<div class="ex-code">$idioma = <input data-answer="$_COOKIE['idioma'] ?? 'pt'|$_COOKIE[&quot;idioma&quot;] ?? 'pt'|$_COOKIE['idioma'] ?? &quot;pt&quot;" aria-label="expressão">;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Logo depois de <code>setcookie('tema', 'escuro')</code>, no mesmo pedido, quanto vale <code>$_COOKIE['tema'] ?? 'nada'</code> (sem cookie anterior)?</p>
+<label><input type="radio" name="q4"> <code>'escuro'</code></label>
+<label><input type="radio" name="q4"> <code>'nada'</code></label>
+<label><input type="radio" name="q4"> <code>null</code></label>
+<label><input type="radio" name="q4"> Dá erro de headers already sent.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. O "output started at index.php:1" aponta a linha 1, mas ela só tem <code>&lt;?php</code>. O que provavelmente está errado?</p>
+<label><input type="radio" name="q5"> O <code>setcookie</code> está com o nome errado.</label>
+<label><input type="radio" name="q5"> Falta o <code>path</code>.</label>
+<label><input type="radio" name="q5"> Há algo invisível antes do <code>&lt;?php</code>: um espaço, uma linha vazia ou o BOM.</label>
+<label><input type="radio" name="q5"> O navegador recusou o cookie.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. O que é seguro guardar num cookie?</p>
+<label><input type="radio" name="q6"> A senha, para não pedir de novo.</label>
+<label><input type="radio" name="q6"> <code>admin=1</code>, para lembrar quem é administrador.</label>
+<label><input type="radio" name="q6"> O número do cartão, criptografado.</label>
+<label><input type="radio" name="q6"> A preferência de tema (claro ou escuro).</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?tema=escuro" data-goal="html:Tema: escuro,src:setcookie,semerro">
+<p class="try-task"><strong>Missão:</strong> a página foi aberta com <code>?tema=escuro</code>, mas mostra "Tema: claro", porque o cookie novo só chega no próximo pedido. Faça duas coisas: quando vier <code>$_GET['tema']</code>, grave o cookie <code>tema</code> por 30 dias; e escolha o tema com <code>$_GET['tema'] ?? $_COOKIE['tema'] ?? 'claro'</code>. Depois clique nos links na aba <strong>Resultado</strong> e em "Recarregar" (sem <code>?tema</code>): o cookie lembra a escolha.</p>
+<pre class="script">&lt;?php
+setcookie('tema', $_GET['tema'] ?? 'claro');
+$tema = $_COOKIE['tema'] ?? 'claro';
+?&gt;
+&lt;p&gt;Tema: &lt;?= htmlspecialchars($tema) ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="?tema=claro"&gt;Claro&lt;/a&gt; | &lt;a href="?tema=escuro"&gt;Escuro&lt;/a&gt; | &lt;a href="?"&gt;Recarregar&lt;/a&gt;&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+if (isset($_GET['tema'])) {
+    setcookie('tema', $_GET['tema'], time() + 60 * 60 * 24 * 30);
+}
+$tema = $_GET['tema'] ?? $_COOKIE['tema'] ?? 'claro';
+?&gt;
+&lt;p&gt;Tema: &lt;?= htmlspecialchars($tema) ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="?tema=claro"&gt;Claro&lt;/a&gt; | &lt;a href="?tema=escuro"&gt;Escuro&lt;/a&gt; | &lt;a href="?"&gt;Recarregar&lt;/a&gt;&lt;/p&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="src:'httponly'\s*=&gt;\s*true,src:'samesite'\s*=&gt;\s*'(Lax|Strict)',src:'path'\s*=&gt;\s*'/',html:Idioma salvo,semerro">
+<p class="try-task"><strong>Missão:</strong> o cookie de idioma está na forma antiga, sem proteção. Reescreva com o <strong>array de opções</strong>: <code>expires</code> em 1 ano, <code>path</code> <code>'/'</code>, <code>httponly</code> <code>true</code> e <code>samesite</code> <code>'Lax'</code>.</p>
+<pre class="script">&lt;?php
+setcookie('idioma', 'pt-BR', time() + 60 * 60 * 24 * 365);
+echo "&lt;p&gt;Idioma salvo.&lt;/p&gt;";
+</pre>
+<pre class="solucao">&lt;?php
+setcookie('idioma', 'pt-BR', [
+    'expires'  =&gt; time() + 60 * 60 * 24 * 365,
+    'path'     =&gt; '/',
+    'httponly' =&gt; true,
+    'samesite' =&gt; 'Lax',
+]);
+echo "&lt;p&gt;Idioma salvo.&lt;/p&gt;";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Cookie = texto que o servidor pede ao navegador para guardar (<code>Set-Cookie</code>) e que volta em todo pedido seguinte (<code>Cookie</code>).</li>
+  <li><code>setcookie(nome, valor, opções)</code>; a expiração é <code>time() + segundos</code>; sem ela, o cookie some ao fechar o navegador.</li>
+  <li>Leia com <code>$_COOKIE['nome'] ?? padrão</code>. O cookie criado agora só aparece no <strong>próximo</strong> pedido.</li>
+  <li>Opções: <code>path</code> (<code>'/'</code>), <code>domain</code>, <code>secure</code> (só HTTPS), <code>httponly</code> (longe do JavaScript), <code>samesite</code> (<code>'Lax'</code>). Use o array de opções.</li>
+  <li>Apagar = gravar vencido (<code>time() - 3600</code>), com o mesmo <code>path</code>/<code>domain</code>.</li>
+  <li><code>setcookie</code> vem antes de qualquer saída; senão, <em>headers already sent</em>. A pista é o "output started at".</li>
+  <li>Cookie é dado do visitante: pequeno (até ~4 KB), sem segredos, validado e escapado. Para login, use <a href="sessoes.html">Sessões</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
