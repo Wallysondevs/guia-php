@@ -450,14 +450,14 @@ Directory publico does not exist.</pre>
 </table>
 </div>
 
-<p>Para fechar, monte um mini-roteador. Esta caixa abre o endereço <code>/contato</code>, mas o código ainda responde "Página inicial" para qualquer caminho:</p>
+<p>Para fechar, monte um mini-roteador. Esta caixa abre o endereço <code>/index.php/contato</code>. Quando o caminho tem um pedaço <strong>depois</strong> do nome do arquivo PHP, o servidor chama o <code>index.php</code> e guarda esse pedaço extra (<code>/contato</code>) em <code>$_SERVER["PATH_INFO"]</code>. É outra forma de ter endereços "bonitos" sem um <code>router.php</code>. Por enquanto, o código responde "Página inicial" para qualquer caminho:</p>
 
-<div class="tryphp" data-modo="web" data-url="/contato" data-goal="html:Fale com a Ana">
-<p class="try-task"><strong>Missão:</strong> acrescente um <code>elseif</code> para o caminho <code>"/contato"</code> que mostre <code>&lt;h1&gt;Fale com a Ana&lt;/h1&gt;</code>. Siga o modelo do <code>router.php</code> desta aula.</p>
+<div class="tryphp" data-modo="web" data-url="/index.php/contato" data-goal="html:Fale com a Ana">
+<p class="try-task"><strong>Missão:</strong> acrescente um <code>elseif</code> para o caminho <code>"/contato"</code> que mostre <code>&lt;h1&gt;Fale com a Ana&lt;/h1&gt;</code>. Siga o modelo do <code>router.php</code> desta aula. Depois, troque o endereço na barra da caixa para <code>localhost:8000/index.php/blog</code> e aperte <kbd>Enter</kbd> para ver o 404.</p>
 <pre class="script">&lt;?php
-$caminho = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
 
-if ($caminho === "/" || $caminho === "/index.php") {
+if ($caminho === "/") {
     echo "&lt;h1&gt;Página inicial&lt;/h1&gt;\n";
 } else {
     http_response_code(404);
@@ -465,9 +465,9 @@ if ($caminho === "/" || $caminho === "/index.php") {
 }
 </pre>
 <pre class="solucao">&lt;?php
-$caminho = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+$caminho = $_SERVER["PATH_INFO"] ?? "/";
 
-if ($caminho === "/" || $caminho === "/index.php") {
+if ($caminho === "/") {
     echo "&lt;h1&gt;Página inicial&lt;/h1&gt;\n";
 } elseif ($caminho === "/contato") {
     echo "&lt;h1&gt;Fale com a Ana&lt;/h1&gt;\n";
@@ -477,6 +477,8 @@ if ($caminho === "/" || $caminho === "/index.php") {
 }
 </pre>
 </div>
+
+<p>O <code>?? "/"</code> quer dizer "se não houver <code>PATH_INFO</code> (quando o endereço é só <code>/index.php</code>), use <code>"/"</code>" (aula <a href="null-coalescing.html">?? e ?-&gt;</a>).</p>
 
 <hr>
 
