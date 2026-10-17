@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Classes Abstratas — abstract class e métodos abstratos | Guia PHP</title>
+<meta name="description" content="Classes abstratas em PHP: abstract class, métodos abstratos que as filhas são obrigadas a escrever, por que não dá para instanciar (Cannot instantiate abstract class), o padrão de 'método modelo' e quando usar, com as formas de pagamento da lojinha da Ana e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Classes Abstratas</span></h1>
+
+<p class="intro">Na <a href="heranca.html">Herança</a>, a classe mãe era um produto "de verdade", que podia ser criado sozinho. Às vezes, porém, a mãe é só uma <strong>ideia geral</strong>: "uma forma de pagamento". Ninguém paga com "uma forma de pagamento"; paga com Pix, boleto ou cartão. Uma <strong>classe abstrata</strong> é uma mãe que serve só de base: ela não pode ser instanciada, e pode <strong>obrigar</strong> as filhas a escrever certos métodos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Declarar uma classe com <code>abstract class</code>.</li>
+  <li>Escrever <strong>métodos abstratos</strong>: só a assinatura, sem corpo.</li>
+  <li>Por que <code>new</code> numa classe abstrata dá erro (e qual erro).</li>
+  <li>O que acontece quando uma filha esquece um método abstrato.</li>
+  <li>Misturar métodos prontos e abstratos (o padrão "método modelo").</li>
+  <li>Quando usar uma classe abstrata.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o formulário com campos obrigatórios</h2>
+<p>Pense num formulário de cadastro de fornecedor. Ele já vem com o cabeçalho, o logotipo da loja e as regras impressas (a parte pronta). Mas alguns campos estão em branco, marcados com <strong>*obrigatório</strong>: cada fornecedor <strong>tem</strong> que preencher. E o formulário em branco, sozinho, não vale como cadastro.</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>No formulário</th><th>Na classe abstrata</th></tr>
+<tr><td>O formulário em branco não vale como cadastro</td><td>Não dá para fazer <code>new</code> numa classe abstrata</td></tr>
+<tr><td>Cabeçalho e regras já impressos</td><td>Métodos normais, com código, que as filhas herdam</td></tr>
+<tr><td>Campos *obrigatórios em branco</td><td><strong>Métodos abstratos</strong>: a mãe diz o nome; cada filha escreve o código</td></tr>
+<tr><td>Cada formulário preenchido</td><td>Cada classe filha "concreta" (Pix, Boleto, Cartão)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>O problema: uma mãe que não deveria existir sozinha</h2>
+<p>Com o que você já sabe, a Ana poderia escrever uma classe <code>Pagamento</code> comum e criar filhas. Mas que taxa tem um pagamento "genérico"?</p>
+
+<pre class="file" data-file="problema.php">&lt;?php
+class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    public function taxa(): float
+    {
+        return 0.0; // ??? que taxa tem um "pagamento genérico"?
+    }
+}
+
+$p = new Pagamento(100);
+echo "Taxa: " . $p-&gt;taxa() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php problema.php
+Taxa: 0</pre>
+
+<p>Dois problemas: alguém pode criar um <code>new Pagamento(100)</code>, que não significa nada; e uma filha que esquecer de escrever o próprio <code>taxa()</code> herda o <code>0.0</code> "de mentira", sem nenhum aviso. A classe abstrata resolve os dois.</p>
+
+<hr>
+
+<h2><code>abstract class</code> e métodos abstratos</h2>
+
+<pre class="file" data-file="pagamentos.php">&lt;?php
+abstract class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    abstract public function nome(): string;
+
+    abstract public function taxa(): float;
+
+    public function total(): float
+    {
+        return round($this-&gt;valor + $this-&gt;taxa(), 2);
+    }
+
+    public function resumo(): string
+    {
+        return $this-&gt;nome() . ": " . $this-&gt;reais($this-&gt;valor)
+            . " + taxa " . $this-&gt;reais($this-&gt;taxa())
+            . " = " . $this-&gt;reais($this-&gt;total());
+    }
+
+    private function reais(float $valor): string
+    {
+        return "R$ " . number_format($valor, 2, ",", ".");
+    }
+}
+
+class Pix extends Pagamento
+{
+    public function nome(): string
+    {
+        return "Pix";
+    }
+
+    public function taxa(): float
+    {
+        return 0.0;
+    }
+}
+
+class Boleto extends Pagamento
+{
+    public function nome(): string
+    {
+        return "Boleto";
+    }
+
+    public function taxa(): float
+    {
+        return 2.50;
+    }
+}
+
+class Cartao extends Pagamento
+{
+    public function __construct(float $valor, public int $parcelas = 1)
+    {
+        parent::__construct($valor);
+    }
+
+    public function nome(): string
+    {
+        return "Cartão {$this-&gt;parcelas}x";
+    }
+
+    public function taxa(): float
+    {
+        $percentual = $this-&gt;parcelas === 1 ? 3.0 : 5.0;
+        return $this-&gt;valor * $percentual / 100;
+    }
+}
+
+$pagamentos = [new Pix(100), new Boleto(100), new Cartao(100), new Cartao(100, 3)];
+foreach ($pagamentos as $pagamento) {
+    echo $pagamento-&gt;resumo() . "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php pagamentos.php
+Pix: R$ 100,00 + taxa R$ 0,00 = R$ 100,00
+Boleto: R$ 100,00 + taxa R$ 2,50 = R$ 102,50
+Cartão 1x: R$ 100,00 + taxa R$ 3,00 = R$ 103,00
+Cartão 3x: R$ 100,00 + taxa R$ 5,00 = R$ 105,00</pre>
+
+<dl class="anatomy">
+  <dt>abstract class Pagamento</dt><dd><code>abstract</code> = "abstrata". A classe vira só um molde de moldes: não pode ser instanciada.</dd>
+  <dt>abstract public function taxa(): float;</dt><dd>Um <strong>método abstrato</strong>: tem nome, parâmetros e tipo de retorno, mas <strong>nenhum corpo</strong> (termina com <code>;</code>, sem chaves). É uma promessa: "toda filha concreta terá um <code>taxa()</code> que devolve <code>float</code>".</dd>
+  <dt>public function total(), resumo()</dt><dd>Métodos normais, com código. As filhas herdam prontos. Repare que <code>total()</code> chama <code>$this-&gt;taxa()</code>, mesmo sem saber qual taxa é: na hora de rodar, vale o <code>taxa()</code> da filha.</dd>
+  <dt>public function __construct(…)</dt><dd>Classes abstratas podem ter construtor e propriedades. As filhas herdam (o <code>Cartao</code> tem o seu e chama <code>parent::__construct</code>).</dd>
+  <dt>class Pix extends Pagamento</dt><dd>Uma filha <strong>concreta</strong> (não abstrata). Ela é obrigada a escrever todos os métodos abstratos da mãe: <code>nome()</code> e <code>taxa()</code>.</dd>
+</dl>
+
+<p>Esse jeito de organizar tem nome: <strong>método modelo</strong> (<em>template method</em>). A mãe escreve o "roteiro" (<code>resumo()</code> e <code>total()</code>) e deixa lacunas (<code>nome()</code> e <code>taxa()</code>) que cada filha preenche. O roteiro fica num lugar só; mudou o formato do resumo, muda para todos.</p>
+
+<h3>Não dá para instanciar</h3>
+
+<pre class="file" data-file="instanciar.php">&lt;?php
+abstract class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    abstract public function taxa(): float;
+}
+
+$p = new Pagamento(100);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php instanciar.php
+
+Fatal error: Uncaught Error: Cannot instantiate abstract class Pagamento in /home/ana/loja/instanciar.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/instanciar.php on line 11</pre>
+
+<p>"Não é possível instanciar a classe abstrata <code>Pagamento</code>". O formulário em branco não vale como cadastro: crie uma das filhas concretas (<code>new Pix(100)</code>).</p>
+
+<h3>A filha que esqueceu um método</h3>
+
+<pre class="file" data-file="faltou.php">&lt;?php
+abstract class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    abstract public function nome(): string;
+
+    abstract public function taxa(): float;
+}
+
+class Boleto extends Pagamento
+{
+    public function nome(): string
+    {
+        return "Boleto";
+    }
+}
+
+echo "Oi\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php faltou.php
+
+Fatal error: Class Boleto contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Pagamento::taxa) in /home/ana/loja/faltou.php on line 13
+Stack trace:
+#0 {main}</pre>
+
+<p>Repare que o <code>Oi</code> da linha 21 nem apareceu: o PHP confere a promessa <strong>ao ler a classe</strong>, antes de rodar qualquer coisa. A mensagem diz: "a classe <code>Boleto</code> contém 1 método abstrato e por isso precisa ser declarada abstrata ou implementar o método que falta (<code>Pagamento::taxa</code>)". <strong>Implementar</strong> é o nome técnico para "escrever o corpo de um método prometido". É exatamente a proteção que faltava na versão sem <code>abstract</code>: esquecer a taxa agora é impossível.</p>
+
+<div class="tryphp" data-goal="out:TED: R$ 50\,00 + taxa R$ 1\,00 = R$ 51\,00,src:extends Pagamento,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana passou a aceitar transferência. Rode o código e leia o erro: a classe <code>Transferencia</code> ainda não cumpre a promessa. Escreva nela os dois métodos que faltam: <code>nome()</code> devolve <code>"TED"</code> e <code>taxa()</code> devolve <code>1.00</code>. A saída deve ser <code>TED: R$ 50,00 + taxa R$ 1,00 = R$ 51,00</code>.</p>
+<pre class="script">&lt;?php
+abstract class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    abstract public function nome(): string;
+
+    abstract public function taxa(): float;
+
+    public function resumo(): string
+    {
+        $f = fn(float $v): string =&gt; "R$ " . number_format($v, 2, ",", ".");
+        return $this-&gt;nome() . ": " . $f($this-&gt;valor) . " + taxa " . $f($this-&gt;taxa())
+            . " = " . $f($this-&gt;valor + $this-&gt;taxa());
+    }
+}
+
+class Transferencia extends Pagamento
+{
+    // escreva nome() e taxa() aqui
+}
+
+echo (new Transferencia(50))-&gt;resumo() . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+abstract class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    abstract public function nome(): string;
+
+    abstract public function taxa(): float;
+
+    public function resumo(): string
+    {
+        $f = fn(float $v): string =&gt; "R$ " . number_format($v, 2, ",", ".");
+        return $this-&gt;nome() . ": " . $f($this-&gt;valor) . " + taxa " . $f($this-&gt;taxa())
+            . " = " . $f($this-&gt;valor + $this-&gt;taxa());
+    }
+}
+
+class Transferencia extends Pagamento
+{
+    public function nome(): string
+    {
+        return "TED";
+    }
+
+    public function taxa(): float
+    {
+        return 1.00;
+    }
+}
+
+echo (new Transferencia(50))-&gt;resumo() . "\n";
+</pre>
+</div>
+
+<p>(O <code>$f = fn(…) =&gt; …</code> do <code>resumo()</code> é uma <a href="closures.html">arrow function</a> que formata dinheiro, só para encurtar o exemplo.)</p>
+
+<hr>
+
+<h2>A abstrata como tipo</h2>
+<p>Você não cria objetos de <code>Pagamento</code>, mas pode (e deve) usar <code>Pagamento</code> como <strong>tipo</strong> de parâmetro. Assim a função aceita qualquer forma de pagamento, inclusive as que ainda nem foram inventadas:</p>
+
+<pre class="file" data-file="tipo.php">&lt;?php
+abstract class Pagamento
+{
+    public function __construct(public float $valor)
+    {
+    }
+
+    abstract public function taxa(): float;
+}
+
+class Pix extends Pagamento
+{
+    public function taxa(): float
+    {
+        return 0.0;
+    }
+}
+
+function finalizarCompra(Pagamento $pagamento): void
+{
+    $total = $pagamento-&gt;valor + $pagamento-&gt;taxa();
+    echo get_class($pagamento) . ": total R$ " . number_format($total, 2, ",", ".") . "\n";
+}
+
+finalizarCompra(new Pix(79.30));
+var_dump(new Pix(1) instanceof Pagamento);
+finalizarCompra("Pix");
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tipo.php
+Pix: total R$ 79,30
+bool(true)
+
+Fatal error: Uncaught TypeError: finalizarCompra(): Argument #1 ($pagamento) must be of type Pagamento, string given, called in /home/ana/loja/tipo.php on line 27 and defined in /home/ana/loja/tipo.php:19
+Stack trace:
+#0 /home/ana/loja/tipo.php(27): finalizarCompra('Pix')
+#1 {main}
+  thrown in /home/ana/loja/tipo.php on line 19</pre>
+
+<p>A função <code>finalizarCompra</code> não sabe nem quer saber se é Pix ou cartão: ela sabe que todo <code>Pagamento</code> tem <code>valor</code> e <code>taxa()</code>, porque a classe abstrata garante. Um texto (<code>"Pix"</code>) é recusado com <code>TypeError</code>.</p>
+
+<hr>
+
+<h2>Variações</h2>
+
+<h3>Uma abstrata filha de outra abstrata</h3>
+<p>Uma classe abstrata pode estender outra e implementar só <strong>parte</strong> dos métodos. Aqui, <code>PagamentoSemTaxa</code> resolve a taxa para todos os pagamentos sem taxa, mas deixa o <code>nome()</code> em aberto:</p>
+
+<pre class="file" data-file="abstrata-filha.php">&lt;?php
+abstract class Pagamento
+{
+    abstract public function nome(): string;
+    abstract public function taxa(): float;
+}
+
+abstract class PagamentoSemTaxa extends Pagamento
+{
+    public function taxa(): float
+    {
+        return 0.0;
+    }
+}
+
+class Pix extends PagamentoSemTaxa
+{
+    public function nome(): string
+    {
+        return "Pix";
+    }
+}
+
+class Dinheiro extends PagamentoSemTaxa
+{
+    public function nome(): string
+    {
+        return "Dinheiro na entrega";
+    }
+}
+
+foreach ([new Pix(), new Dinheiro()] as $p) {
+    echo $p-&gt;nome() . ": taxa " . $p-&gt;taxa() . "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php abstrata-filha.php
+Pix: taxa 0
+Dinheiro na entrega: taxa 0</pre>
+
+<h3>Uma abstrata sem nenhum método abstrato</h3>
+<p>Também vale: <code>abstract</code> aí serve só para proibir o <code>new</code> numa classe que é apenas base de código comum:</p>
+
+<pre class="file" data-file="abstrata-sem-metodos.php">&lt;?php
+abstract class Modelo
+{
+    public function salvar(): string
+    {
+        return "Salvando " . static::class;
+    }
+}
+
+class Cliente extends Modelo
+{
+}
+
+echo (new Cliente())-&gt;salvar() . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php abstrata-sem-metodos.php
+Salvando Cliente</pre>
+
+<p>(O <code>static::class</code> é o nome da classe que foi realmente usada, como você viu em <a href="static.html">static</a>.)</p>
+
+<hr>
+
+<h2>Quando usar uma classe abstrata</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Várias classes "são um" mesmo tipo de coisa, <strong>compartilham código</strong> e cada uma muda alguns detalhes</td><td><strong>Classe abstrata</strong> com os detalhes como métodos abstratos</td></tr>
+<tr><td>A mãe faz sentido sozinha (um <code>Produto</code> comum existe)</td><td>Classe normal + <a href="heranca.html">herança</a></td></tr>
+<tr><td>Só quer garantir que as classes tenham certos métodos, <strong>sem código comum</strong></td><td><a href="interfaces.html">Interface</a></td></tr>
+<tr><td>A classe precisa "ser" duas coisas ao mesmo tempo</td><td>Interfaces (uma classe só pode ter <strong>uma</strong> mãe, abstrata ou não)</td></tr>
+</table>
+</div>
+<p>Uma comparação detalhada entre classe abstrata e interface está na próxima aula, <a href="interfaces.html">Interfaces</a>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Cannot instantiate abstract class</strong>
+<p><strong>O que significa:</strong> <code>new</code> numa classe abstrata (exemplo acima). <strong>Como consertar:</strong> crie um objeto de uma filha concreta. Se não existe nenhuma, crie uma.</p>
+</div>
+
+<div class="cenario">
+<strong>Class … contains 1 abstract method and must therefore be declared abstract or implement the remaining method</strong>
+<p><strong>O que significa:</strong> a filha não escreveu um dos métodos abstratos da mãe (o nome dele aparece entre parênteses no fim da mensagem, como <code>(Pagamento::taxa)</code>). <strong>Como consertar:</strong> escreva o método na filha, com a mesma assinatura. Se a filha também deve ser só uma base, declare-a <code>abstract</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Abstract function … cannot contain body</strong>
+<pre class="file" data-file="corpo.php">&lt;?php
+abstract class Pagamento
+{
+    abstract public function taxa(): float
+    {
+        return 0.0;
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php corpo.php
+
+Fatal error: Abstract function Pagamento::taxa() cannot contain body in /home/ana/loja/corpo.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> um método abstrato não pode ter chaves com código: ele é só a promessa. <strong>Como consertar:</strong> se existe um código padrão que serve para a maioria, tire o <code>abstract</code> do método (as filhas podem sobrescrever). Se não existe, termine a linha com <code>;</code>: <code>abstract public function taxa(): float;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>… declares abstract method … and must therefore be declared abstract</strong>
+<pre class="file" data-file="sem-abstract.php">&lt;?php
+class Pagamento
+{
+    abstract public function taxa(): float;
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-abstract.php
+
+Fatal error: Class Pagamento declares abstract method taxa() and must therefore be declared abstract in /home/ana/loja/sem-abstract.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> só uma classe abstrata pode ter métodos abstratos. <strong>Como consertar:</strong> <code>abstract class Pagamento</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A filha mudou o tipo de retorno</strong>
+<pre class="file" data-file="assinatura-errada.php">&lt;?php
+abstract class Pagamento
+{
+    abstract public function taxa(): float;
+}
+
+class Pix extends Pagamento
+{
+    public function taxa(): string
+    {
+        return "zero";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php assinatura-errada.php
+
+Fatal error: Declaration of Pix::taxa(): string must be compatible with Pagamento::taxa(): float in /home/ana/loja/assinatura-errada.php on line 9
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> a promessa era devolver <code>float</code>, e a filha devolve <code>string</code>. As mesmas regras de compatibilidade da <a href="heranca.html">herança</a> valem aqui. <strong>Como consertar:</strong> siga exatamente a assinatura do método abstrato.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>abstract class X { }</code></td><td>Classe que não pode ser instanciada; só serve de mãe</td></tr>
+<tr><td><code>abstract public function f(): tipo;</code></td><td>Método sem corpo que toda filha concreta precisa implementar</td></tr>
+<tr><td><code>abstract protected function f(): tipo;</code></td><td>O mesmo, para métodos de uso interno (as filhas implementam, ninguém de fora chama)</td></tr>
+<tr><td><code>class Y extends X { … }</code></td><td>Filha concreta: implementa todos os abstratos</td></tr>
+<tr><td><code>abstract class Z extends X { … }</code></td><td>Filha abstrata: pode deixar abstratos para as netas</td></tr>
+<tr><td><code>function f(X $obj)</code></td><td>Aceita qualquer filha concreta de <code>X</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:[E-mail] para ana@exemplo.com: Pedido enviado!,out:[SMS] para 81 99999-0000: Pedido enviado!,src:abstract class Notificacao,src:abstract protected function canal,semerro">
+<p class="try-task"><strong>Missão:</strong> a lojinha avisa o cliente quando o pedido sai. Transforme <code>Notificacao</code> numa classe <strong>abstrata</strong> com o método abstrato <code>abstract protected function canal(): string;</code> (o <code>enviar()</code> já está pronto e usa <code>canal()</code>). Depois crie as filhas <code>Email</code> (canal <code>"E-mail"</code>) e <code>Sms</code> (canal <code>"SMS"</code>). A saída deve ser <code>[E-mail] para ana@exemplo.com: Pedido enviado!</code> e <code>[SMS] para 81 99999-0000: Pedido enviado!</code>.</p>
+<pre class="script">&lt;?php
+class Notificacao
+{
+    public function __construct(public string $destino)
+    {
+    }
+
+    public function enviar(string $mensagem): string
+    {
+        return "[{$this-&gt;canal()}] para {$this-&gt;destino}: $mensagem";
+    }
+}
+
+// crie as classes Email e Sms aqui
+
+
+$avisos = [new Email("ana@exemplo.com"), new Sms("81 99999-0000")];
+foreach ($avisos as $aviso) {
+    echo $aviso-&gt;enviar("Pedido enviado!") . "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+abstract class Notificacao
+{
+    public function __construct(public string $destino)
+    {
+    }
+
+    abstract protected function canal(): string;
+
+    public function enviar(string $mensagem): string
+    {
+        return "[{$this-&gt;canal()}] para {$this-&gt;destino}: $mensagem";
+    }
+}
+
+class Email extends Notificacao
+{
+    protected function canal(): string
+    {
+        return "E-mail";
+    }
+}
+
+class Sms extends Notificacao
+{
+    protected function canal(): string
+    {
+        return "SMS";
+    }
+}
+
+$avisos = [new Email("ana@exemplo.com"), new Sms("81 99999-0000")];
+foreach ($avisos as $aviso) {
+    echo $aviso-&gt;enviar("Pedido enviado!") . "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Declarar a abstrata</h3>
+<p>Complete para que <code>Pagamento</code> não possa ser instanciada:</p>
+<div class="ex-code"><input data-answer="abstract class" aria-label="declaração"> Pagamento { }</div>
+</div>
+
+<div class="exercise">
+<h3>2. O método abstrato</h3>
+<p>Complete a declaração do método abstrato <code>taxa</code>, público, que devolve <code>float</code>:</p>
+<div class="ex-code"><input data-answer="abstract public function|public abstract function" aria-label="modificadores"> taxa(): float;</div>
+</div>
+
+<div class="exercise">
+<h3>3. O que falta</h3>
+<p>Como termina a linha de um método abstrato (depois do tipo de retorno)?</p>
+<div class="ex-code">abstract public function nome(): string<input data-answer=";" aria-label="final da linha"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que acontece com <code>new Pagamento(100)</code>, se <code>Pagamento</code> é abstrata?</p>
+<label><input type="radio" name="q4"> Cria um objeto com taxa zero</label>
+<label><input type="radio" name="q4"> <code>Error: Cannot instantiate abstract class Pagamento</code></label>
+<label><input type="radio" name="q4"> Cria um objeto da primeira filha declarada</label>
+<label><input type="radio" name="q4"> Um <code>Warning</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Uma classe abstrata pode ter…</p>
+<label><input type="radio" name="q5"> Só métodos abstratos</label>
+<label><input type="radio" name="q5"> Só constantes</label>
+<label><input type="radio" name="q5"> Propriedades, construtor, métodos normais e métodos abstratos</label>
+<label><input type="radio" name="q5"> Nenhum método com corpo</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Uma filha concreta não escreveu um dos métodos abstratos da mãe. Quando o PHP avisa?</p>
+<label><input type="radio" name="q6"> Ao ler a classe, antes de rodar o programa</label>
+<label><input type="radio" name="q6"> Só quando alguém chamar o método que falta</label>
+<label><input type="radio" name="q6"> Nunca: o método herda corpo vazio</label>
+<label><input type="radio" name="q6"> Só no <code>new</code> da filha</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">7. Uma função declara o parâmetro <code>Pagamento $p</code> (classe abstrata). O que ela aceita?</p>
+<label><input type="radio" name="q7"> Nada, porque não existem objetos <code>Pagamento</code></label>
+<label><input type="radio" name="q7"> Só o texto <code>"Pagamento"</code></label>
+<label><input type="radio" name="q7"> Qualquer objeto</label>
+<label><input type="radio" name="q7"> Objetos de qualquer filha concreta de <code>Pagamento</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>abstract class</code> é uma mãe que só serve de base: <code>new</code> nela dá <code>Error: Cannot instantiate abstract class</code>.</li>
+  <li>Um <strong>método abstrato</strong> (<code>abstract public function f(): tipo;</code>) é uma promessa sem corpo; toda filha concreta precisa implementá-lo, ou o PHP recusa a classe antes de rodar.</li>
+  <li>A abstrata pode ter propriedades, construtor e métodos prontos que usam os abstratos: o padrão <strong>método modelo</strong>.</li>
+  <li>Use a abstrata como <strong>tipo</strong> de parâmetro para aceitar qualquer filha.</li>
+  <li>Abstrata = código comum + lacunas obrigatórias. Só lacunas, sem código comum? Prefira uma <a href="interfaces.html">interface</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
