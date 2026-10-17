@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP foreach — percorrer arrays item por item | Guia PHP</title>
+<meta name="description" content="O laço foreach em PHP para iniciantes: foreach ($lista as $item), as $chave =&gt; $valor, mudar o array pela chave ou por referência (&amp;$item) e o bug clássico depois do laço, foreach com [$a, $b] (list), a sintaxe alternativa endforeach no HTML e os erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">foreach</span></h1>
+
+<p class="intro">O <code>foreach</code> ("para cada") é o laço que você mais vai usar em PHP. Ele percorre um array <strong>item por item</strong>, do primeiro ao último, sem você precisar contar posições nem saber o tamanho da lista. Lista de compras, produtos de uma loja, linhas que vieram do banco de dados: quase tudo em PHP é "para cada item, faça isto".</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li><code>foreach ($lista as $item)</code>: passar por todos os valores.</li>
+  <li><code>foreach ($lista as $chave =&gt; $valor)</code>: valores <strong>e</strong> chaves (índices ou nomes).</li>
+  <li>Por que mudar <code>$item</code> não muda o array, e as duas formas de mudar: pela chave e <strong>por referência</strong> (<code>&amp;$item</code>).</li>
+  <li>O <strong>bug clássico</strong> da referência depois do laço, demonstrado passo a passo, e como evitá-lo.</li>
+  <li><code>foreach</code> com <code>[$nome, $nota]</code> (o <code>list()</code>) para desmontar cada item.</li>
+  <li>A sintaxe alternativa <code>foreach (…): … endforeach;</code> dentro do HTML.</li>
+</ul>
+</div>
+
+<p>Você vai precisar de <a href="arrays.html">arrays indexados</a> e <a href="arrays-associativos.html">associativos</a> (se ainda não leu, tudo bem: os exemplos explicam o necessário). Antes desta aula vêm <a href="while.html">while</a> e <a href="for.html">for</a>. Os exemplos rodam na pasta <code>~/site</code> da Ana.</p>
+
+<hr>
+
+<h2>A ideia antes do código: conferir a sacola de compras</h2>
+<p>A Ana chegou do mercado e vai tirar as compras da sacola. Ela não conta "item 1, item 2, item 3"; ela simplesmente pega <strong>cada</strong> coisa que está lá, uma de cada vez, até a sacola ficar vazia. Em cada mão, por um momento, está <strong>um</strong> item: o pão, depois o leite, depois o café.</p>
+<p>O <code>foreach</code> faz isso com um array. A cada volta, ele coloca o próximo item numa variável (a "mão") e roda o bloco de código. Quando não há mais itens, o laço termina sozinho. Não existe condição para escrever nem contador para esquecer de aumentar: por isso o <code>foreach</code> quase nunca vira laço infinito.</p>
+
+<hr>
+
+<h2>A forma básica: <code>foreach ($lista as $item)</code></h2>
+
+<pre class="file" data-file="compras.php">&lt;?php
+$compras = ["pão", "leite", "café", "ovos"];
+
+foreach ($compras as $item) {
+    echo "- $item\n";
+}
+echo "Fim da lista.\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>foreach</dt><dd>"Para cada". Começa o laço.</dd>
+  <dt>$compras</dt><dd>O array a percorrer. Vem <strong>antes</strong> do <code>as</code>.</dd>
+  <dt>as</dt><dd>"Como". Liga o array ao nome que cada item vai receber.</dd>
+  <dt>$item</dt><dd>A variável que, a cada volta, guarda <strong>um</strong> item. O nome é você quem escolhe: <code>$item</code>, <code>$produto</code>, <code>$x</code>… Costuma-se usar o singular do nome do array (<code>$compras</code> → <code>$compra</code>, <code>$alunos</code> → <code>$aluno</code>).</dd>
+  <dt>{ … }</dt><dd>O corpo: roda uma vez para cada item.</dd>
+</dl>
+
+<pre class="term">$ php compras.php
+- pão
+- leite
+- café
+- ovos
+Fim da lista.</pre>
+
+<p>Volta a volta: na 1ª, <code>$item</code> vale <code>"pão"</code>; na 2ª, <code>"leite"</code>; na 3ª, <code>"café"</code>; na 4ª, <code>"ovos"</code>. Não há 5ª: o array acabou, e o programa segue para o <code>echo "Fim da lista."</code>.</p>
+
+<p>Se o array estiver <strong>vazio</strong>, o corpo não roda nenhuma vez, sem erro nenhum. Por isso é comum testar antes, para avisar o usuário:</p>
+
+<pre class="file" data-file="vazio.php">&lt;?php
+$compras = [];
+foreach ($compras as $item) {
+    echo "- $item\n";
+}
+if ($compras === []) {
+    echo "A lista está vazia.\n";
+}
+</pre>
+
+<pre class="term">$ php vazio.php
+A lista está vazia.</pre>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> acrescente <code>"manteiga"</code> ao array e rode de novo: o laço se adapta sozinho. Depois troque o <code>echo</code> por <code>echo strtoupper($item), "\n";</code> para mostrar cada item em maiúsculas.</p>
+<pre class="script">&lt;?php
+$compras = ["pão", "leite", "café", "ovos"];
+
+foreach ($compras as $item) {
+    echo "- $item\n";
+}
+echo "Fim da lista.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Chave e valor: <code>as $chave =&gt; $valor</code></h2>
+<p>Todo array tem <strong>chaves</strong>: num array comum, os índices 0, 1, 2…; num array associativo, os nomes que você deu. Para receber a chave também, escreva duas variáveis separadas por <code>=&gt;</code> (a mesma "setinha" usada para criar o array):</p>
+
+<pre class="file" data-file="precos.php">&lt;?php
+$precos = ["pão" =&gt; 8.50, "leite" =&gt; 5.20, "café" =&gt; 18.90];
+
+foreach ($precos as $produto =&gt; $preco) {
+    echo "$produto custa R$ ", number_format($preco, 2, ",", "."), "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>$produto</dt><dd>A <strong>chave</strong> da volta atual: <code>"pão"</code>, depois <code>"leite"</code>, depois <code>"café"</code>.</dd>
+  <dt>=&gt;</dt><dd>Separa a variável da chave da variável do valor. A ordem é sempre <strong>chave =&gt; valor</strong>.</dd>
+  <dt>$preco</dt><dd>O <strong>valor</strong>: 8.50, 5.20, 18.90.</dd>
+  <dt>number_format(…)</dt><dd>Formata o preço no jeito brasileiro (veja <a href="number-format.html">Formatar Números</a>).</dd>
+</dl>
+
+<pre class="term">$ php precos.php
+pão custa R$ 8,50
+leite custa R$ 5,20
+café custa R$ 18,90</pre>
+
+<p>Num array comum, a chave é a posição. Útil para numerar uma lista (somando 1, porque as posições começam em 0):</p>
+
+<pre class="file" data-file="indices.php">&lt;?php
+$compras = ["pão", "leite", "café"];
+
+foreach ($compras as $i =&gt; $item) {
+    echo ($i + 1), ". $item\n";
+}
+</pre>
+
+<pre class="term">$ php indices.php
+1. pão
+2. leite
+3. café</pre>
+
+<div class="note">
+<strong>O <code>foreach</code> segue a ordem em que os itens foram colocados</strong>
+<p>Não é a ordem dos números das chaves. Se você criar <code>$lista[5]</code>, depois <code>$lista[1]</code>, depois <code>$lista[3]</code>, o <code>foreach</code> mostra 5, 1, 3:</p>
+<pre class="term">$ php ordem.php
+5 =&gt; cinco
+1 =&gt; um
+3 =&gt; três</pre>
+<p>Para outra ordem, ordene o array antes (veja <a href="ordenar-arrays.html">Ordenar Arrays</a>).</p>
+</div>
+
+<div class="tryphp" data-goal="out:Comprar leite,out:Comprar ovos,src:as\s*\$\w+\s*=&gt;\s*\$\w+,semerro">
+<p class="try-task"><strong>Missão:</strong> o estoque da lojinha diz quantas unidades há de cada produto. O programa deveria escrever <code>Comprar leite</code> e <code>Comprar ovos</code> (os que estão em zero), mas só tem a quantidade, não o nome. Mude o <code>foreach</code> para receber também a chave, em <code>$produto</code>.</p>
+<pre class="script">&lt;?php
+$estoque = ["pão" =&gt; 12, "leite" =&gt; 0, "café" =&gt; 3, "ovos" =&gt; 0];
+
+foreach ($estoque as $quantidade) {
+    if ($quantidade === 0) {
+        echo "Comprar $produto\n";
+    }
+}
+</pre>
+<pre class="solucao">&lt;?php
+$estoque = ["pão" =&gt; 12, "leite" =&gt; 0, "café" =&gt; 3, "ovos" =&gt; 0];
+
+foreach ($estoque as $produto =&gt; $quantidade) {
+    if ($quantidade === 0) {
+        echo "Comprar $produto\n";
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Mudar os itens do array</h2>
+<p>A Ana quer dobrar todos os preços. A primeira tentativa parece óbvia, mas não funciona:</p>
+
+<pre class="file" data-file="copia.php">&lt;?php
+$precos = [10, 20, 30];
+
+foreach ($precos as $preco) {
+    $preco = $preco * 2;
+}
+print_r($precos);
+</pre>
+
+<pre class="term">$ php copia.php
+Array
+(
+    [0] =&gt; 10
+    [1] =&gt; 20
+    [2] =&gt; 30
+)                    « nada mudou</pre>
+
+<p>A cada volta, <code>$preco</code> recebe uma <strong>cópia</strong> do item. Dobrar a cópia não mexe no array, como anotar um número num papel e rabiscar o papel: o original continua igual. Há duas formas de mudar o array de verdade.</p>
+
+<h3>Forma 1: escrever no array pela chave</h3>
+
+<pre class="file" data-file="chave.php">&lt;?php
+$precos = [10, 20, 30];
+
+foreach ($precos as $i =&gt; $preco) {
+    $precos[$i] = $preco * 2;
+}
+print_r($precos);
+</pre>
+
+<pre class="term">$ php chave.php
+Array
+(
+    [0] =&gt; 20
+    [1] =&gt; 40
+    [2] =&gt; 60
+)</pre>
+
+<p><code>$precos[$i] = …</code> escreve direto na posição <code>$i</code> do array original. É a forma mais segura e fácil de ler.</p>
+
+<h3>Forma 2: por referência, <code>&amp;$preco</code></h3>
+<p>Um <code>&amp;</code> antes da variável do item faz o <code>foreach</code> entregar <strong>o próprio item</strong>, e não uma cópia. A variável vira um "apelido" (uma <strong>referência</strong>) para aquela posição do array: mudar <code>$preco</code> é mudar o array.</p>
+
+<pre class="file" data-file="referencia.php">&lt;?php
+$precos = [10, 20, 30];
+
+foreach ($precos as &amp;$preco) {
+    $preco = $preco * 2;
+}
+print_r($precos);
+</pre>
+
+<pre class="term">$ php referencia.php
+Array
+(
+    [0] =&gt; 20
+    [1] =&gt; 40
+    [2] =&gt; 60
+)</pre>
+
+<p>Funciona, e é mais curto. Mas tem uma armadilha famosa.</p>
+
+<h3 id="bug">O bug clássico: a referência que sobra depois do laço</h3>
+<p>Você viu em <a href="escopo.html">Escopo</a> que a variável do <code>foreach</code> <strong>continua existindo depois do laço</strong>. Com <code>&amp;</code>, ela continua sendo um apelido para o <strong>último</strong> item do array. Se, mais adiante, você usar o mesmo nome num segundo <code>foreach</code> comum, cada volta desse segundo laço <strong>escreve no último item</strong>. Veja a Ana colocando as frutas com inicial maiúscula e depois listando:</p>
+
+<pre class="file" data-file="bug.php">&lt;?php
+$frutas = ["banana", "maçã", "uva"];
+
+foreach ($frutas as &amp;$fruta) {
+    $fruta = ucfirst($fruta);
+}
+
+foreach ($frutas as $fruta) {
+    echo $fruta, "\n";
+}
+print_r($frutas);
+</pre>
+
+<pre class="term">$ php bug.php
+Banana
+Maçã
+Maçã                  « cadê a Uva?
+Array
+(
+    [0] =&gt; Banana
+    [1] =&gt; Maçã
+    [2] =&gt; Maçã       « o array foi estragado
+)</pre>
+
+<p>Nenhum aviso, e a uva sumiu do array. Para ver o que aconteceu, a Ana colocou um <code>var_dump</code> entre os laços e mostrou o array a cada volta do segundo:</p>
+
+<pre class="file" data-file="bug-passo.php">&lt;?php
+$frutas = ["banana", "maçã", "uva"];
+
+foreach ($frutas as &amp;$fruta) {
+    $fruta = ucfirst($fruta);
+}
+var_dump($frutas);
+
+foreach ($frutas as $fruta) {
+    echo "Agora \$fruta = $fruta; o array está: ", implode(", ", $frutas), "\n";
+}
+</pre>
+
+<pre class="term">$ php bug-passo.php
+array(3) {
+  [0]=&gt;
+  string(6) "Banana"
+  [1]=&gt;
+  string(6) "Maçã"
+  [2]=&gt;
+  &amp;string(3) "Uva"          « o &amp;: a posição 2 ainda está ligada a $fruta
+}
+Agora $fruta = Banana; o array está: Banana, Maçã, Banana
+Agora $fruta = Maçã; o array está: Banana, Maçã, Maçã
+Agora $fruta = Maçã; o array está: Banana, Maçã, Maçã</pre>
+
+<ol class="passo">
+  <li>Depois do primeiro laço, <code>$fruta</code> é um apelido para <code>$frutas[2]</code>. O <code>var_dump</code> mostra isso com o <code>&amp;</code> antes de <code>string(3) "Uva"</code>.</li>
+  <li>1ª volta do segundo laço: o PHP coloca <code>"Banana"</code> em <code>$fruta</code>… que é <code>$frutas[2]</code>. A uva foi sobrescrita: o array agora é Banana, Maçã, <strong>Banana</strong>.</li>
+  <li>2ª volta: <code>"Maçã"</code> vai para <code>$fruta</code>, ou seja, para <code>$frutas[2]</code>: Banana, Maçã, <strong>Maçã</strong>.</li>
+  <li>3ª volta: o item da posição 2 agora é <code>"Maçã"</code>, que é copiado para… ele mesmo. Por isso "Maçã" aparece duas vezes.</li>
+</ol>
+
+<p><strong>A correção</strong> é uma linha: <code>unset($fruta);</code> logo depois do laço com <code>&amp;</code>. O <code>unset</code> ("desfazer") apaga o apelido, sem mexer no array:</p>
+
+<pre class="file" data-file="bug2.php">&lt;?php
+$frutas = ["banana", "maçã", "uva"];
+
+foreach ($frutas as &amp;$fruta) {
+    $fruta = ucfirst($fruta);
+}
+unset($fruta);
+
+foreach ($frutas as $fruta) {
+    echo $fruta, "\n";
+}
+print_r($frutas);
+</pre>
+
+<pre class="term">$ php bug2.php
+Banana
+Maçã
+Uva
+Array
+(
+    [0] =&gt; Banana
+    [1] =&gt; Maçã
+    [2] =&gt; Uva
+)</pre>
+
+<div class="warning">
+<strong>Regra prática</strong>
+<p>Usou <code>foreach (… as &amp;$x)</code>? Escreva <code>unset($x);</code> na linha seguinte ao <code>}</code>, sempre. Ou prefira a Forma 1 (<code>$array[$chave] = …</code>), que não deixa nada para trás. Muitos programadores experientes simplesmente evitam o <code>&amp;</code> no <code>foreach</code>.</p>
+</div>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Use</th></tr>
+<tr><td>Só ler os itens</td><td><code>foreach ($lista as $item)</code></td></tr>
+<tr><td>Ler também as chaves</td><td><code>foreach ($lista as $chave =&gt; $valor)</code></td></tr>
+<tr><td>Mudar os itens do próprio array</td><td><code>$lista[$chave] = …</code> dentro do laço (Forma 1), ou <code>&amp;$item</code> + <code>unset($item)</code></td></tr>
+<tr><td>Criar um array novo transformado, sem mexer no original</td><td><code>array_map</code> (veja <a href="closures.html">Funções Anônimas</a>) ou um <code>foreach</code> que preenche um array novo</td></tr>
+<tr><td>Contar de 1 a 10, ou pular de 2 em 2</td><td><a href="for.html">for</a></td></tr>
+<tr><td>Repetir enquanto algo for verdade (sem lista)</td><td><a href="while.html">while</a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Desmontar cada item: <code>foreach</code> com <code>[$a, $b]</code></h2>
+<p>Muitas vezes cada item do array é ele mesmo um pequeno array: um aluno com nome e nota, uma linha de uma planilha. Em vez de escrever <code>$aluno[0]</code> e <code>$aluno[1]</code>, você pode <strong>desmontar</strong> o item direto no <code>foreach</code>, com colchetes no lugar da variável:</p>
+
+<pre class="file" data-file="lista.php">&lt;?php
+$alunos = [
+    ["Ana", 9.5],
+    ["Bruno", 5.5],
+    ["Carla", 8.5],
+];
+
+foreach ($alunos as [$nome, $nota]) {
+    echo "$nome tirou $nota\n";
+}
+
+foreach ($alunos as list($nome, $nota)) {
+    echo "$nome: ", $nota &gt;= 7 ? "aprovado" : "reprovado", "\n";
+}
+
+$produtos = [
+    ["nome" =&gt; "bolo", "preco" =&gt; 25],
+    ["nome" =&gt; "pudim", "preco" =&gt; 12],
+];
+foreach ($produtos as ["nome" =&gt; $n, "preco" =&gt; $p]) {
+    echo "$n: R$ $p\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>as [$nome, $nota]</code></td><td>A cada volta, a posição 0 do item vai para <code>$nome</code> e a posição 1 para <code>$nota</code>.</td></tr>
+<tr><td><code>as list($nome, $nota)</code></td><td>A mesma coisa, na forma antiga, com <code>list()</code>. Você vai encontrar as duas.</td></tr>
+<tr><td><code>as ["nome" =&gt; $n, "preco" =&gt; $p]</code></td><td>Com arrays associativos: a chave <code>"nome"</code> vai para <code>$n</code>, a <code>"preco"</code> para <code>$p</code>.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php lista.php
+Ana tirou 9.5
+Bruno tirou 5.5
+Carla tirou 8.5
+Ana: aprovado
+Bruno: reprovado
+Carla: aprovado
+bolo: R$ 25
+pudim: R$ 12</pre>
+
+<p>Esse "desmontar" se chama <strong>desestruturação</strong> e funciona fora do <code>foreach</code> também; a aula completa é <a href="desestruturacao.html">Desestruturação (list)</a>.</p>
+
+<hr>
+
+<h2>A sintaxe alternativa no HTML: <code>foreach (…): … endforeach;</code></h2>
+<p>Quando o PHP está misturado com HTML (veja <a href="php-e-html.html">PHP Dentro do HTML</a>), as chaves <code>{ }</code> ficam difíceis de achar no meio das tags. Para isso existe uma forma alternativa: dois-pontos no lugar do <code>{</code> e <code>endforeach;</code> ("fim do foreach") no lugar do <code>}</code>.</p>
+
+<dl class="anatomy">
+  <dt>&lt;?php foreach ($compras as $item): ?&gt;</dt><dd>Abre o laço. Repare no <code>:</code> no fim, antes do <code>?&gt;</code>.</dd>
+  <dt>&lt;li&gt;&lt;?= htmlspecialchars($item) ?&gt;&lt;/li&gt;</dt><dd>HTML comum, repetido uma vez por item. O <code>&lt;?=</code> é o atalho de <code>&lt;?php echo</code>, e o <code>htmlspecialchars</code> protege a página contra textos com <code>&lt;</code>, <code>&gt;</code> e aspas (veja <a href="escapar-saida.html">Escapar a Saída</a>).</dd>
+  <dt>&lt;?php endforeach; ?&gt;</dt><dd>Fecha o laço. Muito mais fácil de achar do que um <code>&lt;?php } ?&gt;</code> perdido.</dd>
+</dl>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> veja a lista na aba <strong>Resultado</strong> e o HTML gerado na aba <strong>Código-fonte HTML</strong>: repare que o <code>café &lt;forte&gt;</code> virou <code>café &amp;lt;forte&amp;gt;</code>. Acrescente itens ao array; depois tire o <code>htmlspecialchars</code> e veja o <code>&lt;forte&gt;</code> sumir da página (o navegador achou que era uma tag).</p>
+<pre class="script">&lt;?php
+$compras = ["pão", "leite", "café &lt;forte&gt;"];
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Compras&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Lista de compras&lt;/h1&gt;
+&lt;ul&gt;
+&lt;?php foreach ($compras as $item): ?&gt;
+    &lt;li&gt;&lt;?= htmlspecialchars($item) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<p>O HTML que o PHP real gerou para esse código:</p>
+<pre class="term">$ php web.php
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Compras&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Lista de compras&lt;/h1&gt;
+&lt;ul&gt;
+    &lt;li&gt;pão&lt;/li&gt;
+    &lt;li&gt;leite&lt;/li&gt;
+    &lt;li&gt;café &amp;lt;forte&amp;gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>As outras estruturas têm a mesma forma alternativa: <code>if: … endif;</code>, <code>for: … endfor;</code>, <code>while: … endwhile;</code>, <code>switch: … endswitch;</code>. Use-as nos arquivos de HTML ("templates"); no código PHP puro, prefira as chaves.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>foreach() argument must be of type array|object, null given</code></strong>
+<pre class="file" data-file="naoarray.php">&lt;?php
+$compras = null;
+
+foreach ($compras as $item) {
+    echo "- $item\n";
+}
+echo "Fim\n";
+</pre>
+<pre class="term">$ php naoarray.php
+
+Warning: foreach() argument must be of type array|object, null given in /home/ana/site/naoarray.php on line 4
+Fim</pre>
+<p><strong>O que significa:</strong> "o argumento do foreach precisa ser do tipo array ou objeto; foi dado null". O <code>foreach</code> só percorre arrays (e objetos, no Nível 3). Acontece muito quando uma variável que deveria ser um array veio vazia de um formulário, de um arquivo ou do banco, ou tem o nome escrito errado (aí aparece antes um <code>Undefined variable</code>).</p>
+<p><strong>Como consertar:</strong> descubra por que a variável não é um array (<code>var_dump($compras);</code>). Se ela puder faltar de verdade, use um array vazio como reserva: <code>foreach ($compras ?? [] as $item)</code> (veja <a href="null-coalescing.html">??</a>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>string given</code>: tentou percorrer um texto</strong>
+<pre class="term">$ php texto.php          « $palavra = "café"; foreach ($palavra as $letra) …
+
+Warning: foreach() argument must be of type array|object, string given in /home/ana/site/texto.php on line 3</pre>
+<p><strong>O que significa:</strong> um texto não é um array de letras para o <code>foreach</code>. Nada é repetido.</p>
+<p><strong>Como consertar:</strong> transforme o texto num array antes: <code>mb_str_split("café")</code> devolve <code>["c", "a", "f", "é"]</code> (com acentos certos; veja <a href="mbstring.html">Acentos e mbstring</a>); para separar palavras, <code>explode(" ", $frase)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueceu o <code>as</code>: <code>unexpected variable "$item"</code></strong>
+<pre class="term">$ php semas.php          « foreach ($compras $item) {
+
+Parse error: syntax error, unexpected variable "$item" in /home/ana/site/semas.php on line 3</pre>
+<p><strong>O que significa:</strong> depois de <code>$compras</code> o PHP esperava a palavra <code>as</code> e encontrou outra variável.</p>
+<p><strong>Como consertar:</strong> <code>foreach ($compras as $item)</code>. A ordem também importa: <strong>o array vem primeiro</strong>, o item depois do <code>as</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O último item foi trocado pelo penúltimo (sem erro)</strong>
+<pre class="term">$ php bug.php
+Banana
+Maçã
+Maçã</pre>
+<p><strong>O que aconteceu:</strong> um <code>foreach</code> com <code>&amp;$fruta</code> deixou a variável ligada ao último item, e um <code>foreach</code> seguinte com o mesmo nome escreveu nele. Veja <a href="#bug">o passo a passo acima</a>.</p>
+<p><strong>Como consertar:</strong> <code>unset($fruta);</code> logo depois do laço com <code>&amp;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudei <code>$item</code> e o array não mudou (sem erro)</strong>
+<pre class="term">$ php copia.php
+Array
+(
+    [0] =&gt; 10
+    [1] =&gt; 20
+    [2] =&gt; 30
+)</pre>
+<p><strong>O que aconteceu:</strong> sem <code>&amp;</code>, o item é uma cópia.</p>
+<p><strong>Como consertar:</strong> <code>$precos[$i] = …</code> com <code>as $i =&gt; $preco</code>, ou <code>&amp;$preco</code> seguido de <code>unset($preco)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>foreach ($a as $v) { … }</code></td><td>Uma volta para cada valor de <code>$a</code>, na ordem de inserção.</td></tr>
+<tr><td><code>foreach ($a as $k =&gt; $v) { … }</code></td><td>Recebe também a chave.</td></tr>
+<tr><td><code>foreach ($a as &amp;$v) { … } unset($v);</code></td><td>Por referência: mudar <code>$v</code> muda o array. Sempre com <code>unset</code> depois.</td></tr>
+<tr><td><code>foreach ($a as [$x, $y])</code> / <code>list($x, $y)</code></td><td>Desmonta cada item (array) em variáveis.</td></tr>
+<tr><td><code>foreach ($a as ["k" =&gt; $x])</code></td><td>Desmonta pelo nome da chave.</td></tr>
+<tr><td><code>foreach ($a as $v): … endforeach;</code></td><td>Sintaxe alternativa, para templates HTML.</td></tr>
+<tr><td><code>foreach ($a ?? [] as $v)</code></td><td>Não reclama se <code>$a</code> for <code>null</code>.</td></tr>
+<tr><td><code>break</code> / <code>continue</code></td><td>Sair do laço / pular para o próximo item (veja <a href="break-continue.html">break e continue</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A forma básica</h3>
+<p>Complete para mostrar cada nome do array <code>$alunos</code>:</p>
+<div class="ex-code">foreach ($alunos <input data-answer="as $aluno|as $nome|as $a|as $item" aria-label="trecho">) { echo $aluno; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Chave e valor</h3>
+<p>Complete para receber o nome do produto em <code>$produto</code> e o preço em <code>$preco</code>:</p>
+<div class="ex-code">foreach ($precos as <input data-answer="$produto =&gt; $preco|$produto=&gt;$preco" aria-label="variáveis">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Depois da referência</h3>
+<p>Depois de <code>foreach ($notas as &amp;$nota) { $nota += 1; }</code>, complete a linha que evita o bug clássico:</p>
+<div class="ex-code"><input data-answer="unset($nota);|unset($nota)" aria-label="instrução"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que mostra? <code>$a = [1, 2, 3]; foreach ($a as $x) { $x = 0; } echo implode(",", $a);</code></p>
+<label><input type="radio" name="q4"> 0,0,0</label>
+<label><input type="radio" name="q4"> 1,2,0</label>
+<label><input type="radio" name="q4"> 1,2,3</label>
+<label><input type="radio" name="q4"> Um Warning</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Em que ordem <code>foreach</code> percorre <code>$a = []; $a["z"] = 1; $a["a"] = 2;</code>?</p>
+<label><input type="radio" name="q5"> "a" e depois "z" (ordem alfabética)</label>
+<label><input type="radio" name="q5"> "z" e depois "a" (ordem em que foram colocados)</label>
+<label><input type="radio" name="q5"> Uma ordem aleatória</label>
+<label><input type="radio" name="q5"> Dá erro: chaves de texto não podem ser percorridas</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual forma é a mais indicada dentro de um arquivo de HTML?</p>
+<label><input type="radio" name="q6"> <code>&lt;?php foreach ($a as $x) { ?&gt; … &lt;?php } ?&gt;</code></label>
+<label><input type="radio" name="q6"> <code>&lt;?php for ($i = 0; …) ?&gt;</code></label>
+<label><input type="radio" name="q6"> <code>&lt;?php while (true) ?&gt;</code></label>
+<label><input type="radio" name="q6"> <code>&lt;?php foreach ($a as $x): ?&gt; … &lt;?php endforeach; ?&gt;</code></label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:bolo: R$ 22\,50,out:pudim: R$ 10\,80,out:torta: R$ 36\,00,semerro">
+<p class="try-task"><strong>Missão:</strong> a Ana deu 10% de desconto em todos os doces, mudando o próprio array com <code>&amp;$preco</code>. Mas a torta aparece custando R$ 10,80, o mesmo preço do pudim! Rode, encontre o bug clássico desta aula e corrija para a torta sair por <code>R$ 36,00</code>.</p>
+<pre class="script">&lt;?php
+$precos = ["bolo" =&gt; 25, "pudim" =&gt; 12, "torta" =&gt; 40];
+
+foreach ($precos as &amp;$preco) {
+    $preco = $preco * 0.9;
+}
+
+foreach ($precos as $nome =&gt; $preco) {
+    echo "$nome: R$ ", number_format($preco, 2, ",", "."), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$precos = ["bolo" =&gt; 25, "pudim" =&gt; 12, "torta" =&gt; 40];
+
+foreach ($precos as &amp;$preco) {
+    $preco = $preco * 0.9;
+}
+unset($preco);
+
+foreach ($precos as $nome =&gt; $preco) {
+    echo "$nome: R$ ", number_format($preco, 2, ",", "."), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>foreach ($lista as $item)</code> roda o corpo uma vez para cada item, na ordem em que foram colocados. Array vazio: nenhuma volta.</li>
+  <li><code>as $chave =&gt; $valor</code> entrega também a chave (o índice ou o nome).</li>
+  <li>A variável do item é uma <strong>cópia</strong>. Para mudar o array, use <code>$lista[$chave] = …</code> ou <code>&amp;$item</code>.</li>
+  <li>Depois de um <code>foreach</code> com <code>&amp;</code>, a variável continua ligada ao último item: <code>unset($item);</code> sempre.</li>
+  <li><code>as [$a, $b]</code> (ou <code>list($a, $b)</code>) desmonta cada item em variáveis.</li>
+  <li>No HTML, use <code>foreach (…): … endforeach;</code> e <code>htmlspecialchars</code> em cada valor.</li>
+  <li><code>foreach</code> em algo que não é array: <code>Warning: foreach() argument must be of type array|object</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
