@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Callables de Primeira Classe — strlen(...), Closure::fromCallable e array_map | Guia PHP</title>
+<meta name="description" content="Callables no PHP: as formas antigas (string 'strlen', array [$objeto, 'metodo'], 'Classe::metodo'), call_user_func, is_callable, Closure::fromCallable e a sintaxe de callable de primeira classe strlen(...) do PHP 8.1, com array_map, array_filter e usort, e os erros reais de cada forma.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Callables de Primeira Classe</span></h1>
+
+<p class="intro">Muitas funções do PHP recebem <strong>outra função</strong> como argumento: <code>array_map</code> aplica uma função a cada item, <code>usort</code> usa uma função para comparar, <code>array_filter</code> usa uma para decidir quem fica. Algo que pode ser chamado como função é um <strong>callable</strong> ("chamável"). O PHP tem várias formas de escrever um callable; a mais moderna, do PHP 8.1, é a mais curta e a mais segura: <code>strlen(...)</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é um callable e por que passar uma função como valor.</li>
+  <li>As formas antigas: <code>'strlen'</code>, <code>[$objeto, 'metodo']</code>, <code>'Classe::metodo'</code>, e os problemas delas.</li>
+  <li><code>call_user_func</code>, <code>is_callable</code> e o tipo <code>callable</code>.</li>
+  <li><code>Closure::fromCallable()</code>.</li>
+  <li>A <strong>sintaxe de callable de primeira classe</strong>: <code>strlen(...)</code>, <code>$objeto-&gt;metodo(...)</code>, <code>Classe::metodo(...)</code>. <span class="versao">PHP 8.1+</span></li>
+  <li>A usar tudo isso com <code>array_map</code>, <code>array_filter</code> e <code>usort</code>.</li>
+</ul>
+</div>
+
+<p>Antes, veja <a href="closures.html">Funções Anônimas e Arrow Functions</a>: lá você criou funções <strong>novas</strong> para passar adiante (<code>fn($x) =&gt; $x * 2</code>). Aqui o assunto é passar funções e métodos que <strong>já existem</strong>.</p>
+
+<hr>
+
+<h2>A ideia: passar a receita, não o bolo</h2>
+<p>Quando a Ana pede ao Bruno "faça um bolo", o Bruno entrega o bolo pronto. Mas, se ela pede "use esta receita em cada um destes 10 ingredientes", ela entrega a <strong>receita</strong>, e o Bruno a aplica quantas vezes precisar.</p>
+<p>Em PHP, <code>strlen("caneca")</code> é o bolo: a função roda e devolve <code>6</code>. Para o <code>array_map</code>, a Ana precisa entregar a receita, a própria função <code>strlen</code>, <strong>sem rodá-la</strong>. A dúvida é: como escrever "a função strlen" sem chamá-la? É isso que esta aula responde.</p>
+
+<hr>
+
+<h2>As formas antigas: texto e array</h2>
+<p>Durante muitos anos, o PHP aceitou como callable um <strong>texto com o nome</strong> da função, ou um <strong>array</strong> com o objeto e o nome do método:</p>
+
+<pre class="file" data-file="antigo.php">&lt;?php
+class Loja
+{
+    public function __construct(private float $taxa) {}
+
+    public function comTaxa(float $preco): float
+    {
+        return round($preco * (1 + $this-&gt;taxa), 2);
+    }
+
+    public static function formatar(float $valor): string
+    {
+        return "R$ " . number_format($valor, 2, ",", ".");
+    }
+}
+
+$precos = [10, 19.9, 49.9];
+$loja = new Loja(0.1);
+
+// 1. string com o nome de uma função
+print_r(array_map('round', $precos));
+
+// 2. array [objeto, 'método']
+print_r(array_map([$loja, 'comTaxa'], $precos));
+
+// 3. array ['Classe', 'método estático'] ou string 'Classe::método'
+print_r(array_map(['Loja', 'formatar'], $precos));
+print_r(array_map('Loja::formatar', $precos));
+
+// chamando direto a partir de uma variável
+$f = 'strtoupper';
+echo $f("caneca"), "\n";
+$g = [$loja, 'comTaxa'];
+echo $g(100), "\n";
+echo call_user_func('str_repeat', "ab", 3), "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma antiga</th><th>Quer dizer</th></tr>
+<tr><td><code>'round'</code></td><td>A função <code>round</code></td></tr>
+<tr><td><code>[$loja, 'comTaxa']</code></td><td>O método <code>comTaxa</code> <strong>daquele objeto</strong> <code>$loja</code></td></tr>
+<tr><td><code>['Loja', 'formatar']</code> ou <code>'Loja::formatar'</code></td><td>O método estático <code>formatar</code> da classe <code>Loja</code></td></tr>
+<tr><td><code>$f("caneca")</code></td><td>Uma variável com um callable pode ser chamada com parênteses</td></tr>
+<tr><td><code>call_user_func($f, …)</code></td><td>"Chame este callable com estes argumentos" (o mesmo que <code>$f(…)</code>)</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php antigo.php
+Array
+(
+    [0] =&gt; 10
+    [1] =&gt; 20
+    [2] =&gt; 50
+)
+Array
+(
+    [0] =&gt; 11
+    [1] =&gt; 21.89
+    [2] =&gt; 54.89
+)
+Array
+(
+    [0] =&gt; R$ 10,00
+    [1] =&gt; R$ 19,90
+    [2] =&gt; R$ 49,90
+)
+Array
+(
+    [0] =&gt; R$ 10,00
+    [1] =&gt; R$ 19,90
+    [2] =&gt; R$ 49,90
+)
+CANECA
+110
+ababab</pre>
+
+<p>Funciona, e você vai ver muito isso em código existente. Mas tem três problemas.</p>
+
+<h3>Problema 1: o erro aparece tarde e longe</h3>
+<p>Para o PHP, <code>'strlenn'</code> é só um texto. Ninguém confere se a função existe até o <code>array_map</code> tentar usá-la:</p>
+
+<pre class="file" data-file="typo.php">&lt;?php
+$nomes = ["Ana", "Bruno", "Carla"];
+print_r(array_map('strlenn', $nomes));
+</pre>
+
+<pre class="term">$ php typo.php
+
+Fatal error: Uncaught TypeError: array_map(): Argument #1 ($callback) must be a valid callback or null, function "strlenn" not found or invalid function name in /home/ana/call/typo.php:3
+Stack trace:
+#0 /home/ana/call/typo.php(3): array_map('strlenn', Array)
+#1 {main}
+  thrown in /home/ana/call/typo.php on line 3</pre>
+
+<p>Aqui o erro ficou perto, mas, se o texto tivesse sido guardado numa variável no começo do programa e usado bem depois, o erro apontaria para a linha do uso.</p>
+
+<h3>Problema 2: os editores não enxergam</h3>
+<p>Para o editor (veja <a href="editores.html">Editores e IDEs</a>), <code>'comTaxa'</code> é um texto qualquer. Se você usar "Renomear método" para trocar <code>comTaxa</code> por <code>aplicarTaxa</code>, o texto não muda e o programa quebra. "Ir para a definição" e "Encontrar usos" também não funcionam.</p>
+
+<h3>Problema 3: a visibilidade depende de onde se chama</h3>
+<p>O array <code>[$this, 'capitalizar']</code> com um método <code>private</code> funciona dentro da classe, mas o mesmo array, usado de fora, é recusado:</p>
+
+<pre class="term">$ php privado.php
+…
+Fatal error: Uncaught TypeError: array_map(): Argument #1 ($callback) must be a valid callback or null, cannot access private method Carrinho::capitalizar() in /home/ana/call/privado.php:31
+…</pre>
+
+<p>(O arquivo completo está mais abaixo, na seção de métodos privados.)</p>
+
+<hr>
+
+<h2><code>is_callable</code> e o tipo <code>callable</code></h2>
+<p>Para saber se um valor pode ser chamado, existe <code>is_callable()</code>:</p>
+
+<pre class="file" data-file="iscall.php">&lt;?php
+class Loja
+{
+    public function publico() {}
+    private function privado() {}
+}
+$loja = new Loja();
+var_dump(is_callable('strlen'));
+var_dump(is_callable('strlenn'));
+var_dump(is_callable([$loja, 'publico']));
+var_dump(is_callable([$loja, 'privado']));
+var_dump(is_callable(fn() =&gt; 1));
+</pre>
+
+<pre class="term">$ php iscall.php
+bool(true)
+bool(false)          « a função não existe
+bool(true)
+bool(false)          « existe, mas é privada (vista de fora)
+bool(true)           « funções anônimas também são callables</pre>
+
+<p>E, para exigir um callable num parâmetro, use o tipo <code>callable</code>:</p>
+
+<pre class="file" data-file="aplicar.php">&lt;?php
+function aplicarATodos(array $itens, callable $acao): array
+{
+    $resultado = [];
+    foreach ($itens as $item) {
+        $resultado[] = $acao($item);
+    }
+    return $resultado;
+}
+
+print_r(aplicarATodos(["ana", "bruno"], ucfirst(...)));
+print_r(aplicarATodos(["ana", "bruno"], 'strtoupper'));
+print_r(aplicarATodos(["ana", "bruno"], fn($n) =&gt; "Olá, $n"));
+print_r(aplicarATodos(["ana"], "nao_existe"));
+</pre>
+
+<pre class="term">$ php aplicar.php
+Array
+(
+    [0] =&gt; Ana
+    [1] =&gt; Bruno
+)
+Array
+(
+    [0] =&gt; ANA
+    [1] =&gt; BRUNO
+)
+Array
+(
+    [0] =&gt; Olá, ana
+    [1] =&gt; Olá, bruno
+)
+
+Fatal error: Uncaught TypeError: aplicarATodos(): Argument #2 ($acao) must be of type callable, string given, called in /home/ana/call/aplicar.php on line 14 and defined in /home/ana/call/aplicar.php:2
+Stack trace:
+#0 /home/ana/call/aplicar.php(14): aplicarATodos(Array, 'nao_existe')
+#1 {main}
+  thrown in /home/ana/call/aplicar.php on line 2</pre>
+
+<p>As três formas foram aceitas; o texto <code>"nao_existe"</code>, não. (O <code>ucfirst(...)</code> da primeira chamada é a forma nova, explicada daqui a pouco.) O tipo <code>callable</code> só pode ser usado em parâmetros e retornos, não em propriedades de classe; para guardar numa propriedade, use o tipo <code>Closure</code>.</p>
+
+<div class="warning">
+<strong>Nunca use texto vindo do usuário como callable</strong>
+<p>Como qualquer nome de função vira callable, <code>$acao = $_GET['acao']; $acao($dados);</code> deixa o visitante escolher qual função do PHP rodar (<code>unlink</code>, <code>system</code>…). Se precisar escolher uma ação pelo nome, use uma lista fechada: <code>$acoes = ['maiuscula' =&gt; strtoupper(...), …];</code> e confira com <code>isset($acoes[$nome])</code>.</p>
+</div>
+
+<hr>
+
+<h2><code>Closure::fromCallable()</code></h2>
+<p>O PHP 7.1 trouxe um meio-termo: transformar qualquer callable num objeto <code>Closure</code> (o mesmo tipo das funções anônimas). A conferência acontece na hora da conversão:</p>
+
+<pre class="file" data-file="fromcallable.php">&lt;?php
+class Loja
+{
+    public function __construct(private float $taxa) {}
+    public function comTaxa(float $preco): float { return round($preco * (1 + $this-&gt;taxa), 2); }
+}
+$tamanho = Closure::fromCallable('strlen');
+$taxa = Closure::fromCallable([new Loja(0.1), 'comTaxa']);
+var_dump($tamanho);
+echo $tamanho("caneca"), "\n";
+echo $taxa(100), "\n";
+</pre>
+
+<pre class="term">$ php fromcallable.php
+object(Closure)#1 (2) {
+  ["function"]=&gt;
+  string(6) "strlen"
+  ["parameter"]=&gt;
+  array(1) {
+    ["$string"]=&gt;
+    string(10) "&lt;required&gt;"
+  }
+}
+6
+110</pre>
+
+<p>O <code>var_dump</code> mostra o que há dentro do <code>Closure</code>: qual função ele embrulha (<code>strlen</code>) e os parâmetros dela (<code>$string</code>, obrigatório). Ainda assim, o nome continua sendo um texto (<code>'strlen'</code>), com os problemas 1 e 2. A forma nova resolve isso.</p>
+
+<hr>
+
+<h2>Callable de primeira classe: <code>strlen(...)</code> <span class="versao">PHP 8.1+</span></h2>
+<p>A ideia é simples: escreva a chamada normalmente, mas, no lugar dos argumentos, coloque <strong>três pontos</strong>. O resultado não é a chamada: é um <code>Closure</code> que <strong>fará</strong> a chamada depois.</p>
+
+<pre class="file" data-file="primeira.php">&lt;?php
+class Loja
+{
+    public function __construct(private float $taxa) {}
+
+    public function comTaxa(float $preco): float
+    {
+        return round($preco * (1 + $this-&gt;taxa), 2);
+    }
+
+    public static function formatar(float $valor): string
+    {
+        return "R$ " . number_format($valor, 2, ",", ".");
+    }
+}
+
+$loja = new Loja(0.1);
+
+$tamanho  = strlen(...);
+$comTaxa  = $loja-&gt;comTaxa(...);
+$formatar = Loja::formatar(...);
+
+var_dump($tamanho);
+echo $tamanho("caneca"), "\n";
+echo $comTaxa(100), "\n";
+echo $formatar(1234.5), "\n";
+
+$precos = [10, 19.9, 49.9];
+print_r(array_map($formatar, array_map($comTaxa, $precos)));
+</pre>
+
+<dl class="anatomy">
+  <dt>strlen(...)</dt><dd>"A função <code>strlen</code>, ainda não chamada." Os <code>...</code> aqui não são o operador de <a href="variadicas.html">funções variádicas</a>; dentro dos parênteses, sozinhos, querem dizer "os argumentos virão depois".</dd>
+  <dt>$loja-&gt;comTaxa(...)</dt><dd>"O método <code>comTaxa</code> <strong>deste</strong> objeto". O objeto fica guardado dentro do <code>Closure</code>.</dd>
+  <dt>Loja::formatar(...)</dt><dd>"O método estático <code>formatar</code> da classe <code>Loja</code>".</dd>
+  <dt>$tamanho("caneca")</dt><dd>Chama de fato, como qualquer função.</dd>
+</dl>
+
+<pre class="term">$ php primeira.php
+object(Closure)#2 (2) {
+  ["function"]=&gt;
+  string(6) "strlen"
+  ["parameter"]=&gt;
+  array(1) {
+    ["$string"]=&gt;
+    string(10) "&lt;required&gt;"
+  }
+}
+6
+110
+R$ 1.234,50
+Array
+(
+    [0] =&gt; R$ 11,00
+    [1] =&gt; R$ 21,89
+    [2] =&gt; R$ 54,89
+)</pre>
+
+<p>O resultado é exatamente o mesmo <code>Closure</code> do <code>Closure::fromCallable('strlen')</code>, mas escrito como código, não como texto. Por isso:</p>
+
+<ul>
+  <li><strong>O erro aparece na hora e no lugar certo.</strong> Com o nome errado:</li>
+</ul>
+
+<pre class="term">$ php typo2.php          « $tamanho = strlenn(...);
+
+Fatal error: Uncaught Error: Call to undefined function strlenn() in /home/ana/call/typo2.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/call/typo2.php on line 3</pre>
+
+<ul>
+  <li><strong>O editor entende</strong>: renomear, "ir para a definição" e autocompletar funcionam.</li>
+  <li><strong>A visibilidade é a de onde o callable foi criado</strong> (próxima seção).</li>
+</ul>
+
+<div class="tryphp" data-goal="out:CANECA,out:R$ 1.234\,50,src:strtoupper\(\.\.\.\),src:\$loja-&gt;comTaxa\(\.\.\.\),src:Loja::formatar\(\.\.\.\),semerro">
+<p class="try-task"><strong>Missão:</strong> troque as três formas antigas (o texto <code>'strtoupper'</code>, o array <code>[$loja, 'comTaxa']</code> e o texto <code>'Loja::formatar'</code>) pela sintaxe de primeira classe: <code>strtoupper(...)</code>, <code>$loja-&gt;comTaxa(...)</code> e <code>Loja::formatar(...)</code>. A saída não deve mudar.</p>
+<pre class="script">&lt;?php
+class Loja
+{
+    public function __construct(private float $taxa) {}
+
+    public function comTaxa(float $preco): float
+    {
+        return round($preco * (1 + $this-&gt;taxa), 2);
+    }
+
+    public static function formatar(float $valor): string
+    {
+        return "R$ " . number_format($valor, 2, ",", ".");
+    }
+}
+
+$loja = new Loja(0.1);
+
+$maiuscula = 'strtoupper';
+$taxa = [$loja, 'comTaxa'];
+$formatar = 'Loja::formatar';
+
+echo $maiuscula("caneca"), "\n";
+echo $formatar($taxa(1122.27)), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Loja
+{
+    public function __construct(private float $taxa) {}
+
+    public function comTaxa(float $preco): float
+    {
+        return round($preco * (1 + $this-&gt;taxa), 2);
+    }
+
+    public static function formatar(float $valor): string
+    {
+        return "R$ " . number_format($valor, 2, ",", ".");
+    }
+}
+
+$loja = new Loja(0.1);
+
+$maiuscula = strtoupper(...);
+$taxa = $loja-&gt;comTaxa(...);
+$formatar = Loja::formatar(...);
+
+echo $maiuscula("caneca"), "\n";
+echo $formatar($taxa(1122.27)), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Métodos privados como callable</h2>
+<p>Dentro de uma classe, <code>$this-&gt;metodo(...)</code> cria um <code>Closure</code> que "lembra" que foi criado lá dentro. Ele pode ser entregue para fora e continua funcionando, mesmo com um método <code>private</code>:</p>
+
+<pre class="file" data-file="privado.php">&lt;?php
+class Carrinho
+{
+    private array $itens = ["caneca", "camiseta", "boné"];
+
+    private function capitalizar(string $s): string
+    {
+        return ucfirst($s);
+    }
+
+    public function nomes(): array
+    {
+        return array_map($this-&gt;capitalizar(...), $this-&gt;itens);
+    }
+
+    public function nomesAntigo(): array
+    {
+        return array_map([$this, 'capitalizar'], $this-&gt;itens);
+    }
+
+    public function entregarCallable(): Closure
+    {
+        return $this-&gt;capitalizar(...);
+    }
+}
+$c = new Carrinho();
+print_r($c-&gt;nomes());
+print_r($c-&gt;nomesAntigo());
+$f = $c-&gt;entregarCallable();
+echo $f("bolsa"), "\n";
+print_r(array_map([$c, 'capitalizar'], ["x"]));
+</pre>
+
+<pre class="term">$ php privado.php
+Array
+(
+    [0] =&gt; Caneca
+    [1] =&gt; Camiseta
+    [2] =&gt; Boné
+)
+Array
+(
+    [0] =&gt; Caneca
+    [1] =&gt; Camiseta
+    [2] =&gt; Boné
+)
+Bolsa                « o Closure criado lá dentro funciona aqui fora
+
+Fatal error: Uncaught TypeError: array_map(): Argument #1 ($callback) must be a valid callback or null, cannot access private method Carrinho::capitalizar() in /home/ana/call/privado.php:31
+Stack trace:
+#0 /home/ana/call/privado.php(31): array_map(Array, Array)
+#1 {main}
+  thrown in /home/ana/call/privado.php on line 31</pre>
+
+<p>A classe decide o que entrega: o <code>Closure</code> é uma "chave" que ela mesma deu. Já o array <code>[$c, 'capitalizar']</code>, montado de fora, é recusado, porque quem tenta usá-lo (o <code>array_map</code>, chamado de fora da classe) não tem acesso. Veja <a href="visibilidade.html">Visibilidade</a>.</p>
+
+<hr>
+
+<h2>Na prática: <code>array_map</code>, <code>array_filter</code>, <code>usort</code></h2>
+<p>A Ana recebeu uma lista de produtos digitada às pressas, com espaços sobrando, maiúsculas misturadas e itens vazios. Com funções que já existem no PHP, ela limpa tudo sem escrever nenhuma função nova:</p>
+
+<pre class="file" data-file="uso.php">&lt;?php
+$entrada = ["  caneca ", "CAMISETA", " boné", "12", "", "chaveiro  "];
+
+$limpos = array_map(trim(...), $entrada);
+$semVazios = array_filter($limpos, strlen(...));
+$minusculos = array_map(mb_strtolower(...), $semVazios);
+usort($minusculos, strcmp(...));
+
+print_r($minusculos);
+echo implode(", ", array_map(ucfirst(...), $minusculos)), "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>array_map(trim(...), $entrada)</code></td><td>Aplica <code>trim</code> (tira os espaços das pontas) a cada item</td></tr>
+<tr><td><code>array_filter($limpos, strlen(...))</code></td><td>Mantém os itens em que <code>strlen</code> dá algo "verdadeiro" (diferente de 0): some o texto vazio. Repare na ordem: no <code>array_filter</code>, o callable vem <strong>depois</strong> do array</td></tr>
+<tr><td><code>array_map(mb_strtolower(...), …)</code></td><td>Tudo em minúsculas, inclusive letras acentuadas (veja <a href="mbstring.html">mbstring</a>)</td></tr>
+<tr><td><code>usort($minusculos, strcmp(...))</code></td><td>Ordena usando <code>strcmp</code> para comparar dois textos (veja <a href="ordenar-arrays.html">Ordenar Arrays</a>)</td></tr>
+<tr><td><code>array_map(ucfirst(...), …)</code></td><td>Primeira letra maiúscula, para mostrar</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php uso.php
+Array
+(
+    [0] =&gt; 12
+    [1] =&gt; boné
+    [2] =&gt; camiseta
+    [3] =&gt; caneca
+    [4] =&gt; chaveiro
+)
+12, Boné, Camiseta, Caneca, Chaveiro</pre>
+
+<p>O <code>"12"</code> ficou em primeiro porque, na comparação de textos do <code>strcmp</code>, dígitos vêm antes das letras. Repare também que <code>array_map(ucfirst(...), …)</code> cabe numa linha, enquanto a versão com função anônima seria <code>array_map(fn($s) =&gt; ucfirst($s), …)</code>. Quando a função já existe e recebe exatamente um argumento, o callable de primeira classe é a escrita mais limpa. Na próxima aula, o <a href="pipe.html">operador pipe <code>|&gt;</code></a> usa essa mesma sintaxe para encadear transformações da esquerda para a direita.</p>
+
+<hr>
+
+<h2>Todas as formas: qual usar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>Primeira classe <span class="versao">8.1+</span></td><td><code>strlen(...)</code>, <code>$obj-&gt;m(...)</code>, <code>Classe::m(...)</code></td><td><strong>O padrão</strong> para funções e métodos que já existem</td></tr>
+<tr><td>Arrow function</td><td><code>fn($x) =&gt; $x * $taxa</code></td><td>Quando é preciso <strong>mudar</strong> algo: fixar um argumento, combinar duas funções, uma conta pequena</td></tr>
+<tr><td>Função anônima</td><td><code>function ($x) use ($taxa) { … }</code></td><td>Lógica com várias linhas</td></tr>
+<tr><td>Texto / array</td><td><code>'strlen'</code>, <code>[$obj, 'm']</code></td><td>Só em código antigo (PHP &lt; 8.1) ou quando o nome é escolhido de uma lista fechada</td></tr>
+<tr><td><code>Closure::fromCallable()</code></td><td><code>Closure::fromCallable('strlen')</code></td><td>PHP 7.1 a 8.0; hoje, prefira <code>(...)</code></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Cuidado com funções de vários parâmetros</strong>
+<p>O <code>array_map</code> passa <strong>um</strong> argumento por item. <code>array_map(round(...), $precos)</code> funciona porque o segundo parâmetro de <code>round</code> é opcional. Para arredondar com 1 casa, você precisa fixar o segundo argumento, e aí entra a arrow function: <code>array_map(fn($p) =&gt; round($p, 1), $precos)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>must be a valid callback or null, function "strlenn" not found</strong>
+<p><strong>O que significa:</strong> um callable em forma de texto tem um nome que não existe.</p>
+<p><strong>Como consertar:</strong> corrija o nome. Melhor ainda: troque por <code>strlen(...)</code>, e o próximo erro de digitação vai aparecer na hora, como <code>Call to undefined function</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>cannot access private method Carrinho::capitalizar()</strong>
+<p><strong>O que significa:</strong> o callable <code>[$objeto, 'metodo']</code> aponta para um método privado e foi usado de fora da classe.</p>
+<p><strong>Como consertar:</strong> se a classe quer oferecer esse comportamento, ela entrega um <code>$this-&gt;metodo(...)</code> por um método público; senão, torne o método público.</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot combine nullsafe operator with Closure creation</strong>
+<pre class="term">$ php nullsafe.php       « $f = $loja?-&gt;comTaxa(...);
+
+Fatal error: Cannot combine nullsafe operator with Closure creation in /home/ana/call/nullsafe.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> <code>?-&gt;</code> (veja <a href="null-coalescing.html">?? e ?-&gt;</a>) e <code>(...)</code> não combinam: se <code>$loja</code> fosse <code>null</code>, não haveria método para embrulhar.</p>
+<p><strong>Como consertar:</strong> confira o <code>null</code> antes: <code>$f = $loja !== null ? $loja-&gt;comTaxa(...) : null;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot create Closure for new expression</strong>
+<pre class="term">$ php novo.php           « $f = new DateTime(...);
+
+Fatal error: Cannot create Closure for new expression in /home/ana/call/novo.php on line 2
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> <code>new Classe(...)</code> não vira callable.</p>
+<p><strong>Como consertar:</strong> use uma arrow function: <code>fn(string $d) =&gt; new DateTime($d)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que faz</th></tr>
+<tr><td><code>funcao(...)</code></td><td>Closure da função</td></tr>
+<tr><td><code>$objeto-&gt;metodo(...)</code></td><td>Closure do método daquele objeto</td></tr>
+<tr><td><code>Classe::metodo(...)</code>, <code>static::metodo(...)</code>, <code>self::metodo(...)</code></td><td>Closure do método estático</td></tr>
+<tr><td><code>$closure(...)</code></td><td>Também funciona com variáveis que já guardam um callable</td></tr>
+<tr><td><code>Closure::fromCallable($c)</code></td><td>Converte qualquer callable em <code>Closure</code></td></tr>
+<tr><td><code>is_callable($v)</code></td><td><code>true</code> se <code>$v</code> pode ser chamado daqui</td></tr>
+<tr><td><code>call_user_func($c, ...$args)</code></td><td>Chama o callable (o mesmo que <code>$c(...$args)</code>)</td></tr>
+<tr><td><code>callable</code> / <code>Closure</code></td><td>Tipos para parâmetros (<code>callable</code>) e propriedades (<code>Closure</code>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A função como valor</h3>
+<p>Complete para guardar a função <code>strtolower</code> (sem chamá-la) na sintaxe de primeira classe:</p>
+<div class="ex-code">$minuscula = <input data-answer="strtolower(...)" aria-label="callable">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. O método do objeto</h3>
+<p>Complete para aplicar o método <code>comTaxa</code> do objeto <code>$loja</code> a cada preço:</p>
+<div class="ex-code">$novos = array_map(<input data-answer="$loja-&gt;comTaxa(...)" aria-label="callable">, $precos);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Forma antiga</h3>
+<p>Escreva, na forma antiga de texto, o callable do método estático <code>formatar</code> da classe <code>Loja</code>:</p>
+<div class="ex-code">array_map('<input data-answer="Loja::formatar" aria-label="nome">', $valores);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que a variável <code>$f</code> guarda depois de <code>$f = strlen(...);</code>?</p>
+<label><input type="radio" name="q4"> O número <code>0</code></label>
+<label><input type="radio" name="q4"> Um objeto <code>Closure</code> que chama <code>strlen</code></label>
+<label><input type="radio" name="q4"> O texto <code>"strlen"</code></label>
+<label><input type="radio" name="q4"> Um erro, porque faltam argumentos</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Qual a principal vantagem de <code>strlen(...)</code> sobre <code>'strlen'</code>?</p>
+<label><input type="radio" name="q5"> Roda mais rápido</label>
+<label><input type="radio" name="q5"> Funciona em versões antigas do PHP</label>
+<label><input type="radio" name="q5"> Nome errado dá erro na hora, e o editor reconhece a função</label>
+<label><input type="radio" name="q5"> Aceita mais argumentos</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Para arredondar cada preço com 1 casa decimal com <code>array_map</code>, o que usar?</p>
+<label><input type="radio" name="q6"> <code>fn($p) =&gt; round($p, 1)</code></label>
+<label><input type="radio" name="q6"> <code>round(...)</code></label>
+<label><input type="radio" name="q6"> <code>round(..., 1)</code></label>
+<label><input type="radio" name="q6"> <code>'round, 1'</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:Ana Souza\, Bruno Lima\, Carla Dias,src:trim\(\.\.\.\),src:strlen\(\.\.\.\),semerro">
+<p class="try-task"><strong>Missão final:</strong> a lista de alunos chegou bagunçada. Usando <code>array_map</code>, <code>array_filter</code> e <code>sort</code>, com callables de primeira classe sempre que possível: (1) tire os espaços das pontas com <code>trim(...)</code>; (2) remova os nomes vazios com <code>array_filter</code> e <code>strlen(...)</code>; (3) deixe cada nome com a primeira letra de cada palavra maiúscula (dica: <code>ucwords(...)</code> depois de <code>mb_strtolower(...)</code>); (4) ordene com <code>sort</code>. A saída deve ser <code>Ana Souza, Bruno Lima, Carla Dias</code>.</p>
+<pre class="script">&lt;?php
+$alunos = ["  carla DIAS ", "", "ANA souza", "   ", " bruno lima"];
+
+// seu código aqui
+
+echo implode(", ", $alunos), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$alunos = ["  carla DIAS ", "", "ANA souza", "   ", " bruno lima"];
+
+$alunos = array_map(trim(...), $alunos);
+$alunos = array_filter($alunos, strlen(...));
+$alunos = array_map(mb_strtolower(...), $alunos);
+$alunos = array_map(ucwords(...), $alunos);
+sort($alunos);
+
+echo implode(", ", $alunos), "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Callable = algo que pode ser chamado: função, método, função anônima. Serve para passar uma "receita" a <code>array_map</code>, <code>array_filter</code>, <code>usort</code>…</li>
+  <li>Formas antigas: <code>'strlen'</code>, <code>[$obj, 'metodo']</code>, <code>'Classe::metodo'</code>. Funcionam, mas o erro aparece tarde e o editor não as entende.</li>
+  <li><span class="versao">PHP 8.1+</span> <code>strlen(...)</code>, <code>$obj-&gt;metodo(...)</code>, <code>Classe::metodo(...)</code> criam um <code>Closure</code>: conferido na hora, visível para o editor, com a visibilidade de onde foi criado.</li>
+  <li><code>is_callable()</code> testa; <code>callable</code> é o tipo de parâmetro; <code>Closure</code>, o de propriedade.</li>
+  <li>Função já pronta, com um argumento: <code>(...)</code>. Precisa fixar argumentos ou combinar: arrow function.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
