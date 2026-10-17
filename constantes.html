@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Constantes — define, const e constantes mágicas | Guia PHP</title>
+<meta name="description" content="Constantes em PHP para quem nunca programou: define e const, a convenção de maiúsculas, constantes mágicas (__LINE__, __FILE__, __DIR__), constantes nativas (PHP_VERSION, PHP_EOL, M_PI) e os avisos e erros reais ao redefinir ou usar uma constante que não existe.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Constantes</span></h1>
+
+<p class="intro">Algumas informações do programa não deveriam mudar nunca enquanto ele roda: o nome da loja, a taxa de entrega, o número máximo de parcelas, o valor de π. Para elas, existe a <strong>constante</strong>: uma caixa com etiqueta, como a variável, mas <strong>lacrada</strong>. Depois de criada, ninguém troca o valor. Nesta aula você aprende as duas formas de criar constantes (<code>define</code> e <code>const</code>), conhece as constantes que o PHP já traz prontas e vê o que acontece quando alguém tenta mudar uma.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma constante e quando usar uma no lugar de uma variável.</li>
+  <li>Como criar constantes com <code>define()</code> e com <code>const</code>, e a diferença entre os dois.</li>
+  <li>Por que as constantes são escritas em MAIÚSCULAS.</li>
+  <li>As constantes mágicas <code>__LINE__</code>, <code>__FILE__</code> e <code>__DIR__</code>.</li>
+  <li>Constantes que o PHP já traz: <code>PHP_VERSION</code>, <code>PHP_EOL</code>, <code>M_PI</code>, <code>PHP_INT_MAX</code>…</li>
+  <li>Os avisos e erros reais de redefinir e de usar uma constante que não existe.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>.</p>
+
+<hr>
+
+<h2>A ideia: a placa na parede</h2>
+<p>Na lojinha da Ana, o preço do dia fica num quadro branco: ela apaga e escreve outro quando quer. Isso é uma <strong>variável</strong>. Já o nome da loja está numa <strong>placa de metal</strong> pregada na fachada. Ninguém muda a placa no meio do expediente. Isso é uma <strong>constante</strong>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Variável</th><th>Constante</th></tr>
+<tr><td>Escrita</td><td><code>$taxa</code> (com cifrão)</td><td><code>TAXA</code> (sem cifrão, em maiúsculas)</td></tr>
+<tr><td>Pode mudar de valor?</td><td>Sim, quando quiser</td><td><strong>Não</strong>: o valor é definido uma vez</td></tr>
+<tr><td>Bom para</td><td>Dados que mudam: o nome do cliente, o total do carrinho</td><td>Configurações e valores fixos: nome da loja, taxa, limite, π</td></tr>
+</table>
+</div>
+
+<p>Por que não usar uma variável e "simplesmente não mudar"? Porque num programa grande, alguém (às vezes você mesmo, meses depois) muda sem querer. A constante faz o PHP <strong>garantir</strong> que isso não aconteça. E ela tem outra vantagem: o nome explica o número. <code>$total + TAXA_ENTREGA</code> diz muito mais que <code>$total + 7.5</code>.</p>
+
+<hr>
+
+<h2>1. Criar com <code>const</code></h2>
+<p>A forma mais usada no PHP moderno é a palavra <code>const</code> (de <em>constant</em>):</p>
+
+<pre class="file" data-file="loja.php">&lt;?php
+const NOME_LOJA = "Lojinha da Ana";
+const TAXA_ENTREGA = 7.5;
+const CORES = ["azul", "verde"];
+echo NOME_LOJA, "\n";
+echo TAXA_ENTREGA, "\n";
+echo CORES[1], "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php loja.php
+Lojinha da Ana
+7.5
+verde</pre>
+
+<dl class="anatomy">
+  <dt>const</dt><dd>A palavra que cria a constante.</dd>
+  <dt>NOME_LOJA</dt><dd>O nome. <strong>Sem cifrão</strong>. As regras de nome são as mesmas das variáveis (letra ou <code>_</code> no começo; letras, números e <code>_</code> depois).</dd>
+  <dt>= "Lojinha da Ana";</dt><dd>O valor, que nunca mais muda. Pode ser string, número, booleano, <code>null</code> ou array.</dd>
+  <dt>echo NOME_LOJA</dt><dd>Para usar, escreva só o nome, também sem cifrão.</dd>
+</dl>
+
+<h3>Por que MAIÚSCULAS?</h3>
+<p>O PHP não exige, mas é uma <strong>convenção</strong> seguida por praticamente todo programador: constantes em MAIÚSCULAS, com as palavras separadas por <code>_</code> (o estilo se chama <code>SCREAMING_SNAKE_CASE</code>, "cobra gritando"). Assim, quem lê o código sabe na hora: <code>$taxa</code> pode mudar; <code>TAXA</code> não. E, ao contrário das funções, <strong>os nomes de constantes diferenciam maiúsculas de minúsculas</strong>: <code>TAXA</code> e <code>taxa</code> são constantes diferentes.</p>
+
+<hr>
+
+<h2>2. Criar com <code>define()</code></h2>
+<p>A forma mais antiga é a função <code>define</code> ("definir"). O nome vai <strong>entre aspas</strong>, como texto, e o valor depois da vírgula:</p>
+
+<pre class="file" data-file="definir.php">&lt;?php
+define("TAXA_ENTREGA", 7.5);
+echo TAXA_ENTREGA, "\n";
+var_dump(defined("TAXA_ENTREGA"));
+var_dump(defined("NAO_EXISTE"));
+$x = 2;
+define("DOBRO", $x * 2);
+echo DOBRO, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php definir.php
+7.5
+bool(true)               « defined: "a constante TAXA_ENTREGA existe?"
+bool(false)
+4                        « define aceita um valor calculado com variáveis</pre>
+
+<dl class="anatomy">
+  <dt>define("NOME", valor)</dt><dd>Cria a constante <code>NOME</code>. Repare nas aspas: aqui o nome é um texto.</dd>
+  <dt>defined("NOME")</dt><dd>Pergunta se a constante existe (<code>true</code>/<code>false</code>). Também com o nome entre aspas.</dd>
+</dl>
+
+<h3><code>const</code> ou <code>define</code>?</h3>
+<p>Os dois criam constantes que funcionam igual. As diferenças estão em <strong>onde</strong> e <strong>com o quê</strong> você pode criá-las:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>const</code></th><th><code>define()</code></th></tr>
+<tr><td>Valor calculado com variáveis ou funções</td><td>Não (só valores fixos e contas com outras constantes, como <code>3 * 3</code>)</td><td>Sim: <code>define("DOBRO", $x * 2)</code></td></tr>
+<tr><td>Dentro de um <code>if</code>, de uma função, de um laço</td><td>Não: só no "nível de cima" do arquivo</td><td>Sim</td></tr>
+<tr><td>Dentro de uma classe</td><td>Sim (constantes de classe, aula <a href="static.html">static</a>)</td><td>Não</td></tr>
+<tr><td>Nome montado na hora (<code>"TAXA_" . $estado</code>)</td><td>Não</td><td>Sim</td></tr>
+<tr><td>Quando o PHP cria</td><td>Ao ler o arquivo (antes de rodar)</td><td>Quando a linha é executada</td></tr>
+</table>
+</div>
+
+<p><strong>Regra prática:</strong> use <code>const</code> por padrão: é mais curto, fica claro no topo do arquivo e é o que você vai usar nas classes. Use <code>define</code> quando o valor depender de algo calculado ou quando a constante só deve existir numa condição.</p>
+
+<p>Veja o que o PHP responde quando você força o <code>const</code> fora do lugar:</p>
+
+<pre class="term" data-cwd="~/site">$ cat const-variavel.php
+&lt;?php
+$x = 2;
+const DOBRO = $x * 2;
+$ php const-variavel.php
+
+Fatal error: Constant expression contains invalid operations in /home/ana/site/const-variavel.php on line 3
+Stack trace:
+#0 {main}
+$ cat const-no-if.php
+&lt;?php
+if (true) {
+    const A = 1;
+}
+$ php const-no-if.php
+
+Parse error: syntax error, unexpected token "const" in /home/ana/site/const-no-if.php on line 3</pre>
+
+<p><em>Constant expression contains invalid operations</em> = "a expressão constante contém operações inválidas": o <code>const</code> não pode usar <code>$x</code>. <em>Unexpected token "const"</em>: o <code>const</code> não é aceito dentro do <code>if</code>. Nos dois casos, a saída é o <code>define</code>.</p>
+
+<div class="tryphp" data-goal="out:Em até 12x sem juros,semerro,src:(const\s+LIMITE_PARCELAS|define\(\s*[&quot;']LIMITE_PARCELAS)">
+<p class="try-task"><strong>Missão:</strong> o número 12 está "solto" no meio do texto. Crie uma constante <code>LIMITE_PARCELAS</code> com o valor <code>12</code> (com <code>const</code> ou <code>define</code>) e use-a no <code>echo</code> para mostrar <code>Em até 12x sem juros</code>. Dica: constantes não funcionam dentro das aspas; use o ponto para juntar.</p>
+<pre class="script">&lt;?php
+echo "Em até 12x sem juros\n";
+</pre>
+<pre class="solucao">&lt;?php
+const LIMITE_PARCELAS = 12;
+echo "Em até " . LIMITE_PARCELAS . "x sem juros\n";
+</pre>
+</div>
+
+<div class="warning">
+<strong>Constante não funciona dentro de aspas</strong>
+<p>A interpolação das aspas duplas só reconhece variáveis (com <code>$</code>). Uma constante dentro do texto é só texto:</p>
+<pre class="term" data-cwd="~/site">$ php aspas.php              « echo "Loja: NOME_LOJA\n";  e  echo "Loja: " . NOME_LOJA . "\n";
+Loja: NOME_LOJA
+Loja: Lojinha da Ana</pre>
+<p>Junte com o ponto (aula <a href="operadores-string.html">Operadores de String</a>) ou use <code>printf</code> (aula <a href="sprintf.html">printf e sprintf</a>).</p>
+</div>
+
+<hr>
+
+<h2>3. Tentar mudar uma constante</h2>
+<p>O que acontece se alguém tentar trocar o valor? Depende de como tentar.</p>
+
+<h3>Atribuir com <code>=</code>: o PHP nem aceita o arquivo</h3>
+
+<pre class="term" data-cwd="~/site">$ cat mudar.php
+&lt;?php
+const TAXA = 5;
+TAXA = 10;
+$ php mudar.php
+
+Parse error: syntax error, unexpected token "=" in /home/ana/site/mudar.php on line 3</pre>
+
+<p>Só variáveis podem receber valor com <code>=</code>. Para o PHP, <code>TAXA = 10</code> é uma frase sem sentido.</p>
+
+<h3>Definir de novo: um aviso (e erro no futuro)</h3>
+
+<pre class="file" data-file="redefinir.php">&lt;?php
+define("TAXA", 5);
+define("TAXA", 10);
+echo TAXA, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php redefinir.php
+
+Warning: Constant TAXA already defined, this will be an error in PHP 9 in /home/ana/site/redefinir.php on line 3
+5                        « a segunda definição foi ignorada</pre>
+
+<p><em>Constant TAXA already defined, this will be an error in PHP 9</em> = "a constante TAXA já foi definida; isto será um erro no PHP 9". O valor continua <code>5</code>. Com <code>const TAXA = 10;</code> repetido, a mensagem é a mesma. Se você precisa definir "só se ainda não existir" (comum em arquivos de configuração), pergunte antes: <code>if (!defined("TAXA")) { define("TAXA", 5); }</code>.</p>
+
+<hr>
+
+<h2>4. Constantes mágicas: <code>__LINE__</code>, <code>__FILE__</code>, <code>__DIR__</code></h2>
+<p>O PHP tem algumas constantes especiais, escritas com <strong>dois sublinhados</strong> antes e depois do nome. São chamadas de "mágicas" porque o valor <strong>muda conforme o lugar</strong> onde aparecem no código:</p>
+
+<pre class="file" data-file="magicas.php">&lt;?php
+echo __LINE__, "\n";
+echo __FILE__, "\n";
+echo __DIR__, "\n";
+echo "Esta é a linha ", __LINE__, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php magicas.php
+2                        « o número da linha onde o __LINE__ está
+/home/ana/site/magicas.php
+/home/ana/site
+Esta é a linha 5</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Constante</th><th>Vale</th><th>Uso típico</th></tr>
+<tr><td><code>__LINE__</code></td><td>O número da linha atual</td><td>Mensagens de depuração ("cheguei na linha 42")</td></tr>
+<tr><td><code>__FILE__</code></td><td>O caminho completo do arquivo atual</td><td>Registros de erro</td></tr>
+<tr><td><code>__DIR__</code></td><td>A pasta do arquivo atual</td><td>Incluir outros arquivos com segurança: <code>require __DIR__ . "/config.php";</code> (aula <a href="include-require.html">include e require</a>)</td></tr>
+<tr><td><code>__FUNCTION__</code></td><td>O nome da função onde está</td><td>Aula <a href="funcoes.html">Funções</a></td></tr>
+<tr><td><code>__CLASS__</code>, <code>__METHOD__</code></td><td>O nome da classe / do método</td><td>Aulas de <a href="classes-objetos.html">orientação a objetos</a></td></tr>
+<tr><td><code>__NAMESPACE__</code></td><td>O namespace atual</td><td>Aula <a href="namespaces.html">Namespaces</a></td></tr>
+</table>
+</div>
+
+<p>O <code>__DIR__</code> é o mais importante na prática: com ele, um arquivo encontra os vizinhos não importa de qual pasta o programa foi chamado. No editor do guia, os caminhos mostrados são os do sistema de arquivos do navegador, diferentes dos da Ana.</p>
+
+<hr>
+
+<h2>5. Constantes que o PHP já traz</h2>
+<p>O PHP vem com centenas de constantes prontas. Algumas que você vai ver bastante:</p>
+
+<pre class="file" data-file="nativas.php">&lt;?php
+echo PHP_VERSION, "\n";
+echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION, "\n";
+echo PHP_OS_FAMILY, "\n";
+echo PHP_INT_MAX, "\n";
+echo M_PI, "\n";
+var_dump(M_PI);
+echo "a", PHP_EOL, "b", PHP_EOL;
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php nativas.php
+8.5.8                    « a versão do PHP que está rodando
+8.5
+Linux                    « o sistema operacional
+9223372036854775807
+3.1415926535898          « o echo mostra 14 algarismos
+float(3.141592653589793)
+a
+b                        « PHP_EOL é a quebra de linha</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Constante</th><th>Vale</th><th>Para quê</th></tr>
+<tr><td><code>PHP_VERSION</code></td><td><code>"8.5.8"</code> (no laboratório)</td><td>Saber qual PHP está rodando (veja <a href="versoes.html">Versões do PHP</a>). No editor do guia aparece a versão do PHP do navegador.</td></tr>
+<tr><td><code>PHP_MAJOR_VERSION</code>, <code>PHP_MINOR_VERSION</code></td><td><code>8</code>, <code>5</code></td><td>Comparar versões</td></tr>
+<tr><td><code>PHP_EOL</code></td><td>A quebra de linha do sistema (<code>"\n"</code> no Linux e no macOS, <code>"\r\n"</code> no Windows)</td><td>Escrever arquivos de texto e saídas de terminal</td></tr>
+<tr><td><code>PHP_OS_FAMILY</code></td><td><code>"Linux"</code>, <code>"Windows"</code>, <code>"Darwin"</code> (macOS)</td><td>Saber o sistema</td></tr>
+<tr><td><code>PHP_INT_MAX</code>, <code>PHP_INT_MIN</code>, <code>PHP_FLOAT_EPSILON</code></td><td>Limites dos números</td><td>Aula <a href="numeros.html">int e float</a></td></tr>
+<tr><td><code>M_PI</code></td><td>π = 3,14159…</td><td>Geometria (área do círculo: <code>M_PI * $r ** 2</code>)</td></tr>
+<tr><td><code>E_ALL</code>, <code>E_WARNING</code>…</td><td>Números que representam tipos de erro</td><td>Aula <a href="tipos-erro.html">Tipos de Erro</a></td></tr>
+<tr><td><code>JSON_PRETTY_PRINT</code>, <code>JSON_UNESCAPED_UNICODE</code></td><td>Opções do <code>json_encode</code></td><td>Aula <a href="var-dump.html">var_dump e print_r</a></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong><code>PHP_EOL</code> ou <code>"\n"</code>?</strong>
+<p><code>PHP_EOL</code> (<em>end of line</em>, "fim de linha") se adapta ao sistema. Para páginas web, tanto faz: o navegador ignora quebras de linha no HTML (use <code>&lt;br&gt;</code> ou <code>&lt;p&gt;</code>). Para programas de terminal e arquivos, muita gente prefere <code>PHP_EOL</code>. Neste guia usamos <code>"\n"</code> nos exemplos de terminal porque é mais curto e cabe dentro das aspas duplas.</p>
+</div>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e veja a versão e o sistema do PHP que roda no seu navegador. Depois calcule a área de um círculo de raio 3 com <code>M_PI * 3 ** 2</code>.</p>
+<pre class="script">&lt;?php
+echo "PHP ", PHP_VERSION, " em ", PHP_OS_FAMILY, PHP_EOL;
+echo "Linha atual: ", __LINE__, PHP_EOL;
+echo "Pi: ", M_PI, PHP_EOL;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught Error: Undefined constant "..."</code></strong>
+<pre class="term" data-cwd="~/site">$ cat sem-constante.php
+&lt;?php
+echo TAXA_ENTREGA;
+$ php sem-constante.php
+
+Fatal error: Uncaught Error: Undefined constant "TAXA_ENTREGA" in /home/ana/site/sem-constante.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/sem-constante.php on line 2</pre>
+<p><strong>O que significa:</strong> a constante não existe: nome digitado errado, diferença de maiúsculas (<code>const taxa</code> × <code>TAXA</code>), o <code>define</code> ainda não rodou, ou você esqueceu o <code>$</code> de uma variável (<code>echo nome;</code>). Diferente da variável indefinida (só Warning), a constante indefinida <strong>para o programa</strong>.</p>
+<p><strong>Como consertar:</strong> confira o nome letra por letra, e se é variável (precisa de <code>$</code>) ou constante.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Constant ... already defined, this will be an error in PHP 9</code></strong>
+<p><strong>O que significa:</strong> a mesma constante foi definida duas vezes. Acontece muito quando um arquivo de configuração é incluído duas vezes.</p>
+<p><strong>Como consertar:</strong> defina num lugar só; use <code>require_once</code> (aula <a href="include-require.html">include e require</a>) ou <code>if (!defined("NOME"))</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Constant expression contains invalid operations</code></strong>
+<p><strong>O que significa:</strong> o <code>const</code> recebeu algo que depende de variável ou de função.</p>
+<p><strong>Como consertar:</strong> use <code>define("NOME", $valor)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected token "="</code> ao mudar uma constante</strong>
+<p><strong>O que significa:</strong> constantes não aceitam <code>=</code> depois de criadas.</p>
+<p><strong>Como consertar:</strong> se o valor precisa mudar, ele não é constante: use uma variável.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>const NOME = valor;</code></td><td>Cria a constante (no topo do arquivo ou numa classe)</td></tr>
+<tr><td><code>define("NOME", valor);</code></td><td>Cria a constante (em qualquer lugar, aceita valor calculado)</td></tr>
+<tr><td><code>NOME</code></td><td>Usa a constante (sem <code>$</code>, sem aspas)</td></tr>
+<tr><td><code>defined("NOME")</code></td><td>A constante existe?</td></tr>
+<tr><td><code>constant("NOME")</code></td><td>Lê uma constante cujo nome está num texto</td></tr>
+<tr><td><code>__LINE__</code>, <code>__FILE__</code>, <code>__DIR__</code></td><td>Linha, arquivo e pasta atuais</td></tr>
+<tr><td><code>PHP_VERSION</code>, <code>PHP_EOL</code>, <code>PHP_INT_MAX</code>, <code>M_PI</code></td><td>Constantes nativas</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Criar com const</h3>
+<p>Complete para criar a constante <code>FRETE_GRATIS</code> com o valor 100:</p>
+<div class="ex-code"><input data-answer="const" aria-label="palavra"> FRETE_GRATIS = 100;</div>
+</div>
+
+<div class="exercise">
+<h3>2. A pasta do arquivo</h3>
+<p>Complete com a constante mágica que dá a pasta do arquivo atual:</p>
+<div class="ex-code">require <input data-answer="__DIR__" aria-label="constante"> . "/config.php";</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Qual é a forma certa de usar a constante <code>TAXA</code>?</p>
+<label><input type="radio" name="q3"> <code>echo $TAXA;</code></label>
+<label><input type="radio" name="q3"> <code>echo TAXA;</code></label>
+<label><input type="radio" name="q3"> <code>echo "TAXA";</code></label>
+<label><input type="radio" name="q3"> <code>echo define(TAXA);</code></label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Com <code>$estado = "SP";</code>, qual linha funciona?</p>
+<label><input type="radio" name="q4"> <code>const UF = $estado;</code></label>
+<label><input type="radio" name="q4"> <code>UF = $estado;</code></label>
+<label><input type="radio" name="q4"> <code>define("UF", $estado);</code></label>
+<label><input type="radio" name="q4"> <code>$UF = const $estado;</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. O que acontece ao rodar <code>define("A", 1); define("A", 2); echo A;</code> no PHP 8.5?</p>
+<label><input type="radio" name="q5"> Um Warning "already defined" e aparece <code>1</code></label>
+<label><input type="radio" name="q5"> Aparece <code>2</code>, sem aviso</label>
+<label><input type="radio" name="q5"> Parse error</label>
+<label><input type="radio" name="q5"> Aparece <code>12</code></label>
+</div>
+
+<h3>Missão final: as configurações da loja</h3>
+
+<div class="tryphp" data-goal="out:Lojinha da Ana,out:Total com entrega: 37.5,semerro,src:NOME_LOJA,src:TAXA_ENTREGA">
+<p class="try-task"><strong>Missão:</strong> crie duas constantes: <code>NOME_LOJA</code> com <code>"Lojinha da Ana"</code> e <code>TAXA_ENTREGA</code> com <code>7.5</code>. Mostre o nome da loja na primeira linha e, na segunda, <code>Total com entrega: 37.5</code>, somando <code>$subtotal</code> com a constante (não escreva 7.5 na conta).</p>
+<pre class="script">&lt;?php
+// crie as constantes aqui
+
+$subtotal = 30;
+// mostre o nome da loja e o total aqui
+</pre>
+<pre class="solucao">&lt;?php
+const NOME_LOJA = "Lojinha da Ana";
+const TAXA_ENTREGA = 7.5;
+
+$subtotal = 30;
+echo NOME_LOJA . "\n";
+echo "Total com entrega: " . ($subtotal + TAXA_ENTREGA) . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Constante = caixa lacrada: recebe um valor uma vez e nunca mais muda. Sem <code>$</code>, em MAIÚSCULAS por convenção.</li>
+  <li><code>const NOME = valor;</code> é a forma padrão (topo do arquivo, valores fixos). <code>define("NOME", valor)</code> aceita valores calculados e funciona dentro de <code>if</code>.</li>
+  <li>Constantes não funcionam dentro de aspas: junte com o ponto.</li>
+  <li>Mudar com <code>=</code> é Parse error; definir de novo dá Warning (erro no PHP 9); usar uma que não existe é <code>Fatal error: Undefined constant</code>.</li>
+  <li>Mágicas: <code>__LINE__</code>, <code>__FILE__</code>, <code>__DIR__</code>. Nativas: <code>PHP_VERSION</code>, <code>PHP_EOL</code>, <code>PHP_INT_MAX</code>, <code>M_PI</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
