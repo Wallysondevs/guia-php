@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP match — a expressão de escolha do PHP 8, com comparação estrita | Guia PHP</title>
+<meta name="description" content="A expressão match do PHP 8: devolve um valor, compara com ===, aceita vários valores por braço e default, lança UnhandledMatchError quando nada combina, match(true) para faixas de valores e a comparação com switch. Saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">match</span> <span class="versao">PHP 8.0+</span></h1>
+
+<p class="intro">O <code>match</code> chegou no PHP 8.0 para resolver os problemas do <a href="switch.html"><code>switch</code></a>: nada de <code>break</code> esquecido, nada de comparação frouxa, e o resultado é um <strong>valor</strong> que você guarda direto numa variável. Para escolher um valor a partir de outro, é a ferramenta mais moderna e segura do PHP.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do <code>match</code>: braços com <code>=&gt;</code>, vírgulas e <code>default</code>.</li>
+  <li>Por que ele é uma <strong>expressão</strong> (devolve valor) e o <code>switch</code> não.</li>
+  <li>A comparação <strong>estrita</strong> (<code>===</code>): adeus às surpresas com <code>"0"</code>, <code>null</code> e <code>"1e1"</code>.</li>
+  <li>Vários valores no mesmo braço.</li>
+  <li>O <code>UnhandledMatchError</code>: o erro que aparece quando nenhum braço combina.</li>
+  <li>O <code>match (true)</code> para faixas de valores, e a tabela <code>match</code> × <code>switch</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: uma tabela de consulta</h2>
+<p>Pense na tabela de frete pendurada na parede dos Correios: na coluna da esquerda, a região; na da direita, o preço. Você procura a sua linha e lê a resposta. O <code>match</code> ("combinar", "corresponder") é essa tabela escrita em PHP: cada linha tem um valor à esquerda e o resultado à direita, e o <code>match</code> devolve o resultado da linha que <strong>combinar exatamente</strong>.</p>
+
+<hr>
+
+<h2>A anatomia</h2>
+
+<pre class="file" data-file="dia.php">&lt;?php
+$dia = 3;
+$nome = match ($dia) {
+    1 =&gt; "Domingo",
+    2 =&gt; "Segunda",
+    3 =&gt; "Terça",
+    default =&gt; "Outro dia",
+};
+echo $nome, "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>$nome = match ($dia)</dt><dd>O valor examinado, entre parênteses. O <code>match</code> inteiro <strong>vale</strong> alguma coisa, e esse valor vai para <code>$nome</code>.</dd>
+  <dt>{ … }</dt><dd>Os braços (em inglês, <em>arms</em>), entre chaves.</dd>
+  <dt>1 =&gt; "Domingo",</dt><dd>Um <strong>braço</strong>: à esquerda da seta <code>=&gt;</code>, o valor a comparar; à direita, o resultado. Termina com <strong>vírgula</strong> (não ponto e vírgula).</dd>
+  <dt>default =&gt; "Outro dia",</dt><dd>O braço para "nenhum dos anteriores". Opcional, mas veja o que acontece sem ele.</dd>
+  <dt>};</dt><dd>O <code>;</code> depois da chave termina o comando de atribuição (<code>$nome = …;</code>). A vírgula do último braço é opcional, mas recomendada.</dd>
+</dl>
+
+<pre class="term">$ php dia.php
+Terça</pre>
+
+<p>Compare com o mesmo programa em <code>switch</code>: aquele tinha 13 linhas, quatro <code>break</code> e um <code>echo</code> repetido em cada caso. O <code>match</code> tem um braço por linha e nenhum <code>break</code>: ele <strong>nunca</strong> cai no braço de baixo. Encontrou, devolveu, acabou.</p>
+
+<p>A seta <code>=&gt;</code> é a mesma dos <a href="arrays-associativos.html">arrays associativos</a>, e a semelhança é proposital: um <code>match</code> é quase um array de "chave → resultado", só que com mais poderes.</p>
+
+<h3>Uma expressão: pode ir em qualquer lugar</h3>
+<p>Como o <a href="ternario.html">ternário</a>, o <code>match</code> é uma expressão. Ele pode ir direto num <code>echo</code>, num <code>return</code>, como argumento de função:</p>
+<pre class="file" data-file="direto.php">&lt;?php
+$dia = 7;
+echo match ($dia) {
+    1, 7 =&gt; "Fim de semana",
+    default =&gt; "Dia útil",
+}, "\n";
+</pre>
+<pre class="term">$ php direto.php
+Fim de semana</pre>
+
+<h3>Vários valores no mesmo braço</h3>
+<p>Na linha <code>1, 7 =&gt; "Fim de semana"</code>, os valores à esquerda estão separados por vírgula: "se for 1 <strong>ou</strong> 7". É o equivalente aos <code>case</code> empilhados do <code>switch</code>, numa linha só.</p>
+
+<div class="tryphp" data-goal="out:Frete: R$ 15\,00,src:match">
+<p class="try-task"><strong>Missão:</strong> a lojinha da Ana cobra frete por estado: <code>"SP"</code>, <code>"RJ"</code>, <code>"MG"</code> e <code>"ES"</code> pagam <code>"10,00"</code>; <code>"PE"</code>, <code>"PB"</code>, <code>"RN"</code> e <code>"CE"</code> pagam <code>"15,00"</code>; os outros estados, <code>"25,00"</code>. Complete o <code>match</code> para, com <code>$uf = "PB"</code>, mostrar <code>Frete: R$ 15,00</code>.</p>
+<pre class="script">&lt;?php
+$uf = "PB";
+$frete = match ($uf) {
+    "SP", "RJ", "MG", "ES" =&gt; "10,00",
+    default =&gt; "25,00",
+};
+echo "Frete: R$ $frete";
+</pre>
+<pre class="solucao">&lt;?php
+$uf = "PB";
+$frete = match ($uf) {
+    "SP", "RJ", "MG", "ES" =&gt; "10,00",
+    "PE", "PB", "RN", "CE" =&gt; "15,00",
+    default =&gt; "25,00",
+};
+echo "Frete: R$ $frete";
+</pre>
+</div>
+
+<hr>
+
+<h2>Comparação estrita: <code>===</code></h2>
+<p>O <code>match</code> compara com <code>===</code>: valor <strong>e tipo</strong> precisam ser iguais (veja <a href="operadores-comparacao.html">Comparação (== e ===)</a>). As surpresas da aula de <code>switch</code> desaparecem:</p>
+
+<pre class="file" data-file="estrito.php">&lt;?php
+$opcao = "1";
+echo match ($opcao) {
+    1 =&gt; "número 1",
+    "1" =&gt; "texto 1",
+}, "\n";
+$v = null;
+echo match ($v) {
+    0 =&gt; "zero",
+    null =&gt; "nulo",
+}, "\n";
+$codigo = "1e1";
+echo match ($codigo) {
+    "10" =&gt; "Código 10",
+    "1e1" =&gt; "Código 1e1",
+}, "\n";
+</pre>
+<pre class="term">$ php estrito.php
+texto 1          « "1" (string) não é 1 (int)
+nulo             « null não é 0
+Código 1e1       « "1e1" não é "10"</pre>
+
+<p>A contrapartida: dados de formulário chegam sempre como <strong>texto</strong>. Se <code>$_GET['dia']</code> vale <code>"3"</code>, o braço <code>3 =&gt;</code> não combina. Converta antes, de propósito: <code>match ((int) $_GET['dia'])</code>. Também não há meio-termo para maiúsculas: <code>match ("Ana")</code> não combina com <code>"ana" =&gt;</code>; use <code>mb_strtolower</code> antes se for o caso (veja <a href="mbstring.html">mbstring</a>).</p>
+
+<hr>
+
+<h2>Nenhum braço combinou: <code>UnhandledMatchError</code></h2>
+<p>O <code>switch</code> sem <code>default</code> simplesmente não faz nada quando nenhum caso combina. O <code>match</code> não aceita isso: como ele precisa <strong>devolver</strong> um valor, se nada combinar ele lança um erro.</p>
+
+<pre class="file" data-file="kiwi.php">&lt;?php
+$fruta = "kiwi";
+echo match ($fruta) {
+    "maçã", "pera" =&gt; "Fruta de árvore",
+    "uva", "morango" =&gt; "Fruta pequena",
+};
+</pre>
+<pre class="term">$ php kiwi.php
+
+Fatal error: Uncaught UnhandledMatchError: Unhandled match case 'kiwi' in /home/ana/php/kiwi.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/kiwi.php on line 3</pre>
+
+<dl class="anatomy">
+  <dt>UnhandledMatchError</dt><dd>O nome do erro: "erro de match não tratado".</dd>
+  <dt>Unhandled match case 'kiwi'</dt><dd>"Caso não tratado: <code>'kiwi'</code>". O PHP mostra o valor que não encontrou braço. Com números, aparece sem aspas: <code>Unhandled match case 5</code>.</dd>
+  <dt>:3 / on line 3</dt><dd>A linha onde o <code>match</code> começa.</dd>
+  <dt>Uncaught</dt><dd>"Não capturado": dá para "capturar" esse erro com <code>try</code>/<code>catch</code> (veja <a href="excecoes.html">Exceções</a>). Sem isso, o programa para.</dd>
+</dl>
+
+<p>Isso é uma <strong>vantagem</strong>, não um defeito. Se um valor inesperado aparece (um estado novo, um código digitado errado), o <code>switch</code> esconde o problema; o <code>match</code> avisa na hora, apontando a linha e o valor. Quando "nenhum dos anteriores" é uma situação normal, coloque um <code>default</code>.</p>
+
+<hr>
+
+<h2><code>match (true)</code>: faixas de valores</h2>
+<p>Para faixas (nota maior que 9, maior que 7…), examine <code>true</code> e coloque condições à esquerda dos braços. O primeiro braço cuja condição for <code>true</code> (exatamente <code>true</code>, por causa do <code>===</code>) é escolhido:</p>
+
+<pre class="file" data-file="conceito.php">&lt;?php
+$nota = 8.5;
+$conceito = match (true) {
+    $nota &gt;= 9 =&gt; "A",
+    $nota &gt;= 7 =&gt; "B",
+    $nota &gt;= 5 =&gt; "C",
+    default =&gt; "D",
+};
+echo "Conceito $conceito\n";
+</pre>
+<pre class="term">$ php conceito.php
+Conceito B</pre>
+
+<p>Os braços são testados <strong>de cima para baixo</strong>, como no <code>elseif</code>, então a ordem importa: comece pela faixa mais alta. É a forma mais enxuta de classificar valores em faixas, e substitui bem o <code>switch (true)</code> e as cadeias de <code>elseif</code> que só escolhem um valor.</p>
+
+<hr>
+
+<h2>O lado direito pode ser qualquer expressão</h2>
+<p>À direita da seta pode ir qualquer coisa que produza um valor: uma conta, uma concatenação, a chamada de uma função.</p>
+<pre class="file" data-file="acoes.php">&lt;?php
+$acao = "sair";
+match ($acao) {
+    "entrar" =&gt; print("Bem-vinda!\n"),
+    "sair" =&gt; print("Até logo!\n"),
+};
+</pre>
+<pre class="term">$ php acoes.php
+Até logo!</pre>
+<p>Aqui o <code>match</code> foi usado só pelo efeito (mostrar algo), e o valor devolvido foi ignorado. Funciona com <code>print</code>, que é uma expressão, mas não com <code>echo</code>, que é um comando (veja os erros abaixo). Se cada caso precisa executar várias linhas, use <code>if</code> ou <code>switch</code>: o lado direito do <code>match</code> é <strong>uma</strong> expressão só.</p>
+
+<hr>
+
+<h2><code>match</code> × <code>switch</code></h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>match</code> <span class="versao">8.0+</span></th><th><code>switch</code></th></tr>
+<tr><td>Tipo</td><td>Expressão: devolve um valor</td><td>Comando: executa linhas</td></tr>
+<tr><td>Comparação</td><td><code>===</code> (estrita)</td><td><code>==</code> (frouxa)</td></tr>
+<tr><td><code>break</code></td><td>Não existe; nunca "cai" no próximo</td><td>Obrigatório para não cair (fall-through)</td></tr>
+<tr><td>Vários valores</td><td><code>1, 7 =&gt; …</code></td><td><code>case 1: case 7:</code></td></tr>
+<tr><td>Nada combinou</td><td><code>UnhandledMatchError</code> (se não houver <code>default</code>)</td><td>Não faz nada, em silêncio</td></tr>
+<tr><td>Cada caso</td><td>Uma expressão</td><td>Quantas linhas quiser</td></tr>
+<tr><td>Separador</td><td>Vírgula depois de cada braço</td><td><code>:</code> depois do <code>case</code>, <code>;</code> nos comandos</td></tr>
+<tr><td>PHP antigo</td><td>Só do 8.0 em diante</td><td>Todas as versões</td></tr>
+</table>
+</div>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Escolher <strong>um valor</strong> a partir de outro</td><td><code>match</code></td></tr>
+<tr><td>Classificar em faixas, escolhendo um valor</td><td><code>match (true)</code></td></tr>
+<tr><td>Cada caso executa <strong>várias linhas</strong> diferentes</td><td><code>if</code>/<code>elseif</code> ou <code>switch</code></td></tr>
+<tr><td>Dois caminhos só</td><td><code>if</code>/<code>else</code> ou ternário</td></tr>
+<tr><td>Código que precisa rodar em PHP 7</td><td><code>switch</code> ou <code>if</code></td></tr>
+</table>
+</div>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque <code>$nota</code> por vários valores (10, 7, 4.9) e veja o conceito. Depois apague o braço <code>default</code> e rode com nota 2 para ver o <code>UnhandledMatchError</code>.</p>
+<pre class="script">&lt;?php
+$nota = 6.5;
+$conceito = match (true) {
+    $nota &gt;= 9 =&gt; "A",
+    $nota &gt;= 7 =&gt; "B",
+    $nota &gt;= 5 =&gt; "C",
+    default =&gt; "D",
+};
+echo "Nota $nota: conceito $conceito\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>UnhandledMatchError: Unhandled match case</strong>
+<pre class="file" data-file="cinco.php">&lt;?php
+$x = 5;
+echo match ($x) {
+    1 =&gt; "um",
+    2 =&gt; "dois",
+};
+</pre>
+<pre class="term">$ php cinco.php
+
+Fatal error: Uncaught UnhandledMatchError: Unhandled match case 5 in /home/ana/php/cinco.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/php/cinco.php on line 3</pre>
+<p><strong>O que significa:</strong> nenhum braço combinou com o valor <code>5</code> e não há <code>default</code>.</p>
+<p><strong>Como consertar:</strong> se o valor é válido, acrescente o braço que falta. Se "qualquer outro" é normal, acrescente <code>default =&gt; …</code>. Se você esperava que combinasse, confira o <strong>tipo</strong>: <code>"5"</code> (texto) não combina com <code>5 =&gt;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected integer "2", expecting "}" — faltou a vírgula</strong>
+<pre class="file" data-file="sem-virgula.php">&lt;?php
+$x = 5;
+echo match ($x) {
+    1 =&gt; "um"
+    2 =&gt; "dois",
+};
+</pre>
+<pre class="term">$ php sem-virgula.php
+
+Parse error: syntax error, unexpected integer "2", expecting "}" in /home/ana/php/sem-virgula.php on line 5</pre>
+<p><strong>O que significa:</strong> sem a vírgula no fim da linha 4, o PHP achou que o <code>match</code> tinha acabado e esperava o <code>}</code>; encontrou o <code>2</code> da linha 5.</p>
+<p><strong>Como consertar:</strong> cada braço termina com vírgula. Quem vem do <code>switch</code> às vezes coloca <code>;</code>, que também dá Parse error.</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected token "echo" — dois casos diferentes</strong>
+<pre class="file" data-file="com-echo.php">&lt;?php
+$x = 1;
+match ($x) {
+    1 =&gt; echo "um",
+};
+</pre>
+<pre class="term">$ php com-echo.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/php/com-echo.php on line 4</pre>
+<p><strong>O que significa:</strong> à direita da seta só cabe uma expressão; <code>echo</code> é um comando. Coloque o <code>echo</code> por fora: <code>echo match ($x) { 1 =&gt; "um", };</code>.</p>
+<p>O mesmo erro aparece quando falta o <code>;</code> depois do <code>}</code> do <code>match</code> e a linha seguinte começa com <code>echo</code>:</p>
+<pre class="file" data-file="sem-ponto.php">&lt;?php
+$x = 1;
+$r = match ($x) {
+    1 =&gt; "um",
+}
+echo $r;
+</pre>
+<pre class="term">$ php sem-ponto.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/php/sem-ponto.php on line 6</pre>
+<p><strong>Como consertar:</strong> <code>};</code>. O <code>match</code> é uma expressão dentro de um comando, e o comando precisa terminar com <code>;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Match expressions may only contain one default arm</strong>
+<pre class="file" data-file="dois-default.php">&lt;?php
+$x = 1;
+$r = match ($x) {
+    1 =&gt; "um",
+    default =&gt; "outro",
+    default =&gt; "de novo",
+};
+</pre>
+<pre class="term">$ php dois-default.php
+
+Fatal error: Match expressions may only contain one default arm in /home/ana/php/dois-default.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>Como consertar:</strong> um <code>default</code> só.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th></tr>
+<tr><td>Básico</td><td><code>$r = match ($x) { 1 =&gt; "um", 2 =&gt; "dois", };</code></td></tr>
+<tr><td>Vários valores</td><td><code>1, 7 =&gt; "fim de semana",</code></td></tr>
+<tr><td>Padrão</td><td><code>default =&gt; "outro",</code></td></tr>
+<tr><td>Faixas</td><td><code>match (true) { $n &gt;= 7 =&gt; "B", … }</code></td></tr>
+<tr><td>Direto no <code>echo</code></td><td><code>echo match ($x) { … };</code></td></tr>
+<tr><td>Comparação</td><td><code>===</code></td></tr>
+<tr><td>Nada combinou, sem <code>default</code></td><td><code>UnhandledMatchError</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A seta</h3>
+<p>Complete o braço com o símbolo que separa valor e resultado:</p>
+<div class="ex-code">"pix" <input data-answer="=&gt;" aria-label="símbolo"> "Pagamento instantâneo",</div>
+</div>
+
+<div class="exercise">
+<h3>2. Dois valores, um braço</h3>
+<p>Complete para "S" e "s" darem o mesmo resultado:</p>
+<div class="ex-code">$resposta = match ($tecla) { <input data-answer="&quot;S&quot;, &quot;s&quot;|'S', 's'|&quot;s&quot;, &quot;S&quot;|'s', 'S'|&quot;S&quot;,&quot;s&quot;" aria-label="valores"> =&gt; "sim", default =&gt; "não" };</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>$x = "2"</code>, o que <code>match ($x) { 2 =&gt; "dois", default =&gt; "outro" }</code> devolve?</p>
+<label><input type="radio" name="q3"> <code>"dois"</code></label>
+<label><input type="radio" name="q3"> <code>"outro"</code></label>
+<label><input type="radio" name="q3"> <code>UnhandledMatchError</code></label>
+<label><input type="radio" name="q3"> Parse error</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que acontece quando nenhum braço combina e não há <code>default</code>?</p>
+<label><input type="radio" name="q4"> O <code>match</code> devolve <code>null</code>.</label>
+<label><input type="radio" name="q4"> Roda o último braço.</label>
+<label><input type="radio" name="q4"> Erro: <code>UnhandledMatchError</code>.</label>
+<label><input type="radio" name="q4"> Nada, em silêncio.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Qual destas afirmações é verdadeira?</p>
+<label><input type="radio" name="q5"> O <code>match</code> não precisa de <code>break</code>.</label>
+<label><input type="radio" name="q5"> O <code>match</code> compara com <code>==</code>.</label>
+<label><input type="radio" name="q5"> Cada braço do <code>match</code> pode ter várias linhas de comandos.</label>
+<label><input type="radio" name="q5"> O <code>match</code> existe desde o PHP 5.</label>
+</div>
+
+<div class="tryphp" data-goal="out:Quantidade: poucas unidades,src:match\s*\(\s*true">
+<p class="try-task"><strong>Missão final:</strong> reescreva a classificação de estoque com <code>match (true)</code>: 0 → <code>esgotado</code>; de 1 a 4 → <code>poucas unidades</code>; 5 ou mais → <code>disponível</code>. Com <code>$estoque = 3</code>, a saída deve ser <code>Quantidade: poucas unidades</code>.</p>
+<pre class="script">&lt;?php
+$estoque = 3;
+if ($estoque === 0) {
+    $situacao = "esgotado";
+} elseif ($estoque &lt; 5) {
+    $situacao = "poucas unidades";
+} else {
+    $situacao = "disponível";
+}
+echo "Quantidade: $situacao";
+</pre>
+<pre class="solucao">&lt;?php
+$estoque = 3;
+$situacao = match (true) {
+    $estoque === 0 =&gt; "esgotado",
+    $estoque &lt; 5 =&gt; "poucas unidades",
+    default =&gt; "disponível",
+};
+echo "Quantidade: $situacao";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>match</code> (PHP 8.0+) é uma <strong>expressão</strong>: <code>$r = match ($x) { valor =&gt; resultado, … };</code>.</li>
+  <li>Compara com <code>===</code>: tipo e valor. Converta dados de formulário antes.</li>
+  <li>Não tem <code>break</code> nem fall-through: o primeiro braço que combinar devolve o valor.</li>
+  <li>Vários valores por braço: <code>1, 7 =&gt; …</code>. Padrão: <code>default =&gt; …</code>.</li>
+  <li>Nada combinou e não há <code>default</code>? <code>UnhandledMatchError</code>, com o valor na mensagem.</li>
+  <li><code>match (true)</code> classifica faixas de valores, de cima para baixo.</li>
+  <li>Para escolher valores, prefira <code>match</code>; para executar blocos de várias linhas, <code>if</code> ou <code>switch</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
