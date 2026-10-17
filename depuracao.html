@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Depurar — var_dump, error_log, backtrace e Xdebug | Guia PHP</title>
+<meta name="description" content="Como encontrar bugs em PHP: inspecionar valores com var_dump, print_r e var_export, registrar com error_log, ver o caminho das chamadas com debug_print_backtrace, parar o programa com exit, depurar passo a passo com o Xdebug e escrever boas mensagens de erro.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Depurar</span></h1>
+
+<p class="intro">Os piores bugs não mostram mensagem nenhuma: o programa roda até o fim e o resultado está errado. O total do carrinho dá R$ 90 quando deveria dar R$ 95. Para achar o problema, você precisa <strong>olhar dentro</strong> do programa enquanto ele roda: quanto vale esta variável aqui? Por qual caminho o programa chegou nesta linha? Isso se chama <strong>depurar</strong> (em inglês, <em>debug</em>, "tirar os insetos"). Nesta aula você vai aprender as ferramentas, das mais simples às mais poderosas, e um método para usá-las.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Um método para caçar bugs, em vez de mudar coisas ao acaso.</li>
+  <li>Inspecionar valores com <code>var_dump</code>, <code>print_r</code> e <code>var_export</code>, e quando usar cada um.</li>
+  <li>Parar o programa num ponto com <code>exit</code>/<code>die</code>.</li>
+  <li>Registrar sem atrapalhar a página, com <code>error_log</code>.</li>
+  <li>Ver o caminho das chamadas com <code>debug_print_backtrace</code>.</li>
+  <li>Depurar passo a passo com o <strong>Xdebug</strong> e um editor.</li>
+  <li>Escrever mensagens de erro que ajudam quem vai depurar depois.</li>
+</ul>
+</div>
+
+<p>Você já conhece <code>var_dump</code> e <code>print_r</code> da aula <a href="var-dump.html">var_dump e print_r</a>; aqui eles viram ferramentas de investigação. E já sabe ler as mensagens do PHP (<a href="tipos-erro.html">Tipos de Erro</a>).</p>
+
+<hr>
+
+<h2>A ideia: o detetive</h2>
+<p>Depurar é trabalho de detetive. O detetive não sai prendendo suspeitos ao acaso: ele junta pistas. No programa, as pistas são os <strong>valores das variáveis</strong> em cada ponto. O método:</p>
+
+<ol class="passo">
+  <li><strong>Reproduza</strong> o problema: descubra a entrada exata que causa o resultado errado.</li>
+  <li><strong>Diga o que esperava</strong>: "o total deveria ser 95".</li>
+  <li><strong>Olhe os valores</strong> no meio do caminho (com <code>var_dump</code>), do começo para o fim, até achar o primeiro ponto em que o valor real é diferente do esperado.</li>
+  <li><strong>Conserte</strong> a causa naquele ponto, e não o sintoma no final.</li>
+  <li><strong>Confirme</strong> rodando de novo, e <strong>remova</strong> os <code>var_dump</code> de investigação.</li>
+</ol>
+
+<hr>
+
+<h2>Um bug de verdade</h2>
+<p>O carrinho da lojinha tem 2 bolos de R$ 35,00 e 10 brigadeiros de R$ 2,50. O total deveria ser 70 + 25 = <strong>R$ 95,00</strong>:</p>
+
+<pre class="file" data-file="bug.php">&lt;?php
+$carrinho = [
+    ['produto' =&gt; 'Bolo de cenoura', 'preco' =&gt; '35,00', 'qtd' =&gt; 2],
+    ['produto' =&gt; 'Brigadeiro', 'preco' =&gt; '2,50', 'qtd' =&gt; 10],
+];
+$total = 0;
+foreach ($carrinho as $item) {
+    $total += $item['preco'] * $item['qtd'];
+}
+echo "Total: R$ " . number_format($total, 2, ',', '.') . "\n";
+</pre>
+
+<pre class="term">$ cd dep
+$ php bug.php
+
+Warning: A non-numeric value encountered in /home/ana/dep/bug.php on line 8
+
+Warning: A non-numeric value encountered in /home/ana/dep/bug.php on line 8
+Total: R$ 90,00                « errado: esperava 95,00</pre>
+
+<p>Há uma pista (o <code>Warning</code> da linha 8: "<em>valor não numérico encontrado</em>"), mas ela não diz <strong>qual</strong> valor. Vamos olhar com <code>var_dump</code>, colocado logo antes da conta suspeita:</p>
+
+<pre class="file" data-file="bug2.php">foreach ($carrinho as $item) {
+    var_dump($item['preco'], $item['preco'] * $item['qtd']);
+    $total += $item['preco'] * $item['qtd'];
+}
+</pre>
+
+<pre class="term">$ php bug2.php
+
+Warning: A non-numeric value encountered in /home/ana/dep/bug2.php on line 8
+string(5) "35,00"             « o preço é TEXTO, com vírgula
+int(70)                        « 35 × 2 = 70: o primeiro deu certo por sorte
+
+Warning: A non-numeric value encountered in /home/ana/dep/bug2.php on line 9
+
+Warning: A non-numeric value encountered in /home/ana/dep/bug2.php on line 8
+string(4) "2,50"
+int(20)                        « 2 × 10 = 20: o ",50" foi jogado fora!
+
+Warning: A non-numeric value encountered in /home/ana/dep/bug2.php on line 9
+Total: R$ 90,00</pre>
+
+<p>Achamos: o preço é a string <code>"2,50"</code>, e o PHP, ao fazer a conta, lê só o começo (<code>2</code>) e ignora o resto. É o mesmo problema da aula de <a href="csv.html">CSV</a>: vírgula decimal. O conserto vai na <strong>causa</strong> (converter o preço), e os <code>var_dump</code> saem:</p>
+
+<pre class="file" data-file="bug3.php">foreach ($carrinho as $item) {
+    $preco = (float) str_replace(',', '.', $item['preco']);
+    $total += $preco * $item['qtd'];
+}
+</pre>
+
+<pre class="term">$ php bug3.php
+Total: R$ 95,00</pre>
+
+<div class="tryphp" data-goal="out:Total: R$ 95\,00,semerro">
+<p class="try-task"><strong>Missão:</strong> refaça a investigação. Rode, coloque um <code>var_dump($item['preco'])</code> dentro do laço para ver o problema com seus próprios olhos, conserte a conversão do preço e apague o <code>var_dump</code>. O resultado deve ser <code>Total: R$ 95,00</code>, sem avisos.</p>
+<pre class="script">&lt;?php
+$carrinho = [
+    ['produto' =&gt; 'Bolo de cenoura', 'preco' =&gt; '35,00', 'qtd' =&gt; 2],
+    ['produto' =&gt; 'Brigadeiro', 'preco' =&gt; '2,50', 'qtd' =&gt; 10],
+];
+$total = 0;
+foreach ($carrinho as $item) {
+    $total += $item['preco'] * $item['qtd'];
+}
+echo "Total: R$ " . number_format($total, 2, ',', '.') . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$carrinho = [
+    ['produto' =&gt; 'Bolo de cenoura', 'preco' =&gt; '35,00', 'qtd' =&gt; 2],
+    ['produto' =&gt; 'Brigadeiro', 'preco' =&gt; '2,50', 'qtd' =&gt; 10],
+];
+$total = 0;
+foreach ($carrinho as $item) {
+    $preco = (float) str_replace(',', '.', $item['preco']);
+    $total += $preco * $item['qtd'];
+}
+echo "Total: R$ " . number_format($total, 2, ',', '.') . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>As lupas: <code>var_dump</code>, <code>print_r</code>, <code>var_export</code></h2>
+<p>O <code>echo</code> não serve para investigar: ele não mostra arrays, e esconde tipos. Veja o mesmo pedido em cada ferramenta:</p>
+
+<pre class="file" data-file="comparar.php">&lt;?php
+$pedido = ['cliente' =&gt; 'Bia', 'itens' =&gt; 2, 'total' =&gt; 82.0, 'pago' =&gt; false, 'cupom' =&gt; null];
+echo $pedido, "\n";
+echo "--- print_r:\n";
+print_r($pedido);
+echo "--- var_dump:\n";
+var_dump($pedido);
+echo "--- var_export:\n";
+var_export($pedido);
+echo "\n";
+</pre>
+
+<pre class="term">$ php comparar.php
+
+Warning: Array to string conversion in /home/ana/dep/comparar.php on line 3
+Array                       « o echo só diz "Array"
+--- print_r:
+Array
+(
+    [cliente] =&gt; Bia
+    [itens] =&gt; 2
+    [total] =&gt; 82           « 82 ou 82.0? não dá para saber
+    [pago] =&gt;               « false aparece vazio
+    [cupom] =&gt;              « null também: impossível distinguir
+)
+--- var_dump:
+array(5) {
+  ["cliente"]=&gt;
+  string(3) "Bia"           « tipo e tamanho
+  ["itens"]=&gt;
+  int(2)
+  ["total"]=&gt;
+  float(82)
+  ["pago"]=&gt;
+  bool(false)               « tudo explícito
+  ["cupom"]=&gt;
+  NULL
+}
+--- var_export:
+array (
+  'cliente' =&gt; 'Bia',
+  'itens' =&gt; 2,
+  'total' =&gt; 82.0,
+  'pago' =&gt; false,
+  'cupom' =&gt; NULL,
+)                           « é código PHP válido: dá para copiar e colar</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>Mostra o tipo?</th><th>Bom para</th></tr>
+<tr><td><code>var_dump($x)</code></td><td>Sim, sempre</td><td><strong>Investigar bugs</strong>: diferencia <code>"3"</code> de <code>3</code>, <code>false</code> de <code>null</code> de <code>""</code>. Aceita vários valores: <code>var_dump($a, $b)</code>.</td></tr>
+<tr><td><code>print_r($x)</code></td><td>Não</td><td>Olhar rapidamente a <strong>estrutura</strong> de um array grande. <code>print_r($x, true)</code> devolve o texto em vez de mostrar.</td></tr>
+<tr><td><code>var_export($x)</code></td><td>Sim (como código)</td><td>Copiar um valor para um teste ou arquivo de configuração. Também aceita <code>true</code> para devolver o texto.</td></tr>
+<tr><td><code>json_encode($x)</code></td><td>Mais ou menos</td><td>Uma linha só, ótimo para registros (<code>error_log</code>).</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Comparações que enganam</strong>
+<p>Muitos bugs são de <strong>tipo</strong>. Um valor que veio de um formulário é sempre texto:</p>
+<pre class="term">$ php tipos.php      « $qtd = $_GET['qtd'] ?? '3';  var_dump($qtd === 3);  var_dump($qtd);
+bool(false)          « por que não é 3?
+string(1) "3"        « porque é o texto "3", e === compara o tipo também</pre>
+<p>Na dúvida, <code>var_dump</code> as duas pontas da comparação (veja <a href="operadores-comparacao.html">Comparação</a>).</p>
+</div>
+
+<h3>Numa página web: use <code>&lt;pre&gt;</code></h3>
+<p>No navegador, as quebras de linha do <code>var_dump</code> somem (o HTML junta os espaços), e o resultado vira uma linha só, ilegível. Envolva a saída em <code>&lt;pre&gt;</code> ("pré-formatado"), que mantém as quebras:</p>
+
+<div class="tryphp" data-modo="web" data-goal="outre:&lt;pre&gt;\s*array\(2\),html:Obrigado pela compra">
+<p class="try-task"><strong>Missão:</strong> veja na aba <strong>Resultado</strong> como o <code>var_dump</code> fica embolado. Coloque um <code>echo '&lt;pre&gt;';</code> antes dele e um <code>echo '&lt;/pre&gt;';</code> depois, e compare.</p>
+<pre class="script">&lt;?php
+$pedido = ['cliente' =&gt; 'Bia', 'itens' =&gt; ['bolo', 'brigadeiro']];
+var_dump($pedido);
+?&gt;
+&lt;p&gt;Obrigado pela compra!&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$pedido = ['cliente' =&gt; 'Bia', 'itens' =&gt; ['bolo', 'brigadeiro']];
+echo '&lt;pre&gt;';
+var_dump($pedido);
+echo '&lt;/pre&gt;';
+?&gt;
+&lt;p&gt;Obrigado pela compra!&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Parar ali: <code>exit</code> e <code>die</code></h2>
+<p>Às vezes você quer ver um valor e <strong>parar</strong>, sem que o resto do programa rode (e encha a tela, ou grave algo no arquivo). <code>exit</code> ("sair") termina o programa na hora. <code>die</code> ("morrer") é exatamente a mesma coisa, com outro nome.</p>
+
+<pre class="file" data-file="exit.php">&lt;?php
+$config = ['loja' =&gt; 'Lojinha da Ana', 'frete' =&gt; 12.5];
+var_dump($config);
+exit;
+echo "Isto não aparece\n";
+</pre>
+
+<pre class="term">$ php exit.php; echo "código: $?"
+array(2) {
+  ["loja"]=&gt;
+  string(14) "Lojinha da Ana"
+  ["frete"]=&gt;
+  float(12.5)
+}
+código: 0</pre>
+
+<p>O famoso "<code>var_dump($x); die;</code>" é a técnica de depuração mais usada do mundo PHP. Ela também aceita um texto (mostrado antes de sair) ou um número (o código de saída, para scripts de terminal):</p>
+
+<pre class="term">$ php die.php; echo "código: $?"      « exit("Erro: $arquivo não encontrado\n");
+Erro: precos.csv não encontrado
+código: 0                              « com texto, o código é 0
+$ php exitcode.php; echo "código: $?"  « echo "Algo deu errado\n"; exit(3);
+Algo deu errado
+código: 3                              « com número, o programa sai com esse código</pre>
+
+<div class="warning">
+<strong>Não esqueça um <code>die</code> no código</strong>
+<p>Um <code>var_dump</code> ou <code>exit</code> esquecido num site no ar mostra dados internos a todos os visitantes, ou interrompe a página no meio. Antes de publicar, procure por eles: <code>grep -rn "var_dump\|print_r\|die;" .</code> (veja o <code>grep</code> no Guia Bash). Para falhas de verdade, use <a href="excecoes.html">exceções</a>, não <code>die</code>.</p>
+</div>
+
+<hr>
+
+<h2>Registrar sem atrapalhar: <code>error_log</code></h2>
+<p>Num site, um <code>var_dump</code> aparece para o visitante e pode quebrar o layout (ou um JSON de API). A alternativa é escrever no <strong>registro</strong> com a função <code>error_log</code> (você a viu em <a href="tipos-erro.html">Tipos de Erro</a>). Para registrar um array, transforme-o em texto antes, com <code>print_r($x, true)</code> ou <code>json_encode</code>:</p>
+
+<pre class="file" data-file="errorlog.php">&lt;?php
+$pedido = ['cliente' =&gt; 'Bia', 'total' =&gt; 82.0];
+error_log('Pedido recebido: ' . print_r($pedido, true));
+error_log('Pedido (JSON): ' . json_encode($pedido));
+echo "Obrigado pela compra!\n";
+</pre>
+
+<pre class="term">$ php errorlog.php
+Pedido recebido: Array          « sem arquivo de log configurado, no terminal vai para a saída de erros
+(
+    [cliente] =&gt; Bia
+    [total] =&gt; 82
+)
+
+Pedido (JSON): {"cliente":"Bia","total":82}
+Obrigado pela compra!
+$ php errorlog.php 2&gt;/dev/null      « jogando fora a saída de erros, sobra só a "página"
+Obrigado pela compra!</pre>
+
+<p>Com o servidor embutido (<code>php -S</code>), o <code>error_log</code> aparece no <strong>terminal do servidor</strong>, e não na página. A Ana pediu esta página com o <code>curl</code>:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+$pedido = ['cliente' =&gt; 'Bia', 'total' =&gt; 82.0];
+error_log('Pedido recebido: ' . json_encode($pedido));
+var_dump($pedido);
+?&gt;
+&lt;p&gt;Obrigado pela compra!&lt;/p&gt;
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/
+array(2) {                       « o var_dump foi para a página
+  ["cliente"]=&gt;
+  string(3) "Bia"
+  ["total"]=&gt;
+  float(82)
+}
+&lt;p&gt;Obrigado pela compra!&lt;/p&gt;</pre>
+
+<p>E no terminal onde o <code>php -S</code> estava rodando:</p>
+
+<pre class="term">[Fri Oct 16 21:10:42 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 21:10:43 2026] 127.0.0.1:33700 Accepted
+[Fri Oct 16 21:10:43 2026] Pedido recebido: {"cliente":"Bia","total":82}          « o error_log
+[Fri Oct 16 21:10:43 2026] 127.0.0.1:33700 [200]: GET /
+[Fri Oct 16 21:10:43 2026] 127.0.0.1:33700 Closing</pre>
+
+<p>Num servidor de verdade (Apache, Nginx), o registro vai para o arquivo configurado em <code>error_log</code> no <code>php.ini</code>, ou para o registro do servidor web. Para acompanhar em tempo real: <code>tail -f /caminho/do/erros.log</code>.</p>
+
+<hr>
+
+<h2>Por onde o programa passou: <code>debug_print_backtrace</code></h2>
+<p>Às vezes o valor errado chega a uma função e você não sabe <strong>quem</strong> a chamou. <code>debug_print_backtrace()</code> mostra o rastro de chamadas até aquela linha, igual ao <code>Stack trace</code> das exceções:</p>
+
+<pre class="file" data-file="backtrace.php">&lt;?php
+function calcular_frete(string $cep): float
+{
+    debug_print_backtrace();
+    return 12.5;
+}
+function fechar_pedido(array $pedido): float
+{
+    return $pedido['total'] + calcular_frete($pedido['cep']);
+}
+echo fechar_pedido(['total' =&gt; 82.0, 'cep' =&gt; '13010-000']), "\n";
+</pre>
+
+<pre class="term">$ php backtrace.php
+#0 /home/ana/dep/backtrace.php(9): calcular_frete('13010-000')       « quem chamou calcular_frete, e com o quê
+#1 /home/ana/dep/backtrace.php(11): fechar_pedido(Array)            « quem chamou fechar_pedido
+94.5</pre>
+
+<p>Leia de cima para baixo: "estou em <code>calcular_frete</code>, chamada na linha 9 com <code>'13010-000'</code>, que está em <code>fechar_pedido</code>, chamada na linha 11". A versão <code>debug_backtrace()</code> devolve o mesmo como array, para você registrar com <code>error_log</code>.</p>
+
+<hr>
+
+<h2>O depurador: Xdebug</h2>
+<p>Com <code>var_dump</code>, você precisa adivinhar onde olhar, editar o código, rodar, apagar… Um <strong>depurador</strong> faz isso sem mexer no código: você marca uma linha, o programa <strong>pausa</strong> ali, e você vê <strong>todas</strong> as variáveis, avança uma linha por vez e entra nas funções. Para PHP, o depurador é o <strong>Xdebug</strong>, uma extensão que conversa com o seu editor (VS Code, PhpStorm…).</p>
+
+<div class="note">
+<strong>Esta seção é ilustrativa</strong>
+<p>O Xdebug não existe no editor do guia nem no laboratório da Ana (que usa um PHP compilado sem ele). Os passos abaixo são os de uma instalação comum; as telas dependem do editor que você usar (veja <a href="editores.html">Editores e IDEs</a>).</p>
+</div>
+
+<h3>1. Instalar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sistema</th><th>Como</th></tr>
+<tr><td>Ubuntu / Debian</td><td><code>sudo apt install php-xdebug</code></td></tr>
+<tr><td>Fedora</td><td><code>sudo dnf install php-pecl-xdebug3</code></td></tr>
+<tr><td>macOS (Homebrew)</td><td><code>pecl install xdebug</code></td></tr>
+<tr><td>Windows</td><td>Baixe a DLL certa para a sua versão em xdebug.org/wizard (o site analisa o seu <code>php -i</code> e diz qual arquivo baixar) e acrescente <code>zend_extension=xdebug</code> ao <code>php.ini</code></td></tr>
+</table>
+</div>
+<p>Confira com <code>php -v</code>: aparece uma linha <code>with Xdebug v3…</code>.</p>
+
+<h3>2. Configurar</h3>
+<p>No <code>php.ini</code> (ou no arquivo do Xdebug em <code>conf.d</code>):</p>
+<pre class="file" data-file="php.ini">zend_extension=xdebug
+xdebug.mode=debug            ; liga o modo de depuração passo a passo
+xdebug.start_with_request=yes ; conecta ao editor em toda execução
+</pre>
+<p>O <code>xdebug.mode</code> também aceita <code>develop</code> (um <code>var_dump</code> mais bonito e mensagens de erro com mais detalhes) e <code>coverage</code> (para testes; veja <a href="phpunit.html">PHPUnit</a>). Vários modos se juntam com vírgula: <code>develop,debug</code>.</p>
+
+<h3>3. Depurar no editor (VS Code)</h3>
+<ol class="passo">
+  <li>Instale a extensão <strong>PHP Debug</strong> (da Xdebug).</li>
+  <li>Abra a pasta do projeto e, na aba <strong>Executar e depurar</strong>, crie a configuração "Listen for Xdebug" (o editor fica "escutando" a porta 9003, a padrão do Xdebug 3).</li>
+  <li>Clique à esquerda do número de uma linha para marcar um <strong>ponto de parada</strong> (<em>breakpoint</em>, a bolinha vermelha).</li>
+  <li>Clique em "Iniciar depuração" (<kbd>F5</kbd>) e rode o programa: no terminal (<code>php bug.php</code>) ou abrindo a página no navegador com o <code>php -S</code>.</li>
+  <li>O programa pausa na linha marcada. O painel <strong>Variáveis</strong> mostra todas as variáveis, com tipos (como um <code>var_dump</code> de tudo).</li>
+  <li>Avance com os botões: <strong>Step Over</strong> (<kbd>F10</kbd>, próxima linha), <strong>Step Into</strong> (<kbd>F11</kbd>, entra na função chamada), <strong>Step Out</strong> (<kbd>Shift</kbd>+<kbd>F11</kbd>, termina a função atual) e <strong>Continue</strong> (<kbd>F5</kbd>, até o próximo ponto de parada).</li>
+</ol>
+<p>No bug do carrinho, você marcaria a linha do <code>$total +=</code>, veria <code>$item['preco'] = "2,50"</code> no painel e entenderia o problema sem escrever nenhum <code>var_dump</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ferramenta</th><th>Vantagem</th><th>Desvantagem</th></tr>
+<tr><td><code>var_dump</code> + <code>die</code></td><td>Funciona em qualquer lugar, sem instalar nada</td><td>Precisa editar o código; fácil esquecer no código</td></tr>
+<tr><td><code>error_log</code></td><td>Funciona até em produção, sem o visitante ver</td><td>Você precisa saber o que registrar</td></tr>
+<tr><td>Xdebug</td><td>Vê tudo, linha a linha, sem mexer no código</td><td>Precisa instalar e configurar; deixa o PHP mais lento (não use em produção)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Boas mensagens de erro</h2>
+<p>A depuração começa antes do bug: quando você escreve uma mensagem de erro (numa exceção, num <code>error_log</code>), está escrevendo para a pessoa que vai depurar depois, que pode ser você mesmo daqui a seis meses. Compare:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ruim</th><th>Bom</th><th>Por quê</th></tr>
+<tr><td><code>"Erro!"</code></td><td><code>"Estoque insuficiente de brigadeiro: pediu 50, há 30"</code></td><td>Diz <strong>o que</strong> e com <strong>quais valores</strong>.</td></tr>
+<tr><td><code>"Arquivo inválido"</code></td><td><code>"Linha 7 de alunos.csv tem 2 campos, esperava 3"</code></td><td>Diz <strong>onde</strong> procurar.</td></tr>
+<tr><td><code>"Falha no pagamento"</code></td><td><code>"Pagamento do pedido 1042 recusado: cartão vencido (código 51)"</code></td><td>Identifica o caso e o motivo.</td></tr>
+<tr><td><code>"Data errada"</code></td><td><code>"Data de nascimento '31/02/1997' não existe (use dd/mm/aaaa)"</code></td><td>Mostra o valor recebido e o que era esperado.</td></tr>
+</table>
+</div>
+
+<p>E duas regras de segurança: a mensagem <strong>técnica</strong> vai para o registro; o visitante recebe uma mensagem <strong>amigável</strong> ("Não foi possível concluir o pedido. Tente de novo."). E nunca registre senhas, números de cartão ou dados pessoais desnecessários.</p>
+
+<hr>
+
+<h2>Bugs clássicos (e como o <code>var_dump</code> os revela)</h2>
+
+<div class="cenario">
+<strong><code>=</code> no lugar de <code>==</code></strong>
+<pre class="file" data-file="igual.php">&lt;?php
+$estoque = 0;
+if ($estoque = 5) {
+    echo "Estoque: $estoque (era para ser 0!)\n";
+}
+</pre>
+<pre class="term">$ php igual.php
+Estoque: 5 (era para ser 0!)</pre>
+<p><strong>O que acontece:</strong> <code>=</code> <strong>atribui</strong> 5 à variável (e o valor 5 conta como verdadeiro); não compara. Sem aviso nenhum.</p>
+<p><strong>Como consertar:</strong> <code>if ($estoque === 5)</code>. Um <code>var_dump($estoque)</code> antes e depois do <code>if</code> mostra a variável mudando "sozinha".</p>
+</div>
+
+<div class="cenario">
+<strong>Texto que parece número</strong>
+<p><code>"2,50"</code>, <code>"3"</code> vindo de formulário, <code>" 10"</code> com espaço: o <code>echo</code> mostra igual a um número, o <code>var_dump</code> mostra <code>string(…)</code>.</p>
+<p><strong>Como consertar:</strong> converta e valide na entrada (<a href="validacao.html">Validar Dados</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"Array to string conversion"</strong>
+<pre class="term">Warning: Array to string conversion in /home/ana/dep/comparar.php on line 3
+Array</pre>
+<p><strong>O que significa:</strong> você deu <code>echo</code> num array.</p>
+<p><strong>Como consertar:</strong> para investigar, <code>var_dump</code> ou <code>print_r</code>; para mostrar ao usuário, percorra com <code>foreach</code> ou use <code>implode(', ', $lista)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Funciona no meu computador"</strong>
+<p><strong>O que significa:</strong> algo é diferente no outro ambiente: a versão do PHP, uma extensão (<code>intl</code>, <code>pdo_mysql</code>), o fuso, as permissões, o <code>php.ini</code>.</p>
+<p><strong>Como consertar:</strong> compare <code>php -v</code>, <code>php -m</code> (extensões) e <code>php -i</code> dos dois lados; num site, uma página temporária com <code>phpinfo();</code> (apague depois: ela revela muito sobre o servidor).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que faz</th></tr>
+<tr><td><code>var_dump($a, $b, …)</code></td><td>Mostra valores com tipos.</td></tr>
+<tr><td><code>print_r($x)</code> / <code>print_r($x, true)</code></td><td>Mostra a estrutura / devolve como texto.</td></tr>
+<tr><td><code>var_export($x)</code> / <code>var_export($x, true)</code></td><td>Mostra / devolve como código PHP.</td></tr>
+<tr><td><code>exit;</code>, <code>exit("msg")</code>, <code>exit(3)</code>, <code>die</code></td><td>Termina o programa (com texto ou código de saída).</td></tr>
+<tr><td><code>error_log($texto)</code></td><td>Escreve no registro de erros.</td></tr>
+<tr><td><code>debug_print_backtrace()</code> / <code>debug_backtrace()</code></td><td>Mostra / devolve o rastro de chamadas.</td></tr>
+<tr><td><code>get_debug_type($x)</code></td><td>O tipo do valor, como texto (<code>"string"</code>, <code>"int"</code>, nome da classe).</td></tr>
+<tr><td><code>phpinfo()</code></td><td>Página com toda a configuração do PHP (não deixe no ar).</td></tr>
+<tr><td>Xdebug (<code>xdebug.mode=debug</code>)</td><td>Depuração passo a passo no editor.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Ver o tipo</h3>
+<p>Complete para ver o valor <strong>e o tipo</strong> de <code>$preco</code>:</p>
+<div class="ex-code"><input data-answer="var_dump" aria-label="função">($preco);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Array no registro</h3>
+<p>Complete para escrever o array <code>$pedido</code> no registro de erros, como texto:</p>
+<div class="ex-code">error_log(print_r($pedido, <input data-answer="true" aria-label="argumento" size="6">));</div>
+</div>
+
+<div class="exercise">
+<h3>3. Olhar e parar</h3>
+<p>Complete a técnica mais usada para inspecionar e interromper:</p>
+<div class="ex-code">var_dump($dados); <input data-answer="die;|exit;|die|exit|die();|exit();" aria-label="instrução" size="8"></div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Você precisa saber se <code>$x</code> é <code>false</code>, <code>null</code> ou <code>""</code>. Qual ferramenta mostra a diferença?</p>
+<label><input type="radio" name="q4"> <code>echo $x;</code></label>
+<label><input type="radio" name="q4"> <code>print_r($x);</code></label>
+<label><input type="radio" name="q4"> <code>var_dump($x);</code></label>
+<label><input type="radio" name="q4"> <code>print $x;</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Num site no ar, como registrar um valor para investigar sem o visitante ver?</p>
+<label><input type="radio" name="q5"> <code>error_log(json_encode($valor));</code></label>
+<label><input type="radio" name="q5"> <code>var_dump($valor);</code></label>
+<label><input type="radio" name="q5"> <code>die($valor);</code></label>
+<label><input type="radio" name="q5"> <code>echo "&lt;!-- $valor --&gt;";</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. No Xdebug, o que faz o <strong>Step Into</strong>?</p>
+<label><input type="radio" name="q6"> Pula para o próximo ponto de parada.</label>
+<label><input type="radio" name="q6"> Entra na função chamada na linha atual, para seguir linha a linha dentro dela.</label>
+<label><input type="radio" name="q6"> Termina o programa.</label>
+<label><input type="radio" name="q6"> Executa a linha atual sem entrar nas funções.</label>
+</div>
+
+<div class="tryphp" data-goal="out:Total com desconto: R$ 90\,00,out:Total com desconto: R$ 80\,00,out:Total sem desconto: R$ 100\,00,semerro">
+<p class="try-task"><strong>Missão final (detetive):</strong> os cupons <code>promo10</code> e <code>PROMO20</code>, digitados pelos clientes, deveriam dar 10% e 20% de desconto em R$ 100, mas nenhum funciona. Use <code>var_dump</code> dentro da função para descobrir por quê (olhe o cupom recebido e as chaves do array), conserte a <strong>causa</strong> e remova os <code>var_dump</code>. Resultado esperado: <code>R$ 90,00</code>, <code>R$ 80,00</code> e, para o cupom inexistente, <code>Total sem desconto: R$ 100,00</code>.</p>
+<pre class="script">&lt;?php
+$cupons = ['PROMO10' =&gt; 10, 'PROMO20' =&gt; 20];
+
+function total_com_cupom(array $cupons, float $total, string $cupom): string
+{
+    if (isset($cupons[$cupom])) {
+        $final = $total * (100 - $cupons[$cupom]) / 100;
+        return "Total com desconto: R$ " . number_format($final, 2, ',', '.');
+    }
+    return "Total sem desconto: R$ " . number_format($total, 2, ',', '.');
+}
+
+echo total_com_cupom($cupons, 100, 'promo10'), "\n";
+echo total_com_cupom($cupons, 100, ' PROMO20 '), "\n";
+echo total_com_cupom($cupons, 100, 'NATAL'), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$cupons = ['PROMO10' =&gt; 10, 'PROMO20' =&gt; 20];
+
+function total_com_cupom(array $cupons, float $total, string $cupom): string
+{
+    $cupom = strtoupper(trim($cupom));
+    if (isset($cupons[$cupom])) {
+        $final = $total * (100 - $cupons[$cupom]) / 100;
+        return "Total com desconto: R$ " . number_format($final, 2, ',', '.');
+    }
+    return "Total sem desconto: R$ " . number_format($total, 2, ',', '.');
+}
+
+echo total_com_cupom($cupons, 100, 'promo10'), "\n";
+echo total_com_cupom($cupons, 100, ' PROMO20 '), "\n";
+echo total_com_cupom($cupons, 100, 'NATAL'), "\n";
+</pre>
+</div>
+
+<p>Se você usou <code>var_dump($cupom)</code>, viu <code>string(7) "promo10"</code> (minúsculas) e <code>string(9) " PROMO20 "</code> (9 caracteres para uma palavra de 7: há espaços). O <code>echo</code> não teria mostrado os espaços.</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Depurar é investigar: reproduza, diga o que esperava, olhe os valores no caminho até achar onde divergem, conserte a causa.</li>
+  <li><code>var_dump</code> mostra valor e tipo (a melhor lupa); <code>print_r</code> mostra a estrutura; <code>var_export</code> devolve código PHP. Na web, envolva em <code>&lt;pre&gt;</code>.</li>
+  <li><code>exit</code>/<code>die</code> param o programa ali; não esqueça nenhum no código publicado.</li>
+  <li><code>error_log</code> registra sem o visitante ver (no <code>php -S</code>, aparece no terminal do servidor).</li>
+  <li><code>debug_print_backtrace()</code> mostra quem chamou quem.</li>
+  <li>O Xdebug pausa o programa num ponto de parada e mostra tudo, linha a linha, no editor.</li>
+  <li>Mensagens de erro boas dizem o que, onde e com quais valores.</li>
+</ul>
+
+<p>Próxima aula: <a href="banco-dados.html">Banco de Dados: o Básico</a>.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
