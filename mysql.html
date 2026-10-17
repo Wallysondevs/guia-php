@@ -35,7 +35,7 @@
 
 <div class="warning">
 <strong>Esta aula é para ler (e praticar a parte que roda no navegador)</strong>
-<p>O editor do guia roda o PHP de verdade, mas <strong>dentro do seu navegador</strong>: ele não consegue falar com um servidor MySQL. Por isso, as conexões com MySQL desta página aparecem em sessões de terminal da máquina da Ana (com saídas reais), e as missões treinam o que roda em qualquer lugar: montar o DSN e adaptar SQL do MySQL para o SQLite. A máquina da Ana <strong>não tem</strong> um servidor MySQL instalado; foi de propósito, para você ver as mensagens de erro reais de "servidor não encontrado", que são as que todo mundo encontra no primeiro dia.</p>
+<p>O editor do guia roda o PHP de verdade, mas <strong>dentro do seu navegador</strong>: ele até tem o driver do MySQL, mas não tem acesso à rede, então não consegue falar com um servidor MySQL. Por isso, as conexões com MySQL desta página aparecem em sessões de terminal da máquina da Ana (com saídas reais), e as missões treinam o que roda em qualquer lugar: montar o DSN e adaptar SQL do MySQL para o SQLite. A máquina da Ana <strong>não tem</strong> um servidor MySQL instalado; foi de propósito, para você ver as mensagens de erro reais de "servidor não encontrado", que são as que todo mundo encontra no primeiro dia.</p>
 </div>
 
 <p>Antes desta aula, você precisa conhecer o <a href="pdo.html">PDO</a>, o <a href="crud.html">CRUD</a> e os <a href="prepared-statements.html">prepared statements</a>. Os programas foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/loja</code>.</p>
@@ -114,9 +114,16 @@ Array
 <p><code>PDO::getAvailableDrivers()</code> devolve a lista de bancos que <strong>este</strong> PHP sabe usar. Na máquina da Ana são três: <code>mysql</code> (MySQL e MariaDB), <code>pgsql</code> (PostgreSQL) e <code>sqlite</code>. Se <code>mysql</code> não aparecer, instale a extensão (tabela acima) antes de continuar.</p>
 
 <div class="tryphp">
-<p class="try-task"><strong>Experimente:</strong> rode e veja quais drivers o PHP <strong>do editor do guia</strong> tem. Compare com a lista da máquina da Ana: é por isso que as missões desta aula usam SQLite.</p>
+<p class="try-task"><strong>Experimente:</strong> rode e veja quais drivers o PHP <strong>do editor do guia</strong> tem. Ele tem o <code>mysql</code>, mas roda dentro do navegador, sem acesso à rede: a tentativa de conexão termina com <code>SQLSTATE[HY000] [2002] Host is unreachable</code> ("máquina inalcançável"). É por isso que as missões desta aula usam SQLite.</p>
 <pre class="script">&lt;?php
 print_r(PDO::getAvailableDrivers());
+
+try {
+    $pdo = new PDO("mysql:host=localhost;dbname=loja;charset=utf8mb4", "ana", "troque-esta-senha");
+    echo "Conectado!\n";
+} catch (PDOException $e) {
+    echo "Falhou: ", $e-&gt;getMessage(), "\n";
+}
 </pre>
 </div>
 
