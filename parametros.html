@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Parâmetros — valores padrão, argumentos nomeados e referência | Guia PHP</title>
+<meta name="description" content="Parâmetros de funções no PHP: passar dados para a função, vários parâmetros e a ordem, valores padrão, argumentos nomeados (PHP 8.0), passagem por valor × por referência com &amp;, e os erros reais ArgumentCountError: Too few arguments, Unknown named parameter e could not be passed by reference.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Parâmetros</span></h1>
+
+<p class="intro">Na aula <a href="funcoes.html">Funções</a>, você criou funções que faziam sempre a mesma coisa. Uma função fica muito mais útil quando você pode <strong>entregar dados</strong> a ela na hora da chamada: o nome do cliente, o preço, a quantidade. Esses dados chegam por meio dos <strong>parâmetros</strong>. Esta aula mostra como declarar parâmetros, como deixá-los opcionais com <strong>valores padrão</strong>, como chamar a função dizendo o nome de cada um (<strong>argumentos nomeados</strong>, do PHP 8.0) e a diferença entre passar uma <strong>cópia</strong> e passar <strong>a própria variável</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre <strong>parâmetro</strong> e <strong>argumento</strong>.</li>
+  <li>Funções com vários parâmetros, e por que a ordem importa.</li>
+  <li>O que acontece com argumentos a menos (<code>ArgumentCountError</code>) e a mais.</li>
+  <li>Valores padrão: <code>function f($x, $y = 10)</code>.</li>
+  <li>Argumentos nomeados: <code>precoFinal(18.9, desconto: 0.1)</code>.</li>
+  <li>Passagem por valor × por referência (<code>&amp;$x</code>), e por que preferir o <code>return</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: os campos de um formulário</h2>
+<p>Pense num formulário de pedido em papel: ele tem campos <em>Produto</em>, <em>Quantidade</em>, <em>Desconto</em>. O formulário (a função) é sempre o mesmo; o que muda é o que cada cliente <strong>preenche</strong> nos campos. Os campos são os <strong>parâmetros</strong>; o que é preenchido em cada pedido são os <strong>argumentos</strong>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Termo</th><th>Onde aparece</th><th>Exemplo</th></tr>
+<tr><td><strong>Parâmetro</strong></td><td>Na <strong>definição</strong> da função: a variável que vai receber o dado</td><td><code>function saudacao($nome)</code></td></tr>
+<tr><td><strong>Argumento</strong></td><td>Na <strong>chamada</strong>: o valor que você entrega</td><td><code>saudacao("Ana")</code></td></tr>
+</table>
+</div>
+
+<p>Na prática, muita gente fala "parâmetro" para os dois, e tudo bem. Mas as mensagens de erro do PHP usam as duas palavras com precisão (<em>Too few <strong>arguments</strong></em>, <em>Unknown named <strong>parameter</strong></em>), então vale saber a diferença.</p>
+
+<hr>
+
+<h2>Um parâmetro</h2>
+
+<pre class="file" data-file="p-um.php">&lt;?php
+function saudacao($nome)
+{
+    echo "Olá, $nome!\n";
+}
+
+saudacao("Ana");
+saudacao("Bruno");
+$cliente = "Carla";
+saudacao($cliente);
+saudacao("Dona " . $cliente);
+</pre>
+
+<dl class="anatomy">
+  <dt>function saudacao($nome)</dt><dd>Entre os parênteses, o parâmetro: uma variável comum, com <code>$</code>. Ela só existe <strong>dentro</strong> da função (aula <a href="escopo.html">Escopo</a>).</dd>
+  <dt>saudacao("Ana");</dt><dd>Na chamada, o argumento <code>"Ana"</code> é copiado para <code>$nome</code>, e o corpo roda.</dd>
+  <dt>saudacao($cliente);</dt><dd>O argumento pode ser uma variável: o <strong>valor</strong> dela (<code>"Carla"</code>) é que vai para <code>$nome</code>. Os nomes não precisam combinar.</dd>
+  <dt>saudacao("Dona " . $cliente);</dt><dd>Ou qualquer expressão: o PHP calcula primeiro (<code>"Dona Carla"</code>) e depois chama.</dd>
+</dl>
+
+<pre class="term">$ php p-um.php
+Olá, Ana!
+Olá, Bruno!
+Olá, Carla!
+Olá, Dona Carla!</pre>
+
+<h2>Vários parâmetros: a ordem manda</h2>
+<p>Separe os parâmetros com vírgulas. Na chamada, os argumentos são entregues <strong>na mesma ordem</strong>: o primeiro argumento vai para o primeiro parâmetro, e assim por diante.</p>
+
+<pre class="file" data-file="p-varios.php">&lt;?php
+function precoFinal($preco, $quantidade, $desconto)
+{
+    $total = $preco * $quantidade;
+    return $total - $total * $desconto;
+}
+
+echo precoFinal(18.9, 2, 0.1), "\n";
+echo precoFinal(2, 0.1, 18.9), "\n";
+</pre>
+
+<pre class="term">$ php p-varios.php
+34.02                   « 2 cafés de 18,90 com 10% de desconto
+-3.58                   « mesma função, argumentos fora de ordem: resultado sem sentido</pre>
+
+<p>Na segunda chamada, o PHP não reclamou: ele colocou <code>2</code> em <code>$preco</code>, <code>0.1</code> em <code>$quantidade</code> e <code>18.9</code> em <code>$desconto</code>, exatamente como mandado. O PHP não tem como saber o que você <em>quis</em> dizer. Os argumentos nomeados, mais abaixo, resolvem esse problema.</p>
+
+<h3>Argumentos a menos: <code>ArgumentCountError</code></h3>
+
+<pre class="file" data-file="p-poucos.php">&lt;?php
+function precoFinal($preco, $quantidade, $desconto)
+{
+    $total = $preco * $quantidade;
+    return $total - $total * $desconto;
+}
+
+echo precoFinal(18.9, 2), "\n";
+</pre>
+
+<pre class="term">$ php p-poucos.php
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function precoFinal(), 2 passed in /home/ana/site/p-poucos.php on line 8 and exactly 3 expected in /home/ana/site/p-poucos.php:2
+Stack trace:
+#0 /home/ana/site/p-poucos.php(8): precoFinal(18.9, 2)
+#1 {main}
+  thrown in /home/ana/site/p-poucos.php on line 2</pre>
+
+<p>Leia a mensagem com calma, que ela diz tudo:</p>
+<dl class="anatomy">
+  <dt>ArgumentCountError</dt><dd>"Erro na contagem de argumentos": o tipo do erro.</dd>
+  <dt>Too few arguments to function precoFinal()</dt><dd>"Argumentos de menos para a função <code>precoFinal()</code>".</dd>
+  <dt>2 passed in … on line 8</dt><dd>Foram passados 2, na <strong>chamada</strong> da linha 8.</dd>
+  <dt>and exactly 3 expected</dt><dd>E eram esperados exatamente 3.</dd>
+  <dt>in …/p-poucos.php:2</dt><dd>A linha 2 é onde a <strong>função</strong> foi definida.</dd>
+  <dt>#0 …(8): precoFinal(18.9, 2)</dt><dd>O <em>stack trace</em> mostra a chamada que deu errado, com os valores.</dd>
+</dl>
+<p>O erro é fatal: o programa para ali. Em geral, o lugar a corrigir é a <strong>chamada</strong> (linha 8), não a função.</p>
+
+<h3>Argumentos a mais</h3>
+
+<pre class="file" data-file="p-muitos.php">&lt;?php
+function saudacao($nome)
+{
+    echo "Olá, $nome!\n";
+}
+saudacao("Ana", "Bruno", 42);
+echo strlen("Ana", "Bruno");
+</pre>
+
+<pre class="term">$ php p-muitos.php
+Olá, Ana!               « nas suas funções: os argumentos extras são ignorados, sem aviso
+
+Fatal error: Uncaught ArgumentCountError: strlen() expects exactly 1 argument, 2 given in /home/ana/site/p-muitos.php:7
+Stack trace:
+#0 /home/ana/site/p-muitos.php(7): strlen('Ana', 'Bruno')
+#1 {main}
+  thrown in /home/ana/site/p-muitos.php on line 7</pre>
+
+<p>Uma diferença curiosa: as funções que <strong>você</strong> escreve aceitam argumentos sobrando em silêncio (eles podem ser lidos com <code>func_get_args</code>, veja <a href="variadicas.html">Funções Variádicas</a>); as <strong>nativas</strong> são rigorosas e param o programa.</p>
+
+<hr>
+
+<h2>Valores padrão: parâmetros opcionais</h2>
+<p>Na maioria das compras, a quantidade é 1 e não há desconto. Em vez de obrigar quem chama a escrever <code>precoFinal(18.9, 1, 0.0)</code> toda vez, dê a esses parâmetros um <strong>valor padrão</strong> com <code>=</code>. Se o argumento não vier, vale o padrão.</p>
+
+<pre class="file" data-file="p-padrao.php">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    $total = $preco * $quantidade;
+    return $total - $total * $desconto;
+}
+
+echo precoFinal(18.9), "\n";
+echo precoFinal(18.9, 3), "\n";
+echo precoFinal(18.9, 3, 0.1), "\n";
+</pre>
+
+<pre class="term">$ php p-padrao.php
+18.9                    « só o preço: quantidade 1, sem desconto
+56.7                    « preço e quantidade
+51.03                   « os três</pre>
+
+<p>Agora <code>$preco</code> é <strong>obrigatório</strong> e os outros dois são <strong>opcionais</strong>. Você já usa isso com funções nativas: o <code>number_format</code> funciona com 1, 2 ou 4 argumentos, e <code>in_array</code> tem o terceiro argumento opcional (o modo estrito).</p>
+
+<div class="tryphp">
+<p class="try-task">Chame <code>precoFinal</code> de outras formas: só com o preço, com quantidade, com desconto. Depois mude o valor padrão da quantidade para 2 e veja quais resultados mudam.</p>
+<pre class="script">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    $total = $preco * $quantidade;
+    return $total - $total * $desconto;
+}
+
+echo precoFinal(18.9), "\n";
+echo precoFinal(18.9, 3), "\n";
+echo precoFinal(18.9, desconto: 0.1), "\n";
+</pre>
+</div>
+
+<h3>Regra 1: os opcionais vão no fim</h3>
+<p>Com argumentos por posição, não dá para "pular" um parâmetro do meio. Por isso, os parâmetros com valor padrão devem ficar <strong>depois</strong> dos obrigatórios. Se ficarem antes, o padrão não serve para nada, e o PHP avisa:</p>
+
+<pre class="file" data-file="p-ordem.php">&lt;?php
+function saudacao($saudacao = "Olá", $nome)
+{
+    echo "$saudacao, $nome!\n";
+}
+saudacao("Oi", "Ana");
+saudacao("Ana");
+</pre>
+
+<pre class="term">$ php p-ordem.php
+
+Deprecated: saudacao(): Optional parameter $saudacao declared before required parameter $nome is implicitly treated as a required parameter in /home/ana/site/p-ordem.php on line 2
+Oi, Ana!
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function saudacao(), 1 passed in /home/ana/site/p-ordem.php on line 7 and exactly 2 expected in /home/ana/site/p-ordem.php:2
+Stack trace:
+#0 /home/ana/site/p-ordem.php(7): saudacao('Ana')
+#1 {main}
+  thrown in /home/ana/site/p-ordem.php on line 2</pre>
+
+<p>O aviso diz: "o parâmetro opcional <code>$saudacao</code>, declarado antes do obrigatório <code>$nome</code>, é tratado como obrigatório". Ou seja, o <code>= "Olá"</code> foi ignorado. A correção é inverter: <code>function saudacao($nome, $saudacao = "Olá")</code>.</p>
+
+<h3>Regra 2: o padrão precisa ser um valor fixo</h3>
+<p>O valor padrão tem de ser conhecido antes de o programa rodar: um número, um texto, <code>true</code>/<code>false</code>, <code>null</code>, um array, uma <a href="constantes.html">constante</a>. Chamar uma função ali não pode:</p>
+
+<pre class="file" data-file="p-constexpr.php">&lt;?php
+function registrar($mensagem, $quando = date("d/m/Y"))
+{
+    echo "[$quando] $mensagem\n";
+}
+</pre>
+
+<pre class="term">$ php p-constexpr.php
+
+Fatal error: Constant expression contains invalid operations in /home/ana/site/p-constexpr.php on line 2
+Stack trace:
+#0 {main}</pre>
+
+<p>"A expressão constante contém operações inválidas." O truque padrão é usar <code>null</code> como padrão e calcular o valor de verdade dentro da função, com o <code>??</code> (aula <a href="null-coalescing.html">?? e ?-&gt;</a>):</p>
+
+<pre class="file" data-file="p-null.php">&lt;?php
+function registrar($mensagem, $quando = null)
+{
+    $quando = $quando ?? date("d/m/Y");
+    echo "[$quando] $mensagem\n";
+}
+registrar("Pedido recebido", "01/10/2026");
+registrar("Loja aberta");
+</pre>
+
+<pre class="term">$ php p-null.php
+[01/10/2026] Pedido recebido
+[17/10/2026] Loja aberta        « sem o 2º argumento: a data do dia em que o programa rodou</pre>
+
+<hr>
+
+<h2>Argumentos nomeados <span class="versao">PHP 8.0+</span></h2>
+<p>E se a Ana quiser dar desconto, mas manter a quantidade padrão? Com argumentos por posição, ela teria de repetir o padrão: <code>precoFinal(18.9, 1, 0.1)</code>. Desde o PHP 8.0, dá para dizer <strong>o nome</strong> do parâmetro na chamada, e pular os que não interessam:</p>
+
+<pre class="file" data-file="p-nomeados.php">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    $total = $preco * $quantidade;
+    return $total - $total * $desconto;
+}
+
+echo precoFinal(18.9, 1, 0.1), "\n";
+echo precoFinal(18.9, desconto: 0.1), "\n";
+echo precoFinal(preco: 18.9, quantidade: 2), "\n";
+echo precoFinal(desconto: 0.5, preco: 10, quantidade: 3), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>desconto: 0.1</dt><dd>O nome do parâmetro <strong>sem o <code>$</code></strong>, dois-pontos e o valor. Lê-se "desconto vale 0.1".</dd>
+  <dt>precoFinal(18.9, desconto: 0.1)</dt><dd>Mistura: o primeiro por posição (vai para <code>$preco</code>), o outro pelo nome. A <code>$quantidade</code>, que ficou de fora, usa o padrão.</dd>
+  <dt>precoFinal(desconto: 0.5, preco: 10, quantidade: 3)</dt><dd>Com todos nomeados, a ordem é livre.</dd>
+</dl>
+
+<pre class="term">$ php p-nomeados.php
+17.01
+17.01                   « o mesmo resultado, sem repetir o padrão da quantidade
+37.8
+15                      « 10 × 3, com 50% de desconto</pre>
+
+<p>Além de pular opcionais, os nomes deixam a chamada <strong>autoexplicativa</strong>. Compare <code>precoFinal(10, 3, 0.5)</code> com <code>precoFinal(preco: 10, quantidade: 3, desconto: 0.5)</code>: no segundo, ninguém precisa abrir a definição para entender.</p>
+
+<h3>Também nas funções nativas</h3>
+<p>Os nomes dos parâmetros das funções nativas são os que aparecem no manual do PHP. Isso ajuda muito nas funções com muitos opcionais:</p>
+
+<pre class="file" data-file="p-nativa.php">&lt;?php
+echo number_format(1234.5, 2, ",", "."), "\n";
+echo number_format(1234.5, decimals: 2, decimal_separator: ",", thousands_separator: "."), "\n";
+echo str_pad("7", 3, "0", STR_PAD_LEFT), "\n";
+echo str_pad("7", length: 3, pad_string: "0", pad_type: STR_PAD_LEFT), "\n";
+echo htmlspecialchars("Tom &amp;amp; Jerry", double_encode: false), "\n";
+echo htmlspecialchars("Tom &amp;amp; Jerry"), "\n";
+</pre>
+
+<pre class="term">$ php p-nativa.php
+1.234,50
+1.234,50                « a mesma coisa, mas dá para ler o que é cada argumento
+007
+007
+Tom &amp;amp; Jerry          « double_encode: false — pulou 2 opcionais para chegar ao 4º
+Tom &amp;amp;amp; Jerry</pre>
+
+<p>Na última dupla, <code>double_encode</code> é o <strong>quarto</strong> parâmetro do <code>htmlspecialchars</code>. Sem o nome, seria preciso escrever os dois do meio com os seus padrões. (O que ele faz: não codificar de novo o que já está codificado; veja <a href="escapar-saida.html">Escapar a Saída</a>.)</p>
+
+<h3>As regras dos nomeados</h3>
+<ul>
+  <li>Os <strong>posicionais vêm primeiro</strong>, os nomeados depois. Nunca o contrário.</li>
+  <li>O nome tem de existir na função (sem erro de digitação).</li>
+  <li>Cada parâmetro recebe um valor uma vez só.</li>
+  <li>Os obrigatórios continuam obrigatórios, venham por posição ou por nome.</li>
+</ul>
+<p>Cada regra quebrada tem a sua mensagem (veja <a href="#errado">Quando dá errado</a>).</p>
+
+<div class="warning">
+<strong>O nome do parâmetro vira parte do "contrato"</strong>
+<p>Sem argumentos nomeados, você podia renomear <code>$desconto</code> para <code>$percentual</code> à vontade. Agora, se alguém chamou <code>precoFinal(…, desconto: 0.1)</code>, renomear quebra essa chamada (<code>Unknown named parameter $desconto</code>). Escolha bons nomes desde o começo.</p>
+</div>
+
+<hr>
+
+<h2>Por valor × por referência</h2>
+
+<h3>Por valor: a função recebe uma cópia</h3>
+<p>Normalmente, o parâmetro recebe uma <strong>cópia</strong> do valor. Mudar o parâmetro dentro da função não muda nada fora dela. É como entregar uma fotocópia de um documento: rabiscar a cópia não estraga o original.</p>
+
+<pre class="file" data-file="p-valor.php">&lt;?php
+function aumentar($numero)
+{
+    $numero = $numero + 1;
+    echo "Dentro da função: $numero\n";
+}
+
+$estoque = 10;
+aumentar($estoque);
+echo "Fora da função: $estoque\n";
+</pre>
+
+<pre class="term">$ php p-valor.php
+Dentro da função: 11
+Fora da função: 10      « $estoque não mudou</pre>
+
+<p>Com arrays é igual: a função recebe uma cópia do array.</p>
+
+<pre class="file" data-file="p-valor-array.php">&lt;?php
+function adicionarItem($lista, $item)
+{
+    $lista[] = $item;
+    echo "Dentro: ", implode(", ", $lista), "\n";
+}
+
+$compras = ["arroz", "feijão"];
+adicionarItem($compras, "café");
+echo "Fora:   ", implode(", ", $compras), "\n";
+</pre>
+
+<pre class="term">$ php p-valor-array.php
+Dentro: arroz, feijão, café
+Fora:   arroz, feijão           « a lista original continua com 2 itens</pre>
+
+<p>Isso é uma <strong>proteção</strong>: você pode chamar qualquer função sem medo de que ela estrague suas variáveis.</p>
+
+<h3>Por referência: <code>&amp;</code> entrega a própria variável</h3>
+<p>Colocando <code>&amp;</code> antes do parâmetro, a função recebe <strong>a própria variável</strong> (o original, não uma cópia). O que ela mudar, muda lá fora.</p>
+
+<pre class="file" data-file="p-ref.php">&lt;?php
+function aumentar(&amp;$numero)
+{
+    $numero = $numero + 1;
+}
+
+function adicionarItem(&amp;$lista, $item)
+{
+    $lista[] = $item;
+}
+
+$estoque = 10;
+aumentar($estoque);
+aumentar($estoque);
+echo "Estoque: $estoque\n";
+
+$compras = ["arroz", "feijão"];
+adicionarItem($compras, "café");
+echo implode(", ", $compras), "\n";
+</pre>
+
+<pre class="term">$ php p-ref.php
+Estoque: 12             « duas chamadas, dois aumentos no original
+arroz, feijão, café</pre>
+
+<p>O <code>&amp;</code> vai só na <strong>definição</strong>; a chamada é normal. É exatamente assim que funcionam <code>sort</code>, <code>array_push</code> e <code>array_pop</code>, que mudam o array que você passa (aulas <a href="ordenar-arrays.html">Ordenar Arrays</a> e <a href="funcoes-array.html">Funções de Array</a>). E é por isso que elas exigem uma <strong>variável</strong>: um valor solto não tem onde guardar a mudança.</p>
+
+<pre class="file" data-file="p-ref-literal.php">&lt;?php
+function aumentar(&amp;$numero)
+{
+    $numero = $numero + 1;
+}
+aumentar(10);
+</pre>
+
+<pre class="term">$ php p-ref-literal.php
+
+Fatal error: Uncaught Error: aumentar(): Argument #1 ($numero) could not be passed by reference in /home/ana/site/p-ref-literal.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/p-ref-literal.php on line 6</pre>
+
+<h3>Qual usar?</h3>
+<p>Prefira <strong>por valor + <code>return</code></strong>. A função devolve o resultado, e quem chama decide onde guardar:</p>
+
+<pre class="file" data-file="p-return.php">&lt;?php
+function comItem($lista, $item)
+{
+    $lista[] = $item;
+    return $lista;
+}
+
+$compras = ["arroz", "feijão"];
+$compras = comItem($compras, "café");
+echo implode(", ", $compras), "\n";
+</pre>
+
+<pre class="term">$ php p-return.php
+arroz, feijão, café</pre>
+
+<p>Lendo <code>$compras = comItem(…)</code>, qualquer pessoa vê que <code>$compras</code> muda. Lendo <code>adicionarItem($compras, …)</code>, só olhando a definição dá para saber. Use referência quando a função realmente existe para mudar a variável (como o <code>sort</code>) ou para devolver mais de um resultado.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Por valor (<code>$x</code>)</th><th>Por referência (<code>&amp;$x</code>)</th></tr>
+<tr><td>A função recebe</td><td>uma cópia</td><td>a própria variável</td></tr>
+<tr><td>Mudanças dentro afetam fora?</td><td>não</td><td>sim</td></tr>
+<tr><td>Aceita valor solto (<code>f(10)</code>)?</td><td>sim</td><td>não (erro)</td></tr>
+<tr><td>Quando usar</td><td>quase sempre, com <code>return</code></td><td>quando mudar a variável é o objetivo</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>E os objetos?</strong>
+<p>Objetos (Nível 3) se comportam de um jeito diferente: a função recebe uma "cópia do endereço" do objeto, e consegue mudar as propriedades dele mesmo sem <code>&amp;</code>. Isso é explicado em <a href="classes-objetos.html">Classes e Objetos</a>.</p>
+</div>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>ArgumentCountError: Too few arguments to function …</code></strong>
+<p><strong>O que aconteceu:</strong> a chamada passou menos argumentos que os parâmetros obrigatórios. Veja a saída de <code>p-poucos.php</code>, mais acima: a mensagem diz quantos foram passados, quantos eram esperados e a linha da chamada.</p>
+<p><strong>Como resolver:</strong> complete a chamada; ou, se o dado é mesmo opcional, dê um valor padrão ao parâmetro (no fim da lista).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Cannot use positional argument after named argument</code></strong>
+<pre class="file" data-file="p-err-pos.php">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    return $preco * $quantidade * (1 - $desconto);
+}
+echo precoFinal(preco: 18.9, 2);
+</pre>
+<pre class="term">$ php p-err-pos.php
+
+Fatal error: Cannot use positional argument after named argument in /home/ana/site/p-err-pos.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que aconteceu:</strong> depois de um argumento nomeado, veio um por posição. O PHP não saberia em que posição colocar o <code>2</code>.</p>
+<p><strong>Como resolver:</strong> posicionais primeiro (<code>precoFinal(18.9, 2)</code>) ou todos nomeados (<code>precoFinal(preco: 18.9, quantidade: 2)</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Unknown named parameter $desconta</code></strong>
+<pre class="file" data-file="p-err-desconhecido.php">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    return $preco * $quantidade * (1 - $desconto);
+}
+echo precoFinal(18.9, desconta: 0.1);
+</pre>
+<pre class="term">$ php p-err-desconhecido.php
+
+Fatal error: Uncaught Error: Unknown named parameter $desconta in /home/ana/site/p-err-desconhecido.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/p-err-desconhecido.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> "parâmetro nomeado desconhecido". Não existe <code>$desconta</code> (é <code>$desconto</code>). Para funções nativas, confira o nome exato no manual.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Named parameter $preco overwrites previous argument</code></strong>
+<pre class="file" data-file="p-err-dupl.php">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    return $preco * $quantidade * (1 - $desconto);
+}
+echo precoFinal(18.9, preco: 20);
+</pre>
+<pre class="term">$ php p-err-dupl.php
+
+Fatal error: Uncaught Error: Named parameter $preco overwrites previous argument in /home/ana/site/p-err-dupl.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/p-err-dupl.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> o <code>18.9</code> já foi para <code>$preco</code> pela posição, e depois veio <code>preco: 20</code>. Um parâmetro, dois valores.</p>
+<p><strong>Como resolver:</strong> passe cada parâmetro uma vez só.</p>
+</div>
+
+<div class="cenario">
+<strong><code>ArgumentCountError: precoFinal(): Argument #1 ($preco) not passed</code></strong>
+<pre class="file" data-file="p-err-faltanome.php">&lt;?php
+function precoFinal($preco, $quantidade = 1, $desconto = 0.0)
+{
+    return $preco * $quantidade * (1 - $desconto);
+}
+echo precoFinal(desconto: 0.1);
+</pre>
+<pre class="term">$ php p-err-faltanome.php
+
+Fatal error: Uncaught ArgumentCountError: precoFinal(): Argument #1 ($preco) not passed in /home/ana/site/p-err-faltanome.php:2
+Stack trace:
+#0 /home/ana/site/p-err-faltanome.php(6): precoFinal(NULL, NULL, 0.1)
+#1 {main}
+  thrown in /home/ana/site/p-err-faltanome.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> com argumentos nomeados, um obrigatório ficou de fora. A mensagem é diferente do "Too few arguments": ela diz qual parâmetro faltou (o nº 1, <code>$preco</code>).</p>
+<p><strong>Como resolver:</strong> <code>precoFinal(18.9, desconto: 0.1)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A função "não mudou" a minha variável</strong>
+<p><strong>O que aconteceu:</strong> o parâmetro é por valor (o normal), então a função mexeu numa cópia. Veja <code>p-valor.php</code>.</p>
+<p><strong>Como resolver:</strong> faça a função devolver o novo valor com <code>return</code> e guarde: <code>$estoque = aumentar($estoque);</code>. Ou, se for mesmo o caso, use <code>&amp;</code> no parâmetro.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th></tr>
+<tr><td>Um parâmetro</td><td><code>function f($x) { … }</code> → <code>f(10);</code></td></tr>
+<tr><td>Vários</td><td><code>function f($x, $y) { … }</code> → <code>f(10, 20);</code></td></tr>
+<tr><td>Opcional, com padrão</td><td><code>function f($x, $y = 1) { … }</code> → <code>f(10);</code></td></tr>
+<tr><td>Padrão calculado</td><td><code>function f($quando = null) { $quando = $quando ?? date("d/m/Y"); }</code></td></tr>
+<tr><td>Argumento nomeado</td><td><code>f(10, y: 5)</code>, <code>f(y: 5, x: 10)</code></td></tr>
+<tr><td>Pular opcionais do meio</td><td><code>htmlspecialchars($t, double_encode: false)</code></td></tr>
+<tr><td>Mudar a variável de quem chama</td><td><code>function f(&amp;$x) { $x++; }</code> → <code>f($n);</code></td></tr>
+<tr><td>Devolver o novo valor (preferível)</td><td><code>function f($x) { return $x + 1; }</code> → <code>$n = f($n);</code></td></tr>
+</table>
+</div>
+<p>Parâmetros também podem ter <strong>tipo</strong> (<code>function f(int $x)</code>): é a próxima aula, <a href="tipos-retorno.html">Tipos e Retorno</a>. E uma função pode receber <strong>quantos argumentos quiser</strong> (<code>function soma(...$numeros)</code>): veja <a href="variadicas.html">Funções Variádicas</a>.</p>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="out:R$ 18\,90,out:US$ 1.234\,50,out:R$ 19,src:casas:\s*0,semerro">
+<p class="try-task"><strong>Missão:</strong> o programa para com <code>ArgumentCountError</code>. Dê valores padrão aos parâmetros da função (<code>$moeda</code> = <code>"R$"</code> e <code>$casas</code> = <code>2</code>), para as duas primeiras chamadas funcionarem como estão. Depois, troque a terceira chamada por uma com <strong>argumento nomeado</strong>, <code>casas: 0</code>, sem repetir o <code>"R$"</code>. A saída deve ser <code>R$ 18,90</code>, <code>US$ 1.234,50</code> e <code>R$ 19</code>.</p>
+<pre class="script">&lt;?php
+function formatarPreco($valor, $moeda, $casas)
+{
+    return $moeda . " " . number_format($valor, $casas, ",", ".");
+}
+
+echo formatarPreco(18.9), "\n";
+echo formatarPreco(1234.5, "US$"), "\n";
+echo formatarPreco(18.9, "R$", 0), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+function formatarPreco($valor, $moeda = "R$", $casas = 2)
+{
+    return $moeda . " " . number_format($valor, $casas, ",", ".");
+}
+
+echo formatarPreco(18.9), "\n";
+echo formatarPreco(1234.5, "US$"), "\n";
+echo formatarPreco(18.9, casas: 0), "\n";
+</pre>
+</div>
+
+<pre class="term">$ php precos.php
+R$ 18,90
+US$ 1.234,50
+R$ 19                   « number_format com 0 casas arredonda 18,9 para 19</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Valor padrão</h3>
+<p>Complete para o parâmetro <code>$saudacao</code> valer <code>"Olá"</code> quando não for passado:</p>
+<div class="ex-code">function saudar($nome, $saudacao <input data-answer="= &quot;Olá&quot;|= 'Olá'|=&quot;Olá&quot;|='Olá'" aria-label="valor padrão">) { … }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Só o desconto</h3>
+<p>Complete a chamada para passar só o desconto de 20%, usando argumento nomeado:</p>
+<div class="ex-code">precoFinal(50, <input data-answer="desconto: 0.2|desconto:0.2" aria-label="argumento nomeado">);</div>
+</div>
+
+<div class="exercise">
+<h3>3. Mudar o original</h3>
+<p>Complete para a função mudar a variável de quem chama:</p>
+<div class="ex-code">function zerar(<input data-answer="&amp;$x" aria-label="parâmetro">) { $x = 0; }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Com <code>function f($a, $b = 2, $c = 3)</code>, qual chamada dá <code>ArgumentCountError</code>?</p>
+<label><input type="radio" name="q4"> <code>f(1)</code></label>
+<label><input type="radio" name="q4"> <code>f(1, c: 9)</code></label>
+<label><input type="radio" name="q4"> <code>f()</code></label>
+<label><input type="radio" name="q4"> <code>f(c: 9, a: 1)</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. O que este código mostra? <code>function dobrar($n) { $n = $n * 2; } $x = 5; dobrar($x); echo $x;</code></p>
+<label><input type="radio" name="q5"> 10</label>
+<label><input type="radio" name="q5"> 5</label>
+<label><input type="radio" name="q5"> Nada, porque a função não tem <code>echo</code>.</label>
+<label><input type="radio" name="q5"> Um erro, porque a função não tem <code>return</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Qual chamada é <strong>inválida</strong>?</p>
+<label><input type="radio" name="q6"> <code>f(a: 1, 2)</code></label>
+<label><input type="radio" name="q6"> <code>f(1, b: 2)</code></label>
+<label><input type="radio" name="q6"> <code>f(b: 2, a: 1)</code></label>
+<label><input type="radio" name="q6"> <code>f(1, 2)</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><strong>Parâmetros</strong> são as variáveis da definição; <strong>argumentos</strong>, os valores da chamada. Por posição, a ordem manda.</li>
+  <li>Argumentos a menos: <code>ArgumentCountError: Too few arguments</code>. A mais: ignorados nas suas funções, erro nas nativas.</li>
+  <li>Valor padrão (<code>$y = 1</code>) torna o parâmetro opcional; opcionais vão no fim, e o padrão deve ser um valor fixo (use <code>null</code> + <code>??</code> para calcular).</li>
+  <li>Argumentos nomeados (PHP 8.0): <code>f(10, desconto: 0.1)</code>. Pulam opcionais e explicam a chamada. Posicionais primeiro.</li>
+  <li>Por valor (o normal), a função mexe numa cópia; por referência (<code>&amp;$x</code>), no original. Prefira <code>return</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
