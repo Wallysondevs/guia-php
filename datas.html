@@ -407,14 +407,26 @@ Fatal error: Uncaught Error: Class "IntlDateFormatter" not found in /home/ana/da
 Stack trace:
 #0 {main}
   thrown in /home/ana/datas/intl.php on line 3</pre>
-<p>Onde ela existir, o uso é assim (ilustrativo):</p>
-<pre class="file" data-file="intl.php">if (extension_loaded('intl')) {
-    $fmt = new IntlDateFormatter('pt_BR', IntlDateFormatter::FULL, IntlDateFormatter::NONE,
-                                 'America/Sao_Paulo');
-    echo $fmt-&gt;format(new DateTimeImmutable('2026-10-16'));
-    // sexta-feira, 16 de outubro de 2026
-}
+<p>A Ana tem, na mesma máquina, uma segunda instalação do PHP com mais extensões, que ela chama pelo comando <code>php-completo</code>. Nela, a <code>intl</code> existe:</p>
+<pre class="file" data-file="intl2.php">&lt;?php
+var_dump(extension_loaded('intl'));
+$data = new DateTimeImmutable('2026-10-16', new DateTimeZone('America/Sao_Paulo'));
+$fmt = new IntlDateFormatter('pt_BR', IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'America/Sao_Paulo');
+echo $fmt-&gt;format($data), "\n";
+$fmt = new IntlDateFormatter('pt_BR', IntlDateFormatter::LONG, IntlDateFormatter::SHORT, 'America/Sao_Paulo');
+echo $fmt-&gt;format($data), "\n";
+$fmt = new IntlDateFormatter('pt_BR', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'America/Sao_Paulo', null, "EEEE, d 'de' MMMM");
+echo $fmt-&gt;format($data), "\n";
+$fmt = new IntlDateFormatter('pt_BR', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'America/Sao_Paulo', null, 'MMM/yy');
+echo $fmt-&gt;format($data), "\n";
 </pre>
+<pre class="term">$ php-completo intl2.php
+bool(true)
+sexta-feira, 16 de outubro de 2026          « FULL: data completa, sem hora (NONE)
+16 de outubro de 2026 às 00:00              « LONG para a data, SHORT para a hora
+sexta-feira, 16 de outubro                  « um modelo próprio (letras do padrão ICU, diferentes das do date!)
+out./26</pre>
+<p>Os argumentos são: o idioma (<code>'pt_BR'</code>), o estilo da data, o estilo da hora (<code>FULL</code>, <code>LONG</code>, <code>MEDIUM</code>, <code>SHORT</code> ou <code>NONE</code>), o fuso e, opcionalmente, o calendário e um modelo. Cuidado: os modelos da <code>intl</code> usam outras letras (<code>EEEE</code> = dia da semana, <code>MMMM</code> = mês por extenso, <code>yy</code> = ano com 2 dígitos).</p>
 <p>Confira sempre com <code>extension_loaded('intl')</code> antes, ou fique com o array, que funciona em qualquer lugar.</p>
 </div>
 
