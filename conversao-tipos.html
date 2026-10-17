@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Conversão de Tipos — automática, (int), intval e strict_types | Guia PHP</title>
+<meta name="description" content="Conversão de tipos em PHP para quem nunca programou: a conversão automática (type juggling) de &quot;10&quot; + 5, o Warning de &quot;10 maçãs&quot; + 5, o TypeError de &quot;abc&quot; + 1, casting com (int), (float), (string) e (bool), intval, settype e uma apresentação do declare(strict_types=1), com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Conversão de Tipos</span></h1>
+
+<p class="intro">Um formulário pergunta a idade da cliente, ela digita <code>29</code>, e o PHP recebe… a <strong>string</strong> <code>"29"</code>. Tudo o que vem da web chega como texto. Para fazer contas, o texto precisa virar número; para mostrar um número, ele precisa virar texto. Essa troca de tipo se chama <strong>conversão</strong>. Às vezes o PHP faz sozinho (e às vezes faz o que você não queria); às vezes você pede. Nesta aula você aprende as duas formas, vê o que acontece com textos que <em>quase</em> são números e conhece a chave que liga o "modo rigoroso" do PHP.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o PHP converte os tipos sozinho (<em>type juggling</em>) em contas, textos e decisões.</li>
+  <li>O que acontece com <code>"10" + 5</code>, <code>"10 maçãs" + 5</code> e <code>"abc" + 1</code> no PHP 8.</li>
+  <li>Como converter você mesmo: <code>(int)</code>, <code>(float)</code>, <code>(string)</code>, <code>(bool)</code>.</li>
+  <li>As funções <code>intval</code>, <code>floatval</code>, <code>strval</code>, <code>boolval</code> e <code>settype</code>.</li>
+  <li>O que é <code>declare(strict_types=1)</code>, só para reconhecê-lo.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. Você já conhece os tipos (<a href="tipos-dados.html">Tipos de Dados</a>) e o <code>var_dump</code> (<a href="var-dump.html">var_dump e print_r</a>), que vamos usar o tempo todo.</p>
+
+<hr>
+
+<h2>A ideia: o tradutor automático e o tradutor contratado</h2>
+<p>Imagine uma loja com clientes estrangeiros. Há duas formas de entender o que eles dizem:</p>
+<ul>
+  <li>Um <strong>tradutor automático</strong>, que traduz sozinho sempre que acha necessário. É rápido, mas às vezes traduz errado sem avisar.</li>
+  <li>Um <strong>tradutor contratado</strong>, a quem você pede explicitamente: "traduza isto para português". Dá mais trabalho, mas você sabe exatamente o que foi feito.</li>
+</ul>
+<p>O PHP tem os dois. A <strong>conversão automática</strong> (chamada <em>type juggling</em>, "malabarismo de tipos") acontece sozinha quando o PHP precisa de um tipo e recebe outro. A <strong>conversão explícita</strong> (o <em>casting</em>) é quando você escreve no código "converta para inteiro".</p>
+
+<hr>
+
+<h2>1. A conversão automática</h2>
+<p>O PHP olha o <strong>operador</strong> para decidir o tipo de que precisa. O <code>+</code> precisa de números; o ponto (<code>.</code>) precisa de texto; o <code>if</code> precisa de booleano. Se recebe outro tipo, converte:</p>
+
+<pre class="file" data-file="automatica.php">&lt;?php
+var_dump("10" + 5);
+var_dump("10" . 5);
+var_dump("1.5" + 1);
+var_dump(" 10" + 5);
+var_dump("1e2" + 0);
+var_dump(true + 1);
+var_dump(null + 1);
+var_dump("10" * "2");
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php automatica.php
+int(15)                  « "10" virou o número 10 para a soma
+string(3) "105"         « o ponto quer texto: o 5 virou "5" e foi colado
+float(2.5)               « "1.5" virou float
+int(15)                  « espaços no começo (e no fim) são tolerados
+float(100)               « "1e2" é notação científica: 100.0
+int(2)                   « true vale 1
+int(1)                   « null vale 0
+int(20)                  « os dois textos viraram números</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Onde</th><th>O PHP precisa de</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>+ - * / % **</code></td><td>número</td><td><code>"10" + 5</code></td><td><code>15</code></td></tr>
+<tr><td><code>.</code> e <code>echo</code></td><td>texto</td><td><code>"10" . 5</code></td><td><code>"105"</code></td></tr>
+<tr><td><code>if</code>, <code>while</code>, <code>!</code>, <code>&amp;&amp;</code></td><td>booleano</td><td><code>if ("0")</code></td><td>falso (aula <a href="booleanos.html">Booleanos</a>)</td></tr>
+<tr><td><code>==</code>, <code>&lt;</code>, <code>&gt;</code></td><td>tipos "compatíveis"</td><td><code>10 == "10"</code></td><td><code>true</code> (aula <a href="operadores-comparacao.html">Comparação</a>)</td></tr>
+</table>
+</div>
+
+<p>Repare na diferença das duas primeiras linhas: o mesmo par <code>"10"</code> e <code>5</code> deu <code>15</code> com <code>+</code> e <code>"105"</code> com <code>.</code>. Em PHP, <strong>o operador decide</strong>. (Em JavaScript, <code>"10" + 5</code> dá <code>"105"</code>; o PHP evita essa confusão tendo um operador separado para juntar texto, o ponto.)</p>
+
+<hr>
+
+<h2>2. Texto que é número, que quase é, e que não é</h2>
+<p>Para fazer conta com uma string, o PHP classifica o texto em três grupos. Cada grupo tem um comportamento diferente no PHP 8:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Grupo</th><th>Exemplos</th><th>Numa conta</th></tr>
+<tr><td><strong>Numérico</strong>: só um número (espaços nas pontas são aceitos)</td><td><code>"10"</code>, <code>" 10"</code>, <code>"1.5"</code>, <code>"1e2"</code>, <code>"-3"</code></td><td>Vira o número, sem aviso.</td></tr>
+<tr><td><strong>Começa com número</strong>: número seguido de outra coisa</td><td><code>"10 maçãs"</code>, <code>"12abc"</code>, <code>"12,90"</code></td><td>Usa o número do começo <strong>e dá Warning</strong>.</td></tr>
+<tr><td><strong>Não numérico</strong></td><td><code>"abc"</code>, <code>"maçã"</code>, <code>""</code></td><td><strong>TypeError</strong>: o programa para.</td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="macas.php">&lt;?php
+var_dump("10 maçãs" + 5);
+echo "--\n";
+var_dump("abc" + 1);
+echo "fim\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php macas.php
+
+Warning: A non-numeric value encountered in /home/ana/site/macas.php on line 2
+int(15)                  « usou o 10 do começo, mas reclamou
+--
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + int in /home/ana/site/macas.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/macas.php on line 4
+$ echo $?
+255                      « o "fim" nunca apareceu</pre>
+
+<dl class="anatomy">
+  <dt>Warning: A non-numeric value encountered</dt><dd>"Foi encontrado um valor não numérico". O PHP aproveitou o <code>10</code> do começo e jogou fora o resto (<code>" maçãs"</code>), mas avisa: provavelmente não era isso que você queria.</dd>
+  <dt>TypeError: Unsupported operand types: string + int</dt><dd>"Erro de tipo: tipos de operandos não suportados: string mais int". Não há nenhum número em <code>"abc"</code>: o PHP 8 se recusa a inventar um e para o programa.</dd>
+</dl>
+
+<div class="note">
+<strong>Isso mudou no PHP 8</strong>
+<p>No PHP 7, <code>"abc" + 1</code> dava só um aviso e o resultado <code>1</code> (o texto valia zero). O PHP 8 ficou mais rigoroso: texto sem número numa conta agora é erro. Se você encontrar tutoriais antigos dizendo que "string sem número vale 0 numa soma", eles estão falando do PHP 7.</p>
+</div>
+
+<p>O caso <code>"12,90"</code> merece atenção especial no Brasil: o PHP usa <strong>ponto</strong> como separador decimal, então a vírgula é "outra coisa" e tudo depois dela é descartado. <code>"12,90" * 2</code> dá <code>24</code>, com Warning. Você vai consertar isso na missão final.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> troque o texto de <code>$quantidade</code> e veja em qual grupo ele cai: <code>"3"</code>, <code>" 3 "</code>, <code>"3.5"</code>, <code>"3 unidades"</code>, <code>"três"</code>, <code>""</code>.</p>
+<pre class="script">&lt;?php
+$quantidade = "3 unidades";
+var_dump($quantidade * 2);
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Converter você mesmo: o <em>casting</em></h2>
+<p>Para converter de propósito, escreva o tipo desejado <strong>entre parênteses</strong> antes do valor. Isso se chama <strong>casting</strong> (algo como "moldar"):</p>
+
+<dl class="anatomy">
+  <dt>(int) $x</dt><dd>Converte para inteiro.</dd>
+  <dt>(float) $x</dt><dd>Converte para float.</dd>
+  <dt>(string) $x</dt><dd>Converte para texto.</dd>
+  <dt>(bool) $x</dt><dd>Converte para booleano.</dd>
+  <dt>(array) $x</dt><dd>Converte para array (põe o valor dentro de um array).</dd>
+</dl>
+
+<p>O casting <strong>nunca dá Warning nem erro</strong> por texto estranho: você está dizendo "eu sei o que estou fazendo". Por isso, é bom conhecer as regras.</p>
+
+<h3>Para <code>int</code></h3>
+
+<pre class="file" data-file="para-int.php">&lt;?php
+var_dump((int) "42");
+var_dump((int) "42abc");
+var_dump((int) "abc");
+var_dump((int) 3.99);
+var_dump((int) -3.99);
+var_dump((int) "3.99");
+var_dump((int) true);
+var_dump((int) null);
+var_dump((int) "");
+var_dump((int) "1e3");
+var_dump((int) "0x1A");
+var_dump((int) "012");
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php para-int.php
+int(42)
+int(42)                  « pega o número do começo, em silêncio
+int(0)                   « sem número: 0
+int(3)                   « corta a parte decimal (não arredonda!)
+int(-3)                  « corta em direção ao zero
+int(3)
+int(1)
+int(0)
+int(0)
+int(1000)                « entende notação científica
+int(0)                   « NÃO entende hexadecimal em texto
+int(12)                  « nem octal: o zero à esquerda é ignorado</pre>
+
+<p>O mais importante: <strong><code>(int)</code> corta, não arredonda</strong>. <code>(int) 3.99</code> é <code>3</code>. Para arredondar, use <code>(int) round(3.99)</code> (aula <a href="numeros.html">int e float</a>).</p>
+
+<h3>Para <code>float</code>, <code>string</code> e <code>bool</code></h3>
+
+<pre class="file" data-file="outros.php">&lt;?php
+var_dump((float) "3.14");
+var_dump((float) "3,14");
+var_dump((float) 5);
+var_dump((string) 42);
+var_dump((string) 3.0);
+var_dump((string) true);
+var_dump((string) false);
+var_dump((string) null);
+var_dump((bool) "0");
+var_dump((bool) "abc");
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php outros.php
+float(3.14)
+float(3)                 « a vírgula interrompe: só o 3 foi lido
+float(5)
+string(2) "42"
+string(1) "3"            « 3.0 vira "3", sem o ".0"
+string(1) "1"            « true vira "1"
+string(0) ""             « false vira texto vazio
+string(0) ""             « null também
+bool(false)              « "0" é falso
+bool(true)</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor</th><th><code>(int)</code></th><th><code>(float)</code></th><th><code>(string)</code></th><th><code>(bool)</code></th></tr>
+<tr><td><code>"42"</code></td><td><code>42</code></td><td><code>42.0</code></td><td><code>"42"</code></td><td><code>true</code></td></tr>
+<tr><td><code>"42abc"</code></td><td><code>42</code></td><td><code>42.0</code></td><td><code>"42abc"</code></td><td><code>true</code></td></tr>
+<tr><td><code>"abc"</code></td><td><code>0</code></td><td><code>0.0</code></td><td><code>"abc"</code></td><td><code>true</code></td></tr>
+<tr><td><code>"0"</code></td><td><code>0</code></td><td><code>0.0</code></td><td><code>"0"</code></td><td><code>false</code></td></tr>
+<tr><td><code>""</code></td><td><code>0</code></td><td><code>0.0</code></td><td><code>""</code></td><td><code>false</code></td></tr>
+<tr><td><code>3.99</code></td><td><code>3</code></td><td><code>3.99</code></td><td><code>"3.99"</code></td><td><code>true</code></td></tr>
+<tr><td><code>true</code></td><td><code>1</code></td><td><code>1.0</code></td><td><code>"1"</code></td><td><code>true</code></td></tr>
+<tr><td><code>false</code></td><td><code>0</code></td><td><code>0.0</code></td><td><code>""</code></td><td><code>false</code></td></tr>
+<tr><td><code>null</code></td><td><code>0</code></td><td><code>0.0</code></td><td><code>""</code></td><td><code>false</code></td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Novidade do PHP 8.5: float grande demais para int</strong>
+<p>Converter para int um float que não cabe num inteiro (ou o <code>NAN</code>) agora dá Warning, porque o resultado é lixo:</p>
+<pre class="term" data-cwd="~/site">$ php grande.php             « var_dump((int) 1e20);
+
+Warning: The float 1.0E+20 is not representable as an int, cast occurred in /home/ana/site/grande.php on line 2
+int(7766279631452241920)</pre>
+<p><em>Not representable as an int</em> = "não pode ser representado como int".</p>
+</div>
+
+<div class="tryphp" data-goal="out:int(30),semerro,src:\(int\)|intval">
+<p class="try-task"><strong>Missão:</strong> a idade veio do formulário como texto. Converta-a para inteiro <strong>antes</strong> de somar, guardando em <code>$idade</code>, para o <code>var_dump</code> do ano que vem mostrar <code>int(30)</code>. Use <code>(int)</code> ou <code>intval</code>.</p>
+<pre class="script">&lt;?php
+$idadeDoFormulario = "29";
+$idade = $idadeDoFormulario;
+var_dump($idade);
+var_dump($idade + 1);
+</pre>
+<pre class="solucao">&lt;?php
+$idadeDoFormulario = "29";
+$idade = (int) $idadeDoFormulario;
+var_dump($idade);
+var_dump($idade + 1);
+</pre>
+</div>
+
+<hr>
+
+<h2>4. As funções de conversão: <code>intval</code>, <code>floatval</code>, <code>strval</code>, <code>boolval</code></h2>
+<p>Cada casting tem uma função equivalente. <code>intval("42")</code> é o mesmo que <code>(int) "42"</code>. A vantagem das funções é poderem ser passadas para outras funções (como <code>array_map("intval", $lista)</code>, em <a href="funcoes-array.html">Funções de Array</a>) e, no caso do <code>intval</code>, escolher a <strong>base</strong> do número:</p>
+
+<pre class="file" data-file="funcoes.php">&lt;?php
+var_dump(intval("42"));
+var_dump(intval("12abc"));
+var_dump(intval("0x1A", 16));
+var_dump(intval("101", 2));
+var_dump(intval("012", 0));
+var_dump(floatval("1.5kg"));
+var_dump(strval(10));
+var_dump(boolval([]));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php funcoes.php
+int(42)
+int(12)
+int(26)                  « lido como hexadecimal (base 16)
+int(5)                   « lido como binário (base 2)
+int(10)                  « base 0: o PHP olha o prefixo; "012" é octal
+float(1.5)
+string(2) "10"
+bool(false)              « array vazio é falso</pre>
+
+<dl class="anatomy">
+  <dt>intval($x, $base)</dt><dd>Converte para int. A base (2, 8, 10, 16…) só vale para textos; o padrão é 10. Com base 0, o PHP decide pelo prefixo (<code>0x</code>, <code>0</code>, <code>0b</code>).</dd>
+  <dt>floatval($x)</dt><dd>O mesmo que <code>(float)</code>.</dd>
+  <dt>strval($x)</dt><dd>O mesmo que <code>(string)</code>.</dd>
+  <dt>boolval($x)</dt><dd>O mesmo que <code>(bool)</code>.</dd>
+</dl>
+
+<hr>
+
+<h2>5. <code>settype</code>: mudar o tipo da própria variável</h2>
+<p>O casting e as funções <strong>devolvem</strong> um valor novo; a variável original continua como estava. O <code>settype</code> ("definir o tipo") é diferente: ele <strong>muda a própria variável</strong>.</p>
+
+<pre class="file" data-file="settype.php">&lt;?php
+$x = "123";
+settype($x, "integer");
+var_dump($x);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php settype.php
+int(123)                 « a variável $x agora guarda um int</pre>
+
+<p>Os nomes aceitos são <code>"int"</code> ou <code>"integer"</code>, <code>"float"</code>, <code>"string"</code>, <code>"bool"</code> ou <code>"boolean"</code>, <code>"array"</code> e <code>"null"</code>. Ele devolve <code>true</code> quando consegue. É pouco usado: <code>$x = (int) $x;</code> faz o mesmo e é mais claro.</p>
+
+<h3>Qual usar?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Converter um valor (o mais comum)</td><td><code>(int) $x</code>, <code>(float) $x</code>, <code>(string) $x</code></td></tr>
+<tr><td>Ler um número em outra base</td><td><code>intval($x, 16)</code></td></tr>
+<tr><td>Converter todos os itens de um array</td><td><code>array_map("intval", $lista)</code></td></tr>
+<tr><td>Validar o que veio do usuário <strong>antes</strong> de converter</td><td><code>is_numeric($x)</code> ou <code>filter_var</code> (veja <a href="validacao.html">Validar Dados</a>)</td></tr>
+<tr><td>Mudar o tipo da própria variável</td><td><code>$x = (int) $x;</code> (ou <code>settype</code>)</td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>Converter não é validar</strong>
+<p><code>(int) "abc"</code> dá <code>0</code> sem reclamar. Se a cliente digitou "abc" no campo idade, converter em silêncio esconde o problema. Primeiro confira (<code>is_numeric</code>), depois converta.</p>
+</div>
+
+<hr>
+
+<h2>6. <code>declare(strict_types=1)</code>: o modo rigoroso (só apresentação)</h2>
+<p>No PHP moderno, você pode dizer o tipo que uma função espera receber (aula <a href="tipos-retorno.html">Tipos e Retorno</a>). Por padrão, o PHP ainda faz conversão automática nessa entrada: se a função espera <code>int</code> e recebe <code>"5"</code>, ele converte:</p>
+
+<pre class="file" data-file="sem-strict.php">&lt;?php
+function dobro(int $n): int
+{
+    return $n * 2;
+}
+var_dump(dobro(5));
+var_dump(dobro("5"));
+var_dump(dobro("cinco"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php sem-strict.php
+int(10)
+int(10)                  « "5" foi convertido para 5
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/site/sem-strict.php on line 8 and defined in /home/ana/site/sem-strict.php:2
+Stack trace:
+#0 /home/ana/site/sem-strict.php(8): dobro('cinco')
+#1 {main}
+  thrown in /home/ana/site/sem-strict.php on line 2</pre>
+
+<p>Com a linha <code>declare(strict_types=1);</code> no topo do arquivo, o PHP <strong>desliga essa conversão</strong> nas chamadas de função: o tipo tem que ser exatamente o pedido. Até <code>"5"</code> é recusado:</p>
+
+<pre class="file" data-file="com-strict.php">&lt;?php
+declare(strict_types=1);
+
+function dobro(int $n): int
+{
+    return $n * 2;
+}
+var_dump(dobro(5));
+var_dump(dobro("5"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php com-strict.php
+int(10)
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/site/com-strict.php on line 9 and defined in /home/ana/site/com-strict.php:4
+Stack trace:
+#0 /home/ana/site/com-strict.php(9): dobro('5')
+#1 {main}
+  thrown in /home/ana/site/com-strict.php on line 4</pre>
+
+<dl class="anatomy">
+  <dt>declare(…)</dt><dd>"Declarar": dá uma instrução ao PHP sobre como ler este arquivo.</dd>
+  <dt>strict_types=1</dt><dd>"Tipos estritos: ligado". Vale <strong>só para o arquivo onde está escrito</strong>.</dd>
+  <dt>must be of type int, string given</dt><dd>"Deve ser do tipo int; foi dada uma string".</dd>
+</dl>
+
+<p>Três coisas para saber agora:</p>
+<ul>
+  <li>Ele precisa ser a <strong>primeira instrução</strong> do arquivo, logo depois do <code>&lt;?php</code>. Senão: <code>Fatal error: strict_types declaration must be the very first statement in the script</code>.</li>
+  <li>Ele vale para <strong>chamadas de função</strong> (as suas e as do PHP: <code>strlen(123)</code> vira TypeError). <strong>Não</strong> muda os operadores: <code>"10" + 5</code> continua dando <code>15</code>.</li>
+  <li>Muitos projetos modernos e frameworks colocam essa linha em todos os arquivos. Ela pega erros cedo, em vez de deixar o PHP "adivinhar". Você vai usá-la a partir de <a href="tipos-retorno.html">Tipos e Retorno</a>.</li>
+</ul>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: A non-numeric value encountered</code></strong>
+<p><strong>O que significa:</strong> numa conta, uma string começava com número mas tinha mais coisa depois (<code>"10 maçãs"</code>, <code>"12,90"</code>, <code>"5 kg"</code>). O PHP usou só o número do começo.</p>
+<p><strong>Como consertar:</strong> limpe o texto antes. Para vírgula decimal: <code>(float) str_replace(",", ".", $preco)</code>. Para unidades, separe o número do texto.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught TypeError: Unsupported operand types: string + int</code></strong>
+<p><strong>O que significa:</strong> numa conta, uma string sem nenhum número no começo (<code>"abc"</code>, <code>""</code>, <code>"R$ 10"</code>).</p>
+<p><strong>Como consertar:</strong> confira o valor com <code>var_dump</code>. Valide com <code>is_numeric</code> antes de calcular. Repare que <code>"R$ 10"</code> não começa com número: tire o <code>R$</code> antes.</p>
+</div>
+
+<div class="cenario">
+<strong><code>TypeError: ...(): Argument #1 (...) must be of type int, string given</code></strong>
+<p><strong>O que significa:</strong> uma função que exige <code>int</code> recebeu uma string que não dá para converter, ou o arquivo tem <code>strict_types=1</code> e a string não é aceita de jeito nenhum.</p>
+<p><strong>Como consertar:</strong> converta antes de chamar: <code>dobro((int) $x)</code> (depois de validar).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: strict_types declaration must be the very first statement in the script</code></strong>
+<pre class="term" data-cwd="~/site">$ cat fora-do-lugar.php
+&lt;?php
+echo "oi\n";
+declare(strict_types=1);
+$ php fora-do-lugar.php
+
+Fatal error: strict_types declaration must be the very first statement in the script in /home/ana/site/fora-do-lugar.php on line 3
+Stack trace:
+#0 {main}</pre>
+<p><strong>Como consertar:</strong> mova o <code>declare</code> para logo depois do <code>&lt;?php</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A conversão deu 0 ou um número menor que o esperado</strong>
+<p><strong>O que significa:</strong> <code>(int)</code> cortou a parte decimal (<code>3.99</code> → <code>3</code>), parou na vírgula (<code>"3,5"</code> → <code>3</code>) ou o texto não tinha número (<code>"abc"</code> → <code>0</code>).</p>
+<p><strong>Como consertar:</strong> arredonde com <code>round</code>, troque a vírgula por ponto e valide antes.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>(int) $x</code>, <code>intval($x)</code></td><td>Para inteiro (corta decimais)</td><td><code>(int) "3.99"</code> → <code>3</code></td></tr>
+<tr><td><code>intval($x, $base)</code></td><td>Para inteiro, lendo na base dada</td><td><code>intval("ff", 16)</code> → <code>255</code></td></tr>
+<tr><td><code>(float) $x</code>, <code>floatval($x)</code></td><td>Para float</td><td><code>(float) "1.5kg"</code> → <code>1.5</code></td></tr>
+<tr><td><code>(string) $x</code>, <code>strval($x)</code></td><td>Para texto</td><td><code>(string) false</code> → <code>""</code></td></tr>
+<tr><td><code>(bool) $x</code>, <code>boolval($x)</code></td><td>Para booleano</td><td><code>(bool) "0"</code> → <code>false</code></td></tr>
+<tr><td><code>(array) $x</code></td><td>Para array</td><td><code>(array) "Ana"</code> → <code>["Ana"]</code></td></tr>
+<tr><td><code>settype($x, "int")</code></td><td>Muda o tipo da própria variável</td><td></td></tr>
+<tr><td><code>declare(strict_types=1);</code></td><td>Desliga a conversão automática nas chamadas de função do arquivo</td><td></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Para inteiro</h3>
+<p>Complete para converter <code>$texto</code> em inteiro com casting:</p>
+<div class="ex-code">$n = <input data-answer="(int)|(integer)" aria-label="casting"> $texto;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Ponto ou mais?</h3>
+<p>Qual operador faz <code>"10" ? 5</code> dar <code>"105"</code>?</p>
+<div class="ex-code">var_dump("10" <input data-answer="." aria-label="operador"> 5);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Quanto vale <code>(int) 7.9</code>?</p>
+<label><input type="radio" name="q3"> 8</label>
+<label><input type="radio" name="q3"> 7.9</label>
+<label><input type="radio" name="q3"> 7</label>
+<label><input type="radio" name="q3"> Dá Warning</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. O que acontece com <code>"abc" + 1</code> no PHP 8?</p>
+<label><input type="radio" name="q4"> Dá <code>1</code>, com um Warning</label>
+<label><input type="radio" name="q4"> <code>TypeError</code>: o programa para</label>
+<label><input type="radio" name="q4"> Dá <code>"abc1"</code></label>
+<label><input type="radio" name="q4"> Dá <code>0</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Com <code>declare(strict_types=1);</code> no topo, o que dá <code>"10" + 5</code>?</p>
+<label><input type="radio" name="q5"> TypeError</label>
+<label><input type="radio" name="q5"> <code>"105"</code></label>
+<label><input type="radio" name="q5"> Warning e <code>15</code></label>
+<label><input type="radio" name="q5"> <code>15</code>: o strict_types só vale para chamadas de função</label>
+</div>
+
+<h3>Missão final: o preço com vírgula</h3>
+
+<div class="tryphp" data-goal="out:Total: 25.8,semerro,src:\(float\)|floatval">
+<p class="try-task"><strong>Missão:</strong> o preço veio do formulário escrito do jeito brasileiro, <code>"12,90"</code>, e a conta dá <code>Total: 24</code> com um Warning. Antes de multiplicar, troque a vírgula por ponto com <code>str_replace(",", ".", $preco)</code> e converta o resultado para float com <code>(float)</code>. A saída deve ser <code>Total: 25.8</code>, sem avisos.</p>
+<pre class="script">&lt;?php
+$preco = "12,90";
+$total = $preco * 2;
+echo "Total: $total\n";
+</pre>
+<pre class="solucao">&lt;?php
+$preco = "12,90";
+$preco = (float) str_replace(",", ".", $preco);
+$total = $preco * 2;
+echo "Total: $total\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O PHP converte sozinho conforme o operador: <code>+</code> quer número, <code>.</code> quer texto, <code>if</code> quer booleano.</li>
+  <li>Texto numérico (<code>"10"</code>) vira número em silêncio; texto que começa com número (<code>"10 maçãs"</code>) dá Warning; texto sem número (<code>"abc"</code>) dá <code>TypeError</code> no PHP 8.</li>
+  <li>Para converter de propósito: <code>(int)</code>, <code>(float)</code>, <code>(string)</code>, <code>(bool)</code>, ou <code>intval</code>, <code>floatval</code>, <code>strval</code>, <code>boolval</code>. <code>(int)</code> corta, não arredonda.</li>
+  <li><code>settype</code> muda a própria variável. Converter não é validar: confira antes.</li>
+  <li><code>declare(strict_types=1);</code>, na primeira linha, desliga a conversão automática nas chamadas de função do arquivo.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
