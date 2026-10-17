@@ -395,7 +395,7 @@ Código 10?!</pre>
 <label><input type="radio" name="q5"> Depende do <code>default</code></label>
 </div>
 
-<div class="tryphp" data-goal="out:Pagamento por PIX,outre:Desconto de 5%\s*$,semerro">
+<div class="tryphp" data-goal="out:Pagamento por PIX,out:Desconto de 5%,outre:Desconto de 5%\n(?!Pagamento),semerro">
 <p class="try-task"><strong>Missão final:</strong> na lojinha, o pagamento <code>"pix"</code> deve mostrar <code>Pagamento por PIX</code> e, na linha de baixo, <code>Desconto de 5%</code>; <code>"cartao"</code> mostra <code>Pagamento no cartão</code>; qualquer outro, <code>Forma desconhecida</code>. O código abaixo tem um bug: rode com <code>$pagamento = "pix"</code> e veja o que sobra na saída. Corrija.</p>
 <pre class="script">&lt;?php
 $pagamento = "pix";
