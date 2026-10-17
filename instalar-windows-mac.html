@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Instalar no Windows e macOS — zip oficial, PATH, XAMPP, Laragon e Homebrew | Guia PHP</title>
+<meta name="description" content="Instalar o PHP 8.5 no Windows (zip oficial do php.net, Visual C++, PATH, winget, XAMPP, Laragon, WSL) e no macOS (Homebrew, brew install php), configurar o php.ini e ligar extensões, e conferir com php -v. Passos oficiais, marcados como ilustrativos.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Instalar no Windows e macOS</span></h1>
+
+<p class="intro">No Windows e no macOS, o PHP não vem instalado, e não há um "instalador de duas cliques" oficial: no Windows você baixa um arquivo <code>.zip</code> e diz ao sistema onde ele está; no macOS, o caminho mais simples é o Homebrew. Nesta aula você vai ver os passos oficiais, as alternativas prontas (XAMPP, Laragon, WSL) e como conferir se deu certo.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Instalar o PHP 8.5 no Windows pelo <code>.zip</code> oficial e colocá-lo no <code>PATH</code>.</li>
+  <li>Criar o <code>php.ini</code> e ligar extensões no Windows.</li>
+  <li>Quando usar o <code>winget</code>, o XAMPP, o Laragon ou o WSL.</li>
+  <li>Instalar no macOS com o Homebrew (<code>brew install php</code>).</li>
+  <li>Conferir a instalação com <code>php -v</code> e resolver os erros mais comuns.</li>
+</ul>
+</div>
+
+<div class="warning">
+<strong>Esta aula é ilustrativa</strong>
+<p>O laboratório do guia é um Linux, então os passos e as telas do Windows e do macOS <strong>não</strong> puderam ser executados nele. Eles seguem as instruções oficiais (<a href="https://www.php.net/downloads.php?os=windows">php.net</a> e <a href="https://formulae.brew.sh/formula/php">formulae.brew.sh</a>, consultados em 16/10/2026); nomes de menus e números de versão podem variar um pouco no seu computador. Só as saídas da caixa Experimente e as do laboratório (marcadas) são reais.</p>
+</div>
+
+<div class="tip">
+<strong>Não precisa instalar para começar</strong>
+<p>As caixas Experimente rodam o PHP 8.5 no navegador, e o Nível 1 inteiro pode ser feito sem instalar nada. Instale quando quiser trabalhar com arquivos no seu computador.</p>
+</div>
+
+<hr>
+
+<h2>Antes de tudo: o terminal</h2>
+<p>O PHP é um programa de <strong>linha de comando</strong>: você o usa digitando comandos numa janela de texto, o <strong>terminal</strong>. Não existe "ícone do PHP" para clicar.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sistema</th><th>Terminal</th><th>Como abrir</th></tr>
+<tr><td>Windows 10 e 11</td><td><strong>Terminal</strong> (com o PowerShell) ou Prompt de Comando</td><td>Clique com o botão direito no menu Iniciar → <strong>Terminal</strong>; ou tecle <kbd>Win</kbd>, digite <code>terminal</code> e <kbd>Enter</kbd>.</td></tr>
+<tr><td>macOS</td><td><strong>Terminal</strong></td><td><kbd>Cmd</kbd>+<kbd>Espaço</kbd>, digite <code>terminal</code> e <kbd>Enter</kbd>.</td></tr>
+</table>
+</div>
+
+<p>Nas aulas do guia, os comandos aparecem com o prompt <code>ana@notebook:~$</code> da máquina fictícia (um Linux). No Windows o prompt é algo como <code>PS C:\Users\Ana&gt;</code> e no macOS, <code>ana@MacBook ~ %</code>. Os comandos <code>php</code> são os mesmos nos três.</p>
+
+<hr>
+
+<h2>Windows</h2>
+
+<h3>Qual caminho escolher?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Caminho</th><th>O que é</th><th>Bom para</th></tr>
+<tr><td><strong>Zip oficial</strong></td><td>O PHP puro, do site oficial. Você descompacta e configura o <code>PATH</code>.</td><td>Entender o que está acontecendo; seguir este guia. <strong>Recomendado.</strong></td></tr>
+<tr><td><strong>winget</strong></td><td>O gerenciador de pacotes do próprio Windows. Baixa o mesmo zip oficial e configura o <code>PATH</code> sozinho.</td><td>Quem já usa o <code>winget</code> e quer menos passos.</td></tr>
+<tr><td><strong>Laragon</strong></td><td>Um pacote com PHP, Apache/nginx e MySQL, com painel gráfico.</td><td>Desenvolver sites com banco de dados sem configurar nada.</td></tr>
+<tr><td><strong>XAMPP</strong></td><td>Pacote clássico com Apache, MariaDB e PHP.</td><td>Muito citado em cursos antigos. Confira a versão do PHP que vem nele antes de baixar: o XAMPP costuma demorar a acompanhar as versões novas.</td></tr>
+<tr><td><strong>WSL</strong></td><td>Um Ubuntu de verdade rodando dentro do Windows.</td><td>Ter o mesmo ambiente das aulas (e dos servidores). Depois de instalado, siga <a href="instalar-linux.html">Instalar no Linux</a>.</td></tr>
+</table>
+</div>
+
+<h3>Caminho 1: o zip oficial, passo a passo</h3>
+<ol class="passo">
+  <li><strong>Instale o Visual C++ Redistributable.</strong> O PHP para Windows é montado com o Visual Studio 2022 e precisa das bibliotecas dele. Baixe o "Visual C++ Redistributable for Visual Studio 2015-2022" para x64 (o link está na própria página de downloads do PHP, <code>aka.ms/vs/17/release/vc_redist.x64.exe</code>) e instale. Muitos computadores já têm; instalar de novo não faz mal.</li>
+  <li><strong>Baixe o PHP.</strong> Em <a href="https://www.php.net/downloads.php?os=windows">php.net/downloads.php?os=windows</a>, procure a seção do PHP 8.5 e baixe o <strong>Zip</strong> da linha <strong>VS17 x64 Non Thread Safe</strong>. Em outubro de 2026, o arquivo é o <code>php-8.5.11-nts-Win32-vs17-x64.zip</code> (cerca de 34 MB).</li>
+  <li><strong>Descompacte numa pasta simples</strong>, sem espaços nem acentos no caminho: <code>C:\php</code>. Dentro dela deve ficar o arquivo <code>php.exe</code> (e não uma subpasta com o nome do zip; se ficou, mova o conteúdo um nível acima).</li>
+  <li><strong>Crie o <code>php.ini</code>.</strong> Na pasta <code>C:\php</code> há dois modelos: <code>php.ini-development</code> e <code>php.ini-production</code>. Faça uma cópia do <strong>development</strong> (ele mostra todos os erros, o que é bom para estudar) e renomeie a cópia para <code>php.ini</code>. Se o Windows esconder as extensões dos arquivos, ative "Extensões de nomes de arquivos" no menu <strong>Exibir</strong> do Explorador, senão você pode acabar com um <code>php.ini.txt</code>.</li>
+  <li><strong>Ligue as extensões.</strong> Abra o <code>php.ini</code> no Bloco de Notas (ou no seu editor) e procure as linhas abaixo. Apague o <code>;</code> do começo de cada uma (o <code>;</code> transforma a linha em comentário, ou seja, desligada):
+<pre class="file" data-file="C:\php\php.ini (trechos)">extension_dir = "ext"
+extension=curl
+extension=mbstring
+extension=openssl
+extension=pdo_sqlite
+extension=sqlite3</pre>
+  O <code>extension_dir = "ext"</code> diz que as extensões estão na subpasta <code>ext</code>. As outras linhas ligam as extensões usadas no guia.</li>
+  <li><strong>Coloque o PHP no <code>PATH</code></strong> (explicado logo abaixo).</li>
+  <li><strong>Abra um terminal novo</strong> (os que já estavam abertos não enxergam a mudança) e confira com <code>php -v</code>.</li>
+</ol>
+
+<div class="note">
+<strong>Thread Safe ou Non Thread Safe?</strong>
+<p>A página oficial explica: as versões <strong>NTS</strong> (<em>Non Thread Safe</em>) são para o uso na linha de comando e com servidores que chamam o PHP por FastCGI; as <strong>TS</strong> (<em>Thread Safe</em>) são para quem vai carregar o PHP dentro do Apache como módulo. Para o guia, que usa o terminal e o <code>php -S</code>, escolha <strong>NTS</strong>. E escolha <strong>x64</strong> (64 bits), que serve para praticamente todo Windows atual.</p>
+</div>
+
+<h3>O que é o <code>PATH</code> e como configurar</h3>
+<p>Quando você digita <code>php</code> no terminal, o Windows não procura no disco inteiro: ele olha só numa lista de pastas, guardada numa variável chamada <code>PATH</code> ("caminho"). Se a pasta <code>C:\php</code> não estiver na lista, o Windows responde que não conhece o comando. Para acrescentar:</p>
+
+<ol class="passo">
+  <li>Tecle <kbd>Win</kbd>, digite <code>variáveis de ambiente</code> e abra <strong>Editar as variáveis de ambiente do sistema</strong>.</li>
+  <li>Clique no botão <strong>Variáveis de Ambiente…</strong>.</li>
+  <li>Na parte de cima (<strong>Variáveis de usuário</strong>), selecione <strong>Path</strong> e clique em <strong>Editar…</strong>.</li>
+  <li>Clique em <strong>Novo</strong>, digite <code>C:\php</code> e confirme com <strong>OK</strong> em todas as janelas.</li>
+</ol>
+
+<p>Agora, num terminal <strong>novo</strong>:</p>
+
+<pre class="file" data-file="PowerShell · ilustrativo">PS C:\Users\Ana&gt; php -v
+PHP 8.5.11 (cli) (built: …) (NTS Visual C++ 2022 x64)
+Copyright (c) The PHP Group
+Zend Engine v4.5.11, Copyright (c) Zend Technologies
+    with Zend OPcache v8.5.11, Copyright (c), by Zend Technologies</pre>
+
+<p>A primeira linha confirma a versão e que é a montagem NTS de 64 bits. Para ver qual <code>php.ini</code> foi carregado e quais extensões estão ligadas, use os mesmos comandos do Linux: <code>php --ini</code> (deve mostrar <code>C:\php\php.ini</code> em <code>Loaded Configuration File</code>) e <code>php -m</code> (deve listar <code>mbstring</code>, <code>pdo_sqlite</code>…).</p>
+
+<h3>Caminho 2: <code>winget</code></h3>
+<p>O Windows 10 e 11 vêm com o <code>winget</code>, um gerenciador de pacotes de linha de comando. Ele baixa o zip oficial, descompacta e acerta o <code>PATH</code> sozinho. Primeiro, procure os pacotes do PHP; depois instale o da versão desejada:</p>
+
+<pre class="file" data-file="PowerShell · ilustrativo">winget search PHP.PHP
+winget install --id PHP.PHP.8.5 -e</pre>
+
+<p>O <code>--id</code> diz o identificador exato e o <code>-e</code> (de <em>exact</em>) evita que o <code>winget</code> escolha outro pacote parecido. Os identificadores seguem o padrão <code>PHP.PHP.8.5</code>, <code>PHP.PHP.8.4</code>…; confira com o <code>winget search</code> o que aparece no seu computador. Depois, abra um terminal novo e confira com <code>php -v</code>. Você ainda vai precisar criar o <code>php.ini</code> e ligar as extensões (passos 4 e 5 acima), na pasta onde o <code>winget</code> instalou o PHP: o comando <code>php --ini</code> mostra qual é.</p>
+
+<h3>Caminho 3: Laragon ou XAMPP</h3>
+<p>São "pacotes completos": um instalador gráfico que coloca o PHP, um servidor web (Apache ou nginx) e um banco de dados (MySQL ou MariaDB) de uma vez, com um painel para ligar e desligar tudo. São práticos para quem quer criar sites com banco de dados logo, mas escondem as peças, e às vezes trazem uma versão mais antiga do PHP.</p>
+<ul>
+  <li><strong>Laragon</strong> (<a href="https://laragon.org">laragon.org</a>): leve e atualizado com frequência; permite trocar a versão do PHP pelo menu. Os sites ficam na pasta <code>C:\laragon\www</code>.</li>
+  <li><strong>XAMPP</strong> (<a href="https://www.apachefriends.org">apachefriends.org</a>): o mais conhecido. Os sites ficam em <code>C:\xampp\htdocs</code> e são abertos em <code>http://localhost/</code>. Antes de baixar, veja na página qual versão do PHP vem em cada instalador.</li>
+</ul>
+<p>Com qualquer um deles, o comando <code>php</code> do terminal pode não funcionar até você acrescentar a pasta do PHP deles ao <code>PATH</code> (por exemplo, <code>C:\xampp\php</code>). Use <code>php -v</code> para confirmar <strong>qual</strong> PHP o terminal está usando.</p>
+
+<h3>Caminho 4: WSL, um Linux dentro do Windows</h3>
+<p>O <strong>WSL</strong> (<em>Windows Subsystem for Linux</em>) roda um Ubuntu de verdade dentro do Windows. É o caminho que deixa o seu ambiente mais parecido com o das aulas e com os servidores da internet. Num PowerShell aberto como administrador:</p>
+
+<pre class="file" data-file="PowerShell como administrador · ilustrativo">wsl --install</pre>
+
+<p>O Windows instala o WSL e o Ubuntu, pede para reiniciar e, na primeira abertura do Ubuntu, pede um nome de usuário e uma senha para o Linux. A partir daí, abra o <strong>Ubuntu</strong> pelo menu Iniciar e siga a aula <a href="instalar-linux.html">Instalar no Linux</a> (<code>sudo apt install php-cli</code>). Os seus arquivos do Windows ficam acessíveis em <code>/mnt/c/</code>.</p>
+
+<hr>
+
+<h2>macOS</h2>
+<p>O macOS trazia um PHP antigo de fábrica até a versão 11 (Big Sur); a Apple o removeu a partir do macOS 12 (Monterey). Hoje, o jeito mais usado de instalar é o <strong>Homebrew</strong>, o gerenciador de pacotes mais popular do Mac (o "apt do macOS").</p>
+
+<h3>1. Instale o Homebrew (se ainda não tiver)</h3>
+<p>Confira se ele já existe com <code>brew --version</code>. Se o terminal disser <code>command not found: brew</code>, instale com o comando publicado em <a href="https://brew.sh">brew.sh</a> (copie de lá, para ter sempre a versão atual):</p>
+
+<pre class="file" data-file="Terminal do macOS · ilustrativo">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre>
+
+<p>O instalador pede a senha do Mac, pode pedir para instalar as "Ferramentas de Linha de Comando do Xcode" (aceite) e, no fim, mostra dois ou três comandos em <strong>Next steps</strong> para colocar o <code>brew</code> no <code>PATH</code>. Rode esses comandos exatamente como ele mostrar.</p>
+
+<h3>2. Instale o PHP</h3>
+<pre class="file" data-file="Terminal do macOS · ilustrativo">brew install php</pre>
+
+<p>O Homebrew baixa o PHP mais recente (em outubro de 2026, o <strong>8.5.11</strong>) e as bibliotecas de que ele precisa. Ele já vem com as extensões mais usadas ligadas, inclusive <code>mbstring</code>, <code>pdo_sqlite</code> e <code>curl</code>. Confira:</p>
+
+<pre class="file" data-file="Terminal do macOS · ilustrativo">ana@MacBook ~ % php -v
+PHP 8.5.11 (cli) (built: …) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.5.11, Copyright (c) Zend Technologies
+    with Zend OPcache v8.5.11, Copyright (c), by Zend Technologies</pre>
+
+<p>O <code>php.ini</code> fica em <code>$HOMEBREW_PREFIX/etc/php/8.5/</code>: em Macs com processador Apple (M1, M2…), <code>/opt/homebrew/etc/php/8.5/php.ini</code>; em Macs com Intel, <code>/usr/local/etc/php/8.5/php.ini</code>. Como no Linux, <code>php --ini</code> mostra o caminho exato.</p>
+
+<h3>Outras versões e atualizações</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Comando</th><th>O que faz</th></tr>
+<tr><td><code>brew install php</code></td><td>Instala a versão mais nova (8.5).</td></tr>
+<tr><td><code>brew install php@8.4</code></td><td>Instala uma versão específica (há também <code>php@8.3</code> e <code>php@8.2</code>).</td></tr>
+<tr><td><code>brew upgrade php</code></td><td>Atualiza para a versão de correção mais nova.</td></tr>
+<tr><td><code>brew info php</code></td><td>Mostra a versão disponível e onde ficam os arquivos.</td></tr>
+<tr><td><code>brew services start php</code></td><td>Liga o PHP-FPM em segundo plano (só para usar com nginx ou Apache; para o guia, não precisa).</td></tr>
+<tr><td><code>brew uninstall php</code></td><td>Remove.</td></tr>
+</table>
+</div>
+
+<div class="note">
+<strong>Outras opções no Mac</strong>
+<p>O <strong>Laravel Herd</strong> (para macOS e Windows) e o <strong>MAMP</strong> são pacotes gráficos parecidos com o Laragon e o XAMPP. Funcionam, mas, como no Windows, escondem as peças. Para seguir o guia, o Homebrew é o mais direto.</p>
+</div>
+
+<hr>
+
+<h2>Testando: o mesmo programa nos três sistemas</h2>
+<p>Com o PHP instalado, crie uma pasta <code>site</code>, salve nela um arquivo <code>so.php</code> com o conteúdo abaixo (num editor de código; veja <a href="editores.html">Editores e IDEs</a>) e rode com <code>php so.php</code> no terminal, dentro dessa pasta:</p>
+
+<pre class="file" data-file="so.php">&lt;?php
+echo "Sistema: " . PHP_OS_FAMILY . "\n";
+echo "Separador de pastas: " . DIRECTORY_SEPARATOR . "\n";
+echo "Pasta deste arquivo: " . __DIR__ . "\n";
+</pre>
+
+<p>No laboratório do guia (Linux), a saída real é:</p>
+
+<pre class="term">$ php so.php
+Sistema: Linux
+Separador de pastas: /
+Pasta deste arquivo: /home/ana/t</pre>
+
+<p>No Windows, você veria <code>Sistema: Windows</code>, o separador <code>\</code> e algo como <code>C:\Users\Ana\site</code>; no Mac, <code>Sistema: Darwin</code> (o nome do núcleo do macOS), <code>/</code> e <code>/Users/ana/site</code>. As constantes deixam o mesmo programa funcionar nos três sistemas:</p>
+
+<dl class="anatomy">
+  <dt>PHP_OS_FAMILY</dt><dd>A família do sistema: <code>Windows</code>, <code>Darwin</code> (macOS), <code>Linux</code>, <code>BSD</code>…</dd>
+  <dt>DIRECTORY_SEPARATOR</dt><dd>O caractere que separa as pastas num caminho: <code>\</code> no Windows, <code>/</code> nos outros. (Na prática, o PHP aceita <code>/</code> também no Windows.)</dd>
+  <dt>__DIR__</dt><dd>A pasta onde está o arquivo que está rodando. Começa e termina com dois sublinhados; é uma "constante mágica" (aula <a href="constantes.html">Constantes</a>).</dd>
+</dl>
+
+<p>Rode o mesmo programa no PHP do navegador. Que sistema ele diz que é?</p>
+
+<div class="tryphp">
+<pre class="script">&lt;?php
+echo "Sistema: " . PHP_OS_FAMILY . "\n";
+echo "Separador de pastas: " . DIRECTORY_SEPARATOR . "\n";
+echo "Pasta deste arquivo: " . __DIR__ . "\n";
+echo "Versão: " . PHP_VERSION . "\n";
+</pre>
+</div>
+
+<p>O PHP do navegador roda num "computador de mentirinha" dentro da página, com o seu próprio sistema de arquivos na memória. Por isso a pasta não é nenhuma das suas. A aula <a href="simulador.html">O Editor do Guia</a> explica.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Windows: "php não é reconhecido como nome de cmdlet…"</strong>
+<pre class="file" data-file="PowerShell · ilustrativo">php : O termo 'php' não é reconhecido como nome de cmdlet, função, arquivo de script ou programa operável.</pre>
+<p>(No Prompt de Comando, a frase é <code>'php' não é reconhecido como um comando interno ou externo, um programa operável ou um arquivo em lotes.</code>)</p>
+<p><strong>O que aconteceu:</strong> a pasta do PHP não está no <code>PATH</code>, ou o terminal foi aberto antes de você mudar o <code>PATH</code>.</p>
+<p><strong>Como resolver:</strong> feche e abra o terminal. Se continuar, confira se a pasta digitada no <code>PATH</code> é exatamente a que contém o <code>php.exe</code> (<code>C:\php</code>, e não <code>C:\php\php-8.5.11-nts-Win32-vs17-x64</code>). Para testar sem o <code>PATH</code>, rode com o caminho completo: <code>C:\php\php.exe -v</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Windows: "VCRUNTIME140.dll não foi encontrado"</strong>
+<p><strong>O que aconteceu:</strong> faltam as bibliotecas do Visual C++ que o PHP usa. O Windows mostra uma janela de erro em vez de rodar o <code>php.exe</code>.</p>
+<p><strong>Como resolver:</strong> instale o "Visual C++ Redistributable for Visual Studio 2015-2022" (x64), o passo 1 do caminho do zip.</p>
+</div>
+
+<div class="cenario">
+<strong>"Call to undefined function mb_strtoupper()" ou "could not find driver"</strong>
+<p><strong>O que aconteceu:</strong> a extensão não está ligada. No Windows, quase sempre é o <code>php.ini</code>: ele não existe (só os modelos <code>php.ini-development</code> e <code>php.ini-production</code>), ficou com o nome <code>php.ini.txt</code>, ou as linhas <code>extension=…</code> continuam com o <code>;</code> na frente.</p>
+<p><strong>Como resolver:</strong> rode <code>php --ini</code>. Se <code>Loaded Configuration File</code> disser <code>(none)</code>, o PHP não achou o seu <code>php.ini</code>: confira o nome e a pasta. Depois, <code>php -m</code> deve listar a extensão. Veja as mensagens completas em <a href="instalar-linux.html">Instalar no Linux</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>macOS: "command not found: brew" logo depois de instalar o Homebrew</strong>
+<p><strong>O que aconteceu:</strong> faltou rodar os comandos de <strong>Next steps</strong> que o instalador mostrou, que colocam o <code>brew</code> no <code>PATH</code>.</p>
+<p><strong>Como resolver:</strong> rode os comandos que o instalador mostrou (em Macs com processador Apple, eles acrescentam <code>/opt/homebrew/bin</code> ao <code>PATH</code> no arquivo <code>~/.zprofile</code>) e abra um terminal novo.</p>
+</div>
+
+<div class="cenario">
+<strong>O terminal mostra uma versão do PHP diferente da que instalei</strong>
+<p><strong>O que aconteceu:</strong> há mais de um PHP no computador (por exemplo, o do XAMPP e o do zip oficial, ou dois do Homebrew), e o terminal achou primeiro o outro.</p>
+<p><strong>Como resolver:</strong> descubra qual está sendo usado: <code>where.exe php</code> no Windows, <code>which php</code> no macOS e no Linux. Deixe só a pasta desejada no <code>PATH</code> (ou coloque-a acima das outras).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tarefa</th><th>Windows</th><th>macOS</th></tr>
+<tr><td>Instalar</td><td>Zip oficial em <code>C:\php</code> + <code>PATH</code>, ou <code>winget install --id PHP.PHP.8.5 -e</code></td><td><code>brew install php</code></td></tr>
+<tr><td>Requisito</td><td>Visual C++ Redistributable 2015-2022 (x64)</td><td>Homebrew</td></tr>
+<tr><td>Qual montagem</td><td>VS17 x64 <strong>Non Thread Safe</strong></td><td>a do Homebrew</td></tr>
+<tr><td>php.ini</td><td>Copiar <code>php.ini-development</code> para <code>php.ini</code></td><td><code>/opt/homebrew/etc/php/8.5/php.ini</code> (Apple) ou <code>/usr/local/etc/php/8.5/php.ini</code> (Intel)</td></tr>
+<tr><td>Ligar extensão</td><td>Tirar o <code>;</code> de <code>extension=…</code> no <code>php.ini</code></td><td>As comuns já vêm ligadas</td></tr>
+<tr><td>Conferir</td><td colspan="2"><code>php -v</code> · <code>php -m</code> · <code>php --ini</code></td></tr>
+<tr><td>Qual PHP está sendo usado</td><td><code>where.exe php</code></td><td><code>which php</code></td></tr>
+<tr><td>Atualizar</td><td>Baixar o zip novo e substituir (mantendo o seu <code>php.ini</code>), ou <code>winget upgrade</code></td><td><code>brew upgrade php</code></td></tr>
+</table>
+</div>
+
+<p>Para fechar, uma missão sobre algo que muda entre os sistemas: a quebra de linha. O Linux e o macOS usam um caractere (<code>\n</code>); o Windows, tradicionalmente, dois (<code>\r\n</code>). A constante <code>PHP_EOL</code> (<em>End Of Line</em>, "fim de linha") vale a quebra certa para o sistema onde o PHP está rodando.</p>
+
+<div class="tryphp" data-goal="out:linha 1,out:linha 2,src:PHP_EOL">
+<p class="try-task"><strong>Missão:</strong> o programa escreve <code>linha 1</code> e <code>linha 2</code> grudadas. Coloque <code>. PHP_EOL</code> depois de cada texto, para cada um ficar na sua linha.</p>
+<pre class="script">&lt;?php
+echo "linha 1";
+echo "linha 2";
+</pre>
+<pre class="solucao">&lt;?php
+echo "linha 1" . PHP_EOL;
+echo "linha 2" . PHP_EOL;
+</pre>
+</div>
+
+<p>A aula <a href="echo-print.html">echo e print</a> compara <code>"\n"</code>, <code>PHP_EOL</code> e <code>&lt;br&gt;</code>.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. No Windows, qual zip do PHP 8.5 baixar para seguir o guia?</p>
+<label><input type="radio" name="q1"> VS17 x86 Thread Safe</label>
+<label><input type="radio" name="q1"> VS17 x64 Non Thread Safe</label>
+<label><input type="radio" name="q1"> O "Debug Pack"</label>
+<label><input type="radio" name="q1"> O código-fonte (<code>src.zip</code>)</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Você acrescentou <code>C:\php</code> ao <code>PATH</code>, mas o terminal ainda diz que não conhece o <code>php</code>. Qual a primeira coisa a fazer?</p>
+<label><input type="radio" name="q2"> Reinstalar o Windows.</label>
+<label><input type="radio" name="q2"> Baixar o XAMPP.</label>
+<label><input type="radio" name="q2"> Fechar o terminal e abrir um novo.</label>
+<label><input type="radio" name="q2"> Renomear <code>php.exe</code> para <code>php</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. No <code>php.ini</code>, o que o <code>;</code> no começo de <code>;extension=mbstring</code> faz?</p>
+<label><input type="radio" name="q3"> Transforma a linha em comentário: a extensão fica desligada.</label>
+<label><input type="radio" name="q3"> Liga a extensão.</label>
+<label><input type="radio" name="q3"> Termina a instrução, como no código PHP.</label>
+<label><input type="radio" name="q3"> Nada; é decoração.</label>
+</div>
+
+<div class="exercise">
+<h3>4. Homebrew</h3>
+<p>Complete o comando que instala o PHP no macOS com o Homebrew:</p>
+<div class="ex-code">brew <input data-answer="install php" aria-label="subcomando e pacote"></div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Windows: Visual C++ 2015-2022 → zip <strong>VS17 x64 Non Thread Safe</strong> em <code>C:\php</code> → <code>php.ini-development</code> copiado para <code>php.ini</code> → extensões sem <code>;</code> → <code>C:\php</code> no <code>PATH</code> → terminal novo → <code>php -v</code>.</li>
+  <li>Atalhos no Windows: <code>winget install --id PHP.PHP.8.5 -e</code>; pacotes completos (Laragon, XAMPP); ou o WSL com Ubuntu.</li>
+  <li>macOS: Homebrew → <code>brew install php</code> (8.5.11 em out/2026) → <code>php -v</code>.</li>
+  <li><code>php --ini</code> e <code>php -m</code> funcionam igual nos três sistemas. <code>which php</code> / <code>where.exe php</code> mostram qual PHP está sendo usado.</li>
+  <li><code>PHP_OS_FAMILY</code>, <code>DIRECTORY_SEPARATOR</code> e <code>PHP_EOL</code> ajudam o mesmo código a rodar em qualquer sistema.</li>
+  <li>Próximo passo: <a href="servidor-embutido.html">O Servidor Embutido</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
