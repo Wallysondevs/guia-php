@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Tipos e Retorno — tipos de parâmetro, return e strict_types | Guia PHP</title>
+<meta name="description" content="Tipos em funções PHP: declarar o tipo dos parâmetros e do retorno (int, float, string, bool, array, ?string, void, mixed), o return, a diferença real entre o modo normal (conversão silenciosa) e declare(strict_types=1) (TypeError), e o tipo never do PHP 8.1, com saídas e erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Tipos e Retorno</span></h1>
+
+<p class="intro">Uma função é um combinado: "me dê <em>isto</em> e eu devolvo <em>aquilo</em>". Até agora esse combinado estava só na cabeça de quem escreveu a função. Nesta aula você aprende a escrevê-lo no código: declarar <strong>de que tipo</strong> é cada parâmetro (um número inteiro? um texto? um array?) e <strong>o que a função devolve</strong> com o <code>return</code>. Com os tipos declarados, o PHP passa a conferir o combinado e a avisar na hora em que alguém o quebra, em vez de deixar o erro aparecer lá na frente, com um resultado estranho.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o <code>return</code> devolve um valor (e encerra a função na hora).</li>
+  <li>A diferença entre <strong>mostrar</strong> (<code>echo</code>) e <strong>devolver</strong> (<code>return</code>).</li>
+  <li>Como declarar o tipo dos parâmetros: <code>function f(int $x, string $nome, array $lista)</code>.</li>
+  <li>Como declarar o tipo do retorno: <code>: int</code>, <code>: string</code>, <code>: ?string</code>, <code>: void</code>, <code>: mixed</code>.</li>
+  <li>O que o PHP faz quando o tipo não bate: converter em silêncio (modo normal) ou dar <code>TypeError</code> (<code>declare(strict_types=1)</code>).</li>
+  <li>O que é o tipo <code>never</code> (PHP 8.1).</li>
+</ul>
+</div>
+
+<p>Antes, é bom ter feito <a href="funcoes.html">Funções</a>, <a href="parametros.html">Parâmetros</a> e <a href="tipos-dados.html">Tipos de Dados</a>.</p>
+
+<hr>
+
+<h2>O <code>return</code>: devolver um resultado</h2>
+<p>Uma função pode trabalhar e <strong>entregar</strong> um resultado a quem a chamou, como a calculadora que mostra o total. A palavra <code>return</code> ("retornar", "devolver") faz isso.</p>
+
+<pre class="file" data-file="t-early.php">&lt;?php
+function situacao($nota)
+{
+    if ($nota &gt;= 7) {
+        return "Aprovado";
+    }
+    if ($nota &gt;= 5) {
+        return "Recuperação";
+    }
+    return "Reprovado";
+    echo "Esta linha nunca roda\n";
+}
+echo situacao(9.5), "\n";
+echo situacao(6.0), "\n";
+echo situacao(3.0), "\n";
+</pre>
+
+<pre class="term">$ php t-early.php
+Aprovado
+Recuperação
+Reprovado               « e o "Esta linha nunca roda" de fato não apareceu</pre>
+
+<p>Duas coisas acontecem num <code>return</code>:</p>
+<ol>
+  <li>O valor à direita vira o <strong>resultado da chamada</strong>: no lugar de <code>situacao(9.5)</code>, fica <code>"Aprovado"</code>.</li>
+  <li>A função <strong>termina ali mesmo</strong>. Nada depois do <code>return</code> roda. Por isso o primeiro <code>if</code> não precisa de <code>else</code>: se a nota for 9.5, a função já acabou.</li>
+</ol>
+<p>Esse estilo, com vários <code>return</code> que saem cedo, é muito usado e se chama <em>early return</em> ("retorno antecipado"). Ele evita <code>if</code>s dentro de <code>if</code>s.</p>
+
+<h3>Sem <code>return</code>, a função devolve <code>null</code></h3>
+
+<pre class="file" data-file="t-null.php">&lt;?php
+function dobro($n)
+{
+    $resultado = $n * 2;     // calculou… e não devolveu
+}
+var_dump(dobro(4));
+</pre>
+
+<pre class="term">$ php t-null.php
+NULL</pre>
+
+<p>Este é um erro clássico: a conta foi feita, mas ficou presa dentro da função. Faltou <code>return $resultado;</code>. Mais abaixo, você vai ver que declarar o tipo do retorno faz o PHP denunciar esse erro.</p>
+
+<h3>Mostrar (<code>echo</code>) não é devolver (<code>return</code>)</h3>
+<p>Para quem está começando, as duas coisas parecem iguais, porque nos dois casos "aparece o número". Não são:</p>
+
+<pre class="file" data-file="t-echoreturn.php">&lt;?php
+function dobroEcho(int $n): void
+{
+    echo $n * 2;
+}
+function dobroReturn(int $n): int
+{
+    return $n * 2;
+}
+dobroEcho(5);
+echo "\n";
+$x = dobroReturn(5);
+echo $x + 1, "\n";
+$y = dobroEcho(5);
+echo "\n";
+var_dump($y);
+</pre>
+
+<pre class="term">$ php t-echoreturn.php
+10                      « dobroEcho mostrou o 10 na tela
+11                      « dobroReturn devolveu 10; deu para somar 1
+10                      « dobroEcho mostrou de novo…
+NULL                    « …mas não devolveu nada: $y ficou null</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th><code>echo</code> dentro da função</th><th><code>return</code></th></tr>
+<tr><td>Para onde vai o valor</td><td>Direto para a tela (ou a página)</td><td>Para quem chamou</td></tr>
+<tr><td>Dá para guardar numa variável?</td><td>Não</td><td>Sim</td></tr>
+<tr><td>Dá para usar numa conta, num <code>if</code>?</td><td>Não</td><td>Sim</td></tr>
+</table>
+</div>
+
+<p>Regra prática: funções que <strong>calculam</strong> devolvem com <code>return</code>; quem chama decide se mostra, guarda ou usa em outra conta. Isso deixa a função reaproveitável: <code>formatarPreco</code> serve para a tela, para um e-mail, para um PDF…</p>
+
+<hr>
+
+<h2>Tipos nos parâmetros</h2>
+<p>Sem tipos, uma função aceita qualquer coisa, e o problema só aparece lá dentro, às vezes com uma mensagem que não ajuda:</p>
+
+<pre class="file" data-file="t-sem.php">&lt;?php
+function precoFinal($preco, $quantidade)
+{
+    return $preco * $quantidade;
+}
+echo precoFinal(18.9, 2), "\n";
+echo precoFinal("18.9", "2"), "\n";
+echo precoFinal("dezoito", 2), "\n";
+</pre>
+
+<pre class="term">$ php t-sem.php
+37.8
+37.8
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string * int in /home/ana/site/t-sem.php:4
+Stack trace:
+#0 /home/ana/site/t-sem.php(8): precoFinal('dezoito', 2)
+#1 {main}
+  thrown in /home/ana/site/t-sem.php on line 4</pre>
+
+<p>O erro aponta a <strong>linha 4</strong> (a conta, dentro da função), e a mensagem fala de "operandos". A culpa, na verdade, é de quem chamou na linha 8. Agora com tipos:</p>
+
+<pre class="file" data-file="t-param.php">&lt;?php
+function precoFinal(float $preco, int $quantidade)
+{
+    return $preco * $quantidade;
+}
+echo precoFinal(18.9, 2), "\n";
+echo precoFinal("18.9", "2"), "\n";
+echo precoFinal(18, 2), "\n";
+echo precoFinal("dezoito", 2), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>float $preco</dt><dd>O tipo vem <strong>antes</strong> do nome do parâmetro: "<code>$preco</code> deve ser um número com decimais".</dd>
+  <dt>int $quantidade</dt><dd>"<code>$quantidade</code> deve ser um número inteiro".</dd>
+</dl>
+
+<pre class="term">$ php t-param.php
+37.8
+37.8                    « "18.9" e "2" são textos numéricos: o PHP converteu
+36                      « o int 18 foi aceito como float
+
+Fatal error: Uncaught TypeError: precoFinal(): Argument #1 ($preco) must be of type float, string given, called in /home/ana/site/t-param.php on line 9 and defined in /home/ana/site/t-param.php:2
+Stack trace:
+#0 /home/ana/site/t-param.php(9): precoFinal('dezoito', 2)
+#1 {main}
+  thrown in /home/ana/site/t-param.php on line 2</pre>
+
+<p>A mensagem agora diz exatamente o que houve: "o argumento nº 1 (<code>$preco</code>) deve ser do tipo float, foi passada uma string, <strong>chamada na linha 9</strong>". O erro aparece na porta de entrada da função, e aponta o culpado.</p>
+
+<h3>Os tipos que você vai usar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Aceita</th><th>Exemplo</th></tr>
+<tr><td><code>int</code></td><td>número inteiro</td><td><code>int $quantidade</code></td></tr>
+<tr><td><code>float</code></td><td>número com decimais (aceita int também)</td><td><code>float $preco</code></td></tr>
+<tr><td><code>string</code></td><td>texto</td><td><code>string $nome</code></td></tr>
+<tr><td><code>bool</code></td><td><code>true</code> ou <code>false</code></td><td><code>bool $ativo</code></td></tr>
+<tr><td><code>array</code></td><td>qualquer array</td><td><code>array $notas</code></td></tr>
+<tr><td><code>?string</code></td><td>string <strong>ou <code>null</code></strong> (o <code>?</code> vale para qualquer tipo: <code>?int</code>, <code>?array</code>…)</td><td><code>?string $email</code></td></tr>
+<tr><td><code>int|float</code></td><td>um <strong>ou</strong> outro (tipos união, <span class="versao">PHP 8.0+</span>)</td><td><code>int|float $valor</code></td></tr>
+<tr><td><code>mixed</code></td><td>qualquer coisa (é o mesmo que não pôr tipo, mas deixa claro que foi de propósito)</td><td><code>mixed $valor</code></td></tr>
+</table>
+</div>
+
+<p>Também dá para usar nomes de classes como tipo (<code>Produto $p</code>), assunto do Nível 3. Os tipos mais elaborados estão em <a href="tipos-avancados.html">Tipos Avançados</a>.</p>
+
+<hr>
+
+<h2>Modo normal × <code>declare(strict_types=1)</code></h2>
+<p>Você deve ter reparado: com <code>float $preco</code>, a string <code>"18.9"</code> foi <strong>aceita</strong>. Isso é o modo normal do PHP, chamado de <strong>modo coercivo</strong> ("que força"): se o valor puder ser convertido para o tipo pedido sem perder informação importante, o PHP converte em silêncio. Veja até onde ele vai:</p>
+
+<pre class="file" data-file="t-coerc.php">&lt;?php
+function dobro(int $n)
+{
+    return $n * 2;
+}
+var_dump(dobro(5));
+var_dump(dobro("5"));
+var_dump(dobro(true));
+var_dump(dobro(5.0));
+var_dump(dobro(5.5));
+var_dump(dobro("5 reais"));
+</pre>
+
+<pre class="term">$ php t-coerc.php
+int(10)
+int(10)                 « "5" virou 5
+int(2)                  « true virou 1!
+int(10)                 « 5.0 virou 5
+
+Deprecated: Implicit conversion from float 5.5 to int loses precision in /home/ana/site/t-coerc.php on line 2
+int(10)                 « 5.5 virou 5, com um aviso: o ,5 se perdeu
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/site/t-coerc.php on line 11 and defined in /home/ana/site/t-coerc.php:2
+Stack trace:
+#0 /home/ana/site/t-coerc.php(11): dobro('5 reais')
+#1 {main}
+  thrown in /home/ana/site/t-coerc.php on line 2</pre>
+
+<p>Algumas dessas conversões são práticas (dados de formulário chegam como texto, aula <a href="get-post.html">$_GET e $_POST</a>); outras escondem erros (<code>true</code> virando 1). Se você prefere que o PHP <strong>não</strong> converta nada, ligue o <strong>modo estrito</strong> com uma linha no topo do arquivo:</p>
+
+<pre class="file" data-file="t-strict.php">&lt;?php
+declare(strict_types=1);
+
+function dobro(int $n)
+{
+    return $n * 2;
+}
+var_dump(dobro(5));
+var_dump(dobro("5"));
+</pre>
+
+<dl class="anatomy">
+  <dt>declare(…)</dt><dd>"Declarar": uma instrução para o próprio PHP sobre como tratar o arquivo.</dd>
+  <dt>strict_types=1</dt><dd>"Tipos estritos: ligado". Sem espaços em volta do <code>=</code> por costume; o valor é sempre <code>1</code>.</dd>
+</dl>
+
+<pre class="term">$ php t-strict.php
+int(10)
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/site/t-strict.php on line 9 and defined in /home/ana/site/t-strict.php:4
+Stack trace:
+#0 /home/ana/site/t-strict.php(9): dobro('5')
+#1 {main}
+  thrown in /home/ana/site/t-strict.php on line 4</pre>
+
+<p>Com o modo estrito, <code>"5"</code> não é <code>5</code>: <code>TypeError</code>. A <strong>única</strong> conversão que continua permitida é de <code>int</code> para <code>float</code> (um inteiro "cabe" num float sem perder nada). E o modo vale também para as funções nativas chamadas no arquivo:</p>
+
+<pre class="file" data-file="t-strict-float.php">&lt;?php
+declare(strict_types=1);
+
+function metade(float $n)
+{
+    return $n / 2;
+}
+var_dump(metade(5));
+var_dump(strlen("Ana"));
+var_dump(strlen(123));
+</pre>
+
+<pre class="term">$ php t-strict-float.php
+float(2.5)              « int → float continua aceito
+int(3)
+
+Fatal error: Uncaught TypeError: strlen(): Argument #1 ($string) must be of type string, int given in /home/ana/site/t-strict-float.php:10
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/t-strict-float.php on line 10</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada para <code>f(int $n)</code></th><th>Modo normal</th><th>Com <code>strict_types=1</code></th></tr>
+<tr><td><code>f(5)</code></td><td>5</td><td>5</td></tr>
+<tr><td><code>f("5")</code></td><td>convertido para 5</td><td><code>TypeError</code></td></tr>
+<tr><td><code>f(5.0)</code></td><td>convertido para 5</td><td><code>TypeError</code></td></tr>
+<tr><td><code>f(5.5)</code></td><td>5, com <code>Deprecated</code></td><td><code>TypeError</code></td></tr>
+<tr><td><code>f(true)</code></td><td>convertido para 1</td><td><code>TypeError</code></td></tr>
+<tr><td><code>f("5 reais")</code></td><td><code>TypeError</code></td><td><code>TypeError</code></td></tr>
+<tr><td>para <code>g(float $x)</code>: <code>g(5)</code></td><td>5.0</td><td>5.0 (a exceção permitida)</td></tr>
+</table>
+</div>
+
+<h3>As regras do <code>declare</code></h3>
+<ul>
+  <li>Tem de ser a <strong>primeira instrução</strong> do arquivo, logo depois do <code>&lt;?php</code>. Senão:</li>
+</ul>
+
+<pre class="file" data-file="t-strict-lugar.php">&lt;?php
+echo "Começando\n";
+declare(strict_types=1);
+</pre>
+
+<pre class="term">$ php t-strict-lugar.php
+
+Fatal error: strict_types declaration must be the very first statement in the script in /home/ana/site/t-strict-lugar.php on line 3
+Stack trace:
+#0 {main}</pre>
+
+<ul>
+  <li>Vale <strong>só para o arquivo</strong> onde está escrito, e conta o arquivo de onde a função é <strong>chamada</strong>, não onde ela foi definida. Num projeto com vários arquivos (aula <a href="include-require.html">include e require</a>), coloque-o em todos.</li>
+</ul>
+
+<div class="tip">
+<strong>Qual usar?</strong>
+<p>Projetos modernos usam <code>declare(strict_types=1);</code> em todos os arquivos: erros de tipo aparecem cedo, na linha certa, em vez de virar um cálculo errado. Mas atenção ao que vem de fora: <code>$_GET</code>, <code>$_POST</code>, arquivos e <code>explode</code> sempre dão <strong>strings</strong>. No modo estrito, converta você mesmo (<code>(int) $_GET["quantidade"]</code>) ou valide antes (aulas <a href="conversao-tipos.html">Conversão de Tipos</a> e <a href="validacao.html">Validar Dados</a>).</p>
+</div>
+
+<div class="tryphp">
+<p class="try-task">Rode como está e leia o <code>TypeError</code>. Depois apague a linha do <code>declare</code> e rode de novo: o que muda? Experimente também <code>dobro(5.5)</code> e <code>dobro(true)</code> nos dois modos.</p>
+<pre class="script">&lt;?php
+declare(strict_types=1);
+
+function dobro(int $n): int
+{
+    return $n * 2;
+}
+
+var_dump(dobro(5));
+var_dump(dobro("5"));
+</pre>
+</div>
+
+<hr>
+
+<h2>Tipo do retorno</h2>
+<p>Depois dos parênteses, dois-pontos e o tipo do que a função devolve:</p>
+
+<pre class="file" data-file="t-retorno.php">&lt;?php
+function dobro(int $n): int
+{
+    return $n * 2;
+}
+function media(array $notas): float
+{
+    return array_sum($notas) / count($notas);
+}
+function saudacao(string $nome): string
+{
+    return "Olá, $nome!";
+}
+function eMaiorDeIdade(int $idade): bool
+{
+    return $idade &gt;= 18;
+}
+var_dump(dobro(21));
+var_dump(media([8, 9, 10]));
+var_dump(saudacao("Ana"));
+var_dump(eMaiorDeIdade(17));
+</pre>
+
+<dl class="anatomy">
+  <dt>function media(array $notas): float</dt><dd>Lê-se: "<code>media</code> recebe um array e devolve um float". Só de ler a primeira linha (a <strong>assinatura</strong> da função), você sabe como usá-la.</dd>
+</dl>
+
+<pre class="term">$ php t-retorno.php
+int(42)
+float(9)                « 27 / 3 dá o int 9; o tipo de retorno float o converteu para 9.0
+string(10) "Olá, Ana!"
+bool(false)</pre>
+
+<p>O PHP confere o valor do <code>return</code> do mesmo jeito que confere os parâmetros: no modo normal converte quando pode; no estrito, só aceita int → float. Quando não dá:</p>
+
+<pre class="file" data-file="t-retorno-errado2.php">&lt;?php
+function codigo(string $produto): int
+{
+    return "sem código";
+}
+var_dump(codigo("café"));
+</pre>
+
+<pre class="term">$ php t-retorno-errado2.php
+
+Fatal error: Uncaught TypeError: codigo(): Return value must be of type int, string returned in /home/ana/site/t-retorno-errado2.php:4
+Stack trace:
+#0 /home/ana/site/t-retorno-errado2.php(6): codigo('caf\xC3\xA9')
+#1 {main}
+  thrown in /home/ana/site/t-retorno-errado2.php on line 4</pre>
+
+<p>(No <em>stack trace</em>, o <code>é</code> de "café" aparece como os seus dois bytes, <code>\xC3\xA9</code>: o PHP mostra os bytes acentuados assim nos rastros de erro.)</p>
+
+<p>E aquele erro clássico de esquecer o <code>return</code>? Com o tipo declarado, ele não passa mais em silêncio:</p>
+
+<pre class="file" data-file="t-semreturn.php">&lt;?php
+function dobro(int $n): int
+{
+    $resultado = $n * 2;
+}
+var_dump(dobro(4));
+</pre>
+
+<pre class="term">$ php t-semreturn.php
+
+Fatal error: Uncaught TypeError: dobro(): Return value must be of type int, none returned in /home/ana/site/t-semreturn.php:5
+Stack trace:
+#0 /home/ana/site/t-semreturn.php(6): dobro(4)
+#1 {main}
+  thrown in /home/ana/site/t-semreturn.php on line 5</pre>
+
+<p>"Deve devolver int, <strong>nada</strong> foi devolvido" (<em>none returned</em>). Compare com o <code>NULL</code> silencioso do começo da aula.</p>
+
+<h3>O modo estrito também vale no retorno</h3>
+
+<pre class="file" data-file="t-strict2.php">&lt;?php
+declare(strict_types=1);
+
+function media(array $notas): int
+{
+    return array_sum($notas) / count($notas);
+}
+var_dump(media([8, 9, 10]));
+var_dump(media([7, 8]));
+</pre>
+
+<pre class="term">$ php t-strict2.php
+int(9)                  « 27 / 3 = 9, um int: passou
+
+Fatal error: Uncaught TypeError: media(): Return value must be of type int, float returned in /home/ana/site/t-strict2.php:6
+Stack trace:
+#0 /home/ana/site/t-strict2.php(9): media(Array)
+#1 {main}
+  thrown in /home/ana/site/t-strict2.php on line 6</pre>
+
+<p>15 / 2 = 7.5, um float. Sem o modo estrito, o mesmo código devolveria <code>7</code> com um <code>Deprecated: Implicit conversion from float 7.5 to int loses precision</code>, e a média estaria errada. O problema real aqui é o tipo: média deveria ser <code>float</code>.</p>
+
+<h3><code>?string</code>: pode devolver "nada"</h3>
+<p>Quando uma função procura algo que pode não existir, é comum devolver <code>null</code> nesse caso. O <code>?</code> antes do tipo diz "este tipo <strong>ou</strong> <code>null</code>":</p>
+
+<pre class="file" data-file="t-nullable.php">&lt;?php
+$emails = ["Ana" =&gt; "ana@exemplo.com", "Bruno" =&gt; "bruno@exemplo.com"];
+
+function buscarEmail(array $emails, string $nome): ?string
+{
+    return $emails[$nome] ?? null;
+}
+
+var_dump(buscarEmail($emails, "Ana"));
+var_dump(buscarEmail($emails, "Zeca"));
+echo buscarEmail($emails, "Zeca") ?? "sem e-mail", "\n";
+</pre>
+
+<pre class="term">$ php t-nullable.php
+string(15) "ana@exemplo.com"
+NULL
+sem e-mail</pre>
+
+<p>Repare que o array <code>$emails</code> foi passado como parâmetro: uma função não enxerga as variáveis de fora dela (aula <a href="escopo.html">Escopo</a>). Nos parâmetros, o <code>?</code> funciona igual, e combina bem com o padrão <code>null</code> da aula <a href="parametros.html">Parâmetros</a>:</p>
+
+<pre class="file" data-file="t-nullparam.php">&lt;?php
+function saudacao(?string $nome = null): string
+{
+    return "Olá, " . ($nome ?? "visitante") . "!";
+}
+echo saudacao("Ana"), "\n";
+echo saudacao(), "\n";
+echo saudacao(null), "\n";
+</pre>
+
+<pre class="term">$ php t-nullparam.php
+Olá, Ana!
+Olá, visitante!
+Olá, visitante!</pre>
+
+<p>Sem o <code>?</code>, um parâmetro <code>string</code> recusa <code>null</code> (<code>must be of type string, null given</code>). E escrever <code>string $nome = null</code>, sem o <code>?</code>, ainda funciona mas é desaprovado desde o PHP 8.4 (veja <a href="#errado">Quando dá errado</a>).</p>
+
+<h3><code>void</code>: não devolve nada</h3>
+<p>Para funções que só <strong>fazem</strong> algo (mostrar, gravar), sem resultado, o tipo de retorno é <code>void</code> ("vazio"):</p>
+
+<pre class="file" data-file="t-void.php">&lt;?php
+function linha(int $tamanho): void
+{
+    echo str_repeat("-", $tamanho), "\n";
+}
+linha(10);
+var_dump(linha(3));
+</pre>
+
+<pre class="term">$ php t-void.php
+----------
+---
+NULL                    « quem tenta usar o "resultado" de uma função void recebe null</pre>
+
+<p>Numa função <code>void</code>, <code>return;</code> sozinho (para sair mais cedo) é permitido; <code>return</code> com valor, não:</p>
+
+<pre class="file" data-file="t-void-erro.php">&lt;?php
+function linha(int $tamanho): void
+{
+    return str_repeat("-", $tamanho);
+}
+</pre>
+
+<pre class="term">$ php t-void-erro.php
+
+Fatal error: A void function must not return a value in /home/ana/site/t-void-erro.php on line 4
+Stack trace:
+#0 {main}</pre>
+
+<p>Esse erro aparece antes de qualquer coisa rodar, só de o PHP ler o arquivo.</p>
+
+<h3><code>mixed</code> e tipos união</h3>
+
+<pre class="file" data-file="t-mixed.php">&lt;?php
+function descrever(mixed $valor): string
+{
+    return get_debug_type($valor);
+}
+echo descrever(10), " ", descrever("Ana"), " ", descrever([1, 2]), " ", descrever(null), " ", descrever(2.5), "\n";
+
+function dobro(int|float $n): int|float
+{
+    return $n * 2;
+}
+var_dump(dobro(4), dobro(1.5));
+</pre>
+
+<pre class="term">$ php t-mixed.php
+int string array null float     « get_debug_type diz o tipo de qualquer valor
+int(8)
+float(3)</pre>
+
+<p><code>mixed</code> aceita tudo (inclusive <code>null</code>); use quando a função realmente lida com qualquer tipo. <code>int|float</code> aceita um ou outro. Prefira sempre o tipo mais preciso que fizer sentido.</p>
+
+<h3><code>array</code> para devolver vários valores</h3>
+<p>Uma função devolve <strong>um</strong> valor. Para devolver dois ou mais, devolva um array, e desmonte-o com a <a href="desestruturacao.html">desestruturação</a>:</p>
+
+<pre class="file" data-file="t-array.php">&lt;?php
+function minMax(array $numeros): array
+{
+    return [min($numeros), max($numeros)];
+}
+[$menor, $maior] = minMax([7, 3, 9, 5]);
+echo "Menor: $menor, maior: $maior\n";
+</pre>
+
+<pre class="term">$ php t-array.php
+Menor: 3, maior: 9</pre>
+
+<h3><code>never</code>: a função nunca volta <span class="versao">PHP 8.1+</span></h3>
+<p>Existe ainda um tipo de retorno para funções que <strong>nunca terminam normalmente</strong>: elas sempre encerram o programa (<code>exit</code>) ou lançam uma exceção. É o caso de uma função <code>redirecionar()</code>, que manda o navegador para outra página e para tudo. Você vai encontrar <code>never</code> nas aulas <a href="redirecionar.html">header e Redirecionamento</a> e <a href="excecoes.html">Exceções</a>; por ora, basta saber que ele existe.</p>
+
+<hr>
+
+<h2 id="errado">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>TypeError: …(): Argument #1 ($n) must be of type int, string given</code></strong>
+<p><strong>O que aconteceu:</strong> um argumento não é do tipo declarado (e não pôde ser convertido, ou o modo estrito está ligado). A mensagem traz o número e o nome do parâmetro, o tipo esperado, o tipo recebido e a linha da <strong>chamada</strong> (<em>called in … on line …</em>).</p>
+<p><strong>Como resolver:</strong> vá à linha da chamada. Se o valor veio de um formulário ou de um <code>explode</code>, converta: <code>dobro((int) $texto)</code>. Se o tipo declarado é que está errado (uma média declarada como <code>int</code>), corrija a declaração.</p>
+</div>
+
+<div class="cenario">
+<strong><code>TypeError: …(): Return value must be of type int, none returned</code></strong>
+<p><strong>O que aconteceu:</strong> a função chegou ao fim sem passar por nenhum <code>return</code>. Às vezes é só um caminho esquecido: um <code>if</code> que tem <code>return</code> e um caso que não tem.</p>
+<p><strong>Como resolver:</strong> confira que <strong>todo</strong> caminho termina num <code>return</code> com valor do tipo certo. Se a função não deve devolver nada, o tipo é <code>void</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Deprecated: Implicitly marking parameter $nome as nullable is deprecated</code></strong>
+<pre class="file" data-file="t-implicit.php">&lt;?php
+function saudacao(string $nome = null): string
+{
+    return "Olá, " . ($nome ?? "visitante") . "!";
+}
+echo saudacao(), "\n";
+</pre>
+<pre class="term">$ php t-implicit.php
+
+Deprecated: saudacao(): Implicitly marking parameter $nome as nullable is deprecated, the explicit nullable type must be used instead in /home/ana/site/t-implicit.php on line 2
+Olá, visitante!</pre>
+<p><strong>O que aconteceu:</strong> o tipo é <code>string</code>, mas o padrão é <code>null</code>. Antigamente, isso tornava o parâmetro "string ou null" sem avisar. Desde o PHP 8.4, o PHP pede que você diga isso explicitamente.</p>
+<p><strong>Como resolver:</strong> ponha o <code>?</code>: <code>?string $nome = null</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>strict_types declaration must be the very first statement in the script</code></strong>
+<p><strong>O que aconteceu:</strong> havia algo antes do <code>declare</code> (um <code>echo</code>, um <code>require</code>, até HTML ou uma linha em branco <strong>antes</strong> do <code>&lt;?php</code>). Veja <code>t-strict-lugar.php</code>, acima.</p>
+<p><strong>Como resolver:</strong> o arquivo deve começar exatamente com <code>&lt;?php</code> e, logo depois, <code>declare(strict_types=1);</code>. Comentários antes do <code>declare</code> são permitidos.</p>
+</div>
+
+<div class="cenario">
+<strong><code>A void function must not return a value</code></strong>
+<p><strong>O que aconteceu:</strong> uma função declarada <code>: void</code> tem um <code>return</code> com valor.</p>
+<p><strong>Como resolver:</strong> se a função deve devolver algo, troque <code>void</code> pelo tipo certo; se não deve, use só <code>return;</code> (ou nada).</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th></tr>
+<tr><td>Devolver um valor</td><td><code>return $x;</code></td></tr>
+<tr><td>Sair da função mais cedo</td><td><code>if (…) { return …; }</code></td></tr>
+<tr><td>Tipo no parâmetro</td><td><code>function f(int $n, string $s, array $a, bool $b, float $x)</code></td></tr>
+<tr><td>Parâmetro que aceita null</td><td><code>function f(?string $s = null)</code></td></tr>
+<tr><td>Tipo do retorno</td><td><code>function f(): int</code>, <code>: string</code>, <code>: array</code>, <code>: bool</code>, <code>: float</code></td></tr>
+<tr><td>Retorno que pode ser null</td><td><code>function f(): ?string</code></td></tr>
+<tr><td>Não devolve nada</td><td><code>function f(): void</code></td></tr>
+<tr><td>Qualquer tipo / um ou outro</td><td><code>mixed</code> / <code>int|float</code></td></tr>
+<tr><td>Nunca volta (sempre sai ou lança erro)</td><td><code>function f(): never</code> (8.1)</td></tr>
+<tr><td>Desligar conversões automáticas</td><td><code>declare(strict_types=1);</code> na 1ª linha</td></tr>
+<tr><td>Saber o tipo de um valor</td><td><code>get_debug_type($x)</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="src:declare\(strict_types=1\),src:float\s+\$nota,src:\)\s*:\s*string,out:Recuperação,semerro">
+<p class="try-task"><strong>Missão:</strong> deixe a função "à prova de erros". (1) Ligue o modo estrito na primeira linha depois do <code>&lt;?php</code>. (2) Declare o parâmetro como <code>float $nota</code> e o retorno como <code>string</code>. (3) Rode: uma das chamadas vai dar <code>TypeError</code>. Leia a mensagem e corrija <strong>a chamada</strong>. No fim, as três situações devem aparecer, sem nenhum erro.</p>
+<pre class="script">&lt;?php
+function situacao($nota)
+{
+    if ($nota &gt;= 7) {
+        return "Aprovado";
+    }
+    if ($nota &gt;= 5) {
+        return "Recuperação";
+    }
+    return "Reprovado";
+}
+
+echo situacao(9.5), "\n";
+echo situacao("6.0"), "\n";
+echo situacao(3), "\n";
+</pre>
+<pre class="solucao">&lt;?php
+declare(strict_types=1);
+
+function situacao(float $nota): string
+{
+    if ($nota &gt;= 7) {
+        return "Aprovado";
+    }
+    if ($nota &gt;= 5) {
+        return "Recuperação";
+    }
+    return "Reprovado";
+}
+
+echo situacao(9.5), "\n";
+echo situacao(6.0), "\n";
+echo situacao(3), "\n";
+</pre>
+</div>
+
+<p>No passo 3, o PHP do laboratório mostra:</p>
+<pre class="term">$ php situacao.php
+Aprovado
+
+Fatal error: Uncaught TypeError: situacao(): Argument #1 ($nota) must be of type float, string given, called in /home/ana/site/situacao.php on line 16 and defined in /home/ana/site/situacao.php:4
+Stack trace:
+#0 /home/ana/site/situacao.php(16): situacao('6.0')
+#1 {main}
+  thrown in /home/ana/site/situacao.php on line 4</pre>
+<p>A chamada <code>situacao(3)</code> não dá erro: no modo estrito, int → float continua permitido.</p>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O tipo do retorno</h3>
+<p>Complete para dizer que a função devolve um texto:</p>
+<div class="ex-code">function saudacao(string $nome)<input data-answer=": string|:string" aria-label="tipo do retorno"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Pode ser nulo</h3>
+<p>Complete o tipo do retorno: a função devolve um <code>int</code> ou <code>null</code>:</p>
+<div class="ex-code">function buscarCodigo(string $produto): <input data-answer="?int" aria-label="tipo"></div>
+</div>
+
+<div class="exercise">
+<h3>3. Modo estrito</h3>
+<p>Complete a primeira instrução do arquivo:</p>
+<div class="ex-code">&lt;?php<br><input data-answer="declare(strict_types=1);" aria-label="declaração"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Sem <code>strict_types</code>, o que acontece com <code>dobro("8")</code>, sendo <code>function dobro(int $n): int</code>?</p>
+<label><input type="radio" name="q4"> <code>TypeError</code>.</label>
+<label><input type="radio" name="q4"> Devolve <code>16</code>: o texto "8" é convertido para o número 8.</label>
+<label><input type="radio" name="q4"> Devolve <code>"88"</code>.</label>
+<label><input type="radio" name="q4"> Devolve <code>null</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Com <code>declare(strict_types=1);</code>, qual chamada a <code>function metade(float $x)</code> é aceita?</p>
+<label><input type="radio" name="q5"> <code>metade("10")</code></label>
+<label><input type="radio" name="q5"> <code>metade(true)</code></label>
+<label><input type="radio" name="q5"> <code>metade(10)</code></label>
+<label><input type="radio" name="q5"> <code>metade(null)</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Uma função calcula um valor, mas <code>var_dump(f())</code> mostra <code>NULL</code>. A causa mais provável?</p>
+<label><input type="radio" name="q6"> O tipo de retorno está errado.</label>
+<label><input type="radio" name="q6"> Faltou o <code>declare(strict_types=1)</code>.</label>
+<label><input type="radio" name="q6"> A função foi chamada antes de ser definida.</label>
+<label><input type="radio" name="q6"> Faltou o <code>return</code>: a função calculou, mas não devolveu.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>return</code> devolve um valor e encerra a função. Sem <code>return</code>, o resultado é <code>null</code>. Devolver não é mostrar: <code>echo</code> vai para a tela, <code>return</code> vai para quem chamou.</li>
+  <li>Tipos nos parâmetros (<code>int $n</code>) e no retorno (<code>): int</code>) documentam o combinado e fazem o PHP conferir.</li>
+  <li><code>?tipo</code> aceita <code>null</code>; <code>void</code> não devolve nada; <code>mixed</code> aceita tudo; <code>int|float</code> aceita um ou outro; <code>never</code> nunca volta.</li>
+  <li>Modo normal: o PHP converte o que der (<code>"5"</code> → 5, <code>true</code> → 1). Com <code>declare(strict_types=1);</code> (1ª instrução do arquivo), só int → float; o resto vira <code>TypeError</code>.</li>
+  <li>As mensagens de <code>TypeError</code> dizem o parâmetro, o tipo esperado, o recebido e a linha da chamada.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
