@@ -60,10 +60,21 @@ const SERVIDOR_FONTE = `<?php
         'SERVER_NAME' => 'localhost',
         'SERVER_PORT' => '8000',
     ];
+    // rota do php -S calculada pelo editor (ex.: /contato → /index.php com PATH_INFO=/contato)
+    $rota = isset($s['HTTP_X_GUIA_ROTA']) ? json_decode($s['HTTP_X_GUIA_ROTA'], true) : null;
+    if (is_array($rota)) {
+        $s['REQUEST_URI'] = $rota['uri'];
+        $s['SCRIPT_NAME'] = $rota['script'];
+        $s['SCRIPT_FILENAME'] = '${DOCROOT}' . $rota['script'];
+        $s['PATH_INFO'] = $rota['info'];
+        $s['PHP_SELF'] = $rota['script'] . $rota['info'];
+    }
+    unset($s['HTTP_X_GUIA_ROTA']);
     foreach (['REQUEST_URI', 'REQUEST_METHOD', 'SCRIPT_NAME', 'SCRIPT_FILENAME', 'PATH_INFO', 'PHP_SELF', 'QUERY_STRING'] as $k) {
         if (isset($s[$k]) && $s[$k] !== '') $n[$k] = $s[$k];
     }
     if (isset($n['PATH_INFO'], $n['SCRIPT_NAME'])) $n['PHP_SELF'] = $n['SCRIPT_NAME'] . $n['PATH_INFO'];
+    else $n['PHP_SELF'] = $n['SCRIPT_NAME'] ?? ($s['PHP_SELF'] ?? '');
     $n['HTTP_HOST'] = 'localhost:8000';
     $h = [];
     foreach ($s as $k => $v) {
@@ -210,16 +221,48 @@ export function criarMotor(deps) {
         response: new U.PHPResponse(404, { "content-type": ["text/html; charset=UTF-8"] }, enc.encode(PAGINA_404(caminho))),
       }),
     });
+    function rotear(caminho) {
+      let segs;
+      try { segs = decodeURIComponent(caminho).split("/").filter(Boolean); } catch (e) { segs = caminho.split("/").filter(Boolean); }
+      for (let k = segs.length; k >= 0; k--) {
+        const prefixo = "/" + segs.slice(0, k).join("/");
+        const resto = k < segs.length ? "/" + segs.slice(k).join("/") : "";
+        const abs = DOCROOT + (prefixo === "/" ? "" : prefixo);
+        if (php.isFile(abs)) return { script: prefixo, info: resto };
+        if (php.isDir(abs)) {
+          for (const idx of ["index.php", "index.html"]) {
+            if (php.isFile(abs + "/" + idx)) return { script: (prefixo === "/" ? "" : prefixo) + "/" + idx, info: resto, indice: true };
+          }
+          return null; // pasta sem index: 404
+        }
+      }
+      return null;
+    }
     return {
       php,
+      rotear,
       /** req: { method, url, headers, body (Uint8Array) } */
       async pedir(req) {
         const cab = Object.assign({}, CABECALHOS_NAVEGADOR, req.headers || {});
+        // Rota como o php -S sem roteador: sobe pelo caminho até achar um
+        // arquivo (o resto vira PATH_INFO) ou uma pasta com index.php/index.html.
+        const pedido = new URL(req.url || "/", URL_BASE);
+        const rota = rotear(pedido.pathname);
+        if (!rota) {
+          return { status: 404, headers: { "content-type": ["text/html; charset=UTF-8"] }, body: enc.encode(PAGINA_404(pedido.pathname)), errors: "", exit: 0 };
+        }
+        let url = pedido.pathname + pedido.search;
+        if (rota.script.endsWith(".php")) {
+          cab["x-guia-rota"] = JSON.stringify({ uri: pedido.pathname + pedido.search, script: rota.script, info: rota.info });
+          url = encodeURI(rota.script) + pedido.search;
+        } else if (rota.info || rota.indice) {
+          url = encodeURI(rota.script) + pedido.search;
+        }
         if (req.body && req.body.length !== undefined) cab["content-length"] = String(req.body.length);
         // requestStreamed: o request() do php-wasm troca o status por 500 em
         // qualquer erro fatal; o php -S só faz isso se o erro NÃO foi mostrado
         // (display_errors desligado).
-        const st = await handler.requestStreamed({ method: req.method || "GET", url: req.url || "/", headers: cab, body: req.body });
+        const st = await handler.requestStreamed({ method: req.method || "GET", url, headers: cab, body: req.body });
         const r = await U.PHPResponse.fromStreamedResponse(st);
         let status = r.httpStatusCode;
         if (status === 200 && r.exitCode !== 0 && !/Fatal error|Parse error/.test(r.text)) status = 500;

@@ -253,8 +253,8 @@ $_SESSION["visitas"] = ($_SESSION["visitas"] ?? 0) + 1;
 <p>Clicar em <strong>Rodar</strong> de novo recomeça o site do zero (e a contagem volta a 1). As sessões são o assunto de <a href="sessoes.html">Sessões</a>.</p>
 
 <div class="note">
-<strong>Endereços que não existem dão 404</strong>
-<p>Uma diferença em relação ao <code>php -S</code> sem roteador: no editor, um caminho que não corresponde a nenhuma aba (como <code>localhost:8000/contato</code>) responde <code>404 Not Found</code>, em vez de cair no <code>index.php</code>. Para endereços "bonitos" nas caixas, as aulas usam <code>/index.php/contato</code> (veja o fim de <a href="servidor-embutido.html">O Servidor Embutido</a>) ou <code>?pagina=contato</code>.</p>
+<strong>Endereços que não existem caem no <code>index.php</code></strong>
+<p>Como no <code>php -S</code> sem roteador, um caminho que não corresponde a nenhuma aba (como <code>localhost:8000/contato</code>) é entregue ao <code>index.php</code> da pasta, com <code>$_SERVER['PATH_INFO']</code> valendo <code>/contato</code>. O <code>404 Not Found</code> só aparece quando a pasta do caminho não tem <code>index.php</code> (por exemplo <code>localhost:8000/css/nada.css</code>, se existir uma aba <code>css/estilo.css</code> e nenhum <code>css/index.php</code>). Endereços "bonitos" estão no fim de <a href="servidor-embutido.html">O Servidor Embutido</a>.</p>
 </div>
 
 <hr>
