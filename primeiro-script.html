@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Olá, Mundo — o primeiro script, &lt;?php, echo e ; | Guia PHP</title>
+<meta name="description" content="O primeiro programa em PHP, parte por parte: a marca &lt;?php, o echo, as aspas, o ponto e vírgula e a quebra de linha \n. Criar o arquivo .php, rodar no terminal com php ola.php e no navegador com php -S, e por que omitir a marca de fechamento ?&gt; em arquivos só de PHP.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Olá, Mundo</span></h1>
+
+<p class="intro">Há uma tradição na programação: o primeiro programa em qualquer linguagem escreve "Olá, mundo!" na tela. Em PHP, ele tem duas linhas. Nesta aula você vai entender cada pedaço dessas duas linhas, criar o arquivo, rodá-lo no terminal e no navegador, e conhecer os primeiros erros que todo mundo comete (e como consertá-los).</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que fazem <code>&lt;?php</code>, <code>echo</code>, as aspas e o <code>;</code>.</li>
+  <li>Para que serve o <code>\n</code> no fim do texto.</li>
+  <li>Criar um arquivo <code>.php</code> e rodá-lo com <code>php ola.php</code>.</li>
+  <li>Ver o mesmo arquivo como página, com <code>php -S</code> e o navegador (ou o <code>curl</code>).</li>
+  <li>O que é a marca de fechamento <code>?&gt;</code> e por que é melhor não usá-la em arquivos só de PHP.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: um bilhete com instruções</h2>
+<p>Imagine que você deixa um bilhete para alguém: "Fale <em>bom dia</em> para a turma." A pessoa lê e faz. Um programa PHP é um bilhete assim, escrito numa língua que o PHP entende. A primeira instrução que você vai aprender é a mais simples de todas: <strong>escreva este texto</strong>.</p>
+
+<hr>
+
+<h2>O programa</h2>
+
+<pre class="file" data-file="ola.php">&lt;?php
+echo "Olá, mundo!\n";
+</pre>
+
+<p>Duas linhas. Vamos desmontar cada pedaço:</p>
+
+<dl class="anatomy">
+  <dt>&lt;?php</dt><dd>A <strong>marca de abertura</strong>. Avisa: "daqui em diante, é código PHP". Tudo o que vier antes dela (ou sem ela) é tratado como texto comum e copiado para a saída sem ser executado. É escrita sempre assim: menor-que, interrogação, <code>php</code>, sem espaços no meio.</dd>
+  <dt>echo</dt><dd>Uma palavra do PHP que significa "escreva na saída o que vem a seguir". Em inglês, <em>echo</em> é "eco": o PHP "ecoa" o que você mandar. No terminal, a saída é a tela; numa página, é o HTML enviado ao navegador.</dd>
+  <dt>"Olá, mundo!\n"</dt><dd>O texto a escrever, entre <strong>aspas duplas</strong>. As aspas marcam onde o texto começa e termina e não aparecem na saída. Um texto assim, em programação, se chama <strong>string</strong> (em inglês, "cordão": letras enfileiradas como contas num cordão).</dd>
+  <dt>\n</dt><dd>Dentro das aspas duplas, a barra invertida seguida de <code>n</code> não é escrita como está: vira uma <strong>quebra de linha</strong> (<em>new line</em>, "nova linha"). É como apertar <kbd>Enter</kbd> no fim do texto.</dd>
+  <dt>;</dt><dd>O <strong>ponto e vírgula</strong> termina a instrução, como o ponto final de uma frase. Cada instrução do PHP termina com <code>;</code>.</dd>
+</dl>
+
+<p>Repare no que <strong>não</strong> existe: não há nada para "iniciar" ou "terminar" o programa. O PHP simplesmente lê o arquivo de cima para baixo e executa cada instrução, na ordem. Quando o arquivo acaba, o programa acaba.</p>
+
+<p>Rode no editor:</p>
+
+<div class="tryphp">
+<pre class="script">&lt;?php
+echo "Olá, mundo!\n";
+</pre>
+</div>
+
+<h3>Mais de uma instrução</h3>
+<p>Cada <code>echo</code> escreve um pedaço. Com vários, o PHP escreve um depois do outro, na ordem em que aparecem:</p>
+
+<pre class="file" data-file="apresentacao.php">&lt;?php
+echo "Olá, mundo!\n";
+echo "Meu nome é Ana.\n";
+echo "Estou aprendendo PHP.\n";
+</pre>
+
+<pre class="term">$ php apresentacao.php
+Olá, mundo!
+Meu nome é Ana.
+Estou aprendendo PHP.</pre>
+
+<div class="tryphp" data-goal="out:Olá\, mundo!,out:Eu moro em,semerro">
+<p class="try-task"><strong>Missão:</strong> acrescente uma terceira linha que escreva <code>Eu moro em</code> seguido da sua cidade (por exemplo, <code>Eu moro em Recife.</code>), com <code>\n</code> no fim. Não esqueça as aspas e o <code>;</code>.</p>
+<pre class="script">&lt;?php
+echo "Olá, mundo!\n";
+echo "Meu nome é Ana.\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Olá, mundo!\n";
+echo "Meu nome é Ana.\n";
+echo "Eu moro em Recife.\n";
+</pre>
+</div>
+
+<h3>Para que serve o <code>\n</code>?</h3>
+<p>O <code>echo</code> escreve <strong>exatamente</strong> o que você mandou, nem um caractere a mais: ele não pula linha sozinho. Veja o que acontece no terminal sem o <code>\n</code>:</p>
+
+<pre class="file" data-file="semn.php">&lt;?php
+echo "Olá, mundo!";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php semn.php
+Olá, mundo!ana@notebook:~/site$                 « o prompt grudou no texto</pre>
+
+<p>O texto saiu, mas o prompt do terminal ficou grudado nele, porque ninguém mandou pular a linha. Com o <code>\n</code>, o prompt volta para a linha de baixo, como deve ser. Duas observações:</p>
+<ul>
+  <li>No editor do guia, o <code>\n</code> final não faz diferença visível, mas faça o hábito de colocá-lo em programas de terminal.</li>
+  <li>Numa página da web, o <code>\n</code> não pula linha na tela (o navegador ignora quebras no HTML); lá se usa <code>&lt;br&gt;</code> ou parágrafos <code>&lt;p&gt;</code>. A aula <a href="echo-print.html">echo e print</a> compara as formas.</li>
+</ul>
+
+<hr>
+
+<h2>Criando o arquivo</h2>
+<p>Um programa PHP é um arquivo de texto com a extensão <code>.php</code>. Para criar o seu:</p>
+
+<ol class="passo">
+  <li>Crie uma pasta para os exercícios, por exemplo <code>site</code>, dentro da sua pasta pessoal.</li>
+  <li>Abra a pasta no seu editor de código (aula <a href="editores.html">Editores e IDEs</a>) e crie um arquivo novo chamado <code>ola.php</code>.</li>
+  <li>Digite as duas linhas do programa (digite, não copie: é assim que os dedos aprendem onde ficam o <code>&lt;</code>, o <code>?</code> e o <code>;</code>).</li>
+  <li>Salve (<kbd>Ctrl</kbd>+<kbd>S</kbd>) em UTF-8.</li>
+</ol>
+
+<p>Se preferir o terminal, dá para criar o arquivo sem editor. Tudo o que você digitar entre a primeira linha e a palavra <code>FIM</code> vai para dentro do arquivo (os <code>&gt;</code> são o terminal pedindo a continuação):</p>
+
+<pre class="term">$ mkdir -p site &amp;&amp; cd site
+$ cat &gt; ola.php &lt;&lt;'FIM'
+&gt; &lt;?php
+&gt; echo "Olá, mundo!\n";
+&gt; FIM
+$ cat ola.php
+&lt;?php
+echo "Olá, mundo!\n";</pre>
+
+<hr>
+
+<h2>Rodando no terminal: <code>php ola.php</code></h2>
+<p>Com o PHP instalado (aulas <a href="instalar-linux.html">Instalar no Linux</a> e <a href="instalar-windows-mac.html">Instalar no Windows e macOS</a>), entre na pasta do arquivo e chame o <code>php</code> com o nome do arquivo:</p>
+
+<pre class="term">$ cd site
+$ php ola.php
+Olá, mundo!
+$ echo $?
+0                « 0 = o programa terminou sem erro</pre>
+
+<dl class="anatomy">
+  <dt>php</dt><dd>O interpretador: o programa que lê o seu código e o executa.</dd>
+  <dt>ola.php</dt><dd>O arquivo a executar. O caminho é relativo à pasta onde você está; de outra pasta, seria <code>php site/ola.php</code>.</dd>
+</dl>
+
+<p>O <code>echo $?</code> (comando do terminal, não do PHP) mostra o <strong>código de saída</strong> do último programa: <code>0</code> quer dizer sucesso. Você vai usar isso em <a href="linha-comando.html">PHP na Linha de Comando</a>.</p>
+
+<div class="tip">
+<strong>No terminal, a extensão nem importa</strong>
+<p>O comando <code>php</code> executa qualquer arquivo que você mandar, até um <code>ola.txt</code>:</p>
+<pre class="term" data-cwd="~/site">$ php ola.txt
+Olá, mundo!</pre>
+<p>Mesmo assim, use sempre <code>.php</code>: os editores reconhecem a linguagem pela extensão, e os servidores web só passam pelo PHP os arquivos <code>.php</code>.</p>
+</div>
+
+<hr>
+
+<h2>Rodando como página: <code>php -S</code></h2>
+<p>O mesmo arquivo pode ser aberto no navegador. Ligue o servidor embutido do PHP na pasta <code>site</code> (detalhes na aula <a href="servidor-embutido.html">O Servidor Embutido</a>):</p>
+
+<pre class="term" data-cwd="~/site">$ php -S localhost:8000
+[Fri Oct 16 21:12:00 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>Deixe esse terminal aberto e, no navegador, acesse <code>http://localhost:8000/ola.php</code>. Aparece <code>Olá, mundo!</code>. Ou, num segundo terminal, peça a página com o <code>curl</code>:</p>
+
+<pre class="term">$ curl localhost:8000/ola.php
+Olá, mundo!</pre>
+
+<p>E o servidor anota a visita no primeiro terminal:</p>
+
+<pre class="term" data-cwd="~/site">$ php -S localhost:8000
+[Fri Oct 16 21:12:00 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 21:12:01 2026] 127.0.0.1:56636 Accepted
+[Fri Oct 16 21:12:01 2026] 127.0.0.1:56636 [200]: GET /ola.php
+[Fri Oct 16 21:12:01 2026] 127.0.0.1:56636 Closing</pre>
+
+<p>Quando terminar, volte ao terminal do servidor e aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Terminal</th><th>Navegador</th></tr>
+<tr><td>Comando</td><td><code>php ola.php</code></td><td><code>php -S localhost:8000</code> + <code>http://localhost:8000/ola.php</code></td></tr>
+<tr><td>Quem chama o PHP</td><td>Você</td><td>O servidor, a cada visita (ou a cada <kbd>F5</kbd>)</td></tr>
+<tr><td>Para onde vai o <code>echo</code></td><td>A tela do terminal</td><td>A página enviada ao navegador</td></tr>
+<tr><td>Quando usar</td><td>Programas de terminal, exercícios do Nível 1</td><td>Páginas e sites (a partir de <a href="php-e-html.html">PHP Dentro do HTML</a>)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>A marca de fechamento <code>?&gt;</code></h2>
+<p>Se existe <code>&lt;?php</code> para abrir, existe <code>?&gt;</code> para fechar: ele diz "aqui acaba o código PHP; o que vier depois é texto comum de novo". Ele é essencial quando PHP e HTML se misturam (você vai ver na próxima aula). Num arquivo que só tem PHP, ele é opcional:</p>
+
+<pre class="file" data-file="fecha.php">&lt;?php
+echo "Olá, mundo!" ?&gt;
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php fecha.php
+Olá, mundo!ana@notebook:~/site$</pre>
+
+<p>Funciona (e, curiosamente, o <code>?&gt;</code> também serve de fim de instrução, por isso não houve reclamação da falta do <code>;</code>). Mas a recomendação oficial do PHP e do padrão de estilo PSR-12 é: <strong>em arquivos que só têm PHP, não feche com <code>?&gt;</code></strong>. O motivo é sutil, e aparece quando um arquivo é usado por outro.</p>
+
+<h3>O problema: o que vem depois do <code>?&gt;</code> vira saída</h3>
+<p>A Ana separou a configuração da loja num arquivo próprio, que termina com <code>?&gt;</code> e, sem ela perceber, uma linha em branco a mais:</p>
+
+<pre class="file" data-file="config.php · erro de propósito">&lt;?php
+$loja = "Lojinha da Ana";
+?&gt;
+
+</pre>
+
+<pre class="file" data-file="inicio.php">&lt;?php
+require "config.php";
+header("Content-Type: text/plain; charset=utf-8");
+echo "Bem-vinda à $loja!\n";
+</pre>
+
+<p>O <code>inicio.php</code> carrega o <code>config.php</code> (com <code>require</code>, aula <a href="include-require.html">include e require</a>) e tenta ajustar um cabeçalho da resposta com <code>header()</code> (aula <a href="redirecionar.html">header e Redirecionamento</a>). Veja o resultado:</p>
+
+<pre class="term">$ curl -i localhost:8000/inicio.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:12:01 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8          « o header() não teve efeito
+
+
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/site/config.php:4) in &lt;b&gt;/home/ana/site/inicio.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+Bem-vinda à Lojinha da Ana!</pre>
+
+<p>"Não é possível modificar o cabeçalho: os cabeçalhos já foram enviados (a saída começou em <code>config.php:4</code>)". A linha em branco depois do <code>?&gt;</code> está <strong>fora</strong> do PHP, então é texto comum e foi enviada ao navegador. Assim que o primeiro caractere sai, os cabeçalhos da resposta vão junto, e não dá mais para mudá-los. (O PHP engole uma única quebra de linha logo depois do <code>?&gt;</code>; foi a segunda que escapou, a da linha 4.)</p>
+
+<p>Agora o mesmo <code>config.php</code> sem a marca de fechamento:</p>
+
+<pre class="file" data-file="config2.php">&lt;?php
+$loja = "Lojinha da Ana";
+</pre>
+
+<pre class="term">$ curl -i localhost:8000/inicio2.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:12:06 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-Type: text/plain; charset=utf-8          « agora o header() funcionou
+
+Bem-vinda à Lojinha da Ana!</pre>
+
+<p>Sem <code>?&gt;</code>, linhas em branco no fim do arquivo continuam "dentro" do PHP e são ignoradas. Por isso a regra: <strong>arquivo só de PHP: abre com <code>&lt;?php</code> e não fecha</strong>. Arquivo que mistura PHP e HTML: abre e fecha quantas vezes precisar.</p>
+
+<hr>
+
+<h2>Variações que funcionam (e uma para evitar)</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Funciona?</th><th>Use?</th></tr>
+<tr><td><code>&lt;?php</code> … (sem fechar)</td><td>Sim</td><td><strong>Sim</strong>, em arquivos só de PHP.</td></tr>
+<tr><td><code>&lt;?php</code> … <code>?&gt;</code></td><td>Sim</td><td>Quando houver HTML depois do PHP.</td></tr>
+<tr><td><code>&lt;?= "texto" ?&gt;</code></td><td>Sim: é um atalho para <code>&lt;?php echo "texto" ?&gt;</code></td><td>Sim, dentro do HTML (próxima aula).</td></tr>
+<tr><td><code>&lt;?PHP</code> e <code>ECHO</code> em maiúsculas</td><td>Sim: palavras do PHP não diferenciam maiúsculas</td><td>Não: o costume é tudo minúsculo (aula <a href="sintaxe.html">Sintaxe</a>).</td></tr>
+<tr><td><code>&lt;?</code> … <code>?&gt;</code> (a "marca curta")</td><td><strong>Depende da configuração</strong> (<code>short_open_tag</code>)</td><td><strong>Não.</strong> Num servidor com ela desligada, o código aparece cru para o visitante.</td></tr>
+</table>
+</div>
+
+<p>Prova da marca curta: o mesmo arquivo, <code>&lt;? echo "Olá\n"; ?&gt;</code>, no PHP do laboratório (configuração de fábrica, marca curta ligada) e num PHP com <code>short_open_tag=Off</code> (como o <code>php.ini</code> de produção do Ubuntu):</p>
+
+<pre class="term" data-cwd="~/site">$ php curta.php
+Olá
+$ php -d short_open_tag=Off curta.php
+&lt;? echo "Olá\n"; ?&gt;                 « não executou: saiu como texto</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Esqueci o <code>;</code></strong>
+<pre class="file" data-file="a.php · erro de propósito">&lt;?php
+echo "Olá, mundo!"
+echo "Tchau!";
+</pre>
+<pre class="term" data-cwd="~/t">$ php a.php
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in /home/ana/t/a.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> "Erro de análise: erro de sintaxe, palavra <code>echo</code> inesperada, esperava <code>,</code> ou <code>;</code>, na linha 3". O <code>;</code> que falta é o da <strong>linha 2</strong>, mas o PHP só percebe o problema quando encontra o <code>echo</code> da linha 3 sem que a instrução anterior tenha terminado. Nenhuma linha rodou: com erro de sintaxe, o PHP nem começa.</p>
+<p><strong>Como resolver:</strong> olhe a linha indicada <strong>e a anterior</strong>. Coloque o <code>;</code> no fim da linha 2.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueci o <code>;</code> na última linha</strong>
+<pre class="term" data-cwd="~/site">$ php semfim.php
+
+Parse error: syntax error, unexpected end of file, expecting "," or ";" in /home/ana/site/semfim.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> "fim de arquivo inesperado". O arquivo acabou (linha 3 é a linha vazia depois do último <code>Enter</code>) com uma instrução ainda aberta.</p>
+<p><strong>Como resolver:</strong> <code>;</code> no fim da última instrução.</p>
+</div>
+
+<div class="cenario">
+<strong>Esqueci de fechar as aspas</strong>
+<pre class="file" data-file="b.php · erro de propósito">&lt;?php
+echo "Olá, mundo!;
+</pre>
+<pre class="term" data-cwd="~/t">$ php b.php
+
+Parse error: syntax error, unexpected end of file, expecting variable or "${" or "{$" in /home/ana/t/b.php on line 3</pre>
+<p><strong>O que aconteceu:</strong> as aspas abriram e nunca fecharam, então o <code>;</code> e todo o resto do arquivo viraram parte do texto. O PHP chegou ao fim do arquivo ainda "dentro" da string. A parte <code>expecting variable or "${"</code> parece estranha; é o PHP listando o que poderia vir dentro de uma string de aspas duplas. Quando a mensagem fala em "end of file" (fim de arquivo), procure algo que abriu e não fechou: aspas, parênteses, chaves.</p>
+<p><strong>Como resolver:</strong> feche as aspas antes do <code>;</code>: <code>echo "Olá, mundo!";</code>. No editor de código, as cores denunciam: tudo depois da aspa aberta fica com a cor de texto.</p>
+</div>
+
+<div class="cenario">
+<strong>O código apareceu na tela em vez de rodar</strong>
+<pre class="file" data-file="d.php · erro de propósito">echo "Olá!";
+</pre>
+<pre class="term" data-cwd="~/t">$ php d.php
+echo "Olá!";</pre>
+<p><strong>O que aconteceu:</strong> faltou o <code>&lt;?php</code>. Sem ele, o PHP trata o arquivo inteiro como texto comum e o copia para a saída, sem erro nenhum.</p>
+<p><strong>Como resolver:</strong> comece o arquivo com <code>&lt;?php</code>, na primeira linha, sem nada antes (nem espaço, nem linha em branco).</p>
+</div>
+
+<div class="cenario">
+<strong>"Could not open input file"</strong>
+<pre class="term" data-cwd="~/site">$ php ola
+Could not open input file: ola
+$ echo $?
+1</pre>
+<p><strong>O que aconteceu:</strong> "Não foi possível abrir o arquivo de entrada: ola". O nome digitado não corresponde a nenhum arquivo nesta pasta: aqui, faltou o <code>.php</code>. Também acontece quando você está na pasta errada.</p>
+<p><strong>Como resolver:</strong> confira com <code>ls</code> (no Windows, <code>dir</code>) e digite o nome completo. A tecla <kbd>Tab</kbd> completa nomes de arquivos.</p>
+</div>
+
+<div class="cenario">
+<strong>"headers already sent … output started at …"</strong>
+<p><strong>O que aconteceu:</strong> alguma coisa foi escrita antes de um <code>header()</code>, de um <code>session_start()</code> ou de um redirecionamento. Os culpados mais comuns: uma linha em branco depois de um <code>?&gt;</code> (como no exemplo acima), espaços antes do <code>&lt;?php</code>, ou o BOM de um arquivo salvo como "UTF-8 com BOM" (aula <a href="editores.html">Editores e IDEs</a>).</p>
+<p><strong>Como resolver:</strong> a mensagem diz o arquivo e a linha onde a saída começou (<code>output started at config.php:4</code>). Vá até lá, apague o que sobra e não feche arquivos só de PHP com <code>?&gt;</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Elemento</th><th>O que faz</th></tr>
+<tr><td><code>&lt;?php</code></td><td>Começa o código PHP. Primeira coisa do arquivo.</td></tr>
+<tr><td><code>?&gt;</code></td><td>Termina o código PHP. Omita em arquivos só de PHP.</td></tr>
+<tr><td><code>echo "texto";</code></td><td>Escreve o texto na saída.</td></tr>
+<tr><td><code>"…"</code></td><td>Uma string (texto) entre aspas duplas.</td></tr>
+<tr><td><code>\n</code></td><td>Quebra de linha, dentro de aspas duplas.</td></tr>
+<tr><td><code>;</code></td><td>Termina cada instrução.</td></tr>
+<tr><td><code>php arquivo.php</code></td><td>Roda o arquivo no terminal.</td></tr>
+<tr><td><code>php -S localhost:8000</code></td><td>Liga o servidor; abra <code>http://localhost:8000/arquivo.php</code>.</td></tr>
+</table>
+</div>
+
+<p>Para fechar, conserte um programa quebrado. Ele tem <strong>três</strong> problemas, um em cada linha. Rode, leia a mensagem, conserte um de cada vez:</p>
+
+<div class="tryphp" data-goal="outre:^Bom dia!\nHoje é dia de PHP\.,semerro">
+<p class="try-task"><strong>Missão:</strong> faça o programa escrever <code>Bom dia!</code> numa linha e <code>Hoje é dia de PHP.</code> na linha de baixo, sem nenhum erro. Dica: falta a marca de abertura, sobra uma aspa a menos e falta um <code>;</code>.</p>
+<pre class="script">php
+echo "Bom dia!\n;
+echo "Hoje é dia de PHP.\n"
+</pre>
+<pre class="solucao">&lt;?php
+echo "Bom dia!\n";
+echo "Hoje é dia de PHP.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A marca de abertura</h3>
+<p>Complete a primeira linha de todo arquivo PHP:</p>
+<div class="ex-code"><input data-answer="&lt;?php" aria-label="marca de abertura"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Escrever um texto</h3>
+<p>Complete a instrução para escrever <code>Oi</code> e pular a linha:</p>
+<div class="ex-code"><input data-answer="echo" aria-label="palavra"> "Oi\n";</div>
+</div>
+
+<div class="exercise">
+<h3>3. Rodar no terminal</h3>
+<p>Complete o comando que roda o arquivo <code>ola.php</code>:</p>
+<div class="ex-code"><input data-answer="php ola.php" aria-label="comando"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. A mensagem diz <code>unexpected token "echo" … on line 5</code>. Onde provavelmente está o erro?</p>
+<label><input type="radio" name="q4"> Na linha 6.</label>
+<label><input type="radio" name="q4"> No fim da linha 4: faltou o <code>;</code>.</label>
+<label><input type="radio" name="q4"> Na palavra <code>echo</code>, que está escrita errado.</label>
+<label><input type="radio" name="q4"> No <code>&lt;?php</code>.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">5. Por que não se usa <code>?&gt;</code> no fim de um arquivo que só tem PHP?</p>
+<label><input type="radio" name="q5"> Porque dá erro de sintaxe.</label>
+<label><input type="radio" name="q5"> Porque o PHP 8.5 não aceita mais.</label>
+<label><input type="radio" name="q5"> Porque espaços ou linhas em branco depois dele viram saída e podem causar "headers already sent".</label>
+<label><input type="radio" name="q5"> Porque deixa o programa mais lento.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. O que <code>echo "A"; echo "B";</code> escreve?</p>
+<label><input type="radio" name="q6"> <code>AB</code></label>
+<label><input type="radio" name="q6"> <code>A</code> e <code>B</code> em linhas separadas</label>
+<label><input type="radio" name="q6"> <code>A B</code></label>
+<label><input type="radio" name="q6"> <code>"A""B"</code></label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Todo arquivo PHP começa com <code>&lt;?php</code>; sem ele, o conteúdo sai como texto.</li>
+  <li><code>echo "texto";</code> escreve na saída; as aspas delimitam a string; o <code>;</code> termina a instrução.</li>
+  <li><code>\n</code> pula a linha no terminal; o <code>echo</code> nunca pula sozinho.</li>
+  <li>Terminal: <code>php ola.php</code>. Navegador: <code>php -S localhost:8000</code> e <code>http://localhost:8000/ola.php</code>.</li>
+  <li>Em arquivos só de PHP, não feche com <code>?&gt;</code>: o que sobra depois dele vira saída e causa "headers already sent".</li>
+  <li>Erros de sintaxe (<code>Parse error</code>): olhe a linha indicada e a anterior; "unexpected end of file" = algo abriu e não fechou.</li>
+  <li>Próximo passo: <a href="php-e-html.html">PHP Dentro do HTML</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
