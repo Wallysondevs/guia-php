@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções — criar, chamar e organizar | Guia PHP</title>
+<meta name="description" content="Funções no PHP do zero: o que é uma função, funções nativas × as suas, criar com function e chamar, regras de nomes, chamar antes de definir (no mesmo arquivo), funções dentro de if, guardar funções num arquivo separado, e os erros reais Call to undefined function e Cannot redeclare.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções</span></h1>
+
+<p class="intro">Uma <strong>função</strong> é um pedaço de código com um <strong>nome</strong>, que você escreve uma vez e usa quantas vezes quiser, só chamando o nome. Você já usa funções desde o começo do guia: <code>strlen</code>, <code>count</code>, <code>number_format</code>, <code>print_r</code>… Todas foram escritas por alguém e vêm prontas no PHP. Nesta aula você aprende a criar as <strong>suas</strong>. É o primeiro passo para organizar programas maiores: em vez de um arquivo enorme, de cima a baixo, você divide o trabalho em partes com nome.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma função e por que ela existe.</li>
+  <li>A diferença entre funções <strong>nativas</strong> (do PHP) e as <strong>suas</strong>.</li>
+  <li>Como criar uma função com <code>function</code> e como chamá-la.</li>
+  <li>As regras para o nome de uma função (e as convenções).</li>
+  <li>Por que dá para chamar uma função <strong>antes</strong> de escrevê-la no arquivo, e quando isso não funciona.</li>
+  <li>Como guardar suas funções num arquivo separado.</li>
+</ul>
+</div>
+
+<p>Esta é a primeira aula do grupo Funções. As próximas aprofundam cada parte: <a href="parametros.html">Parâmetros</a> (os dados que a função recebe) e <a href="tipos-retorno.html">Tipos e Retorno</a> (o resultado que ela devolve).</p>
+
+<hr>
+
+<h2>A ideia: uma receita com nome</h2>
+<p>Num caderno de receitas, a receita de "massa de pão" é escrita uma vez. Depois, em outras receitas, basta dizer "faça a massa de pão" (página 12), sem copiar os passos de novo. Se um dia a Ana melhorar a massa, ela muda <strong>um lugar</strong>, e todas as receitas que usam a massa saem melhores.</p>
+
+<p>Funções são isso: você <strong>define</strong> (escreve a receita, uma vez) e <strong>chama</strong> (manda fazer, quantas vezes quiser).</p>
+
+<h2>Funções nativas: as que já vêm prontas</h2>
+<p>O PHP já traz centenas de funções, as <strong>funções nativas</strong> (ou "internas", <em>built-in</em>). Você chama todas do mesmo jeito: o nome, parênteses, e dentro deles os dados que a função precisa.</p>
+
+<pre class="file" data-file="fn-nativas.php">&lt;?php
+echo strlen("Recife"), "\n";
+echo strtoupper("ana"), "\n";
+echo count(["a", "b", "c"]), "\n";
+echo max(3, 9, 4), "\n";
+echo count(get_defined_functions()["internal"]), "\n";
+</pre>
+
+<pre class="term">$ php fn-nativas.php
+6                       « strlen: o tamanho do texto
+ANA                     « strtoupper: em maiúsculas
+3                       « count: quantos itens
+9                       « max: o maior
+1528                    « quantas funções nativas este PHP tem</pre>
+
+<p>A última linha conta as funções nativas do PHP do laboratório: <strong>1528</strong>. O número muda conforme as extensões instaladas, mas a ideia é a mesma: antes de escrever uma função, vale procurar se o PHP já tem uma pronta (o <a href="https://www.php.net/manual/pt_BR/funcref.php">manual do PHP</a> lista todas; as de texto e de arrays estão na <a href="ref-string.html">Referência de Strings</a> e na <a href="ref-array.html">Referência de Arrays</a>).</p>
+
+<p>As funções nativas resolvem problemas gerais. As <strong>suas</strong> resolvem os problemas do <strong>seu</strong> programa: mostrar o cabeçalho da lojinha, calcular o frete, formatar o preço do jeito da Ana.</p>
+
+<hr>
+
+<h2>O problema: código repetido</h2>
+<p>A Ana imprime os pedidos da lojinha no terminal, cada um com um cabeçalho:</p>
+
+<pre class="file" data-file="fn-repetido.php">&lt;?php
+echo "==============================\n";
+echo "  Lojinha da Ana - Recife/PE\n";
+echo "==============================\n";
+echo "Pedido 1: 2 cafés\n";
+echo "==============================\n";
+echo "  Lojinha da Ana - Recife/PE\n";
+echo "==============================\n";
+echo "Pedido 2: 10 pães\n";
+</pre>
+
+<p>As três linhas do cabeçalho aparecem duas vezes. Com 50 pedidos, seriam 50 cópias. E quando a lojinha mudar de endereço, a Ana vai ter de achar e corrigir cada uma, torcendo para não esquecer nenhuma.</p>
+
+<h2>Criar e chamar uma função</h2>
+
+<pre class="file" data-file="fn-cabecalho.php">&lt;?php
+function cabecalho()
+{
+    echo "==============================\n";
+    echo "  Lojinha da Ana - Recife/PE\n";
+    echo "==============================\n";
+}
+
+cabecalho();
+echo "Pedido 1: 2 cafés\n";
+cabecalho();
+echo "Pedido 2: 10 pães\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>function</dt><dd>Palavra reservada que diz "vou definir uma função" (<em>function</em> = função).</dd>
+  <dt>cabecalho</dt><dd>O nome que você escolheu. É por ele que a função será chamada.</dd>
+  <dt>( )</dt><dd>Os parênteses são obrigatórios. Aqui estão vazios porque esta função não precisa de nenhum dado; na próxima seção eles ganham conteúdo.</dd>
+  <dt>{ … }</dt><dd>O <strong>corpo</strong> da função: as instruções que rodam a cada chamada. A chave de abertura <code>{</code> na linha de baixo é o estilo recomendado pelo padrão PSR-12 (aula <a href="psr.html">Padrões PSR</a>); na mesma linha também funciona.</dd>
+  <dt>cabecalho();</dt><dd>A <strong>chamada</strong>: o nome, os parênteses e o ponto e vírgula. É aqui que o código do corpo roda.</dd>
+</dl>
+
+<pre class="term">$ php fn-cabecalho.php
+==============================
+  Lojinha da Ana - Recife/PE
+==============================
+Pedido 1: 2 cafés
+==============================
+  Lojinha da Ana - Recife/PE
+==============================
+Pedido 2: 10 pães</pre>
+
+<p>A saída é idêntica à do código repetido, mas agora o cabeçalho existe em <strong>um lugar só</strong>. Mudou o endereço? Uma linha.</p>
+
+<h3>Definir não é executar</h3>
+<p>Escrever a função só a <strong>guarda</strong> com um nome. O corpo só roda quando alguém chama:</p>
+
+<pre class="file" data-file="fn-semchamar.php">&lt;?php
+function saudacao()
+{
+    echo "Olá!\n";
+}
+echo "Fim\n";
+</pre>
+
+<pre class="term">$ php fn-semchamar.php
+Fim                     « o "Olá!" não apareceu: ninguém chamou saudacao()</pre>
+
+<h3>O caminho da execução</h3>
+<p>Quando o PHP encontra uma chamada, ele "pula" para dentro da função, roda o corpo de cima a baixo e <strong>volta</strong> para a linha seguinte à chamada:</p>
+
+<pre class="file" data-file="fn-primeira.php">&lt;?php
+function saudacao()
+{
+    echo "Olá! Bem-vinda à lojinha da Ana.\n";
+    echo "Hoje tem café fresquinho.\n";
+}
+
+echo "Antes de chamar\n";
+saudacao();
+saudacao();
+echo "Depois de chamar\n";
+</pre>
+
+<pre class="term">$ php fn-primeira.php
+Antes de chamar
+Olá! Bem-vinda à lojinha da Ana.        « 1ª chamada
+Hoje tem café fresquinho.
+Olá! Bem-vinda à lojinha da Ana.        « 2ª chamada
+Hoje tem café fresquinho.
+Depois de chamar</pre>
+
+<div class="tryphp">
+<p class="try-task">Crie uma segunda função, <code>rodape()</code>, que mostre <code>Obrigada e volte sempre!</code>, e chame-a depois de cada pedido. Experimente também tirar uma das chamadas e ver o que muda.</p>
+<pre class="script">&lt;?php
+function cabecalho()
+{
+    echo "==============================\n";
+    echo "  Lojinha da Ana - Recife/PE\n";
+    echo "==============================\n";
+}
+
+cabecalho();
+echo "Pedido 1: 2 cafés\n";
+cabecalho();
+echo "Pedido 2: 10 pães\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Uma prévia: receber dados e devolver um resultado</h2>
+<p>A função <code>cabecalho()</code> faz sempre a mesma coisa. As funções ficam bem mais úteis quando <strong>recebem</strong> dados (entre os parênteses) e <strong>devolvem</strong> um resultado (com <code>return</code>), como as nativas fazem. Só uma prévia, que as próximas aulas explicam em detalhe:</p>
+
+<pre class="file" data-file="fn-param.php">&lt;?php
+function saudacao($nome)
+{
+    echo "Olá, $nome!\n";
+}
+
+function dobro($numero)
+{
+    return $numero * 2;
+}
+
+saudacao("Bruno");
+saudacao("Carla");
+$resultado = dobro(21);
+echo "O dobro de 21 é $resultado\n";
+echo "O dobro de 5 é ", dobro(5), "\n";
+</pre>
+
+<pre class="term">$ php fn-param.php
+Olá, Bruno!
+Olá, Carla!
+O dobro de 21 é 42
+O dobro de 5 é 10</pre>
+
+<ul>
+  <li><code>$nome</code> e <code>$numero</code> são <strong>parâmetros</strong>: variáveis que recebem o valor passado na chamada. Veja <a href="parametros.html">Parâmetros</a>.</li>
+  <li><code>return</code> devolve um valor para quem chamou, que pode guardá-lo numa variável ou usá-lo direto. Veja <a href="tipos-retorno.html">Tipos e Retorno</a>.</li>
+</ul>
+
+<hr>
+
+<h2>Nomes de funções</h2>
+
+<h3>As regras</h3>
+<ul>
+  <li>Começa com uma <strong>letra</strong> ou <code>_</code>; depois, letras, números e <code>_</code>.</li>
+  <li><strong>Sem</strong> espaço, hífen ou outros símbolos. <strong>Sem</strong> o <code>$</code> (isso é coisa de variável).</li>
+  <li>Não pode repetir o nome de outra função, nem de uma nativa.</li>
+</ul>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Nome</th><th>Vale?</th><th>Por quê</th></tr>
+<tr><td><code>calcularFrete</code></td><td>sim</td><td>letras, estilo <em>camelCase</em></td></tr>
+<tr><td><code>calcular_frete</code></td><td>sim</td><td>letras e <code>_</code>, estilo <em>snake_case</em></td></tr>
+<tr><td><code>total2</code></td><td>sim</td><td>número depois da primeira letra</td></tr>
+<tr><td><code>2vezes</code></td><td>não</td><td>começa com número</td></tr>
+<tr><td><code>mostrar-total</code></td><td>não</td><td>hífen (o PHP lê como "menos")</td></tr>
+<tr><td><code>count</code></td><td>não</td><td>já existe uma função nativa com esse nome</td></tr>
+</table>
+</div>
+
+<h3>Maiúsculas não importam (mas escreva igual)</h3>
+<p>Ao contrário das variáveis (<code>$nome</code> e <code>$Nome</code> são diferentes), os nomes de funções <strong>não</strong> diferenciam maiúsculas de minúsculas:</p>
+
+<pre class="file" data-file="fn-maiusc.php">&lt;?php
+function saudacao()
+{
+    echo "Olá!\n";
+}
+Saudacao();
+SAUDACAO();
+STRLEN("x");
+echo "ok\n";
+</pre>
+
+<pre class="term">$ php fn-maiusc.php
+Olá!
+Olá!
+ok                      « STRLEN também funcionou (sem mostrar nada, porque não tem echo)</pre>
+
+<p>Funciona, mas é só uma tolerância antiga do PHP. Escreva sempre do mesmo jeito que na definição: fica mais fácil de achar o nome com a busca do editor.</p>
+
+<h3>As convenções</h3>
+<ul>
+  <li>Use um <strong>verbo</strong> (a função <em>faz</em> algo): <code>mostrarCabecalho</code>, <code>calcularFrete</code>, <code>formatarPreco</code>. Para funções que respondem sim/não, é comum começar com <code>e</code>/<code>tem</code> (<code>eMaiorDeIdade</code>, <code>temEstoque</code>).</li>
+  <li>Escolha <strong>um</strong> estilo e mantenha. As funções nativas usam <em>snake_case</em> (<code>array_key_exists</code>); muitos projetos modernos usam <em>camelCase</em> (<code>calcularFrete</code>), o mesmo dos métodos das classes (aula <a href="psr.html">Padrões PSR</a>).</li>
+  <li>Evite acentos. O PHP até aceita <code>function média()</code>, mas qualquer pessoa que digite <code>media()</code> sem acento vai receber um erro. Nomes de código sem acento evitam essa armadilha.</li>
+</ul>
+
+<hr>
+
+<h2>Chamar antes de definir</h2>
+<p>Até agora, as funções foram escritas no começo do arquivo e chamadas depois. Mas veja isto:</p>
+
+<pre class="file" data-file="fn-antes.php">&lt;?php
+saudacao();
+echo "O dobro de 4 é ", dobro(4), "\n";
+
+function saudacao()
+{
+    echo "Olá! Fui chamada antes de ser escrita.\n";
+}
+
+function dobro($n)
+{
+    return $n * 2;
+}
+</pre>
+
+<pre class="term">$ php fn-antes.php
+Olá! Fui chamada antes de ser escrita.
+O dobro de 4 é 8</pre>
+
+<p>Funcionou. Isso acontece porque o PHP não executa o arquivo direto: primeiro ele <strong>lê o arquivo inteiro</strong> e o transforma num formato interno (essa etapa se chama <strong>compilação</strong>; veja <a href="como-funciona.html">Como o PHP Funciona</a>). Durante a leitura, ele já registra todas as funções escritas "soltas" no arquivo. Quando a execução começa, elas já existem. Em outras linguagens, esse comportamento é chamado de <em>hoisting</em> ("içar": as definições são "puxadas" para o topo).</p>
+
+<h3>Quando não funciona: função dentro de um <code>if</code></h3>
+<p>Uma função definida <strong>dentro</strong> de um bloco, como um <code>if</code>, só passa a existir quando a execução <strong>chega</strong> naquela linha:</p>
+
+<pre class="file" data-file="fn-condicional2.php">&lt;?php
+saudacao();
+
+$modoFesta = true;
+if ($modoFesta) {
+    function saudacao()
+    {
+        echo "Olá! Hoje é dia de festa!\n";
+    }
+}
+</pre>
+
+<pre class="term">$ php fn-condicional2.php
+
+Fatal error: Uncaught Error: Call to undefined function saudacao() in /home/ana/site/fn-condicional2.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/fn-condicional2.php on line 2</pre>
+
+<p>Com a chamada <strong>depois</strong> do <code>if</code>, o mesmo código funciona (<code>Olá! Hoje é dia de festa!</code>). Funções condicionais existem, mas são raras; quase sempre há um jeito mais claro.</p>
+
+<h3>Nem com funções de outro arquivo</h3>
+<p>Funções que estão em outro arquivo só existem depois que esse arquivo é carregado com <code>require</code>. A seção seguinte mostra isso.</p>
+
+<div class="tip">
+<strong>Onde colocar, então?</strong>
+<p>Mesmo podendo chamar antes, a convenção é <strong>definir primeiro e usar depois</strong>: funções no começo do arquivo (ou num arquivo separado), o "programa principal" no fim. Quem lê o código de cima para baixo entende melhor.</p>
+</div>
+
+<hr>
+
+<h2>Organizar: um arquivo só para as funções</h2>
+<p>Quando o programa cresce, a Ana separa as funções num arquivo próprio, <code>funcoes.php</code>, e o carrega no começo de cada página com <code>require_once</code> ("exija, uma vez só"). Assim, todas as páginas da lojinha usam o mesmo cabeçalho.</p>
+
+<pre class="file" data-file="funcoes.php">&lt;?php
+function cabecalho()
+{
+    echo "==============================\n";
+    echo "  Lojinha da Ana - Recife/PE\n";
+    echo "==============================\n";
+}
+
+function rodape()
+{
+    echo "------------------------------\n";
+    echo "Obrigada e volte sempre!\n";
+}
+</pre>
+
+<pre class="file" data-file="loja.php">&lt;?php
+require_once "funcoes.php";
+
+cabecalho();
+echo "Pedido 1: 2 cafés\n";
+rodape();
+</pre>
+
+<pre class="term">$ php loja.php
+==============================
+  Lojinha da Ana - Recife/PE
+==============================
+Pedido 1: 2 cafés
+------------------------------
+Obrigada e volte sempre!</pre>
+
+<p>Aqui a ordem importa: se a chamada vier antes do <code>require_once</code>, as funções ainda não foram carregadas.</p>
+
+<pre class="file" data-file="loja2.php">&lt;?php
+cabecalho();
+require_once "funcoes.php";
+</pre>
+
+<pre class="term">$ php loja2.php
+
+Fatal error: Uncaught Error: Call to undefined function cabecalho() in /home/ana/site/loja2.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/loja2.php on line 2</pre>
+
+<p>O <code>require</code> e seus irmãos (<code>include</code>, <code>require_once</code>, <code>include_once</code>) são o assunto da aula <a href="include-require.html">include e require</a>. Por que <code>_once</code>? Porque carregar o mesmo arquivo de funções duas vezes daria o erro <code>Cannot redeclare function</code>, que você vê logo abaixo.</p>
+
+<div class="tryphp">
+<p class="try-task">Este exemplo tem dois arquivos (veja as abas). O <code>loja.php</code> é o que roda; ele carrega o <code>funcoes.php</code>. Acrescente uma função nova no <code>funcoes.php</code> (por exemplo, <code>horario()</code>, que mostre o horário de funcionamento) e chame-a no <code>loja.php</code>.</p>
+<pre class="script" data-file="loja.php">&lt;?php
+require_once "funcoes.php";
+
+cabecalho();
+echo "Pedido 1: 2 cafés\n";
+rodape();
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+function cabecalho()
+{
+    echo "==============================\n";
+    echo "  Lojinha da Ana - Recife/PE\n";
+    echo "==============================\n";
+}
+
+function rodape()
+{
+    echo "------------------------------\n";
+    echo "Obrigada e volte sempre!\n";
+}
+</pre>
+</div>
+
+<h3>Antes de criar, pergunte se já existe</h3>
+<p>A função <code>function_exists</code> diz se uma função existe (sua ou nativa). É útil para conferir se o PHP instalado tem uma função nova:</p>
+
+<pre class="file" data-file="fn-exists.php">&lt;?php
+function saudacao()
+{
+}
+var_dump(function_exists("saudacao"));
+var_dump(function_exists("strlen"));
+var_dump(function_exists("array_first"));
+var_dump(function_exists("voar"));
+</pre>
+
+<pre class="term">$ php fn-exists.php
+bool(true)
+bool(true)
+bool(true)              « array_first existe: este é o PHP 8.5
+bool(false)</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Call to undefined function saudacoa()</code></strong>
+<pre class="file" data-file="fn-undefined.php">&lt;?php
+function saudacao()
+{
+    echo "Olá!\n";
+}
+saudacoa();
+</pre>
+<pre class="term">$ php fn-undefined.php
+
+Fatal error: Uncaught Error: Call to undefined function saudacoa() in /home/ana/site/fn-undefined.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/fn-undefined.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> "chamada a uma função não definida". O PHP não conhece nenhuma função com esse nome. As causas mais comuns: erro de digitação (como aqui, <code>saudacoa</code>); o arquivo com a função não foi carregado (ou foi carregado depois da chamada); a função está dentro de um <code>if</code> que ainda não rodou; ou é uma função nativa de uma extensão que não está instalada, ou de uma versão mais nova do PHP.</p>
+<p><strong>Como resolver:</strong> copie o nome da definição e cole na chamada. Confira o <code>require</code>. Para funções nativas, veja o manual (ele diz a versão e a extensão) e use <code>function_exists</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Cannot redeclare function saudacao()</code></strong>
+<pre class="file" data-file="fn-redeclare.php">&lt;?php
+function saudacao()
+{
+    echo "Olá!\n";
+}
+function saudacao()
+{
+    echo "Oi!\n";
+}
+</pre>
+<pre class="term">$ php fn-redeclare.php
+
+Fatal error: Cannot redeclare function saudacao() (previously declared in /home/ana/site/fn-redeclare.php:2) in /home/ana/site/fn-redeclare.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que aconteceu:</strong> "não é possível declarar de novo". Duas funções com o mesmo nome. A mensagem diz onde está a primeira (<em>previously declared in</em>… linha 2) e onde está a repetida (linha 6). Também acontece quando o mesmo arquivo de funções é carregado duas vezes com <code>require</code>/<code>include</code> (por isso o <code>require_once</code>).</p>
+<p>Com o nome de uma função nativa, a mensagem é parecida, sem o "previously declared":</p>
+<pre class="term">$ php fn-nativa-nome.php
+
+Fatal error: Cannot redeclare function count() in /home/ana/site/fn-nativa-nome.php on line 2
+Stack trace:
+#0 {main}</pre>
+<p><strong>Como resolver:</strong> dê outro nome a uma das funções (e lembre que maiúsculas não contam: <code>Count</code> também colide). Para arquivos de funções, use <code>require_once</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Parse error: syntax error, unexpected token "-", expecting "("</code></strong>
+<pre class="file" data-file="fn-hifen.php">&lt;?php
+function mostrar-total()
+{
+}
+</pre>
+<pre class="term">$ php fn-hifen.php
+
+Parse error: syntax error, unexpected token "-", expecting "(" in /home/ana/site/fn-hifen.php on line 2</pre>
+<p><strong>O que aconteceu:</strong> o PHP leu o nome <code>mostrar</code> e esperava os parênteses; achou um hífen. Com um nome que começa com número (<code>function 2vezes()</code>), a mensagem é <code>unexpected integer "2", expecting "("</code>.</p>
+<p><strong>Como resolver:</strong> use só letras, números (não no começo) e <code>_</code>: <code>mostrarTotal</code> ou <code>mostrar_total</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Você quer…</th><th>Código</th></tr>
+<tr><td>Definir uma função</td><td><code>function nome() { … }</code></td></tr>
+<tr><td>Chamar</td><td><code>nome();</code></td></tr>
+<tr><td>Receber um dado</td><td><code>function saudacao($nome) { … }</code> → <code>saudacao("Ana");</code></td></tr>
+<tr><td>Devolver um resultado</td><td><code>function dobro($n) { return $n * 2; }</code> → <code>$x = dobro(4);</code></td></tr>
+<tr><td>Carregar funções de outro arquivo</td><td><code>require_once "funcoes.php";</code></td></tr>
+<tr><td>Saber se uma função existe</td><td><code>function_exists("nome")</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+
+<div class="tryphp" data-goal="src:function\s+linha\s*\(,src:linha\(\);,out:Pão,semerro">
+<p class="try-task"><strong>Missão:</strong> a nota da lojinha repete a mesma linha de traços três vezes. Crie uma função <code>linha()</code> que mostre os traços e troque os três <code>echo</code> repetidos por chamadas a ela. A saída deve continuar igual.</p>
+<pre class="script">&lt;?php
+echo "--------------------\n";
+echo "Café ........ 18,90\n";
+echo "--------------------\n";
+echo "Pão .......... 0,75\n";
+echo "--------------------\n";
+</pre>
+<pre class="solucao">&lt;?php
+function linha()
+{
+    echo "--------------------\n";
+}
+
+linha();
+echo "Café ........ 18,90\n";
+linha();
+echo "Pão .......... 0,75\n";
+linha();
+</pre>
+</div>
+
+<pre class="term">$ php nota.php
+--------------------
+Café ........ 18,90
+--------------------
+Pão .......... 0,75
+--------------------</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A palavra que define</h3>
+<p>Complete para definir a função <code>boasVindas</code>:</p>
+<div class="ex-code"><input data-answer="function" aria-label="palavra reservada"> boasVindas()<br>{<br>&nbsp;&nbsp;&nbsp;&nbsp;echo "Bem-vinda!\n";<br>}</div>
+</div>
+
+<div class="exercise">
+<h3>2. A chamada</h3>
+<p>Complete para chamar a função <code>boasVindas</code>:</p>
+<div class="ex-code"><input data-answer="boasVindas();" aria-label="chamada"></div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Qual destes nomes de função é <strong>inválido</strong>?</p>
+<label><input type="radio" name="q3"> <code>calcular_total</code></label>
+<label><input type="radio" name="q3"> <code>calcular-total</code></label>
+<label><input type="radio" name="q3"> <code>calcularTotal</code></label>
+<label><input type="radio" name="q3"> <code>total2</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Um arquivo chama <code>ola();</code> na linha 2 e define <code>function ola() { … }</code> na linha 5, solta no arquivo. O que acontece?</p>
+<label><input type="radio" name="q4"> <code>Call to undefined function ola()</code>.</label>
+<label><input type="radio" name="q4"> Nada aparece: a chamada é ignorada.</label>
+<label><input type="radio" name="q4"> <code>Cannot redeclare function ola()</code>.</label>
+<label><input type="radio" name="q4"> Funciona: o PHP registra as funções do arquivo antes de começar a executar.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Um arquivo só tem a definição <code>function ola() { echo "Olá"; }</code>, sem nenhuma chamada. O que ele mostra ao rodar?</p>
+<label><input type="radio" name="q5"> Nada.</label>
+<label><input type="radio" name="q5"> <code>Olá</code>.</label>
+<label><input type="radio" name="q5"> Um aviso dizendo que a função não foi usada.</label>
+<label><input type="radio" name="q5"> <code>ola</code>.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma função é um bloco de código com nome: definida uma vez, chamada quantas vezes quiser. Evita repetição e deixa mudanças num lugar só.</li>
+  <li>O PHP tem mais de mil funções <strong>nativas</strong>; as <strong>suas</strong> resolvem os problemas do seu programa.</li>
+  <li>Defina com <code>function nome() { … }</code>; chame com <code>nome();</code>. Definir não executa nada.</li>
+  <li>Nomes: letra ou <code>_</code> no começo, sem hífen, sem repetir outra função. Maiúsculas não importam, mas escreva igual.</li>
+  <li>Funções soltas no arquivo podem ser chamadas antes da definição; dentro de <code>if</code> ou em outro arquivo, só depois.</li>
+  <li>Guarde as funções num arquivo e carregue com <code>require_once</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
