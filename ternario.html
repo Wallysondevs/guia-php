@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Operador Ternário — ? :, o Elvis ?: e o ?? | Guia PHP</title>
+<meta name="description" content="O operador ternário do PHP (condição ? valor1 : valor2), o ternário curto ?: (Elvis), a diferença para o ??, a armadilha de precedência com o ponto e o ternário aninhado sem parênteses, que é erro fatal no PHP 8. Saídas reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Operador Ternário</span></h1>
+
+<p class="intro">Muitas vezes um <code>if</code> serve só para escolher entre <strong>dois valores</strong>: "aprovado" ou "reprovado", "item" ou "itens". Para esses casos, o PHP tem um atalho que cabe numa linha: o <strong>operador ternário</strong>, escrito com <code>?</code> e <code>:</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do ternário: <code>condição ? valor_se_sim : valor_se_não</code>.</li>
+  <li>A diferença entre um <strong>comando</strong> (<code>if</code>) e uma <strong>expressão</strong> (o ternário), e por que isso importa.</li>
+  <li>Os parênteses que evitam surpresas quando o ternário está no meio de uma concatenação.</li>
+  <li>O ternário curto <code>?:</code> (o "Elvis") e a diferença para o <code>??</code>.</li>
+  <li>Por que ternário dentro de ternário sem parênteses é <strong>erro fatal</strong> no PHP 8.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: uma pergunta com duas respostas prontas</h2>
+<p>"Está frio? <strong>Se sim</strong>, casaco; <strong>se não</strong>, camiseta." A frase inteira <strong>resulta</strong> numa peça de roupa. O ternário é igual: uma pergunta seguida das duas respostas possíveis, e o resultado é um <strong>valor</strong> que você pode guardar, mostrar ou passar adiante.</p>
+<p>O nome "ternário" quer dizer "de três partes": a condição, o valor do sim e o valor do não. É o único operador do PHP com três partes. (O <code>+</code>, por exemplo, tem duas: <code>a + b</code>.)</p>
+
+<hr>
+
+<h2>A anatomia</h2>
+
+<pre class="file" data-file="ternario.php">&lt;?php
+$nota = 8;
+$situacao = $nota &gt;= 7 ? "Aprovado" : "Reprovado";
+echo $situacao, "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>$nota &gt;= 7</dt><dd>A <strong>condição</strong>: a pergunta, igual à de um <code>if</code>.</dd>
+  <dt>?</dt><dd>"Então…". Separa a pergunta das respostas.</dd>
+  <dt>"Aprovado"</dt><dd>O valor se a condição for <strong>verdadeira</strong>.</dd>
+  <dt>:</dt><dd>"Senão…".</dd>
+  <dt>"Reprovado"</dt><dd>O valor se a condição for <strong>falsa</strong>.</dd>
+  <dt>$situacao = …</dt><dd>O resultado (um dos dois valores) é guardado na variável.</dd>
+</dl>
+
+<pre class="term">$ php ternario.php
+Aprovado</pre>
+
+<p>O mesmo programa com <code>if</code> (veja <a href="if-else.html">if, elseif, else</a>) teria cinco linhas:</p>
+<pre class="file" data-file="com-if.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7) {
+    $situacao = "Aprovado";
+} else {
+    $situacao = "Reprovado";
+}
+echo $situacao, "\n";
+</pre>
+<pre class="term">$ php com-if.php
+Aprovado</pre>
+
+<h3>Expressão × comando</h3>
+<p>Essa é a diferença importante. O <code>if</code> é um <strong>comando</strong>: ele escolhe quais linhas rodar. O ternário é uma <strong>expressão</strong>: ele <strong>vale</strong> alguma coisa, como <code>2 + 3</code> vale <code>5</code>. Por isso o ternário pode ficar onde um valor pode ficar: depois de um <code>=</code>, dentro de um <code>echo</code>, como argumento de uma função, dentro de um texto concatenado.</p>
+
+<pre class="file" data-file="plural.php">&lt;?php
+$qtd = 1;
+echo "$qtd " . ($qtd === 1 ? "item" : "itens") . " no carrinho\n";
+$qtd = 3;
+echo "$qtd " . ($qtd === 1 ? "item" : "itens") . " no carrinho\n";
+</pre>
+<pre class="term">$ php plural.php
+1 item no carrinho
+3 itens no carrinho</pre>
+
+<p>O caso do plural é o exemplo clássico do ternário: com <code>if</code>, você precisaria de uma variável a mais.</p>
+
+<div class="tryphp" data-goal="out:Bom dia\, Ana!,src:\?\s*[&quot;']">
+<p class="try-task"><strong>Missão:</strong> usando um ternário, faça o programa dizer <code>Bom dia, Ana!</code> quando <code>$hora</code> for menor que 12 e <code>Boa tarde, Ana!</code> nos outros casos. Com <code>$hora = 9</code>, deve aparecer "Bom dia".</p>
+<pre class="script">&lt;?php
+$hora = 9;
+$saudacao = "Olá";
+echo "$saudacao, Ana!";
+</pre>
+<pre class="solucao">&lt;?php
+$hora = 9;
+$saudacao = $hora &lt; 12 ? "Bom dia" : "Boa tarde";
+echo "$saudacao, Ana!";
+</pre>
+</div>
+
+<hr>
+
+<h2 id="parenteses">Use parênteses na concatenação</h2>
+<p>No exemplo do plural, o ternário estava entre parênteses. Veja o que acontece sem eles:</p>
+
+<pre class="file" data-file="precedencia.php">&lt;?php
+$nota = 8;
+echo "Você está " . ($nota &gt;= 7 ? "aprovado" : "reprovado") . "\n";
+echo "Você está " . $nota &gt;= 7 ? "aprovado" : "reprovado";
+echo "\n";
+</pre>
+<pre class="term">$ php precedencia.php
+Você está aprovado
+aprovado                « sumiu o "Você está "!</pre>
+
+<p>O ternário tem uma das <strong>menores prioridades</strong> entre os operadores (veja <a href="precedencia.html">Precedência</a>). Sem parênteses, o PHP fez, nesta ordem:</p>
+<ol class="passo">
+  <li>A concatenação primeiro: <code>"Você está " . $nota</code> → <code>"Você está 8"</code>.</li>
+  <li>A comparação: <code>"Você está 8" &gt;= 7</code>. Comparar texto com número dá um resultado sem sentido (aqui, <code>true</code>).</li>
+  <li>Só então o ternário: <code>true ? "aprovado" : "reprovado"</code> → <code>"aprovado"</code>, e só isso foi mostrado.</li>
+</ol>
+<p>Nenhum erro, nenhum aviso. A regra: <strong>ternário no meio de outra expressão, sempre entre parênteses</strong>.</p>
+
+<hr>
+
+<h2>O ternário curto <code>?:</code> ("Elvis")</h2>
+<p>Muito comum é querer "o valor, se ele for verdadeiro; senão, um valor padrão". Com o ternário completo, você repete a variável: <code>$nome ? $nome : "Visitante"</code>. O ternário curto omite o meio: <code>$nome ?: "Visitante"</code>.</p>
+<p>O apelido "operador Elvis" vem do desenho <code>?:</code>, que lembra o topete e os olhos do cantor Elvis Presley, visto de lado.</p>
+
+<pre class="file" data-file="elvis.php">&lt;?php
+$nome = "Ana";
+echo $nome ?: "Visitante", "\n";
+$nome = "";
+echo $nome ?: "Visitante", "\n";
+$nome = "0";
+echo $nome ?: "Visitante", "\n";
+</pre>
+<pre class="term">$ php elvis.php
+Ana               « "Ana" é verdadeiro: fica o próprio valor
+Visitante         « "" é falso: usa o padrão
+Visitante         « "0" também é falso!</pre>
+
+<p><code>$a ?: $b</code> quer dizer: "se <code>$a</code> for verdadeiro, <code>$a</code>; senão, <code>$b</code>". O "verdadeiro" aqui segue a tabela de valores falsos da aula de <a href="if-else.html">if</a>: <code>""</code>, <code>"0"</code>, <code>0</code>, <code>[]</code>, <code>null</code> e <code>false</code> fazem o Elvis usar o padrão.</p>
+
+<h3><code>?:</code> × <code>??</code></h3>
+<p>O <code>??</code> (<em>null coalescing</em>, detalhado em <a href="null-coalescing.html">?? e ?-&gt;</a>) parece igual, mas pergunta outra coisa: "o valor <strong>existe e não é <code>null</code></strong>?".</p>
+
+<pre class="file" data-file="elvis-ou-nulo.php">&lt;?php
+$nome = "0";
+echo $nome ?: "Visitante", "\n";
+echo $nome ?? "Visitante", "\n";
+echo $semNome ?? "Visitante", "\n";
+echo $semNome ?: "Visitante", "\n";
+</pre>
+<pre class="term">$ php elvis-ou-nulo.php
+Visitante         « ?: acha "0" falso
+0                 « ?? só olha se é null: "0" não é, fica
+Visitante         « ??: a variável não existe → padrão, sem aviso
+
+Warning: Undefined variable $semNome in /home/ana/php/elvis-ou-nulo.php on line 6
+Visitante         « ?: também usa o padrão, mas reclama da variável</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Valor de <code>$x</code></th><th><code>$x ?: "padrão"</code></th><th><code>$x ?? "padrão"</code></th></tr>
+<tr><td><code>"Ana"</code></td><td><code>"Ana"</code></td><td><code>"Ana"</code></td></tr>
+<tr><td><code>""</code></td><td><code>"padrão"</code></td><td><code>""</code></td></tr>
+<tr><td><code>"0"</code> ou <code>0</code></td><td><code>"padrão"</code></td><td><code>"0"</code> ou <code>0</code></td></tr>
+<tr><td><code>null</code></td><td><code>"padrão"</code></td><td><code>"padrão"</code></td></tr>
+<tr><td>não existe</td><td><code>"padrão"</code> + <code>Warning</code></td><td><code>"padrão"</code>, sem aviso</td></tr>
+</table>
+</div>
+
+<p>Qual usar: para dados que podem <strong>não existir</strong> (um campo de formulário, uma chave de array), <code>??</code>. Para trocar valores <strong>vazios</strong> (um campo que veio mas em branco) por um padrão, <code>?:</code>. Muitas vezes você quer os dois: <code>($_GET['nome'] ?? "") ?: "Visitante"</code>.</p>
+
+<div class="warning">
+<strong>O Elvis devolve o valor da condição</strong>
+<p>Com uma comparação na frente, o resultado do "sim" é o próprio <code>true</code>: <code>$nota &gt;= 7 ?: "não"</code> vale <code>true</code> (que o <code>echo</code> mostra como <code>1</code>) quando a nota é alta. O Elvis é para valores, não para perguntas.</p>
+</div>
+
+<hr>
+
+<h2 id="aninhado">Ternário dentro de ternário</h2>
+<p>A Ana quis classificar a nota em três faixas numa linha só:</p>
+
+<pre class="file" data-file="aninhado.php">&lt;?php
+$nota = 6;
+echo $nota &gt;= 7 ? "Aprovado" : $nota &gt;= 5 ? "Recuperação" : "Reprovado";
+</pre>
+<pre class="term">$ php aninhado.php
+
+Fatal error: Unparenthesized `a ? b : c ? d : e` is not supported. Use either `(a ? b : c) ? d : e` or `a ? b : (c ? d : e)` in /home/ana/php/aninhado.php on line 3
+Stack trace:
+#0 {main}</pre>
+
+<p>"Ternário encadeado sem parênteses (<code>a ? b : c ? d : e</code>) não é suportado. Use <code>(a ? b : c) ? d : e</code> ou <code>a ? b : (c ? d : e)</code>." O próprio PHP mostra as duas formas possíveis. É um erro fatal, encontrado <strong>antes</strong> de rodar: nada do programa executa.</p>
+
+<p>Por que o PHP proíbe? Por um motivo histórico: até o PHP 7, essa linha era aceita, mas o PHP a lia na ordem "errada" (da esquerda para a direita, diferente de todas as outras linguagens), o que gerava bugs. No PHP 7.4 virou aviso, e no PHP 8 virou erro. Com parênteses, a intenção fica clara:</p>
+
+<pre class="file" data-file="aninhado-certo.php">&lt;?php
+$nota = 6;
+echo $nota &gt;= 7 ? "Aprovado" : ($nota &gt;= 5 ? "Recuperação" : "Reprovado"), "\n";
+</pre>
+<pre class="term">$ php aninhado-certo.php
+Recuperação</pre>
+
+<p>Funciona, mas é difícil de ler. Para três ou mais caminhos, prefira <code>if</code>/<code>elseif</code> ou, ainda melhor, um <a href="match.html"><code>match</code></a>. Uma exceção: o <code>?:</code> encadeado (<code>$a ?: $b ?: "padrão"</code>) é permitido sem parênteses, porque ali não há ambiguidade.</p>
+
+<hr>
+
+<h2>Quando usar o ternário</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th></tr>
+<tr><td>Escolher entre dois valores curtos</td><td>Ternário: <code>$x ? "sim" : "não"</code></td></tr>
+<tr><td>Escolher dentro de um texto ou de um HTML</td><td>Ternário entre parênteses: <code>"…" . ($x ? "a" : "b") . "…"</code></td></tr>
+<tr><td>Valor padrão para algo vazio</td><td><code>?:</code></td></tr>
+<tr><td>Valor padrão para algo que pode não existir</td><td><code>??</code></td></tr>
+<tr><td>Três caminhos ou mais</td><td><code>if</code>/<code>elseif</code> ou <code>match</code></td></tr>
+<tr><td>Executar comandos diferentes (não escolher valores)</td><td><code>if</code>/<code>else</code></td></tr>
+</table>
+</div>
+
+<p>Em templates HTML, o ternário é muito usado para atributos: <code>&lt;option &lt;?= $uf === "PE" ? "selected" : "" ?&gt;&gt;</code>.</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> o ternário escolhe a classe e o texto do aviso de estoque. Troque <code>$estoque</code> para <code>0</code> e rode de novo.</p>
+<pre class="script">&lt;?php $estoque = 12; ?&gt;
+&lt;h2&gt;Uva — R$ 7,90/kg&lt;/h2&gt;
+&lt;p style="color: &lt;?= $estoque &gt; 0 ? 'green' : 'red' ?&gt;"&gt;
+    &lt;?= $estoque &gt; 0 ? "Disponível ($estoque kg)" : "Esgotado" ?&gt;
+&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Unparenthesized `a ? b : c ? d : e` is not supported</strong>
+<p><strong>O que significa:</strong> há um ternário dentro do "senão" de outro, sem parênteses. Veja <a href="#aninhado">Ternário dentro de ternário</a>.</p>
+<p><strong>Como consertar:</strong> coloque parênteses no ternário de dentro, ou reescreva com <code>if</code>/<code>elseif</code> ou <code>match</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected token "echo" — comandos dentro do ternário</strong>
+<pre class="file" data-file="com-echo.php">&lt;?php
+$nota = 8;
+$nota &gt;= 7 ? echo "Aprovado" : echo "Reprovado";
+</pre>
+<pre class="term">$ php com-echo.php
+
+Parse error: syntax error, unexpected token "echo" in /home/ana/php/com-echo.php on line 3</pre>
+<p><strong>O que significa:</strong> o ternário escolhe <strong>valores</strong>; <code>echo</code> é um comando, não um valor.</p>
+<p><strong>Como consertar:</strong> coloque o <code>echo</code> do lado de fora: <code>echo $nota &gt;= 7 ? "Aprovado" : "Reprovado";</code>. Para executar comandos diferentes, use <code>if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected token ";" — faltou o <code>:</code></strong>
+<pre class="file" data-file="sem-senao.php">&lt;?php
+$nota = 8;
+$x = $nota &gt;= 7 ? "sim";
+</pre>
+<pre class="term">$ php sem-senao.php
+
+Parse error: syntax error, unexpected token ";" in /home/ana/php/sem-senao.php on line 3</pre>
+<p><strong>O que significa:</strong> o ternário completo precisa das três partes. O PHP esperava o <code>:</code> e o valor do "senão", e encontrou o fim do comando.</p>
+<p><strong>Como consertar:</strong> <code>$x = $nota &gt;= 7 ? "sim" : "não";</code>. Se você queria "só quando for verdade", é um <code>if</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Parte do texto sumiu</strong>
+<p><strong>O que significa:</strong> um ternário sem parênteses no meio de uma concatenação. Veja <a href="#parenteses">Use parênteses na concatenação</a>.</p>
+<p><strong>Como consertar:</strong> <code>"texto " . ($cond ? "a" : "b") . " texto"</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Lê-se</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>c ? a : b</code></td><td>Se <code>c</code>, <code>a</code>; senão, <code>b</code></td><td><code>8 &gt;= 7 ? "sim" : "não"</code> → <code>"sim"</code></td></tr>
+<tr><td><code>a ?: b</code></td><td><code>a</code>, se for verdadeiro; senão, <code>b</code></td><td><code>"" ?: "padrão"</code> → <code>"padrão"</code></td></tr>
+<tr><td><code>a ?? b</code></td><td><code>a</code>, se existir e não for <code>null</code>; senão, <code>b</code></td><td><code>"" ?? "padrão"</code> → <code>""</code></td></tr>
+<tr><td><code>c1 ? a : (c2 ? b : c)</code></td><td>Aninhado, com parênteses</td><td>Permitido, mas prefira <code>match</code></td></tr>
+<tr><td><code>c1 ? a : c2 ? b : c</code></td><td>Aninhado sem parênteses</td><td><code>Fatal error</code> no PHP 8</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Par ou ímpar</h3>
+<p>Complete para mostrar "par" ou "ímpar" (o <code>%</code> dá o resto da divisão):</p>
+<div class="ex-code">echo $n % 2 === 0 <input data-answer="? &quot;par&quot; : &quot;ímpar&quot;|? 'par' : 'ímpar'|?&quot;par&quot;:&quot;ímpar&quot;" aria-label="ternário">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Valor padrão para vazio</h3>
+<p>Complete com o operador que troca um <code>$apelido</code> vazio por <code>"sem apelido"</code>:</p>
+<div class="ex-code">echo $apelido <input data-answer="?:" aria-label="operador"> "sem apelido";</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Com <code>$x = 0;</code>, o que mostra <code>echo $x ?? 10;</code>?</p>
+<label><input type="radio" name="q3"> <code>10</code></label>
+<label><input type="radio" name="q3"> <code>0</code></label>
+<label><input type="radio" name="q3"> Nada</label>
+<label><input type="radio" name="q3"> Um aviso</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Com <code>$x = 0;</code>, o que mostra <code>echo $x ?: 10;</code>?</p>
+<label><input type="radio" name="q4"> <code>10</code></label>
+<label><input type="radio" name="q4"> <code>0</code></label>
+<label><input type="radio" name="q4"> Nada</label>
+<label><input type="radio" name="q4"> Um aviso</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que acontece no PHP 8 com <code>echo $a ? "x" : $b ? "y" : "z";</code>?</p>
+<label><input type="radio" name="q5"> Mostra "x", "y" ou "z" normalmente.</label>
+<label><input type="radio" name="q5"> Mostra um <code>Warning</code> e continua.</label>
+<label><input type="radio" name="q5"> Mostra um <code>Deprecated</code> e continua.</label>
+<label><input type="radio" name="q5"> Erro fatal: falta parênteses.</label>
+</div>
+
+<div class="tryphp" data-goal="out:2 alunos aprovados,out:1 aluno reprovado,src:\?\s*[&quot;']">
+<p class="try-task"><strong>Missão final:</strong> o resumo da turma está com o plural errado. Use um ternário em cada linha para escolher entre "aluno"/"alunos" e "aprovado"/"aprovados" (e "reprovado"/"reprovados"). A saída deve ser:<br><code>2 alunos aprovados</code><br><code>1 aluno reprovado</code></p>
+<pre class="script">&lt;?php
+$aprovados = 2;
+$reprovados = 1;
+echo "$aprovados alunos aprovados\n";
+echo "$reprovados alunos reprovados\n";
+</pre>
+<pre class="solucao">&lt;?php
+$aprovados = 2;
+$reprovados = 1;
+echo "$aprovados " . ($aprovados === 1 ? "aluno aprovado" : "alunos aprovados") . "\n";
+echo "$reprovados " . ($reprovados === 1 ? "aluno reprovado" : "alunos reprovados") . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>condição ? sim : não</code> é uma <strong>expressão</strong>: ela vale um dos dois valores e pode ir num <code>=</code>, num <code>echo</code>, num texto.</li>
+  <li>No meio de uma concatenação, coloque o ternário entre parênteses.</li>
+  <li><code>$a ?: $b</code> (Elvis): <code>$a</code> se for verdadeiro; senão <code>$b</code>. Trata <code>""</code>, <code>"0"</code> e <code>0</code> como vazios.</li>
+  <li><code>$a ?? $b</code>: <code>$a</code> se existir e não for <code>null</code>; não avisa sobre variáveis inexistentes.</li>
+  <li>Ternário dentro de ternário sem parênteses é erro fatal no PHP 8. Para três caminhos ou mais, use <code>if</code>/<code>elseif</code> ou <code>match</code>.</li>
+  <li>O ternário escolhe valores; para executar comandos diferentes, use <code>if</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
