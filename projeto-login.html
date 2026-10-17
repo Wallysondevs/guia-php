@@ -1,0 +1,1969 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projeto Login — cadastro, login com sessão, área restrita e CSRF | Guia PHP</title>
+<meta name="description" content="Projeto passo a passo: um sistema de login em PHP com SQLite. Cadastro com password_hash, login com password_verify, sessão, área restrita, logout, session_regenerate_id contra fixação de sessão e token CSRF nos formulários. Ataques e defesas mostrados com saídas reais do php -S e curl.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP Projeto <span class="hl">Login com Sessão</span></h1>
+
+<p class="intro">Quase todo site tem uma parte que só aparece para quem entrou com e-mail e senha. Neste projeto você monta essa parte do zero: a página de cadastro, a de login, um painel que só abre para quem entrou e o botão de sair. E, como login é o alvo preferido de quem ataca sites, cada etapa fecha uma porta: senha guardada com <code>password_hash</code>, sessão renovada no login e formulários protegidos com token CSRF. Os ataques são mostrados de verdade, com o <code>curl</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Organizar um projeto em vários arquivos com um <code>comum.php</code> incluído em todas as páginas.</li>
+  <li>Cadastrar usuários num banco SQLite, guardando só o <strong>hash</strong> da senha (<code>password_hash</code>).</li>
+  <li>Conferir a senha no login com <code>password_verify</code> e lembrar quem entrou com <code>$_SESSION</code>.</li>
+  <li>Proteger uma página (área restrita) e fazer o logout que apaga a sessão e o cookie.</li>
+  <li>Por que chamar <code>session_regenerate_id(true)</code> no login (fixação de sessão, demonstrada).</li>
+  <li>O que é CSRF e como um token escondido nos formulários impede o ataque.</li>
+</ul>
+</div>
+
+<h2>Antes de começar</h2>
+<p>Este é o projeto mais "cheio" até aqui. Ele usa:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que usamos</th><th>Aula</th></tr>
+<tr><td><code>session_start</code>, <code>$_SESSION</code>, o cookie <code>PHPSESSID</code></td><td><a href="sessoes.html">Sessões</a>, <a href="cookies.html">Cookies</a></td></tr>
+<tr><td><code>password_hash</code>, <code>password_verify</code></td><td><a href="senhas.html">Senhas (password_hash)</a></td></tr>
+<tr><td>Token CSRF, <code>hash_equals</code></td><td><a href="csrf.html">CSRF e Segurança de Formulários</a></td></tr>
+<tr><td><code>new PDO('sqlite:…')</code>, <code>prepare</code>/<code>execute</code></td><td><a href="pdo.html">Conectar com PDO</a>, <a href="prepared-statements.html">Prepared Statements</a></td></tr>
+<tr><td><code>require</code></td><td><a href="include-require.html">include e require</a></td></tr>
+<tr><td><code>header('Location: …')</code></td><td><a href="redirecionar.html">header e Redirecionamento</a></td></tr>
+</table>
+</div>
+<p>Também vale ter feito o <a href="projeto-contato.html">Formulário de Contato</a> (validação e Post/Redirect/Get).</p>
+
+<h3>Os arquivos do projeto</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>Papel</th><th>Etapa</th></tr>
+<tr><td><code>banco.php</code></td><td>Abre o SQLite e cria a tabela <code>usuarios</code></td><td>1</td></tr>
+<tr><td><code>comum.php</code></td><td>Incluído no topo de todas as páginas: sessão, banco e funções</td><td>1, 2, 6</td></tr>
+<tr><td><code>cadastro.php</code></td><td>Formulário "Criar conta"</td><td>1</td></tr>
+<tr><td><code>login.php</code></td><td>Formulário "Entrar"</td><td>2, 5</td></tr>
+<tr><td><code>painel.php</code></td><td>A área restrita</td><td>2, 3</td></tr>
+<tr><td><code>sair.php</code></td><td>O logout</td><td>4, 6</td></tr>
+<tr><td><code>index.php</code></td><td>Manda o visitante para o painel</td><td>código completo</td></tr>
+</table>
+</div>
+
+<pre class="term">$ mkdir login
+$ cd login
+$ php -S localhost:8000
+[Fri Oct 16 20:57:04 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>Nas caixas "Experimente", cada arquivo é uma aba; o primeiro é a página que abre. O banco SQLite é criado na hora, dentro da caixa. Para o <code>curl</code> "lembrar" do login entre um comando e outro, usamos um <strong>pote de cookies</strong>: <code>-c jar.txt</code> guarda os cookies recebidos e <code>-b jar.txt</code> os envia de volta, como o navegador faz.</p>
+
+<hr>
+
+<h2>As etapas</h2>
+
+<ol class="passo">
+
+<li>
+<h3>Etapa 1 · O banco e o cadastro</h3>
+<p>Primeiro, o lugar onde os usuários moram. O <code>banco.php</code> abre (ou cria) o arquivo <code>dados.sqlite</code> e garante que a tabela existe:</p>
+
+<pre class="file" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>new PDO('sqlite:' . __DIR__ . '/dados.sqlite')</code></td><td>Conecta ao banco SQLite, que é um arquivo comum. Se ele não existir, é criado. Não precisa instalar servidor de banco nenhum.</td></tr>
+<tr><td><code>PDO::FETCH_ASSOC</code></td><td>As linhas lidas vêm como arrays associativos: <code>$usuario['nome']</code>.</td></tr>
+<tr><td><code>CREATE TABLE IF NOT EXISTS usuarios</code></td><td>Cria a tabela só se ela ainda não existir. <code>email … UNIQUE</code> impede dois cadastros com o mesmo e-mail, até no nível do banco.</td></tr>
+<tr><td><code>senha_hash TEXT</code></td><td>A coluna guarda o <strong>hash</strong>, nunca a senha.</td></tr>
+<tr><td>O bloco "Só para testar"</td><td>Cria a usuária <code>ana@exemplo.com</code> com a senha <code>cafe-com-pao</code> quando a tabela está vazia, para você poder testar o login nas caixas. Num site de verdade, apague.</td></tr>
+</table>
+</div>
+
+<p>O <code>comum.php</code> começa pequeno: fuso horário, banco e duas funções que todas as páginas vão usar.</p>
+<pre class="file" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+</pre>
+<p>A <code>redirecionar()</code> junta o <code>header('Location: …', true, 303)</code> e o <code>exit</code> do Post/Redirect/Get numa linha só. O tipo de retorno <code>never</code> <span class="versao">PHP 8.1+</span> diz "esta função nunca volta" (ela sempre termina o script); em versões antigas, tire o <code>: never</code>.</p>
+
+<p>E o cadastro. A estrutura é a do formulário de contato; a novidade está no fim do bloco PHP:</p>
+<pre class="file" data-file="cadastro.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$nome  = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($nome) &lt; 2) {
+        $erros[] = 'Escreva o seu nome.';
+    }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $erros[] = 'Esse e-mail não parece válido.';
+    }
+    if (mb_strlen($senha) &lt; 8) {
+        $erros[] = 'A senha precisa ter pelo menos 8 caracteres.';
+    }
+
+    if (!$erros) {
+        $busca = $pdo-&gt;prepare('SELECT id FROM usuarios WHERE email = ?');
+        $busca-&gt;execute([$email]);
+        if ($busca-&gt;fetch()) {
+            $erros[] = 'Já existe uma conta com esse e-mail.';
+        }
+    }
+
+    if (!$erros) {
+        $novo = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+        $novo-&gt;execute([$nome, $email, password_hash($senha, PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+        redirecionar('login.php?cadastrado=1');
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Criar conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Criar conta&lt;/h1&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;form method="post" action="cadastro.php"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($nome) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha (mínimo 8 caracteres)&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Criar conta&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Já tem conta? &lt;a href="login.php"&gt;Entrar&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>$pdo-&gt;prepare('… WHERE email = ?')</dt><dd>Prepara a consulta com um <code>?</code> no lugar do e-mail. O valor nunca é colado no SQL: vai separado no <code>execute</code>. É isso que impede a injeção de SQL (veja <a href="prepared-statements.html">Prepared Statements</a>).</dd>
+  <dt>$busca-&gt;execute([$email])</dt><dd>Roda a consulta, trocando o <code>?</code> pelo e-mail.</dd>
+  <dt>if ($busca-&gt;fetch())</dt><dd><code>fetch</code> devolve a linha encontrada ou <code>false</code>. Achou alguém? Então o e-mail já tem conta.</dd>
+  <dt>password_hash($senha, PASSWORD_DEFAULT)</dt><dd>Transforma a senha num hash: um texto do qual não dá para voltar à senha. <code>PASSWORD_DEFAULT</code> usa o melhor algoritmo da versão do PHP (hoje, bcrypt com custo 12).</dd>
+  <dt>type="password"</dt><dd>O navegador mostra bolinhas. E repare: o campo de senha <strong>não</strong> volta preenchido quando há erro; senha não deve circular de volta pela página.</dd>
+</dl>
+
+<pre class="term">$ curl -s -d 'nome=B&amp;email=beto&amp;senha=123' localhost:8000/cadastro.php | grep erro
+  &lt;p class="erro"&gt;Escreva o seu nome.&lt;/p&gt;
+  &lt;p class="erro"&gt;Esse e-mail não parece válido.&lt;/p&gt;
+  &lt;p class="erro"&gt;A senha precisa ter pelo menos 8 caracteres.&lt;/p&gt;
+$ curl -si -d 'nome=Beto Souza&amp;email=beto@exemplo.com&amp;senha=pao-de-queijo' localhost:8000/cadastro.php | grep -E 'HTTP|Location'
+HTTP/1.1 303 See Other
+Location: login.php?cadastrado=1                  « o login.php chega na etapa 2
+$ curl -s -d 'nome=Beto de Novo&amp;email=beto@exemplo.com&amp;senha=outra-senha' localhost:8000/cadastro.php | grep erro
+  &lt;p class="erro"&gt;Já existe uma conta com esse e-mail.&lt;/p&gt;
+$ sqlite3 dados.sqlite 'SELECT id, nome, email, senha_hash FROM usuarios'
+1|Ana|ana@exemplo.com|$2y$12$P/cr98ewf1pXO6FtmIaWdu/YMCHeWasABQ21H/2MytAkCK/NPHFFy
+2|Beto Souza|beto@exemplo.com|$2y$12$FVXg1aRzIZCmCfKCzfyUHuoO/0sFJSpC.LGkNBrXP9HJALTWlmbNa</pre>
+
+<p>Olhe a última coluna: nem a Ana nem o Beto têm a senha no banco. Se alguém roubar o arquivo <code>dados.sqlite</code>, não vai ler <code>pao-de-queijo</code> em lugar nenhum. O hash começa com <code>$2y$</code> (o algoritmo bcrypt), depois <code>12$</code> (o custo: quanto maior, mais lento para quem tenta adivinhar) e o resto mistura um "sal" aleatório com o resultado. Por causa do sal, a <strong>mesma senha</strong> gera hashes diferentes a cada vez:</p>
+
+<pre class="file" data-file="hash.php">&lt;?php
+$h1 = password_hash('cafe-com-pao', PASSWORD_DEFAULT);
+$h2 = password_hash('cafe-com-pao', PASSWORD_DEFAULT);
+echo $h1, "\n";
+echo $h2, "\n";
+var_dump(password_verify('cafe-com-pao', $h1));
+var_dump(password_verify('Cafe-com-pao', $h1));
+var_dump(password_verify('cafe-com-pao', $h2));
+</pre>
+<pre class="term">$ php hash.php
+$2y$12$WvFEKacFV4ZWYfsOxMQMwOg36feQMGqAm8AEB3F/XCNuhw9gWCcqO
+$2y$12$C96MRdzOZ1jrv.embQOvIep21RD1VNNI4GIlCffurdTQouZ.HF7Bu      « mesma senha, outro hash
+bool(true)
+bool(false)                                                         « uma letra maiúscula muda tudo
+bool(true)</pre>
+<p>É por isso que não dá para comparar <code>password_hash($senha) == $hash_do_banco</code>: quem confere é o <code>password_verify</code>, que lê o sal de dentro do hash. Mais detalhes em <a href="senhas.html">Senhas</a>.</p>
+
+<div class="tryphp" data-modo="web" data-url="/cadastro.php" data-post="nome=Beto Souza&amp;email=beto@exemplo.com&amp;senha=pao-de-queijo&amp;confirmar=pao-de-quejo" data-goal="html:As senhas não conferem.">
+<p class="try-task"><strong>Missão:</strong> acrescente o campo <strong>Repita a senha</strong> (<code>name="confirmar"</code>, <code>type="password"</code>) e a regra: se <code>$senha !== $confirmar</code>, o erro é <code>As senhas não conferem.</code>. A caixa já envia duas senhas diferentes (repare no "quejo").</p>
+<pre class="script" data-file="cadastro.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$nome  = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($nome) &lt; 2) {
+        $erros[] = 'Escreva o seu nome.';
+    }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $erros[] = 'Esse e-mail não parece válido.';
+    }
+    if (mb_strlen($senha) &lt; 8) {
+        $erros[] = 'A senha precisa ter pelo menos 8 caracteres.';
+    }
+
+    if (!$erros) {
+        $busca = $pdo-&gt;prepare('SELECT id FROM usuarios WHERE email = ?');
+        $busca-&gt;execute([$email]);
+        if ($busca-&gt;fetch()) {
+            $erros[] = 'Já existe uma conta com esse e-mail.';
+        }
+    }
+
+    if (!$erros) {
+        $novo = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+        $novo-&gt;execute([$nome, $email, password_hash($senha, PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+        redirecionar('login.php?cadastrado=1');
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Criar conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Criar conta&lt;/h1&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;form method="post" action="cadastro.php"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($nome) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha (mínimo 8 caracteres)&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Criar conta&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Já tem conta? &lt;a href="login.php"&gt;Entrar&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="cadastro.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$nome  = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$confirmar = $_POST['confirmar'] ?? '';
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (mb_strlen($nome) &lt; 2) {
+        $erros[] = 'Escreva o seu nome.';
+    }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $erros[] = 'Esse e-mail não parece válido.';
+    }
+    if (mb_strlen($senha) &lt; 8) {
+        $erros[] = 'A senha precisa ter pelo menos 8 caracteres.';
+    }
+    if ($senha !== $confirmar) {
+        $erros[] = 'As senhas não conferem.';
+    }
+
+    if (!$erros) {
+        $busca = $pdo-&gt;prepare('SELECT id FROM usuarios WHERE email = ?');
+        $busca-&gt;execute([$email]);
+        if ($busca-&gt;fetch()) {
+            $erros[] = 'Já existe uma conta com esse e-mail.';
+        }
+    }
+
+    if (!$erros) {
+        $novo = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+        $novo-&gt;execute([$nome, $email, password_hash($senha, PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+        redirecionar('login.php?cadastrado=1');
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Criar conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Criar conta&lt;/h1&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;form method="post" action="cadastro.php"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($nome) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha (mínimo 8 caracteres)&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Repita a senha&lt;br&gt;&lt;input type="password" name="confirmar"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Criar conta&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Já tem conta? &lt;a href="login.php"&gt;Entrar&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 2 · O login e a sessão</h3>
+<p>Para o site "lembrar" que a Ana entrou, usamos a <strong>sessão</strong>: o PHP guarda dados no servidor e entrega ao navegador só um cookie com um número de identificação, o <code>PHPSESSID</code>. A cada pedido, o navegador devolve o cookie e o PHP reabre a gaveta certa. O <code>comum.php</code> passa a abrir a sessão:</p>
+
+<pre class="file" data-file="comum.php">date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';</pre>
+<dl class="anatomy">
+  <dt>session_start(</dt><dd>Abre a sessão: lê o cookie <code>PHPSESSID</code> (ou cria um novo) e enche o array <code>$_SESSION</code>. Precisa vir antes de qualquer saída, como o <code>header()</code>.</dd>
+  <dt>'cookie_httponly' =&gt; true</dt><dd>O cookie não pode ser lido por JavaScript. Se um dia alguém conseguir injetar um script na página, ele não rouba a sessão.</dd>
+  <dt>'cookie_samesite' =&gt; 'Lax'</dt><dd>O navegador não envia o cookie em POSTs que vêm de <strong>outros</strong> sites. É uma primeira barreira contra CSRF (etapa 6).</dd>
+</dl>
+
+<p>O <code>login.php</code>:</p>
+<pre class="file" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>SELECT id, nome, senha_hash … WHERE email = ?</code></td><td>Busca a pessoa pelo e-mail, com prepared statement.</td></tr>
+<tr><td><code>$usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])</code></td><td>Duas condições: o e-mail existe <strong>e</strong> a senha confere com o hash. Se o e-mail não existir, <code>$usuario</code> é <code>false</code> e o <code>&amp;&amp;</code> nem chama o <code>password_verify</code>.</td></tr>
+<tr><td><code>$_SESSION['usuario'] = ['id' =&gt; …, 'nome' =&gt; …]</code></td><td>Guarda na sessão quem entrou. Só o necessário: nada de hash de senha na sessão.</td></tr>
+<tr><td><code>redirecionar('painel.php')</code></td><td>Post/Redirect/Get: depois do login, vai para o painel.</td></tr>
+<tr><td><code>'E-mail ou senha incorretos.'</code></td><td>A <strong>mesma</strong> mensagem para e-mail inexistente e senha errada. Dizer "este e-mail não existe" ensinaria a um atacante quais e-mails têm conta.</td></tr>
+</table>
+</div>
+
+<p>E o primeiro <code>painel.php</code>, que mostra o nome guardado na sessão:</p>
+<pre class="file" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<pre class="term">$ curl -s -c jar.txt -b jar.txt -d 'email=ana@exemplo.com&amp;senha=errada' localhost:8000/login.php | grep -E 'erro|value='
+  &lt;p class="erro"&gt;E-mail ou senha incorretos.&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="ana@exemplo.com"&gt;&lt;/label&gt;&lt;/p&gt;
+$ curl -s -c jar.txt -b jar.txt -d 'email=ninguem@exemplo.com&amp;senha=qualquer' localhost:8000/login.php | grep -E 'erro'
+  &lt;p class="erro"&gt;E-mail ou senha incorretos.&lt;/p&gt;          « mesma mensagem: não entrega nada
+$ curl -si -c jar.txt -b jar.txt -d 'email=ana@exemplo.com&amp;senha=cafe-com-pao' localhost:8000/login.php | grep -E 'HTTP|Location|Set-Cookie'
+HTTP/1.1 303 See Other
+Location: painel.php
+$ cat jar.txt
+# Netscape HTTP Cookie File
+# https://curl.se/docs/http-cookies.html
+# This file was generated by libcurl! Edit at your own risk.
+
+#HttpOnly_localhost	FALSE	/	FALSE	0	PHPSESSID	e079bc890e095f5ec6e3b451983fe999
+$ curl -s -b jar.txt localhost:8000/painel.php | grep h1
+&lt;h1&gt;Olá, Ana!&lt;/h1&gt;</pre>
+
+<p>O cookie <code>PHPSESSID</code> é a "pulseira" da Ana: com ele, o painel sabe quem ela é. Mas veja o que acontece com quem chega <strong>sem</strong> pulseira:</p>
+<pre class="term">$ curl -s localhost:8000/painel.php
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "usuario" in &lt;b&gt;/home/ana/login/painel.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Trying to access array offset on null in &lt;b&gt;/home/ana/login/painel.php&lt;/b&gt; on line &lt;b&gt;10&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: e(): Argument #1 ($texto) must be of type string, null given, called in /home/ana/login/painel.php on line 10 and defined in /home/ana/login/comum.php:10
+Stack trace:
+#0 /home/ana/login/painel.php(10): e(NULL)
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/login/comum.php&lt;/b&gt; on line &lt;b&gt;10&lt;/b&gt;&lt;br /&gt;</pre>
+<p>Três problemas em cascata: <code>$_SESSION['usuario']</code> não existe (o <code>Warning</code> da linha 4), então <code>$usuario</code> é <code>null</code>; ler <code>['nome']</code> de um <code>null</code> dá outro <code>Warning</code>; e o <code>e()</code>, que exige texto, recebe <code>null</code> e para tudo com um <code>TypeError</code>. O painel "funcionou" para estranhos, só que quebrado. A próxima etapa tranca a porta.</p>
+
+<div class="tryphp" data-modo="web" data-url="/login.php" data-post="email=ana@exemplo.com&amp;senha=cafe-com-pao" data-goal="html:Você entrou às">
+<p class="try-task"><strong>Missão:</strong> a caixa já faz o login da Ana e segue para o painel. Guarde na sessão a hora do login (<code>$_SESSION['entrou_em'] = date('H:i');</code> no <code>login.php</code>) e mostre no painel: <code>Você entrou às 20:59.</code> (com a sua hora).</p>
+<pre class="script" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        $_SESSION['entrou_em'] = date('H:i');
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;p&gt;Você entrou às &lt;?= e($_SESSION['entrou_em']) ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 3 · A área restrita</h3>
+<p>Trancar uma página é simples: logo no começo, antes de mostrar qualquer coisa, pergunte "tem alguém logado?". Se não tiver, mande para o login e pare.</p>
+
+<pre class="file" data-file="painel.php">&amp;lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&amp;gt;</pre>
+
+<p>O <code>exit</code> dentro do <code>redirecionar()</code> é o que realmente tranca: sem ele, o PHP mandaria o cabeçalho de redirecionamento <strong>e</strong> continuaria gerando o painel. Um navegador obedeceria e mudaria de página, mas o <code>curl</code> (ou qualquer robô) leria o conteúdo secreto na resposta.</p>
+
+<pre class="term">$ curl -si localhost:8000/painel.php | grep -E 'HTTP|Location'
+HTTP/1.1 303 See Other
+Location: login.php
+$ curl -sL localhost:8000/painel.php | grep h1
+&lt;h1&gt;Entrar&lt;/h1&gt;                « seguindo o redirecionamento, cai no login</pre>
+
+<p>Toda página restrita repete essas três linhas. Num projeto maior, elas viram uma função no <code>comum.php</code>, e é isso que a missão pede.</p>
+
+<div class="tryphp" data-modo="web" data-url="/painel.php" data-goal="html:Entrar,src:function exigir_login">
+<p class="try-task"><strong>Missão:</strong> crie no <code>comum.php</code> a função <code>exigir_login(): array</code>, que redireciona para o login quando não há usuário e, se houver, devolve <code>$_SESSION['usuario']</code>. No painel, troque o <code>if</code> e a linha seguinte por <code>$usuario = exigir_login();</code>. A caixa abre o painel sem login: o resultado deve ser a página <strong>Entrar</strong>.</p>
+<pre class="script" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+</pre>
+<pre class="script" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$usuario = exigir_login();
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+
+function exigir_login(): array
+{
+    if (!isset($_SESSION['usuario'])) {
+        redirecionar('login.php');
+    }
+    return $_SESSION['usuario'];
+}
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 4 · Sair (logout)</h3>
+<p>Sair é desfazer o login: esvaziar a sessão, apagar o cookie do navegador e destruir a "gaveta" no servidor. Por enquanto, um link simples no painel leva ao <code>sair.php</code>:</p>
+
+<pre class="file" data-file="painel.php">&lt;p&gt;&lt;a href="sair.php"&gt;Sair&lt;/a&gt;&lt;/p&gt;</pre>
+<pre class="file" data-file="sair.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', time() - 3600, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+session_destroy();
+
+redirecionar('login.php?saiu=1');
+</pre>
+
+<dl class="anatomy">
+  <dt>$_SESSION = [];</dt><dd>Esvazia os dados da sessão (nesta requisição e no que será gravado).</dd>
+  <dt>session_get_cookie_params()</dt><dd>Lê como o cookie da sessão foi criado (caminho, domínio…). O cookie só é apagado se for "o mesmo".</dd>
+  <dt>setcookie(session_name(), '', time() - 3600, …)</dt><dd>Manda um cookie <code>PHPSESSID</code> vazio com validade no passado: o navegador entende "apague".</dd>
+  <dt>session_destroy()</dt><dd>Apaga o arquivo da sessão no servidor.</dd>
+</dl>
+
+<pre class="term">$ curl -s -c jar.txt -b jar.txt -d 'email=ana@exemplo.com&amp;senha=cafe-com-pao' -L localhost:8000/login.php | grep -E 'h1|Sair'
+&lt;h1&gt;Olá, Ana!&lt;/h1&gt;
+&lt;p&gt;&lt;a href="sair.php"&gt;Sair&lt;/a&gt;&lt;/p&gt;
+$ grep -c PHPSESSID jar.txt
+1
+$ curl -si -c jar.txt -b jar.txt localhost:8000/sair.php | grep -E 'HTTP|Location|Set-Cookie'
+HTTP/1.1 303 See Other
+Set-Cookie: PHPSESSID=deleted; expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; path=/; HttpOnly
+Location: login.php?saiu=1
+$ grep -c PHPSESSID jar.txt
+0                                « o cookie sumiu do pote</pre>
+
+<p>O <code>Set-Cookie: PHPSESSID=deleted; expires=Thu, 01 Jan 1970…</code> é o pedido de "apague este cookie" (o PHP escreve <code>deleted</code> e uma data de 1970). Depois disso, o painel volta a mandar para o login.</p>
+
+<div class="warning">
+<strong>Sair por um link tem um problema</strong>
+<p>Qualquer página da internet pode conter <code>&lt;img src="http://localhost:8000/sair.php"&gt;</code>. Quando a Ana abrir essa página, o navegador dela "carrega a imagem", isto é, visita o <code>sair.php</code>, e ela é deslogada sem clicar em nada. Deslogar é inofensivo, mas imagine se o link fosse "apagar minha conta". Ações que <strong>mudam</strong> algo devem ser POST com token: é a etapa 6.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/login.php" data-post="email=ana@exemplo.com&amp;senha=cafe-com-pao" data-goal="html:Visitas nesta sessão: 1">
+<p class="try-task"><strong>Missão:</strong> conte as visitas ao painel na sessão: <code>$_SESSION['visitas'] = ($_SESSION['visitas'] ?? 0) + 1;</code> e mostre <code>Visitas nesta sessão: N</code>. Depois, na aba Resultado, recarregue o painel algumas vezes, clique em <strong>Sair</strong>, entre de novo (ana@exemplo.com / cafe-com-pao) e veja o contador recomeçar do 1.</p>
+<pre class="script" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;p&gt;&lt;a href="sair.php"&gt;Sair&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="sair.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', time() - 3600, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+session_destroy();
+
+redirecionar('login.php?saiu=1');
+</pre>
+<pre class="script" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+$_SESSION['visitas'] = ($_SESSION['visitas'] ?? 0) + 1;
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;p&gt;Visitas nesta sessão: &lt;?= $_SESSION['visitas'] ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="sair.php"&gt;Sair&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 5 · <code>session_regenerate_id</code>: um crachá novo a cada login</h3>
+<p>O sistema funciona, mas tem um furo clássico chamado <strong>fixação de sessão</strong>. A ideia do ataque: o atacante escolhe um número de sessão, dá um jeito de a vítima usar esse número (um link preparado, um computador compartilhado) e espera ela fazer login. Como o número não muda no login, o atacante, que sabe o número, entra junto.</p>
+
+<p>No laboratório, com a versão da etapa 4, o "atacante" inventou o número <code>idescolhidopelatacante</code>. A Ana faz login usando esse cookie (primeiro comando); depois o atacante usa o mesmo cookie (segundo comando):</p>
+<pre class="term">$ curl -si -b 'PHPSESSID=idescolhidopelatacante' -d 'email=ana@exemplo.com&amp;senha=cafe-com-pao' localhost:8000/login.php | grep -E 'HTTP|Location|Set-Cookie'
+HTTP/1.1 303 See Other
+Location: painel.php                         « nenhum cookie novo: o número continua o mesmo
+$ curl -s -b 'PHPSESSID=idescolhidopelatacante' localhost:8000/painel.php | grep h1
+&lt;h1&gt;Olá, Ana!&lt;/h1&gt;                           « o atacante está dentro da conta da Ana</pre>
+
+<p>A correção é uma linha no <code>login.php</code>, logo depois de conferir a senha:</p>
+<pre class="file" data-file="login.php">    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }</pre>
+<dl class="anatomy">
+  <dt>session_regenerate_id</dt><dd>"Gerar de novo o identificador da sessão": troca o número, mantendo os dados, e manda o cookie novo ao navegador.</dd>
+  <dt>(true)</dt><dd>Apaga a sessão antiga no servidor. Sem o <code>true</code>, o número velho continuaria valendo por um tempo.</dd>
+</dl>
+
+<pre class="term">$ curl -si -b 'PHPSESSID=idescolhidopelatacante' -d 'email=ana@exemplo.com&amp;senha=cafe-com-pao' localhost:8000/login.php | grep -E 'HTTP|Location|Set-Cookie'
+HTTP/1.1 303 See Other
+Set-Cookie: PHPSESSID=11ef8e1494f2daf925a5c6a3673fd61e; path=/; HttpOnly; SameSite=Lax      « crachá novo para a Ana
+Location: painel.php
+$ curl -si -b 'PHPSESSID=idescolhidopelatacante' localhost:8000/painel.php | grep -E 'HTTP|Location'
+HTTP/1.1 303 See Other
+Location: login.php                          « o número do atacante não vale mais nada</pre>
+
+<p>Regra para levar: <strong>sempre que o nível de acesso muda</strong> (login, troca de senha, virar administrador), chame <code>session_regenerate_id(true)</code>.</p>
+
+<div class="tryphp" data-modo="web" data-url="/login.php" data-post="email=ana@exemplo.com&amp;senha=cafe-com-pao" data-goal="src:session_regenerate_id\(true\),html:Olá\, Ana!">
+<p class="try-task"><strong>Missão:</strong> o <code>login.php</code> desta caixa é o da etapa 4, ainda sem a proteção. Acrescente o <code>session_regenerate_id(true);</code> no lugar certo e confira que o login continua funcionando (o painel deve mostrar <code>Olá, Ana!</code>).</p>
+<pre class="script" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;p&gt;&lt;a href="sair.php"&gt;Sair&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 6 · Token CSRF nos formulários</h3>
+<p><strong>CSRF</strong> (<em>Cross-Site Request Forgery</em>, "falsificação de pedido entre sites") é quando outro site faz o navegador da vítima enviar um formulário para o <strong>seu</strong> site. O navegador manda junto o cookie da sessão, e o seu site acha que foi a própria pessoa. A defesa: cada formulário leva um número secreto (o <strong>token</strong>) que só o seu site conhece, e todo POST sem o número certo é recusado.</p>
+
+<p>Duas funções novas no <code>comum.php</code>:</p>
+<pre class="file" data-file="comum.php">function token_csrf(): string
+{
+    if (empty($_SESSION['csrf'])) {
+        $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf'];
+}
+
+function conferir_csrf(): void
+{
+    $enviado = $_POST['csrf'] ?? '';
+    if (!is_string($enviado) || !hash_equals(token_csrf(), $enviado)) {
+        http_response_code(403);
+        exit('Formulário expirado ou inválido. Volte, recarregue a página e tente de novo.');
+    }
+}</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>bin2hex(random_bytes(32))</code></td><td>32 bytes aleatórios, próprios para segurança, escritos como 64 letras e números. Impossível de adivinhar.</td></tr>
+<tr><td><code>$_SESSION['csrf']</code></td><td>O token fica guardado na sessão: um por pessoa, criado na primeira vez que é pedido.</td></tr>
+<tr><td><code>hash_equals(a, b)</code></td><td>Compara dois segredos levando sempre o mesmo tempo. Um <code>===</code> comum para no primeiro caractere diferente, e a diferença de tempo pode ajudar um atacante a descobrir o token aos poucos.</td></tr>
+<tr><td><code>http_response_code(403)</code></td><td>Responde "403 Forbidden" (proibido).</td></tr>
+</table>
+</div>
+
+<p>Todo formulário ganha um campo escondido com o token, e todo arquivo que recebe POST chama <code>conferir_csrf()</code> antes de fazer qualquer coisa:</p>
+<pre class="file" data-file="login.php">&lt;form method="post" action="login.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  ...
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    conferir_csrf();
+    ...</pre>
+
+<p>E o sair vira um <strong>formulário POST</strong> com token; um GET no <code>sair.php</code> só volta ao painel:</p>
+<pre class="file" data-file="painel.php">&lt;form method="post" action="sair.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;button&gt;Sair&lt;/button&gt;
+&lt;/form&gt;</pre>
+<pre class="file" data-file="sair.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirecionar('painel.php');
+}
+conferir_csrf();
+
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', time() - 3600, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+session_destroy();
+
+redirecionar('login.php?saiu=1');
+</pre>
+
+<p>No laboratório: o token aparece no formulário; um POST sem ele recebe 403; com ele, tudo funciona. (Para o <code>curl</code> enviar o token, guardamos o valor num arquivo com <code>sed</code>; no navegador, o campo escondido faz isso sozinho.)</p>
+<pre class="term">$ curl -s -c jar.txt -b jar.txt localhost:8000/login.php | grep csrf
+  &lt;input type="hidden" name="csrf" value="f4f9c3453302e832d34788cc19a58fa8cddc8103ae32bf636468d61bd8d6763a"&gt;
+$ curl -s -c jar.txt -b jar.txt localhost:8000/login.php | sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' &gt; token.txt
+$ curl -si -c jar.txt -b jar.txt -d "csrf=$(cat token.txt)&amp;email=ana@exemplo.com&amp;senha=cafe-com-pao" localhost:8000/login.php | grep -E 'HTTP|Location|Set-Cookie'
+HTTP/1.1 303 See Other
+Set-Cookie: PHPSESSID=b3f89f2657ae48bfaf42ef771576d5c7; path=/; HttpOnly; SameSite=Lax
+Location: painel.php
+$ curl -si -c jar.txt -b jar.txt -d "email=ana@exemplo.com" localhost:8000/sair.php
+HTTP/1.1 403 Forbidden                       « POST sem token: recusado
+Host: localhost:8000
+Date: Fri, 16 Oct 2026 23:57:06 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-type: text/html; charset=UTF-8
+
+Formulário expirado ou inválido. Volte, recarregue a página e tente de novo.
+$ curl -s -c jar.txt -b jar.txt localhost:8000/painel.php | sed -n 's/.*name="csrf" value="\([^"]*\)".*/\1/p' &gt; token.txt
+$ curl -si -c jar.txt -b jar.txt -d "csrf=$(cat token.txt)" localhost:8000/sair.php | grep -E 'HTTP|Location|Set-Cookie'
+HTTP/1.1 303 See Other
+Set-Cookie: PHPSESSID=deleted; expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; path=/; HttpOnly
+Location: login.php?saiu=1</pre>
+
+<p>As linhas <code>Expires: Thu, 19 Nov 1981…</code> e <code>Cache-Control: no-store…</code> são colocadas pelo próprio <code>session_start()</code>: páginas com sessão não devem ficar guardadas no cache. Um site atacante não consegue ler o token da sua página (o navegador não deixa um site ler o conteúdo de outro), então não tem como montar um POST válido. Mais sobre o ataque em <a href="csrf.html">CSRF e Segurança de Formulários</a>.</p>
+
+<div class="tryphp" data-modo="web" data-url="/login.php" data-post="email=ana@exemplo.com&amp;senha=cafe-com-pao">
+<p class="try-task"><strong>Caixa livre:</strong> esta é a versão final. A caixa começa com um POST <strong>sem token</strong> (como faria um site atacante): veja o 403. Depois abra o <code>login.php</code> pela aba Resultado (rode de novo sem o envio inicial, ou clique em voltar), entre com <code>ana@exemplo.com</code> / <code>cafe-com-pao</code> pelo formulário e clique em Sair: com o token no campo escondido, tudo funciona. Veja o token na aba Código-fonte HTML.</p>
+<pre class="script" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    conferir_csrf();
+
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;form method="post" action="sair.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;button&gt;Sair&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="sair.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirecionar('painel.php');
+}
+conferir_csrf();
+
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', time() - 3600, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+session_destroy();
+
+redirecionar('login.php?saiu=1');
+</pre>
+<pre class="script" data-file="cadastro.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$nome  = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    conferir_csrf();
+
+    if (mb_strlen($nome) &lt; 2) {
+        $erros[] = 'Escreva o seu nome.';
+    }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $erros[] = 'Esse e-mail não parece válido.';
+    }
+    if (mb_strlen($senha) &lt; 8) {
+        $erros[] = 'A senha precisa ter pelo menos 8 caracteres.';
+    }
+
+    if (!$erros) {
+        $busca = $pdo-&gt;prepare('SELECT id FROM usuarios WHERE email = ?');
+        $busca-&gt;execute([$email]);
+        if ($busca-&gt;fetch()) {
+            $erros[] = 'Já existe uma conta com esse e-mail.';
+        }
+    }
+
+    if (!$erros) {
+        $novo = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+        $novo-&gt;execute([$nome, $email, password_hash($senha, PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+        redirecionar('login.php?cadastrado=1');
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Criar conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Criar conta&lt;/h1&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;form method="post" action="cadastro.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($nome) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha (mínimo 8 caracteres)&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Criar conta&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Já tem conta? &lt;a href="login.php"&gt;Entrar&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+
+function token_csrf(): string
+{
+    if (empty($_SESSION['csrf'])) {
+        $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf'];
+}
+
+function conferir_csrf(): void
+{
+    $enviado = $_POST['csrf'] ?? '';
+    if (!is_string($enviado) || !hash_equals(token_csrf(), $enviado)) {
+        http_response_code(403);
+        exit('Formulário expirado ou inválido. Volte, recarregue a página e tente de novo.');
+    }
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+</div>
+</li>
+
+</ol>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Warning: session_start(): Session cannot be started after headers have already been sent</strong>
+<p>Uma página com HTML <strong>antes</strong> do <code>require</code> do <code>comum.php</code>:</p>
+<pre class="term">$ curl -s localhost:8000/t-sessao.php
+&lt;p&gt;Bem-vinda!&lt;/p&gt;
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  session_start(): Session cannot be started after headers have already been sent (sent from /home/ana/login/t-sessao.php on line 1) in &lt;b&gt;/home/ana/login/comum.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;
+ok</pre>
+<p><strong>O que significa:</strong> a sessão usa um cookie, e cookies são cabeçalhos; depois que a página começou a sair, não dá mais. O resultado é pior que o aviso: <code>$_SESSION</code> fica vazio e ninguém consegue ficar logado. <strong>Como consertar:</strong> o <code>require __DIR__ . '/comum.php';</code> deve ser a primeira linha de toda página, sem nada (nem espaço) antes do <code>&lt;?php</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Fatal error: Cannot redeclare function e()</strong>
+<pre class="term">$ curl -s localhost:8000/t-dupla.php
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Cannot redeclare function e() (previously declared in /home/ana/login/comum.php:10) in &lt;b&gt;/home/ana/login/comum.php&lt;/b&gt; on line &lt;b&gt;10&lt;/b&gt;&lt;br /&gt;</pre>
+<p>O <code>comum.php</code> foi incluído duas vezes (por exemplo, uma página que inclui o <code>comum.php</code> e também outro arquivo que o inclui de novo), e uma função não pode ser criada duas vezes. <strong>Como consertar:</strong> use <code>require_once</code>, que ignora a segunda inclusão (veja <a href="include-require.html">include e require</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>O login nunca funciona, mesmo com a senha certa</strong>
+<p>Causas comuns: comparar a senha com o hash usando <code>==</code> ou gerar um hash novo e comparar (<code>password_hash($senha) === $hash</code>), que é sempre falso por causa do sal; ou a coluna do banco curta demais e o hash cortado. Use sempre <code>password_verify($senha, $hash)</code> e uma coluna <code>TEXT</code> (ou <code>VARCHAR(255)</code> no MySQL).</p>
+</div>
+
+<div class="cenario">
+<strong>Logado numa aba, deslogado em outra (ou o login "não pega")</strong>
+<p>O cookie da sessão não está voltando. No <code>curl</code>, faltou o <code>-b jar.txt</code>. No navegador, confira se você usa sempre o mesmo endereço (<code>localhost</code> e <code>127.0.0.1</code> são "sites" diferentes para os cookies) e se nenhuma página chama <code>session_start()</code> depois de imprimir algo.</p>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<p>A versão final, com as seis etapas.</p>
+<pre class="file" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="file" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+
+function token_csrf(): string
+{
+    if (empty($_SESSION['csrf'])) {
+        $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf'];
+}
+
+function conferir_csrf(): void
+{
+    $enviado = $_POST['csrf'] ?? '';
+    if (!is_string($enviado) || !hash_equals(token_csrf(), $enviado)) {
+        http_response_code(403);
+        exit('Formulário expirado ou inválido. Volte, recarregue a página e tente de novo.');
+    }
+}
+</pre>
+<pre class="file" data-file="cadastro.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$nome  = trim($_POST['nome'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erros = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    conferir_csrf();
+
+    if (mb_strlen($nome) &lt; 2) {
+        $erros[] = 'Escreva o seu nome.';
+    }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $erros[] = 'Esse e-mail não parece válido.';
+    }
+    if (mb_strlen($senha) &lt; 8) {
+        $erros[] = 'A senha precisa ter pelo menos 8 caracteres.';
+    }
+
+    if (!$erros) {
+        $busca = $pdo-&gt;prepare('SELECT id FROM usuarios WHERE email = ?');
+        $busca-&gt;execute([$email]);
+        if ($busca-&gt;fetch()) {
+            $erros[] = 'Já existe uma conta com esse e-mail.';
+        }
+    }
+
+    if (!$erros) {
+        $novo = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+        $novo-&gt;execute([$nome, $email, password_hash($senha, PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+        redirecionar('login.php?cadastrado=1');
+    }
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Criar conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Criar conta&lt;/h1&gt;
+&lt;?php foreach ($erros as $erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;form method="post" action="cadastro.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;p&gt;&lt;label&gt;Nome&lt;br&gt;&lt;input name="nome" value="&lt;?= e($nome) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha (mínimo 8 caracteres)&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Criar conta&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Já tem conta? &lt;a href="login.php"&gt;Entrar&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="file" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    conferir_csrf();
+
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="file" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;form method="post" action="sair.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;button&gt;Sair&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="file" data-file="sair.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirecionar('painel.php');
+}
+conferir_csrf();
+
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', time() - 3600, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+session_destroy();
+
+redirecionar('login.php?saiu=1');
+</pre>
+<pre class="file" data-file="index.php">&lt;?php
+// A página inicial só manda para o painel (que manda para o login, se preciso)
+header('Location: painel.php', true, 303);
+exit;
+</pre>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Quem já entrou não vê o login:</strong> no topo do <code>login.php</code> e do <code>cadastro.php</code>, se já houver usuário na sessão, redirecione para o painel.</li>
+  <li><strong>Limite de tentativas:</strong> conte as tentativas erradas na sessão; depois de 5, recuse por 1 minuto (guarde a hora com <code>time()</code>).</li>
+  <li><strong>Trocar a senha:</strong> uma página <code>senha.php</code> (protegida, com token) que pede a senha atual e a nova duas vezes, confere com <code>password_verify</code> e grava o novo hash com <code>UPDATE … WHERE id = ?</code>. Chame <code>session_regenerate_id(true)</code> depois de trocar.</li>
+  <li><strong>Hash sempre atual:</strong> no login, depois do <code>password_verify</code>, use <code>password_needs_rehash($hash, PASSWORD_DEFAULT)</code> para regravar o hash se o PHP passar a usar um algoritmo mais forte (veja <a href="senhas.html">Senhas</a>).</li>
+  <li><strong>Proteger as mensagens:</strong> leve o <code>mensagens.php</code> do <a href="projeto-contato.html">projeto de contato</a> para cá e tranque-o com a área restrita.</li>
+</ol>
+
+<div class="tryphp" data-modo="web" data-url="/login.php" data-goal="html:Conta criada em">
+<p class="try-task"><strong>Missão final:</strong> crie a página <strong>Minha conta</strong> (aba <code>conta.php</code>): protegida como o painel, ela busca no banco o nome, o e-mail e a data de criação da conta pelo <code>id</code> guardado na sessão (prepared statement!) e mostra <code>Conta criada em …</code>. No painel, acrescente o link <code>&lt;a href="conta.php"&gt;Minha conta&lt;/a&gt;</code>. Rode, entre com <code>ana@exemplo.com</code> / <code>cafe-com-pao</code> e clique no link.</p>
+<pre class="script" data-file="login.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+$email = trim($_POST['email'] ?? '');
+$senha = $_POST['senha'] ?? '';
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    conferir_csrf();
+
+    $busca = $pdo-&gt;prepare('SELECT id, nome, senha_hash FROM usuarios WHERE email = ?');
+    $busca-&gt;execute([$email]);
+    $usuario = $busca-&gt;fetch();
+
+    if ($usuario &amp;&amp; password_verify($senha, $usuario['senha_hash'])) {
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = ['id' =&gt; $usuario['id'], 'nome' =&gt; $usuario['nome']];
+        redirecionar('painel.php');
+    }
+    $erro = 'E-mail ou senha incorretos.';
+}
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Entrar&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Entrar&lt;/h1&gt;
+&lt;?php if (isset($_GET['cadastrado'])): ?&gt;
+  &lt;p class="sucesso"&gt;Conta criada! Agora é só entrar.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if (isset($_GET['saiu'])): ?&gt;
+  &lt;p class="sucesso"&gt;Você saiu. Até logo!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;form method="post" action="login.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;p&gt;&lt;label&gt;E-mail&lt;br&gt;&lt;input name="email" value="&lt;?= e($email) ?&gt;"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Senha&lt;br&gt;&lt;input type="password" name="senha"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Entrar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;p&gt;Não tem conta? &lt;a href="cadastro.php"&gt;Crie uma&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="conta.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+// Missão: proteja esta página como o painel.php e mostre
+// o nome, o e-mail e a data de criação da conta (busque no banco pelo id).
+</pre>
+<pre class="script" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;form method="post" action="sair.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;button&gt;Sair&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="sair.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirecionar('painel.php');
+}
+conferir_csrf();
+
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', time() - 3600, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+session_destroy();
+
+redirecionar('login.php?saiu=1');
+</pre>
+<pre class="script" data-file="comum.php">&lt;?php
+// Incluído no topo de todas as páginas
+date_default_timezone_set('America/Sao_Paulo');
+session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_samesite' =&gt; 'Lax',
+]);
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function redirecionar(string $endereco): never
+{
+    header('Location: ' . $endereco, true, 303);
+    exit;
+}
+
+function token_csrf(): string
+{
+    if (empty($_SESSION['csrf'])) {
+        $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf'];
+}
+
+function conferir_csrf(): void
+{
+    $enviado = $_POST['csrf'] ?? '';
+    if (!is_string($enviado) || !hash_equals(token_csrf(), $enviado)) {
+        http_response_code(403);
+        exit('Formulário expirado ou inválido. Volte, recarregue a página e tente de novo.');
+    }
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Abre o banco SQLite (o arquivo é criado na primeira vez)
+$pdo = new PDO('sqlite:' . __DIR__ . '/dados.sqlite');
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS usuarios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome       TEXT NOT NULL,
+    email      TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    criado_em  TEXT NOT NULL
+)');
+
+// Só para testar: se não houver ninguém, cria a usuária de teste.
+// Apague este bloco num site de verdade.
+if ($pdo-&gt;query('SELECT COUNT(*) FROM usuarios')-&gt;fetchColumn() == 0) {
+    $teste = $pdo-&gt;prepare('INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, ?)');
+    $teste-&gt;execute(['Ana', 'ana@exemplo.com', password_hash('cafe-com-pao', PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="conta.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+
+$busca = $pdo-&gt;prepare('SELECT nome, email, criado_em FROM usuarios WHERE id = ?');
+$busca-&gt;execute([$_SESSION['usuario']['id']]);
+$conta = $busca-&gt;fetch();
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Minha conta&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Minha conta&lt;/h1&gt;
+&lt;p&gt;Nome: &lt;?= e($conta['nome']) ?&gt;&lt;/p&gt;
+&lt;p&gt;E-mail: &lt;?= e($conta['email']) ?&gt;&lt;/p&gt;
+&lt;p&gt;Conta criada em &lt;?= e($conta['criado_em']) ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="painel.php"&gt;Voltar ao painel&lt;/a&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="painel.php">&lt;?php
+require __DIR__ . '/comum.php';
+
+if (!isset($_SESSION['usuario'])) {
+    redirecionar('login.php');
+}
+$usuario = $_SESSION['usuario'];
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Painel&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Olá, &lt;?= e($usuario['nome']) ?&gt;!&lt;/h1&gt;
+&lt;p&gt;Esta é a área restrita: só aparece para quem entrou.&lt;/p&gt;
+&lt;p&gt;&lt;a href="conta.php"&gt;Minha conta&lt;/a&gt;&lt;/p&gt;
+&lt;form method="post" action="sair.php"&gt;
+  &lt;input type="hidden" name="csrf" value="&lt;?= token_csrf() ?&gt;"&gt;
+  &lt;button&gt;Sair&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<p>Complete o cadastro e o login da senha:</p>
+<div class="ex-code">$hash = <input data-answer="password_hash">($senha, PASSWORD_DEFAULT);<br>if (<input data-answer="password_verify">($senha, $hash)) { … }</div>
+</div>
+
+<div class="exercise">
+<p>Complete a linha que troca o identificador da sessão no login, apagando a sessão antiga:</p>
+<div class="ex-code"><input data-answer="session_regenerate_id">(<input data-answer="true">);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">Por que o login responde "E-mail ou senha incorretos." tanto para e-mail inexistente quanto para senha errada?</p>
+<label><input type="radio" name="q1"> Para economizar código</label>
+<label><input type="radio" name="q1"> Porque o PHP não consegue saber qual dos dois está errado</label>
+<label><input type="radio" name="q1"> Para não revelar a um atacante quais e-mails têm conta no site</label>
+<label><input type="radio" name="q1"> Porque o <code>password_verify</code> só devolve <code>false</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">O que fica guardado na coluna <code>senha_hash</code>?</p>
+<label><input type="radio" name="q2"> A senha, criptografada de um jeito que o PHP consegue reverter</label>
+<label><input type="radio" name="q2"> Um hash com sal, do qual não dá para voltar à senha; o <code>password_verify</code> confere se uma senha gera aquele hash</label>
+<label><input type="radio" name="q2"> A senha em texto puro, porque o SQLite é seguro</label>
+<label><input type="radio" name="q2"> O token CSRF</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">Um site atacante tem <code>&lt;form action="http://localhost:8000/sair.php" method="post"&gt;</code> que se envia sozinho. Na versão final, o que acontece?</p>
+<label><input type="radio" name="q3"> A Ana é deslogada</label>
+<label><input type="radio" name="q3"> O PHP dá Fatal error</label>
+<label><input type="radio" name="q3"> O navegador bloqueia todo formulário que aponta para outro site</label>
+<label><input type="radio" name="q3"> O POST chega sem o token certo e recebe 403</label>
+</div>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Senha nunca vai para o banco: <code>password_hash($senha, PASSWORD_DEFAULT)</code> no cadastro, <code>password_verify($senha, $hash)</code> no login.</li>
+  <li>A sessão (<code>session_start</code> + <code>$_SESSION</code>) lembra quem entrou; o navegador só guarda o cookie <code>PHPSESSID</code>. Use <code>cookie_httponly</code> e <code>cookie_samesite</code>.</li>
+  <li>Área restrita: no topo da página, sem usuário na sessão, redirecione <strong>e pare</strong> (<code>exit</code>).</li>
+  <li>Logout: <code>$_SESSION = []</code>, apagar o cookie e <code>session_destroy()</code>; feito por POST com token.</li>
+  <li>No login, <code>session_regenerate_id(true)</code> contra fixação de sessão.</li>
+  <li>Todo formulário leva um token CSRF escondido; todo POST confere com <code>hash_equals</code> antes de agir.</li>
+  <li>Todo SQL com valores vindos de fora usa <code>prepare</code> + <code>execute</code>.</li>
+</ul>
+<p>Próximo projeto: <a href="projeto-tarefas.html">Tarefas com SQLite</a>, um CRUD completo com PDO.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
