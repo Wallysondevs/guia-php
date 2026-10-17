@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Sessões — session_start, $_SESSION e logout | Guia PHP</title>
+<meta name="description" content="Sessões em PHP: session_start, o array $_SESSION, o cookie PHPSESSID e o arquivo da sessão no servidor, contador de visitas, a ideia de um login, logout com session_destroy, session_regenerate_id e a diferença entre sessão e cookie.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Sessões</span></h1>
+
+<p class="intro">Na aula de <a href="cookies.html">Cookies</a>, você viu que dá para o site "lembrar" de um visitante, mas que o cookie fica no computador dele, onde pode ser lido e mudado. E se você precisar lembrar de algo que o visitante <strong>não pode</strong> mexer, como "esta pessoa fez login como Ana"? A resposta é a <strong>sessão</strong>: os dados ficam guardados no <strong>servidor</strong>, e o navegador leva só um número de identificação. É assim que funcionam logins, carrinhos de compra e mensagens do tipo "cadastro salvo!" na página seguinte.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma sessão e como ela usa um cookie (<code>PHPSESSID</code>) só para o número.</li>
+  <li>Como começar uma sessão com <code>session_start</code> e guardar dados em <code>$_SESSION</code>.</li>
+  <li>Onde os dados ficam de verdade (o arquivo da sessão no servidor).</li>
+  <li>Um contador de visitas e um carrinho de compras.</li>
+  <li>A ideia de um login com sessão (o login completo está em <a href="projeto-login.html">Login com Sessão</a>).</li>
+  <li>Como sair (logout) com <code>session_destroy</code>.</li>
+  <li>Por que usar <code>session_regenerate_id</code> no login.</li>
+  <li>Quando usar sessão e quando usar cookie.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: o guarda-volumes</h2>
+<p>No guarda-volumes de um museu, você entrega a mochila e recebe uma <strong>ficha numerada</strong>. A mochila fica guardada lá dentro; você leva só a ficha. Na saída, mostra a ficha e recebe a mochila de volta. Se perder a ficha, perdeu o acesso. E ninguém consegue mexer na sua mochila mudando o número escrito na ficha: no máximo, pega uma ficha que não existe.</p>
+
+<figure>
+<pre class="file" data-file="sessão = ficha + guarda-volumes">  NAVEGADOR                                SERVIDOR
+  (leva a ficha)                           (guarda os dados)
+
+  cookie PHPSESSID=aede68e6…  ─────▶   arquivo sess_aede68e6…
+                                         ┌──────────────────────┐
+                                         │ usuario  = "ana"     │
+                                         │ carrinho = [bolo,…]  │
+                                         │ visitas  = 3         │
+                                         └──────────────────────┘</pre>
+<figcaption>A sessão = um número aleatório no cookie <code>PHPSESSID</code> (a ficha) + um arquivo no servidor com os dados (a mochila). O PHP liga um ao outro sozinho.</figcaption>
+</figure>
+
+<p>Você não precisa criar o cookie nem o arquivo: o PHP faz tudo quando você chama <code>session_start()</code>. Para o seu código, a sessão é só um array, <code>$_SESSION</code>, que "sobrevive" de um pedido para o outro.</p>
+
+<hr>
+
+<h2>Começando: <code>session_start</code> e <code>$_SESSION</code></h2>
+<pre class="file" data-file="contador.php">&lt;?php
+session_start();
+$_SESSION['visitas'] = ($_SESSION['visitas'] ?? 0) + 1;
+echo "Visitas nesta sessão: ", $_SESSION['visitas'], "\n";
+echo "ID da sessão: ", session_id(), "\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>session_start();</dt><dd>"Começar sessão". Se o navegador mandou um cookie <code>PHPSESSID</code> válido, o PHP abre o arquivo dessa sessão e carrega os dados em <code>$_SESSION</code>. Se não mandou, cria um número novo e uma sessão vazia. Vem <strong>antes de qualquer saída</strong>, como o <code>setcookie</code>.</dd>
+  <dt>$_SESSION['visitas']</dt><dd>Um array comum: leia e grave chaves como em qualquer array. Ao final da página, o PHP salva o conteúdo no arquivo da sessão sozinho.</dd>
+  <dt>?? 0</dt><dd>Na primeira visita, a chave não existe (veja <a href="get-post.html">Undefined array key</a>).</dd>
+  <dt>session_id()</dt><dd>O número da ficha desta sessão. Aqui só para você ver; normalmente não precisa dele.</dd>
+</dl>
+
+<p>Primeiro, a resposta completa, com os cabeçalhos (<code>-i</code>):</p>
+
+<pre class="term">$ curl -si localhost:8000/contador.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:08:20 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Set-Cookie: PHPSESSID=eb569c35e6f72d1c2ed1815e8328aa2e; path=/
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-type: text/html; charset=UTF-8
+
+Visitas nesta sessão: 1
+ID da sessão: eb569c35e6f72d1c2ed1815e8328aa2e</pre>
+
+<p>O <code>session_start</code> mandou quatro cabeçalhos:</p>
+<ul>
+  <li><code>Set-Cookie: PHPSESSID=…; path=/</code>: a ficha. <code>PHPSESSID</code> é o nome padrão do cookie de sessão; o valor é um número aleatório de 32 caracteres. Sem data de expiração: some ao fechar o navegador.</li>
+  <li><code>Expires</code> (numa data de 1981, no passado), <code>Cache-Control</code> e <code>Pragma</code>: pedem ao navegador para <strong>não guardar a página em cache</strong>, porque ela é pessoal e muda a cada visita.</li>
+</ul>
+
+<p>Agora três visitas seguidas, com o "pote de cookies" do <code>curl</code> (<code>-c</code> grava, <code>-b</code> envia, como em <a href="cookies.html">Cookies</a>):</p>
+
+<pre class="term">$ curl -s -c pote -b pote localhost:8000/contador.php
+Visitas nesta sessão: 1
+ID da sessão: aede68e6cef190d7d5c62fa0d67ebfb4
+$ curl -s -c pote -b pote localhost:8000/contador.php
+Visitas nesta sessão: 2
+ID da sessão: aede68e6cef190d7d5c62fa0d67ebfb4
+$ curl -s -c pote -b pote localhost:8000/contador.php
+Visitas nesta sessão: 3
+ID da sessão: aede68e6cef190d7d5c62fa0d67ebfb4
+$ tail -1 pote
+localhost	FALSE	/	FALSE	0	PHPSESSID	aede68e6cef190d7d5c62fa0d67ebfb4</pre>
+
+<p>O mesmo número nas três visitas: o navegador (o <code>curl</code>) devolveu a ficha, e o PHP achou a sessão certa. Repare que o cookie guarda <strong>só o número</strong>. O <code>3</code> não está em lugar nenhum do lado da Ana. Onde está, então?</p>
+
+<h3>Onde os dados ficam</h3>
+<p>Por padrão, o PHP grava cada sessão num arquivo na pasta temporária do servidor, chamado <code>sess_</code> + o número:</p>
+
+<pre class="term">$ ls -l /tmp/sess_*
+-rw------- 1 ana ana 12 out 16 21:08 /tmp/sess_aede68e6cef190d7d5c62fa0d67ebfb4
+-rw------- 1 ana ana 12 out 16 21:08 /tmp/sess_eb569c35e6f72d1c2ed1815e8328aa2e
+$ cat /tmp/sess_aede68e6cef190d7d5c62fa0d67ebfb4
+visitas|i:3;</pre>
+
+<p>Dois arquivos: um para cada "visitante" (o primeiro <code>curl -si</code>, sem pote, ganhou uma sessão só para ele). O conteúdo <code>visitas|i:3;</code> é o <code>$_SESSION</code> num formato do PHP: a chave <code>visitas</code>, um inteiro (<code>i</code>) de valor 3. Você nunca precisa ler esse arquivo; é só para ver que os dados estão <strong>no servidor</strong>. (A pasta é definida por <code>session.save_path</code> no <code>php.ini</code>; vazia, usa a pasta temporária do sistema. Em sites grandes, as sessões costumam ficar num banco de dados ou no Redis.)</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task">O contador de visitas com sessão. Rode e clique em <strong>Visitar de novo</strong> algumas vezes: o editor guarda o cookie <code>PHPSESSID</code> entre os pedidos desta caixa, como um navegador. Veja o <code>$_SESSION</code> e o <code>$_COOKIE</code> embaixo: o número de visitas só aparece no primeiro; no segundo, só a ficha.</p>
+<pre class="script">&lt;?php
+session_start();
+$_SESSION['visitas'] = ($_SESSION['visitas'] ?? 0) + 1;
+?&gt;
+&lt;p&gt;Visitas nesta sessão: &lt;?= $_SESSION['visitas'] ?&gt;&lt;/p&gt;
+&lt;form&gt;&lt;button&gt;Visitar de novo&lt;/button&gt;&lt;/form&gt;
+&lt;h3&gt;$_SESSION (no servidor)&lt;/h3&gt;
+&lt;pre&gt;&lt;?php print_r($_SESSION); ?&gt;&lt;/pre&gt;
+&lt;h3&gt;$_COOKIE (o que o navegador mandou)&lt;/h3&gt;
+&lt;pre&gt;&lt;?php print_r($_COOKIE); ?&gt;&lt;/pre&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Guardar de tudo: arrays na sessão</h2>
+<p><code>$_SESSION</code> aceita qualquer valor: textos, números, booleanos e <strong>arrays</strong>. Isso permite, por exemplo, um carrinho de compras:</p>
+
+<pre class="file" data-file="carrinho.php">&lt;?php
+session_start();
+$_SESSION['carrinho'] ??= [];             // cria o carrinho vazio na primeira vez
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['carrinho'][] = $_POST['produto'] ?? '';
+}
+?&gt;
+&lt;p&gt;Itens no carrinho: &lt;?= count($_SESSION['carrinho']) ?&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;?php foreach ($_SESSION['carrinho'] as $item): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($item) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>$_SESSION['carrinho'] ??= [];</dt><dd>O operador <code>??=</code> (de <a href="operadores-atribuicao.html">Operadores de Atribuição</a>) só atribui se a chave ainda não existir: na primeira visita, o carrinho vira um array vazio; nas outras, fica como está.</dd>
+  <dt>$_SESSION['carrinho'][] = …</dt><dd>Acrescenta um item no fim da lista, que fica salva na sessão.</dd>
+</dl>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operação</th><th>Código</th></tr>
+<tr><td>Gravar</td><td><code>$_SESSION['chave'] = $valor;</code></td></tr>
+<tr><td>Ler (com padrão)</td><td><code>$_SESSION['chave'] ?? 'padrão'</code></td></tr>
+<tr><td>Existe?</td><td><code>isset($_SESSION['chave'])</code></td></tr>
+<tr><td>Apagar uma chave</td><td><code>unset($_SESSION['chave']);</code></td></tr>
+<tr><td>Esvaziar tudo</td><td><code>$_SESSION = [];</code></td></tr>
+</table>
+</div>
+
+<p>Um uso muito comum: a <strong>mensagem de uma vez só</strong> (chamada de <em>flash</em>). A página que salva um cadastro grava <code>$_SESSION['aviso'] = 'Cadastro salvo!'</code> e redireciona; a página seguinte mostra o aviso e faz <code>unset($_SESSION['aviso'])</code>, para ele não aparecer de novo. Você monta isso em <a href="redirecionar.html">header e Redirecionamento</a>.</p>
+
+<hr>
+
+<h2>A ideia de um login</h2>
+<p>Agora o motivo principal das sessões. Um login é, no fundo, isto:</p>
+<ol>
+  <li>A pessoa envia usuário e senha.</li>
+  <li>O PHP confere. Se estiver certo, grava na sessão <strong>quem</strong> é: <code>$_SESSION['usuario'] = 'ana'</code>.</li>
+  <li>Toda página restrita pergunta: "<code>$_SESSION['usuario']</code> existe?". Se não, nega o acesso.</li>
+</ol>
+<p>Como a sessão está no servidor, a pessoa não consegue "se promover" mudando um cookie: o máximo que ela muda é o número da ficha, e um número inventado não corresponde a nenhuma sessão.</p>
+
+<pre class="file" data-file="login.php">&lt;?php
+session_start();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $usuario = $_POST['usuario'] ?? '';
+    $senha   = $_POST['senha'] ?? '';
+    if ($usuario === 'ana' &amp;&amp; $senha === 'bolo123') {   // só a ideia! veja projeto-login.html
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = $usuario;
+        echo "Login feito.\n";
+    } else {
+        echo "Usuário ou senha errados.\n";
+    }
+}
+</pre>
+
+<pre class="file" data-file="painel.php">&lt;?php
+session_start();
+if (!isset($_SESSION['usuario'])) {
+    echo "Acesso negado: faça login.\n";
+    exit;
+}
+echo "Olá, ", htmlspecialchars($_SESSION['usuario']), "! Este é o seu painel.\n";
+</pre>
+
+<div class="warning"><strong>Só a ideia.</strong> Senha escrita no código e comparada com <code>===</code> serve para entender o mecanismo, nunca para um site de verdade. Senhas são guardadas no banco de dados com <code>password_hash</code> e conferidas com <code>password_verify</code> (<a href="senhas.html">Senhas</a>), e o formulário precisa de outras proteções. O login completo, do jeito certo, é o projeto <a href="projeto-login.html">Login com Sessão</a>.</div>
+
+<p>Testando o caminho completo (o <code>grep</code> mostra só o cabeçalho <code>Set-Cookie</code> e a mensagem):</p>
+
+<pre class="term">$ curl -s -b pote2 -c pote2 localhost:8000/painel.php
+Acesso negado: faça login.
+$ curl -s -b pote2 -c pote2 localhost:8000/contador.php | tail -1
+ID da sessão: 74a8036513814e08fe4c54f2286fb699
+$ curl -si -b pote2 -c pote2 localhost:8000/login.php -d "usuario=ana&amp;senha=errada" | grep -i "set-cookie\|errad"
+Usuário ou senha errados.
+$ curl -si -b pote2 -c pote2 localhost:8000/login.php -d "usuario=ana&amp;senha=bolo123" | grep -i "set-cookie\|login"
+Set-Cookie: PHPSESSID=c1218ccc8c8fac82e8b2daf847938b0b; path=/
+Login feito.
+$ curl -s -b pote2 -c pote2 localhost:8000/painel.php
+Olá, ana! Este é o seu painel.</pre>
+
+<p>Repare: antes do login, a sessão era <code>74a80365…</code>. No login certo, o PHP mandou um <code>Set-Cookie</code> com um número <strong>novo</strong>, <code>c1218ccc…</code>. Quem fez isso foi o <code>session_regenerate_id(true)</code>.</p>
+
+<h3>Por que trocar o número no login: <code>session_regenerate_id</code></h3>
+<p>Imagine que um atacante consiga fazer a vítima usar um número de sessão que <strong>ele</strong> conhece (por exemplo, mandando um link num computador compartilhado). Se o número continuar o mesmo depois do login, o atacante, com o mesmo número, também estará "logado como a vítima". Esse ataque se chama <strong>fixação de sessão</strong>.</p>
+<p>A defesa: no momento em que a pessoa faz login (ou muda de nível de acesso), troque a ficha. <code>session_regenerate_id(true)</code> cria um número novo, mantém os dados e, com o <code>true</code>, apaga o arquivo da sessão antiga. O número que o atacante conhecia deixa de valer.</p>
+
+<hr>
+
+<h2>Sair: logout com <code>session_destroy</code></h2>
+<p>Para encerrar a sessão de verdade, são três passos: esvaziar o array, apagar o cookie no navegador e destruir o arquivo no servidor:</p>
+
+<pre class="file" data-file="sair.php">&lt;?php
+session_start();
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', [
+    'expires'  =&gt; time() - 3600,
+    'path'     =&gt; $p['path'],
+    'domain'   =&gt; $p['domain'],
+    'secure'   =&gt; $p['secure'],
+    'httponly' =&gt; $p['httponly'],
+]);
+session_destroy();
+echo "Você saiu.\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>session_start();</code></td><td>Abre a sessão atual (não dá para destruir o que não foi aberto).</td></tr>
+<tr><td><code>$_SESSION = [];</code></td><td>Esvazia os dados desta página em diante.</td></tr>
+<tr><td><code>session_get_cookie_params()</code></td><td>As opções com que o cookie de sessão foi criado (<code>path</code>, <code>domain</code>…), para apagar com as mesmas (veja <a href="cookies.html">apagar um cookie</a>).</td></tr>
+<tr><td><code>setcookie(session_name(), '', …)</code></td><td>Apaga o cookie <code>PHPSESSID</code> (<code>session_name()</code> devolve esse nome).</td></tr>
+<tr><td><code>session_destroy();</code></td><td>Apaga o arquivo da sessão no servidor.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl -si -b pote2 -c pote2 localhost:8000/sair.php | grep -i "set-cookie\|saiu"
+Set-Cookie: PHPSESSID=deleted; expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; path=/
+Você saiu.
+$ curl -s -b pote2 -c pote2 localhost:8000/painel.php
+Acesso negado: faça login.</pre>
+
+<p>Só <code>session_destroy()</code>, sem os outros passos, apaga o arquivo, mas o <code>$_SESSION</code> da página atual continua cheio até ela terminar, e o navegador continua com o cookie antigo. Faça os três.</p>
+
+<hr>
+
+<h2>Sessão × cookie</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Cookie</th><th>Sessão</th></tr>
+<tr><td>Onde ficam os dados</td><td>No navegador do visitante</td><td>No servidor (o navegador guarda só o número, num cookie)</td></tr>
+<tr><td>O visitante pode ler ou mudar?</td><td>Sim</td><td>Não (só pode perder ou trocar o número)</td></tr>
+<tr><td>Tamanho</td><td>Até ~4 KB</td><td>Sem limite prático (é um arquivo no servidor)</td></tr>
+<tr><td>Quanto dura</td><td>O que você definir em <code>expires</code> (dias, meses)</td><td>Até fechar o navegador e/ou alguns minutos sem uso (<code>session.gc_maxlifetime</code>, 1440 segundos = 24 minutos por padrão)</td></tr>
+<tr><td>Disponível quando</td><td>No pedido <strong>seguinte</strong> ao <code>setcookie</code></td><td>No <strong>mesmo</strong> pedido, logo após gravar em <code>$_SESSION</code></td></tr>
+<tr><td>Como usar</td><td><code>setcookie</code> + <code>$_COOKIE</code></td><td><code>session_start</code> + <code>$_SESSION</code></td></tr>
+<tr><td>Bom para</td><td>Preferências que podem durar muito: tema, idioma, "lembrar meu usuário"</td><td>Login, carrinho, mensagens de uma vez, qualquer coisa que o visitante não pode alterar</td></tr>
+</table>
+</div>
+
+<h3>Configurações úteis</h3>
+<p>O cookie de sessão sai, por padrão, sem <code>httponly</code>, <code>secure</code> nem <code>samesite</code>. Para protegê-lo como você aprendeu em <a href="cookies.html">Cookies</a>, passe as opções ao <code>session_start</code> (ou configure no <code>php.ini</code>):</p>
+<pre class="file" data-file="trecho.php">session_start([
+    'cookie_httponly' =&gt; true,
+    'cookie_secure'   =&gt; true,     // com o site em HTTPS
+    'cookie_samesite' =&gt; 'Lax',
+    'use_strict_mode' =&gt; true,     // recusa números de sessão inventados
+]);</pre>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>session_start(): Session cannot be started after headers have already been sent</code></strong>
+<pre class="file" data-file="erro.php">&lt;h1&gt;Painel&lt;/h1&gt;
+&lt;?php
+session_start();
+</pre>
+<pre class="term">$ curl -s localhost:8000/erro.php
+&lt;h1&gt;Painel&lt;/h1&gt;
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  session_start(): Session cannot be started after headers have already been sent (sent from /home/ana/site/s/erro.php on line 1) in &lt;b&gt;/home/ana/site/s/erro.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que aconteceu:</strong> o mesmo problema do <a href="cookies.html">headers already sent</a>: o HTML da linha 1 já foi enviado, e o <code>session_start</code> precisa mandar o cabeçalho <code>Set-Cookie</code>. A sessão não começa, e <code>$_SESSION</code> não é carregado.</p>
+<p><strong>Como resolver:</strong> <code>session_start()</code> na primeira linha, logo depois do <code>&lt;?php</code>, sem nada antes (nem espaço, nem linha vazia).</p>
+</div>
+
+<div class="cenario">
+<strong>Gravei na sessão, mas na página seguinte ela está vazia</strong>
+<pre class="file" data-file="semstart.php">&lt;?php
+$_SESSION['usuario'] = 'ana';
+echo "Gravei? ";
+</pre>
+<pre class="file" data-file="lesemstart.php">&lt;?php
+session_start();
+var_dump($_SESSION);
+</pre>
+<pre class="term">$ curl -s -c pote3 -b pote3 localhost:8000/semstart.php
+Gravei?
+$ curl -s -c pote3 -b pote3 localhost:8000/lesemstart.php
+array(0) {
+}</pre>
+<p><strong>O que aconteceu:</strong> o <code>semstart.php</code> não chamou <code>session_start()</code>. Sem ele, <code>$_SESSION</code> é só um array comum, que some no fim da página: nada foi salvo, e nenhum aviso apareceu. Outras causas: o navegador não está devolvendo o cookie (cookies bloqueados, ou páginas em domínios diferentes, como <code>localhost</code> e <code>127.0.0.1</code>), ou a sessão expirou.</p>
+<p><strong>Como resolver:</strong> <code>session_start()</code> no topo de <strong>toda</strong> página que lê ou grava a sessão. Um arquivo comum incluído em todas (<a href="include-require.html">include e require</a>) ajuda a não esquecer.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Notice: session_start(): Ignoring session_start() because a session is already active</code></strong>
+<pre class="term">$ curl -s localhost:8000/duas.php
+&lt;br /&gt;
+&lt;b&gt;Notice&lt;/b&gt;:  session_start(): Ignoring session_start() because a session is already active (started from /home/ana/site/s/duas.php on line 2) in &lt;b&gt;/home/ana/site/s/duas.php&lt;/b&gt; on line &lt;b&gt;3&lt;/b&gt;&lt;br /&gt;
+ok</pre>
+<p><strong>O que aconteceu:</strong> <code>session_start()</code> foi chamado duas vezes no mesmo pedido (muitas vezes, uma no arquivo principal e outra num arquivo incluído). A segunda é ignorada; a mensagem só avisa.</p>
+<p><strong>Como resolver:</strong> deixe um só <code>session_start()</code>, ou proteja com <code>if (session_status() === PHP_SESSION_NONE) { session_start(); }</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined global variable $_SESSION</code></strong>
+<p><strong>O que aconteceu:</strong> leitura de <code>$_SESSION</code> sem <code>session_start()</code> antes (veja o exemplo em <a href="superglobais.html">Superglobais</a>).</p>
+<p><strong>Como resolver:</strong> <code>session_start()</code> no topo da página.</p>
+</div>
+
+<div class="cenario">
+<strong>O login "cai" sozinho depois de um tempo</strong>
+<p><strong>O que aconteceu:</strong> sessões sem uso por mais de <code>session.gc_maxlifetime</code> segundos (24 minutos por padrão) podem ser apagadas pela limpeza automática do PHP. Também somem quando o navegador é fechado, porque o cookie <code>PHPSESSID</code> não tem data de expiração.</p>
+<p><strong>Como resolver:</strong> é o comportamento esperado (e mais seguro). Para "lembrar de mim" por semanas, o login completo usa um cookie próprio, com cuidados extras.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função / item</th><th>O que faz</th></tr>
+<tr><td><code>session_start()</code></td><td>Abre (ou cria) a sessão; antes de qualquer saída</td></tr>
+<tr><td><code>$_SESSION['x']</code></td><td>Lê/grava dados da sessão</td></tr>
+<tr><td><code>session_id()</code></td><td>O número da sessão atual</td></tr>
+<tr><td><code>session_name()</code></td><td>O nome do cookie (<code>PHPSESSID</code>)</td></tr>
+<tr><td><code>session_regenerate_id(true)</code></td><td>Troca o número, mantendo os dados (use no login)</td></tr>
+<tr><td><code>session_get_cookie_params()</code></td><td>As opções do cookie de sessão</td></tr>
+<tr><td><code>session_destroy()</code></td><td>Apaga a sessão no servidor</td></tr>
+<tr><td><code>session_status()</code></td><td><code>PHP_SESSION_NONE</code> (não iniciada) ou <code>PHP_SESSION_ACTIVE</code></td></tr>
+<tr><td><code>session.save_path</code>, <code>session.gc_maxlifetime</code></td><td>Onde ficam os arquivos; quanto tempo sem uso até poderem ser apagados</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A primeira linha</h3>
+<p>Complete a função que precisa vir no topo de toda página que usa sessão:</p>
+<div class="ex-code">&lt;?php <input data-answer="session_start();|session_start()" aria-label="função"></div>
+</div>
+
+<div class="exercise">
+<h3>2. Lembrar o nome</h3>
+<p>Complete para guardar o nome <code>'Ana'</code> na sessão, na chave <code>nome</code>:</p>
+<div class="ex-code"><input data-answer="$_SESSION['nome']|$_SESSION[&quot;nome&quot;]" aria-label="destino"> = 'Ana';</div>
+</div>
+
+<div class="exercise">
+<h3>3. No login</h3>
+<p>Complete a função que troca o número da sessão logo após o login:</p>
+<div class="ex-code"><input data-answer="session_regenerate_id" aria-label="função">(true);</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que o cookie <code>PHPSESSID</code> guarda?</p>
+<label><input type="radio" name="q4"> Todos os dados de <code>$_SESSION</code>, criptografados.</label>
+<label><input type="radio" name="q4"> O nome do usuário logado.</label>
+<label><input type="radio" name="q4"> Só um número aleatório que identifica a sessão no servidor.</label>
+<label><input type="radio" name="q4"> A senha, para o login automático.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. Para guardar "esta pessoa está logada como ana", o mais seguro é:</p>
+<label><input type="radio" name="q5"> <code>$_SESSION['usuario'] = 'ana'</code></label>
+<label><input type="radio" name="q5"> <code>setcookie('usuario', 'ana')</code></label>
+<label><input type="radio" name="q5"> Um campo <code>hidden</code> no formulário.</label>
+<label><input type="radio" name="q5"> <code>?usuario=ana</code> no endereço.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Qual combinação faz um logout completo?</p>
+<label><input type="radio" name="q6"> Só <code>session_destroy()</code>.</label>
+<label><input type="radio" name="q6"> Só <code>unset($_SESSION['usuario'])</code>.</label>
+<label><input type="radio" name="q6"> Fechar a aba.</label>
+<label><input type="radio" name="q6"> <code>$_SESSION = []</code>, apagar o cookie de sessão e <code>session_destroy()</code>.</label>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="produto=Bolo+de+cenoura" data-goal="html:Itens no carrinho: 1,html:Bolo de cenoura,src:session_start,semerro">
+<p class="try-task"><strong>Missão:</strong> o carrinho da padaria não lembra de nada: adicione dois produtos na aba <strong>Resultado</strong> e o contador nunca passa de 1, sem nenhum aviso (sem a sessão, <code>$_SESSION</code> é só um array comum, que some no fim de cada pedido). Descubra o que falta no começo do código, rode de novo e veja o carrinho crescer.</p>
+<pre class="script">&lt;?php
+$_SESSION['carrinho'] ??= [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['carrinho'][] = $_POST['produto'] ?? '';
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;select name="produto"&gt;
+    &lt;option&gt;Bolo de cenoura&lt;/option&gt;&lt;option&gt;Pão de queijo&lt;/option&gt;&lt;option&gt;Torta de limão&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Itens no carrinho: &lt;?= count($_SESSION['carrinho']) ?&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;?php foreach ($_SESSION['carrinho'] as $item): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($item) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+</pre>
+<pre class="solucao">&lt;?php
+session_start();
+$_SESSION['carrinho'] ??= [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['carrinho'][] = $_POST['produto'] ?? '';
+}
+?&gt;
+&lt;form method="post"&gt;
+  &lt;select name="produto"&gt;
+    &lt;option&gt;Bolo de cenoura&lt;/option&gt;&lt;option&gt;Pão de queijo&lt;/option&gt;&lt;option&gt;Torta de limão&lt;/option&gt;
+  &lt;/select&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Itens no carrinho: &lt;?= count($_SESSION['carrinho']) ?&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;?php foreach ($_SESSION['carrinho'] as $item): ?&gt;
+  &lt;li&gt;&lt;?= htmlspecialchars($item) ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+</pre>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="html:Acesso negado,src:isset\(\$_SESSION\['usuario'\]\),semerro">
+<p class="try-task"><strong>Missão:</strong> o "painel secreto" aparece para qualquer um. Antes do segredo, confira se <code>$_SESSION['usuario']</code> existe; se não existir, mostre <code>Acesso negado</code> e o link de entrar, e pare com <code>exit</code>. Depois teste na aba <strong>Resultado</strong>: Entrar, ver o painel, Sair.</p>
+<pre class="script">&lt;?php
+session_start();
+if (isset($_GET['entrar'])) {            // finge um login certo (só para testar)
+    session_regenerate_id(true);
+    $_SESSION['usuario'] = 'ana';
+}
+if (isset($_GET['sair'])) {
+    $_SESSION = [];
+    session_destroy();
+}
+// proteja o painel aqui
+
+echo "&lt;p&gt;Olá, " . htmlspecialchars($_SESSION['usuario']) . "! Saldo do caixa: R$ 1.234,00&lt;/p&gt;";
+echo '&lt;p&gt;&lt;a href="?sair=1"&gt;Sair&lt;/a&gt;&lt;/p&gt;';
+</pre>
+<pre class="solucao">&lt;?php
+session_start();
+if (isset($_GET['entrar'])) {            // finge um login certo (só para testar)
+    session_regenerate_id(true);
+    $_SESSION['usuario'] = 'ana';
+}
+if (isset($_GET['sair'])) {
+    $_SESSION = [];
+    session_destroy();
+}
+if (!isset($_SESSION['usuario'])) {
+    echo '&lt;p&gt;Acesso negado. &lt;a href="?entrar=1"&gt;Entrar&lt;/a&gt;&lt;/p&gt;';
+    exit;
+}
+
+echo "&lt;p&gt;Olá, " . htmlspecialchars($_SESSION['usuario']) . "! Saldo do caixa: R$ 1.234,00&lt;/p&gt;";
+echo '&lt;p&gt;&lt;a href="?sair=1"&gt;Sair&lt;/a&gt;&lt;/p&gt;';
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Sessão = dados guardados no <strong>servidor</strong> + um número aleatório no cookie <code>PHPSESSID</code> que liga o navegador a eles.</li>
+  <li><code>session_start()</code> no topo de toda página que usa a sessão, antes de qualquer saída.</li>
+  <li><code>$_SESSION</code> é um array comum que sobrevive entre pedidos: grave, leia (<code>?? padrão</code>), <code>unset</code>.</li>
+  <li>Login = conferir a senha e gravar <code>$_SESSION['usuario']</code>; páginas restritas conferem com <code>isset</code>.</li>
+  <li><code>session_regenerate_id(true)</code> no login, contra fixação de sessão.</li>
+  <li>Logout: <code>$_SESSION = []</code>, apagar o cookie, <code>session_destroy()</code>.</li>
+  <li>Cookie para preferências que o visitante pode ver; sessão para tudo que ele não pode mexer.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
