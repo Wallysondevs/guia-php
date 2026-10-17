@@ -37,7 +37,7 @@ echo "Olá, Ana!";
 - **`data-modo="web"`**: o código é tratado como uma página web (`index.php` servida pelo PHP): o editor mostra duas abas, **Resultado** (o HTML renderizado, como no navegador — formulários funcionam e enviam GET/POST para o próprio PHP) e **Código-fonte HTML**. Use nas aulas de PHP dentro do HTML, formulários, sessões, cookies, redirecionamento. `data-url="/index.php?nome=Ana"` define a primeira requisição; `data-post="nome=Ana&idade=29"` faz a primeira requisição ser um POST.
 - Padrão (`data-modo="cli"`): saída em texto, como `php arquivo.php` no terminal.
 - **Vários arquivos** (para `include`, classes em arquivos separados, `.csv`, `.json`): vários `<pre class="script" data-file="…">` na mesma caixa (abas). O primeiro é o que roda.
-- `data-stdin="…"` (entrada para `fgets(STDIN)`/`readline`), `data-args="…"` (`$argv`).
+- `data-stdin="…"` (entrada para `fgets(STDIN)`), `data-args="…"` (`$argv`). **`readline()` não existe no PHP do navegador** — nas caixas use sempre `fgets(STDIN)`; `readline()` só em `pre.term` (laboratório: `php-completo`).
 - Sem `data-goal`: caixa livre. Com `data-goal`: missão, `pre.solucao` **obrigatório** (com várias abas, um `pre.solucao data-file="…"` por arquivo que muda).
 
 ### Metas (`data-goal`, separadas por vírgula; `\,` = vírgula literal)
