@@ -857,3 +857,121 @@ figcaption { margin-top: 8px; font-size: .92rem; color: var(--muted); line-heigh
 }
 .tryjava .sim, .tryjshell .sim { max-width: 100%; }
 .tj .ts-code { tab-size: 4; }
+
+/* ---------------- Guia PHP: editor .tryphp (assets/phpsim.js) ---------------- */
+.tryphp {
+  margin: 22px 0;
+  padding: 4px 18px 14px;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  min-width: 0;
+}
+.tryphp .sim { max-width: 100%; }
+.tp .ts-code { tab-size: 4; }
+.tp-tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.tp-tab {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font: 600 13.5px "Ubuntu Mono", ui-monospace, monospace;
+  cursor: pointer;
+}
+.tp-tab::before { content: "📄 "; }
+.tp-tab:hover { color: var(--accent); border-color: var(--accent); }
+.tp-tab.on { background: var(--code-bg); color: var(--text); border-color: var(--accent); }
+.tp-entrada-l { display: flex; align-items: flex-start; gap: 6px; flex: 1; min-width: 0; font-size: 14px; }
+.tp-entrada {
+  flex: 1; min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 "Ubuntu Mono", ui-monospace, monospace;
+  resize: vertical;
+}
+.tp-dica { flex: 1; min-width: 0; font-size: 14px; color: var(--muted); }
+.tp-carga {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--note-bg);
+  font-size: 14px;
+}
+.tp-carga[hidden] { display: none; }
+.tp-carga-txt { flex: 1 1 220px; min-width: 0; }
+.tp-barra { flex: 1 1 140px; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.tp-barra i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.tp .ts-saida { margin-top: 8px; }
+.tp .sim-screen .sim-err { color: #ff8a80; }
+.tp .sim-digitado { color: #ffffff; font-weight: 700; }
+.tp .ts-campo { width: auto; min-width: 12ch; max-width: 100%; }
+/* modo web: um mini navegador */
+.tp-nav { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--sidebar-bg); }
+.tp-nav[hidden] { display: none; }
+.tp-nav-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+.tp-nav-bar .sim-btn { color: var(--text); border-color: var(--border); font-size: 14px; padding: 2px 8px; }
+.tp-nav-bar .sim-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.tp-nav-bar .sim-btn:disabled { opacity: .4; cursor: default; }
+.tp-url {
+  flex: 1; min-width: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13.5px "Ubuntu Mono", ui-monospace, monospace;
+}
+.tp-codigo-http { font: 700 12.5px system-ui, sans-serif; color: var(--muted); }
+.tp-codigo-http:empty { display: none; }
+.tp-codigo-http.ruim { color: var(--bad); }
+.tp-vistas { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border); }
+.tp-vista {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font: 600 13.5px system-ui, sans-serif;
+  cursor: pointer;
+}
+.tp-vista.on { background: var(--bg); color: var(--text); border-color: var(--border); margin-bottom: -1px; }
+.tp-res { background: #ffffff; }
+.tp-frame { display: block; width: 100%; height: 160px; border: 0; background: #ffffff; color-scheme: light; }
+.tp-src { background: var(--code-bg); }
+.tp-src[hidden], .tp-res[hidden] { display: none; }
+.tp-src-txt, .tp-cab-txt {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 420px;
+  overflow: auto;
+  color: var(--code-text);
+  font: 13.5px/1.5 "Ubuntu Mono", ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tp-cab { border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.tp-cab summary { padding: 6px 12px; cursor: pointer; color: var(--muted); }
+.tp-cab-txt { padding-top: 0; color: var(--muted); }
+.tp-stderr {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--warn-bg);
+  color: var(--text);
+  font: 13.5px/1.5 "Ubuntu Mono", ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tp-stderr[hidden] { display: none; }
+@media (max-width: 600px) {
+  .tryphp { padding: 4px 10px 12px; }
+  .tp-tab { font-size: 12.5px; padding: 3px 7px; }
+  .tp .ts-run { flex-direction: column; align-items: stretch; }
+  .tp-frame { height: 200px; }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "guia-php-tools",
+  "private": true,
+  "description": "Ferramentas do Guia PHP: testar-missoes.js e sim.js rodam o mesmo PHP 8.5.10 (WebAssembly) do navegador, no Node. Reinstale com: cd tools && npm install",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@php-wasm/node-8-5": "3.1.58",
+    "@php-wasm/universal": "3.1.58"
+  },
+  "devDependencies": {
+    "@php-wasm/web-8-5": "3.1.58",
+    "esbuild": "0.25.0"
+  },
+  "scripts": {
+    "construir": "node construir-php.mjs",
+    "testar": "node testar-missoes.js"
+  }
+}

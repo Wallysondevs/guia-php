@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demonstração do Experimente | Guia PHP</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>body { max-width: 860px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--text); font: 17px/1.6 system-ui, sans-serif; }</style>
+</head>
+<body>
+<h1>Demonstração do <span class="hl">Experimente</span> (PHP 8.5 real)</h1>
+<p>Página de teste das caixas <code>.tryphp</code> (não faz parte do menu). Sirva a raiz do site e abra <code>/tools/demo.html</code>.</p>
+
+<h2>Modo cli com missão</h2>
+<div class="tryphp" data-goal="out:Olá, Ana!">
+<p class="try-task"><strong>Missão:</strong> troque "mundo" por "Ana" e clique em Rodar.</p>
+<pre class="script">&lt;?php
+echo "Olá, mundo!\n";
+</pre>
+<pre class="solucao">&lt;?php
+echo "Olá, Ana!\n";
+</pre>
+</div>
+
+<h2>Entrada digitada (sem data-stdin) e argumentos</h2>
+<div class="tryphp" data-args="um 'dois três'">
+<pre class="script" data-file="pergunta.php">&lt;?php
+echo "Qual é o seu nome? ";
+$nome = trim(fgets(STDIN));
+echo "Oi, $nome! Você passou ", count($argv) - 1, " argumentos.\n";
+echo $naoexiste;
+exit(3);
+</pre>
+</div>
+
+<h2>Entrada fixa (data-stdin) e várias abas</h2>
+<div class="tryphp" data-stdin="Ana\n29" data-goal="out:Ana tem 29 anos,semerro">
+<pre class="script" data-file="idade.php">&lt;?php
+require 'funcoes.php';
+echo "Nome: ";
+$nome = trim(fgets(STDIN));
+echo "Idade: ";
+$idade = (int) fgets(STDIN);
+echo frase($nome, $idade), "\n";
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+function frase(string $n, int $i): string {
+    return "$n tem $i ano";
+}
+</pre>
+<pre class="solucao" data-file="funcoes.php">&lt;?php
+function frase(string $n, int $i): string {
+    return "$n tem $i anos";
+}
+</pre>
+</div>
+
+<h2>Laço infinito (botão Parar)</h2>
+<div class="tryphp">
+<pre class="script">&lt;?php
+$i = 0;
+while (true) { $i++; }
+</pre>
+</div>
+
+<h2>Modo web com formulário e sessão</h2>
+<div class="tryphp" data-modo="web" data-goal="html:Olá, Bia!">
+<p class="try-task"><strong>Missão:</strong> rode, escreva "Bia" no formulário e envie.</p>
+<pre class="script">&lt;?php
+session_start();
+$_SESSION['visitas'] = ($_SESSION['visitas'] ?? 0) + 1;
+$nome = $_POST['nome'] ?? '';
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Saudação&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;?php if ($nome !== ''): ?&gt;
+  &lt;h1&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/h1&gt;
+&lt;?php endif; ?&gt;
+&lt;p&gt;Visitas nesta sessão: &lt;?= $_SESSION['visitas'] ?&gt;&lt;/p&gt;
+&lt;form method="post"&gt;
+  &lt;input name="nome" placeholder="Seu nome"&gt; &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;&lt;a href="?pagina=2"&gt;Um link com GET&lt;/a&gt; · &lt;a href="sair.php"&gt;Sair (redireciona)&lt;/a&gt;&lt;/p&gt;
+&lt;?php if (isset($_GET['pagina'])) echo "&lt;p&gt;Página " . (int) $_GET['pagina'] . "&lt;/p&gt;"; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="sair.php">&lt;?php
+session_start();
+session_destroy();
+header('Location: index.php?saiu=1');
+</pre>
+<pre class="solucao">&lt;?php
+echo "&lt;h1&gt;Olá, Bia!&lt;/h1&gt;";
+</pre>
+</div>
+
+<h2>Modo web com data-url e upload</h2>
+<div class="tryphp" data-modo="web" data-url="/index.php?nome=Ana">
+<pre class="script">&lt;?php
+echo "&lt;p&gt;GET: " . htmlspecialchars($_GET['nome'] ?? '-') . "&lt;/p&gt;";
+if ($_FILES) {
+    $f = $_FILES['arq'];
+    echo "&lt;p&gt;Recebi " . htmlspecialchars($f['name']) . " (" . $f['size'] . " bytes)&lt;/p&gt;";
+}
+?&gt;
+&lt;form method="post" enctype="multipart/form-data"&gt;
+  &lt;input type="file" name="arq"&gt; &lt;button&gt;Enviar arquivo&lt;/button&gt;
+&lt;/form&gt;
+</pre>
+</div>
+
+<script src="../assets/phpsim.js"></script>
+</body>
+</html>
