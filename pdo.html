@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Conectar com PDO — new PDO, exec, query, fetch e fetchAll | Guia PHP</title>
+<meta name="description" content="Conectar o PHP a um banco de dados com PDO: o DSN do SQLite (e o do MySQL), PDO::ERRMODE_EXCEPTION, exec para comandos, query com fetch, fetchAll e fetchColumn, os modos FETCH_ASSOC, FETCH_NUM e FETCH_OBJ, e as mensagens reais de erro de conexão e de SQL, com missões no editor.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Conectar com PDO</span></h1>
+
+<p class="intro">Na aula anterior você viu o que é um banco de dados e como é o SQL. Agora o PHP vai <strong>conversar</strong> com o banco. Quem faz essa ponte é o <strong>PDO</strong> (<em>PHP Data Objects</em>, "objetos de dados do PHP"): uma forma única de conectar, mandar SQL e ler respostas, que funciona igual para SQLite, MySQL, PostgreSQL e outros. Nesta aula você vai abrir uma conexão, criar uma tabela, ler os dados de várias formas e entender as mensagens de erro.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é o PDO e o que é um <strong>driver</strong>.</li>
+  <li>Como conectar com <code>new PDO("sqlite:loja.db")</code> e o que é o <strong>DSN</strong>.</li>
+  <li>Por que usar <code>PDO::ERRMODE_EXCEPTION</code> e como tratar o erro de conexão.</li>
+  <li>A diferença entre <code>exec</code> (comandos) e <code>query</code> (perguntas).</li>
+  <li>Como ler o resultado com <code>fetch</code>, <code>fetchAll</code> e <code>fetchColumn</code>, e os modos <code>FETCH_ASSOC</code>, <code>FETCH_NUM</code> e <code>FETCH_OBJ</code>.</li>
+</ul>
+</div>
+
+<p>Os programas foram executados com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/loja</code>. O PDO já vem no PHP; para o SQLite, nada precisa ser instalado. O editor do guia também tem o SQLite, então você pode repetir tudo nas caixas "Experimente".</p>
+
+<hr>
+
+<h2>A ideia: o adaptador de tomada</h2>
+<p>Quem viaja leva um <strong>adaptador universal de tomada</strong>: o carregador do celular é sempre o mesmo, e só a pecinha que encaixa na parede muda de país para país. O PDO é esse adaptador:</p>
+<ul>
+  <li><strong>O seu código PHP</strong> (o carregador) usa sempre os mesmos comandos: <code>new PDO</code>, <code>query</code>, <code>exec</code>, <code>fetch</code>…</li>
+  <li><strong>O driver</strong> (a pecinha) sabe falar com um banco específico: <code>pdo_sqlite</code> para SQLite, <code>pdo_mysql</code> para MySQL, <code>pdo_pgsql</code> para PostgreSQL.</li>
+</ul>
+<p>Para ver quais "pecinhas" o seu PHP tem:</p>
+
+<pre class="term" data-cwd="~/loja">$ php -r 'print_r(PDO::getAvailableDrivers());'
+Array
+(
+    [0] =&gt; mysql
+    [1] =&gt; pgsql
+    [2] =&gt; sqlite
+)</pre>
+
+<p>A máquina da Ana tem três. Nesta aula usamos o <code>sqlite</code>; o <code>mysql</code> fica para a aula <a href="mysql.html">MySQL e MariaDB</a>.</p>
+
+<hr>
+
+<h2>1. Conectar: <code>new PDO</code></h2>
+
+<pre class="file" data-file="conectar.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+echo "Conectado!\n";
+var_dump($pdo);
+</pre>
+
+<dl class="anatomy">
+  <dt>new PDO(...)</dt><dd>Cria um <strong>objeto</strong> PDO: a conexão aberta com o banco. A palavra <code>new</code> cria objetos (você vai estudá-los em <a href="classes-objetos.html">Classes e Objetos</a>; por enquanto, pense no objeto como "a linha telefônica com o banco").</dd>
+  <dt>"sqlite:loja.db"</dt><dd>O <strong>DSN</strong> (<em>Data Source Name</em>, "nome da fonte de dados"): um texto que diz <strong>qual driver</strong> usar (antes dos dois-pontos) e <strong>onde está o banco</strong> (depois). Aqui: "SQLite, no arquivo <code>loja.db</code>".</dd>
+  <dt>$pdo</dt><dd>A variável que guarda a conexão. Tudo o que você fizer com o banco passa por ela: <code>$pdo-&gt;query(...)</code>, <code>$pdo-&gt;exec(...)</code>. A seta <code>-&gt;</code> quer dizer "use esta função <strong>do</strong> objeto".</dd>
+</dl>
+
+<pre class="term" data-cwd="~/loja">$ php conectar.php
+Conectado!
+object(PDO)#1 (0) {          « um objeto da classe PDO: a conexão
+}
+$ ls -l loja.db
+-rw-r--r-- 1 ana ana 0 out 16 21:02 loja.db       « o arquivo foi criado (vazio, por enquanto)</pre>
+
+<p>Se o arquivo <code>loja.db</code> não existe, o SQLite o <strong>cria</strong> na hora, vazio. Isso é prático, mas tem um lado ruim: errar o nome do arquivo não dá erro, só cria outro banco vazio (você vai ver isso em <a href="crud.html">CRUD com PDO</a>).</p>
+
+<h3>Os DSNs mais comuns</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>DSN</th><th>Significa</th></tr>
+<tr><td><code>sqlite:loja.db</code></td><td>Arquivo <code>loja.db</code> na pasta <strong>em que você está</strong> ao rodar o programa.</td></tr>
+<tr><td><code>sqlite:/home/ana/loja/loja.db</code></td><td>Caminho completo: sempre o mesmo arquivo.</td></tr>
+<tr><td><code>"sqlite:" . __DIR__ . "/loja.db"</code></td><td>O arquivo ao lado do <strong>programa</strong>, de qualquer pasta que ele seja rodado. A forma recomendada.</td></tr>
+<tr><td><code>sqlite::memory:</code></td><td>Um banco <strong>na memória</strong>, que some quando o programa termina. Ótimo para testes e para as caixas do editor.</td></tr>
+<tr><td><code>mysql:host=localhost;dbname=loja;charset=utf8mb4</code></td><td>Um servidor MySQL/MariaDB (só para conhecer; veja <a href="mysql.html">MySQL e MariaDB</a>). Usuário e senha vão no 2º e 3º argumentos: <code>new PDO($dsn, "ana", "senha")</code>.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>2. Comandos: <code>exec</code></h2>
+<p>Para mandar um SQL que <strong>faz</strong> alguma coisa e não devolve linhas (criar tabela, inserir, alterar, apagar), use <code>exec</code> ("executar"):</p>
+
+<pre class="file" data-file="montar.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$pdo-&gt;exec("CREATE TABLE IF NOT EXISTS produtos (
+    id INTEGER PRIMARY KEY,
+    nome TEXT NOT NULL,
+    preco REAL NOT NULL,
+    estoque INTEGER NOT NULL
+)");
+
+$quantos = $pdo-&gt;exec("INSERT INTO produtos (nome, preco, estoque) VALUES
+    ('Caderno', 15.90, 30),
+    ('Caneta azul', 2.50, 100),
+    ('Mochila', 89.90, 5)");
+
+echo "Linhas inseridas: $quantos\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php montar.php
+Linhas inseridas: 3
+$ ls -l loja.db
+-rw-r--r-- 1 ana ana 8192 out 16 21:02 loja.db       « agora tem tabela e dados</pre>
+
+<dl class="anatomy">
+  <dt>$pdo-&gt;exec("CREATE TABLE …")</dt><dd>Cria a tabela (o SQL foi explicado em <a href="banco-dados.html">Banco de Dados: o Básico</a>). O texto pode ocupar várias linhas.</dd>
+  <dt>$quantos = $pdo-&gt;exec("INSERT …")</dt><dd>O <code>exec</code> devolve <strong>quantas linhas</strong> o comando afetou: aqui, 3 inseridas.</dd>
+</dl>
+
+<div class="warning">
+<strong><code>exec</code> e <code>query</code> só com SQL fixo</strong>
+<p>Nesta aula, todo SQL é escrito por você, sem nada que venha de fora. Quando um valor vier de um formulário ou do usuário (um nome, um id), <strong>não</strong> cole o valor no texto do SQL: use <code>prepare</code> e <code>execute</code>, que você vai ver em <a href="crud.html">CRUD com PDO</a>. O motivo (SQL injection) é a aula <a href="prepared-statements.html">Prepared Statements</a>.</p>
+</div>
+
+<hr>
+
+<h2>3. Perguntas: <code>query</code> e <code>fetch</code></h2>
+<p>Para um <code>SELECT</code>, que devolve linhas, use <code>query</code> ("consulta"). Ele não devolve as linhas direto: devolve um <strong>resultado</strong> (um objeto <code>PDOStatement</code>), de onde você <strong>busca</strong> as linhas com <code>fetch</code> ("buscar", "ir pegar").</p>
+
+<pre class="file" data-file="ler-uma.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$stmt = $pdo-&gt;query("SELECT id, nome, preco FROM produtos");
+$linha = $stmt-&gt;fetch();
+print_r($linha);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php ler-uma.php
+Array
+(
+    [id] =&gt; 1
+    [0] =&gt; 1
+    [nome] =&gt; Caderno
+    [1] =&gt; Caderno
+    [preco] =&gt; 15.9
+    [2] =&gt; 15.9
+)</pre>
+
+<dl class="anatomy">
+  <dt>$stmt = $pdo-&gt;query(...)</dt><dd>Manda o <code>SELECT</code>. <code>$stmt</code> (de <em>statement</em>, "comando") é o resultado, como uma pilha de fichas prontas para pegar.</dd>
+  <dt>$stmt-&gt;fetch()</dt><dd>Pega a <strong>próxima</strong> linha da pilha, como array. Chamando de novo, vem a seguinte. Quando acabam, devolve <code>false</code>.</dd>
+</dl>
+
+<p>Repare que cada valor veio <strong>duas vezes</strong>: pelo nome da coluna (<code>[nome]</code>) e pela posição (<code>[1]</code>). É o modo padrão, <code>PDO::FETCH_BOTH</code> ("os dois"). Repare também nos tipos: o id veio como número inteiro e o preço como número com casas (<code>15.9</code>, sem o zero do fim; para mostrar <code>15,90</code>, use <a href="number-format.html"><code>number_format</code></a>).</p>
+
+<h3>Escolhendo o formato da linha</h3>
+<p>Você pode dizer ao <code>fetch</code> como quer cada linha:</p>
+
+<pre class="file" data-file="modos.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos WHERE id = 1");
+print_r($stmt-&gt;fetch(PDO::FETCH_ASSOC));
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos WHERE id = 1");
+print_r($stmt-&gt;fetch(PDO::FETCH_NUM));
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos WHERE id = 1");
+$obj = $stmt-&gt;fetch(PDO::FETCH_OBJ);
+echo $obj-&gt;nome, " custa ", $obj-&gt;preco, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php modos.php
+Array                          « FETCH_ASSOC: chaves com os nomes das colunas
+(
+    [nome] =&gt; Caderno
+    [preco] =&gt; 15.9
+)
+Array                          « FETCH_NUM: chaves 0, 1, 2…
+(
+    [0] =&gt; Caderno
+    [1] =&gt; 15.9
+)
+Caderno custa 15.9             « FETCH_OBJ: um objeto, lido com -&gt;</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Modo</th><th>A linha vem como</th><th>Você lê com</th><th>Quando usar</th></tr>
+<tr><td><code>PDO::FETCH_ASSOC</code></td><td>Array associativo</td><td><code>$linha["nome"]</code></td><td><strong>O mais usado</strong>; o padrão deste guia</td></tr>
+<tr><td><code>PDO::FETCH_NUM</code></td><td>Array indexado</td><td><code>$linha[0]</code></td><td>Raramente; com <a href="desestruturacao.html"><code>[$nome, $preco] = $linha</code></a></td></tr>
+<tr><td><code>PDO::FETCH_BOTH</code></td><td>Os dois juntos (padrão)</td><td><code>$linha["nome"]</code> ou <code>$linha[1]</code></td><td>Evite: duplica tudo</td></tr>
+<tr><td><code>PDO::FETCH_OBJ</code></td><td>Objeto simples</td><td><code>$linha-&gt;nome</code></td><td>Quem prefere a seta (comum em sistemas prontos)</td></tr>
+</table>
+</div>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e compare. Depois troque <code>PDO::FETCH_ASSOC</code> por <code>PDO::FETCH_NUM</code>, por <code>PDO::FETCH_BOTH</code> e por <code>PDO::FETCH_OBJ</code> (com o <code>FETCH_OBJ</code>, o <code>print_r</code> mostra <code>stdClass Object</code>).</p>
+<pre class="script">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT, preco REAL)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Caderno', 15.90), ('Caneta azul', 2.50)");
+
+$stmt = $pdo-&gt;query("SELECT id, nome, preco FROM produtos");
+print_r($stmt-&gt;fetch(PDO::FETCH_ASSOC));
+</pre>
+</div>
+
+<h3>Todas as linhas: <code>while</code> com <code>fetch</code></h3>
+<p>Como o <code>fetch</code> devolve <code>false</code> quando as linhas acabam, ele cabe direitinho num <a href="while.html"><code>while</code></a>: "enquanto houver linha, mostre":</p>
+
+<pre class="file" data-file="listar.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos ORDER BY preco");
+
+while ($linha = $stmt-&gt;fetch(PDO::FETCH_ASSOC)) {
+    echo $linha["nome"], ": R$ ", number_format($linha["preco"], 2, ",", "."), "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php listar.php
+Caneta azul: R$ 2,50
+Caderno: R$ 15,90
+Mochila: R$ 89,90</pre>
+
+<p>A condição <code>$linha = $stmt-&gt;fetch(...)</code> faz duas coisas: guarda a linha em <code>$linha</code> e, ao mesmo tempo, serve de teste. Uma linha (array com dados) conta como verdadeiro; <code>false</code> encerra o laço.</p>
+
+<h3>Todas de uma vez: <code>fetchAll</code></h3>
+<p>Se você quer todas as linhas num array (para contar, ordenar, passar para outra função), use <code>fetchAll</code>:</p>
+
+<pre class="file" data-file="todas.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$produtos = $pdo-&gt;query("SELECT nome, estoque FROM produtos")-&gt;fetchAll(PDO::FETCH_ASSOC);
+
+echo "Quantos: ", count($produtos), "\n";
+print_r($produtos);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php todas.php
+Quantos: 3
+Array
+(
+    [0] =&gt; Array
+        (
+            [nome] =&gt; Caderno
+            [estoque] =&gt; 30
+        )
+
+    [1] =&gt; Array
+        (
+            [nome] =&gt; Caneta azul
+            [estoque] =&gt; 100
+        )
+
+    [2] =&gt; Array
+        (
+            [nome] =&gt; Mochila
+            [estoque] =&gt; 5
+        )
+
+)</pre>
+
+<p>Um array de arrays: cada posição é uma linha (veja <a href="arrays-multidimensionais.html">Arrays Multidimensionais</a>). Repare que <code>query(...)-&gt;fetchAll(...)</code> está encadeado: o resultado do <code>query</code> já recebe o <code>fetchAll</code>, sem a variável <code>$stmt</code> no meio.</p>
+
+<h3>Um valor só: <code>fetchColumn</code></h3>
+<p>Para perguntas com uma resposta só (quantos produtos? qual a soma do estoque?), o <code>fetchColumn</code> devolve direto o valor da primeira coluna da primeira linha:</p>
+
+<pre class="file" data-file="contar.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$total = $pdo-&gt;query("SELECT COUNT(*) FROM produtos")-&gt;fetchColumn();
+$soma  = $pdo-&gt;query("SELECT SUM(estoque) FROM produtos")-&gt;fetchColumn();
+
+echo "Produtos: $total\n";
+echo "Itens no estoque: $soma\n";
+var_dump($total);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php contar.php
+Produtos: 3
+Itens no estoque: 135          « 30 + 100 + 5
+int(3)</pre>
+
+<h3><code>foreach</code> direto no resultado</h3>
+<p>O resultado do <code>query</code> também pode ir direto num <code>foreach</code>, que pega uma linha por volta. É a forma mais curta, e você vai vê-la muito:</p>
+
+<pre class="file" data-file="memoria.php">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE recados (texto TEXT)");
+$pdo-&gt;exec("INSERT INTO recados VALUES ('Comprar papel'), ('Ligar para o fornecedor')");
+
+foreach ($pdo-&gt;query("SELECT texto FROM recados") as $linha) {
+    echo "- ", $linha["texto"], "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php memoria.php
+- Comprar papel
+- Ligar para o fornecedor</pre>
+
+<p>Este exemplo usa <code>sqlite::memory:</code>: o banco nasce, recebe dados e some quando o programa termina. Nenhum arquivo foi criado. É assim que funcionam as caixas "Experimente" desta aula.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Quero…</th><th>Use</th><th>Devolve</th></tr>
+<tr><td>Rodar um comando (CREATE, INSERT, UPDATE, DELETE)</td><td><code>$pdo-&gt;exec($sql)</code></td><td>Número de linhas afetadas</td></tr>
+<tr><td>Fazer uma pergunta (SELECT)</td><td><code>$pdo-&gt;query($sql)</code></td><td>Um resultado (<code>PDOStatement</code>)</td></tr>
+<tr><td>A próxima linha</td><td><code>$stmt-&gt;fetch()</code></td><td>Array (ou objeto); <code>false</code> no fim</td></tr>
+<tr><td>Todas as linhas</td><td><code>$stmt-&gt;fetchAll()</code></td><td>Array de linhas (vazio se nenhuma)</td></tr>
+<tr><td>Um valor</td><td><code>$stmt-&gt;fetchColumn()</code></td><td>O valor; <code>false</code> se não há linha</td></tr>
+<tr><td>Percorrer</td><td><code>foreach ($stmt as $linha)</code></td><td>Uma linha por volta</td></tr>
+</table>
+</div>
+
+<div class="tryphp" data-goal="out:Total: 4 produtos,src:fetchColumn,src:COUNT,src:Lápis,semerro">
+<p class="try-task"><strong>Missão:</strong> o banco tem 3 produtos. Com <code>exec</code>, insira mais um: <code>'Lápis'</code>, preço <code>1.20</code>. Depois, com <code>SELECT COUNT(*)</code> e <code>fetchColumn()</code>, mostre:</p>
+<pre class="out">Total: 4 produtos</pre>
+<pre class="script">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT, preco REAL)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES
+    ('Caderno', 15.90), ('Caneta azul', 2.50), ('Mochila', 89.90)");
+
+// 1. insira o Lápis
+// 2. conte os produtos e mostre "Total: N produtos"
+</pre>
+<pre class="solucao">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT, preco REAL)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES
+    ('Caderno', 15.90), ('Caneta azul', 2.50), ('Mochila', 89.90)");
+
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES ('Lápis', 1.20)");
+
+$total = $pdo-&gt;query("SELECT COUNT(*) FROM produtos")-&gt;fetchColumn();
+echo "Total: $total produtos\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>4. Erros: <code>PDO::ERRMODE_EXCEPTION</code></h2>
+<p>O que acontece quando o SQL está errado? Depende do <strong>modo de erro</strong> da conexão. Desde o <span class="versao">PHP 8.0+</span>, o padrão é <code>PDO::ERRMODE_EXCEPTION</code>: todo erro vira uma <strong>exceção</strong> (veja <a href="excecoes.html">Exceções</a>), que para o programa com uma mensagem clara, se não for tratada:</p>
+
+<pre class="file" data-file="excecao.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$stmt = $pdo-&gt;query("SELECT nome FROM produto");   // faltou o "s"
+$lista = $stmt-&gt;fetchAll();
+echo "Fim do programa\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php excecao.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: produto in /home/ana/loja/excecao.php:4
+Stack trace:
+#0 /home/ana/loja/excecao.php(4): PDO-&gt;query('SELECT nome FRO...')
+#1 {main}
+  thrown in /home/ana/loja/excecao.php on line 4</pre>
+
+<p>A mensagem diz <strong>o quê</strong> (<code>no such table: produto</code>, "não existe a tabela produto") e <strong>onde</strong> (linha 4, no <code>query</code>). Agora o mesmo programa no modo antigo, <code>PDO::ERRMODE_SILENT</code> ("silencioso"), que era o padrão até o PHP 7:</p>
+
+<pre class="file" data-file="silencioso.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+$pdo-&gt;setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
+
+$stmt = $pdo-&gt;query("SELECT nome FROM produto");   // faltou o "s"
+var_dump($stmt);
+print_r($pdo-&gt;errorInfo());
+
+$lista = $stmt-&gt;fetchAll();
+echo "Fim do programa\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php silencioso.php
+bool(false)                    « o query falhou calado e devolveu false
+Array
+(
+    [0] =&gt; HY000
+    [1] =&gt; 1
+    [2] =&gt; no such table: produto     « o motivo só aparece se você perguntar
+)
+
+Fatal error: Uncaught Error: Call to a member function fetchAll() on false in /home/ana/loja/silencioso.php:9
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/silencioso.php on line 9</pre>
+
+<p>No modo silencioso, o <code>query</code> não reclama: só devolve <code>false</code>. O motivo fica guardado em <code>errorInfo()</code>, e o programa só quebra <strong>depois</strong>, na linha 9, com um erro que não fala nada de banco (<code>Call to a member function fetchAll() on false</code>, "chamar a função fetchAll em false"). Imagine procurar o problema na linha 9 quando ele está na linha 5. Por isso: <strong>deixe sempre no modo exceção</strong>.</p>
+
+<h3>Opções na conexão</h3>
+<p>Mesmo sendo o padrão, é costume escrever o modo de erro na conexão (deixa claro, e protege se o código rodar num PHP antigo). Junto, vale definir o formato padrão das linhas, para não repetir <code>PDO::FETCH_ASSOC</code> em todo <code>fetch</code>. As opções vão num array, no 4º argumento:</p>
+
+<pre class="file" data-file="opcoes.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db", null, null, [
+    PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC,
+]);
+
+foreach ($pdo-&gt;query("SELECT nome, estoque FROM produtos") as $linha) {
+    echo $linha["nome"], " (", $linha["estoque"], ")\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php opcoes.php
+Caderno (30)
+Caneta azul (100)
+Mochila (5)</pre>
+
+<dl class="anatomy">
+  <dt>null, null</dt><dd>O 2º e o 3º argumentos são usuário e senha. O SQLite não usa, então vão vazios (<code>null</code>).</dd>
+  <dt>PDO::ATTR_ERRMODE =&gt; PDO::ERRMODE_EXCEPTION</dt><dd>"Atributo modo de erro: exceção."</dd>
+  <dt>PDO::ATTR_DEFAULT_FETCH_MODE =&gt; PDO::FETCH_ASSOC</dt><dd>"Formato padrão das linhas: associativo." Agora <code>fetch()</code>, <code>fetchAll()</code> e o <code>foreach</code> já entregam <code>$linha["nome"]</code>.</dd>
+</dl>
+
+<p>Com <a href="parametros.html">argumentos nomeados</a> (<span class="versao">PHP 8.0+</span>) dá para pular os dois <code>null</code>: <code>new PDO("sqlite:loja.db", options: [...])</code>. É a forma usada em <a href="crud.html">CRUD com PDO</a>. Depois de conectado, também dá para mudar uma opção com <code>$pdo-&gt;setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION)</code> e consultar com <code>getAttribute</code>:</p>
+
+<pre class="file" data-file="atributos.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+echo "Driver: ", $pdo-&gt;getAttribute(PDO::ATTR_DRIVER_NAME), "\n";
+echo "Versão do SQLite: ", $pdo-&gt;getAttribute(PDO::ATTR_SERVER_VERSION), "\n";
+echo "Modo de erro: ", $pdo-&gt;getAttribute(PDO::ATTR_ERRMODE), " (", PDO::ERRMODE_EXCEPTION, " = exceção)\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php atributos.php
+Driver: sqlite
+Versão do SQLite: 3.45.2
+Modo de erro: 2 (2 = exceção)          « o padrão do PHP 8</pre>
+
+<h3>O erro de conexão</h3>
+<p>A conexão também pode falhar: o arquivo está numa pasta que não existe, sem permissão, ou (no MySQL) o servidor está desligado. O <code>new PDO</code> lança uma <code>PDOException</code>, e você decide o que mostrar com <code>try</code>/<code>catch</code>:</p>
+
+<pre class="file" data-file="tratar.php">&lt;?php
+try {
+    $pdo = new PDO("sqlite:/dados/loja.db");
+    echo "Conectado!\n";
+} catch (PDOException $e) {
+    echo "Não consegui abrir o banco.\n";
+    echo "Detalhe: ", $e-&gt;getMessage(), "\n";
+    echo "Código: ", $e-&gt;getCode(), "\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php tratar.php
+Não consegui abrir o banco.
+Detalhe: SQLSTATE[HY000] [14] unable to open database file
+Código: 14</pre>
+
+<dl class="anatomy">
+  <dt>try { … }</dt><dd>"Tente": o código que pode falhar.</dd>
+  <dt>catch (PDOException $e)</dt><dd>"Se der erro de PDO, pegue-o em <code>$e</code>."</dd>
+  <dt>$e-&gt;getMessage()</dt><dd>A mensagem: <code>unable to open database file</code> ("não consegui abrir o arquivo do banco"). A pasta <code>/dados</code> não existe, e o SQLite não cria pastas, só o arquivo.</dd>
+  <dt>$e-&gt;getCode()</dt><dd>O código do erro (14, no SQLite, é "não consegui abrir").</dd>
+</dl>
+
+<div class="tip">
+<strong>Detalhes para você, mensagem simples para o visitante</strong>
+<p>Num site, não mostre o <code>getMessage()</code> ao visitante: ele pode revelar caminhos de pastas e nomes de servidores. Mostre "O sistema está fora do ar, tente mais tarde" e grave o detalhe num log com <code>error_log($e-&gt;getMessage())</code> (veja <a href="depuracao.html">Depurar</a>). A aula <a href="mysql.html">MySQL e MariaDB</a> mostra isso com as mensagens reais de um servidor que não responde.</p>
+</div>
+
+<h3>Fechar a conexão</h3>
+<p>A conexão fecha sozinha quando o programa termina (no fim de cada página, num site). Se precisar fechar antes, apague a variável: <code>$pdo = null;</code>.</p>
+
+<hr>
+
+<h2 id="cenarios">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>unable to open database file</code></strong>
+<pre class="file" data-file="sem-pasta.php">&lt;?php
+$pdo = new PDO("sqlite:/dados/loja.db");
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sem-pasta.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000] [14] unable to open database file in /home/ana/loja/sem-pasta.php:2
+Stack trace:
+#0 /home/ana/loja/sem-pasta.php(2): PDO-&gt;__construct('sqlite:/dados/l...')
+#1 {main}
+  thrown in /home/ana/loja/sem-pasta.php on line 2</pre>
+<p><strong>O que significa:</strong> o SQLite não conseguiu abrir nem criar o arquivo. Causas: a pasta não existe (aqui, <code>/dados</code>), ou o PHP não tem permissão de escrever nela (comum num servidor web, que roda com outro usuário).</p>
+<p><strong>Como consertar:</strong> confira o caminho; crie a pasta (<code>mkdir</code>); confira as permissões da pasta e do arquivo. Prefira <code>__DIR__ . "/loja.db"</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>could not find driver</code></strong>
+<pre class="file" data-file="driver-errado.php">&lt;?php
+$pdo = new PDO("sqlite3:loja.db");
+</pre>
+<pre class="term" data-cwd="~/loja">$ php driver-errado.php
+
+Fatal error: Uncaught PDOException: could not find driver in /home/ana/loja/driver-errado.php:2
+Stack trace:
+#0 /home/ana/loja/driver-errado.php(2): PDO-&gt;__construct('sqlite3:loja.db')
+#1 {main}
+  thrown in /home/ana/loja/driver-errado.php on line 2</pre>
+<p><strong>O que significa:</strong> "não encontrei o driver" <code>sqlite3</code>. O prefixo do DSN para SQLite é <code>sqlite:</code>, sem o 3. A mesma mensagem aparece quando o nome está certo mas a extensão não está instalada (como <code>mysql:</code> sem o <code>pdo_mysql</code>).</p>
+<p><strong>Como consertar:</strong> confira o prefixo e rode <code>php -r 'print_r(PDO::getAvailableDrivers());'</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>must be a valid data source name</code></strong>
+<pre class="file" data-file="dsn-errado.php">&lt;?php
+$pdo = new PDO("loja.db");
+</pre>
+<pre class="term" data-cwd="~/loja">$ php dsn-errado.php
+
+Fatal error: Uncaught PDOException: PDO::__construct(): Argument #1 ($dsn) must be a valid data source name in /home/ana/loja/dsn-errado.php:2
+Stack trace:
+#0 /home/ana/loja/dsn-errado.php(2): PDO-&gt;__construct('loja.db')
+#1 {main}
+  thrown in /home/ana/loja/dsn-errado.php on line 2</pre>
+<p><strong>O que significa:</strong> "o argumento nº 1 (<code>$dsn</code>) precisa ser um nome de fonte de dados válido". Faltou o driver e os dois-pontos: o PDO recebeu só o nome do arquivo.</p>
+<p><strong>Como consertar:</strong> <code>new PDO("sqlite:loja.db")</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>near "SELEC": syntax error</code></strong>
+<pre class="file" data-file="sintaxe.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$stmt = $pdo-&gt;query("SELEC nome FROM produtos");
+</pre>
+<pre class="term" data-cwd="~/loja">$ php sintaxe.php
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 near "SELEC": syntax error in /home/ana/loja/sintaxe.php:4
+Stack trace:
+#0 /home/ana/loja/sintaxe.php(4): PDO-&gt;query('SELEC nome FROM...')
+#1 {main}
+  thrown in /home/ana/loja/sintaxe.php on line 4</pre>
+<p><strong>O que significa:</strong> o PHP está certo; o <strong>SQL</strong> dentro do texto está errado. O SQLite mostra onde se perdeu: <code>near "SELEC"</code> ("perto de SELEC"). Erros de SQL só aparecem quando o programa roda, porque, para o PHP, o SQL é só um texto.</p>
+<p><strong>Como consertar:</strong> leia a palavra depois de <code>near</code> e a anterior: o erro está ali. Na dúvida, teste o SQL sozinho, com <code>echo</code> antes do <code>query</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Call to a member function fetchAll() on false</code></strong>
+<p>Aparece no modo silencioso (veja <code>silencioso.php</code>, acima): o <code>query</code> falhou, devolveu <code>false</code>, e o programa tentou usar o resultado.</p>
+<p><strong>Como consertar:</strong> não use <code>ERRMODE_SILENT</code>. Com <code>ERRMODE_EXCEPTION</code>, o erro aparece na linha certa e com o motivo real.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Undefined array key "nome"</code></strong>
+<pre class="file" data-file="modo-errado.php">&lt;?php
+$pdo = new PDO("sqlite:loja.db");
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos WHERE id = 1");
+$linha = $stmt-&gt;fetch(PDO::FETCH_NUM);
+
+echo $linha["nome"], "\n";
+</pre>
+<pre class="term" data-cwd="~/loja">$ php modo-errado.php
+
+Warning: Undefined array key "nome" in /home/ana/loja/modo-errado.php on line 7
+</pre>
+<p><strong>O que significa:</strong> "chave de array indefinida: nome". Com <code>FETCH_NUM</code>, a linha tem as chaves <code>0</code> e <code>1</code>, não <code>"nome"</code>. O mesmo aviso aparece se o nome da chave não bate com o da coluna (<code>$linha["Nome"]</code>, ou uma coluna que não está no <code>SELECT</code>).</p>
+<p><strong>Como consertar:</strong> use <code>FETCH_ASSOC</code> (ou defina-o como padrão na conexão) e escreva as chaves exatamente como as colunas do <code>SELECT</code>. Na dúvida, <code>print_r($linha)</code>.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Caneta azul: R$ 2\,50,out:Caderno: R$ 15\,90,out:Mochila: R$ 89\,90,semerro">
+<p class="try-task"><strong>Missão:</strong> este programa deveria listar os produtos do mais barato para o mais caro, mas enche a tela de avisos. Rode, leia o primeiro aviso e corrija (é uma palavra só). A saída correta é:</p>
+<pre class="out">Caneta azul: R$ 2,50
+Caderno: R$ 15,90
+Mochila: R$ 89,90</pre>
+<pre class="script">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT, preco REAL)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES
+    ('Caderno', 15.90), ('Caneta azul', 2.50), ('Mochila', 89.90)");
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos ORDER BY preco");
+
+while ($linha = $stmt-&gt;fetch(PDO::FETCH_NUM)) {
+    echo $linha["nome"], ": R$ ", number_format($linha["preco"], 2, ",", "."), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$pdo = new PDO("sqlite::memory:");
+$pdo-&gt;exec("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT, preco REAL)");
+$pdo-&gt;exec("INSERT INTO produtos (nome, preco) VALUES
+    ('Caderno', 15.90), ('Caneta azul', 2.50), ('Mochila', 89.90)");
+
+$stmt = $pdo-&gt;query("SELECT nome, preco FROM produtos ORDER BY preco");
+
+while ($linha = $stmt-&gt;fetch(PDO::FETCH_ASSOC)) {
+    echo $linha["nome"], ": R$ ", number_format($linha["preco"], 2, ",", "."), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Código</th><th>O que faz</th></tr>
+<tr><td><code>new PDO($dsn)</code></td><td>Conecta (SQLite)</td></tr>
+<tr><td><code>new PDO($dsn, $usuario, $senha, $opcoes)</code></td><td>Conecta com usuário, senha e opções (MySQL e outros)</td></tr>
+<tr><td><code>PDO::getAvailableDrivers()</code></td><td>Lista os drivers deste PHP</td></tr>
+<tr><td><code>$pdo-&gt;exec($sql)</code></td><td>Roda um comando; devolve as linhas afetadas</td></tr>
+<tr><td><code>$pdo-&gt;query($sql)</code></td><td>Roda um <code>SELECT</code>; devolve um <code>PDOStatement</code></td></tr>
+<tr><td><code>$stmt-&gt;fetch($modo)</code></td><td>Próxima linha, ou <code>false</code></td></tr>
+<tr><td><code>$stmt-&gt;fetchAll($modo)</code></td><td>Todas as linhas num array</td></tr>
+<tr><td><code>$stmt-&gt;fetchColumn()</code></td><td>Valor da 1ª coluna da próxima linha</td></tr>
+<tr><td><code>PDO::FETCH_ASSOC</code> / <code>FETCH_NUM</code> / <code>FETCH_BOTH</code> / <code>FETCH_OBJ</code></td><td>Formato da linha</td></tr>
+<tr><td><code>PDO::ATTR_ERRMODE</code></td><td>Modo de erro: <code>ERRMODE_EXCEPTION</code> (padrão no PHP 8), <code>ERRMODE_WARNING</code>, <code>ERRMODE_SILENT</code></td></tr>
+<tr><td><code>PDO::ATTR_DEFAULT_FETCH_MODE</code></td><td>Formato padrão das linhas</td></tr>
+<tr><td><code>$pdo-&gt;setAttribute($attr, $valor)</code> / <code>getAttribute($attr)</code></td><td>Muda / consulta uma opção</td></tr>
+<tr><td><code>$pdo-&gt;errorInfo()</code></td><td>Detalhes do último erro (útil no modo silencioso)</td></tr>
+<tr><td><code>$e-&gt;getMessage()</code>, <code>$e-&gt;getCode()</code></td><td>Mensagem e código de uma <code>PDOException</code></td></tr>
+<tr><td><code>$pdo = null</code></td><td>Fecha a conexão antes do fim do programa</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O DSN</h3>
+<p>Complete para abrir o arquivo <code>escola.db</code> com SQLite:</p>
+<div class="ex-code">$pdo = new PDO("<input data-answer="sqlite:escola.db" aria-label="DSN">");</div>
+</div>
+
+<div class="exercise">
+<h3>2. Banco temporário</h3>
+<p>Complete o DSN para criar um banco SQLite que só existe na memória:</p>
+<div class="ex-code">$pdo = new PDO("<input data-answer="sqlite::memory:" aria-label="DSN">");</div>
+</div>
+
+<div class="exercise">
+<h3>3. Linhas com nome</h3>
+<p>Complete para cada linha vir como array associativo:</p>
+<div class="ex-code">$linha = $stmt-&gt;fetch(<input data-answer="PDO::FETCH_ASSOC" aria-label="modo">);</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Qual método usar para <code>CREATE TABLE</code> e <code>INSERT</code> com SQL fixo?</p>
+<label><input type="radio" name="q4"> <code>query</code>, porque devolve as linhas.</label>
+<label><input type="radio" name="q4"> <code>exec</code>, que devolve quantas linhas foram afetadas.</label>
+<label><input type="radio" name="q4"> <code>fetch</code>.</label>
+<label><input type="radio" name="q4"> <code>fetchColumn</code>.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. O que <code>$stmt-&gt;fetch()</code> devolve quando não há mais linhas?</p>
+<label><input type="radio" name="q5"> Um array vazio.</label>
+<label><input type="radio" name="q5"> <code>null</code>.</label>
+<label><input type="radio" name="q5"> Lança uma exceção.</label>
+<label><input type="radio" name="q5"> <code>false</code>.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Por que preferir <code>PDO::ERRMODE_EXCEPTION</code> a <code>PDO::ERRMODE_SILENT</code>?</p>
+<label><input type="radio" name="q6"> Porque o erro aparece na hora, na linha certa e com o motivo; no silencioso, o programa quebra depois, com uma mensagem que não ajuda.</label>
+<label><input type="radio" name="q6"> Porque o modo exceção deixa o banco mais rápido.</label>
+<label><input type="radio" name="q6"> Porque o modo silencioso apaga a tabela quando há erro.</label>
+<label><input type="radio" name="q6"> Porque o modo silencioso não existe no PHP 8.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">7. <code>$pdo-&gt;query("SELECT COUNT(*) FROM produtos")-&gt;fetchColumn()</code> devolve…</p>
+<label><input type="radio" name="q7"> um array com todas as linhas.</label>
+<label><input type="radio" name="q7"> o nome da primeira coluna.</label>
+<label><input type="radio" name="q7"> o número de produtos.</label>
+<label><input type="radio" name="q7"> <code>true</code> se a tabela existe.</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>O <strong>PDO</strong> é a forma única de o PHP falar com bancos; o <strong>driver</strong> (<code>pdo_sqlite</code>, <code>pdo_mysql</code>…) sabe falar com cada um.</li>
+  <li>Conecte com <code>new PDO("sqlite:loja.db")</code>. O <strong>DSN</strong> diz o driver e onde está o banco; <code>sqlite::memory:</code> é um banco temporário.</li>
+  <li><code>exec</code> para comandos (devolve linhas afetadas); <code>query</code> para <code>SELECT</code> (devolve um resultado).</li>
+  <li>Leia o resultado com <code>fetch</code> (uma linha, <code>false</code> no fim), <code>fetchAll</code> (todas), <code>fetchColumn</code> (um valor) ou <code>foreach</code>.</li>
+  <li>Use <code>PDO::FETCH_ASSOC</code>, de preferência como padrão: <code>PDO::ATTR_DEFAULT_FETCH_MODE</code>.</li>
+  <li>Deixe <code>PDO::ERRMODE_EXCEPTION</code> (o padrão do PHP 8) e trate o erro de conexão com <code>try</code>/<code>catch</code>.</li>
+  <li>Valores que vêm de fora nunca vão colados no SQL: isso é <code>prepare</code>/<code>execute</code>, na próxima aula.</li>
+</ul>
+
+<p>Próxima aula: <a href="crud.html">CRUD com PDO</a>, para cadastrar, listar, atualizar e apagar os produtos da lojinha.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
