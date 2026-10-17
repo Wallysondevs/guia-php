@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Funções de String — referência com mb_* e resultados reais | Guia PHP</title>
+<meta name="description" content="Referência das funções de string do PHP 8.5, incluindo as mb_* para acentos: strlen, mb_strlen, substr, mb_substr, strpos, str_contains, str_replace, trim, str_pad, strtoupper, mb_strtoupper, sprintf, number_format, htmlspecialchars e outras, com assinatura, exemplo e o resultado real.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Funções de String</span></h1>
+
+<p class="intro">As funções de texto que você vai usar no dia a dia, agrupadas pelo que fazem, com as versões <code>mb_*</code> para textos com acento. Cada linha tem a assinatura, uma explicação curta, um exemplo e o <strong>resultado real</strong>, conferido no PHP 8.5 da máquina da Ana. Para aprender com calma, veja <a href="strings.html">Strings</a>, <a href="funcoes-string.html">Funções de String</a>, <a href="mbstring.html">Acentos e mbstring</a> e <a href="sprintf.html">printf e sprintf</a>.</p>
+
+<div class="note">
+<strong>Como ler as tabelas</strong>
+<ul>
+  <li>Os exemplos usam estas variáveis (cada exemplo começa do zero):
+<pre class="file" data-file="exemplos.php">&lt;?php
+$texto   = "banana";
+$nome    = "  Ana Souza  ";
+$palavra = "Ação";
+</pre></li>
+  <li>A assinatura mostra os parâmetros e, depois dos dois-pontos, o tipo do resultado. Parâmetros com <code>= valor</code> são opcionais. <code>int|false</code> = devolve um número <strong>ou</strong> <code>false</code>.</li>
+  <li>Os resultados estão escritos como código PHP: <code>'nana'</code> é um texto; <code>true</code>/<code>false</code>, booleanos; <code>['ab', 'cd']</code>, um array. Textos com quebra de linha aparecem entre aspas duplas com <code>\n</code>; bytes soltos (um acento cortado ao meio) aparecem como <code>"\xA7"</code>.</li>
+  <li>Os índices começam em <strong>0</strong>: em <code>"banana"</code>, o <code>b</code> é a posição 0. Nenhuma função muda o texto original; todas devolvem um texto novo.</li>
+</ul>
+</div>
+
+<h2 id="bytes">Antes de tudo: bytes × letras</h2>
+<p>O PHP guarda textos em <strong>UTF-8</strong>, em que letras com acento ocupam <strong>2 bytes</strong>. As funções sem <code>mb_</code> contam e cortam <strong>bytes</strong>; as <code>mb_*</code> ("multibyte") contam <strong>letras</strong>. Com textos em português, a diferença aparece logo:</p>
+<pre class="file" data-file="bytes.php">&lt;?php
+$palavra = "Ação";
+echo strlen($palavra), " bytes, ", mb_strlen($palavra), " letras\n";
+echo strtoupper($palavra), " × ", mb_strtoupper($palavra), "\n";
+echo substr($palavra, 0, 2), " × ", mb_substr($palavra, 0, 2), "\n";
+</pre>
+<pre class="term" data-cwd="~/ref">$ php bytes.php
+6 bytes, 4 letras
+AçãO × AÇÃO
+A� × Aç</pre>
+<p>O <code>substr</code> cortou o <code>ç</code> no meio (ficou só o primeiro dos seus 2 bytes, que o terminal mostra como <code>�</code>). <strong>Regra prática:</strong> para contar, cortar, mudar maiúsculas ou completar textos que podem ter acento, use a versão <code>mb_</code>. Para procurar e trocar (<code>str_contains</code>, <code>str_replace</code>), as normais funcionam bem.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Para…</th><th>Sem acento (bytes)</th><th>Com acento (use)</th></tr>
+<tr><td>Tamanho</td><td><code>strlen</code></td><td><code>mb_strlen</code></td></tr>
+<tr><td>Pedaço</td><td><code>substr</code>, <code>str_split</code></td><td><code>mb_substr</code>, <code>mb_str_split</code>, <code>mb_strimwidth</code></td></tr>
+<tr><td>Posição</td><td><code>strpos</code>, <code>strrpos</code></td><td><code>mb_strpos</code>, <code>mb_strrpos</code></td></tr>
+<tr><td>Maiúsculas/minúsculas</td><td><code>strtoupper</code>, <code>strtolower</code>, <code>ucfirst</code>, <code>ucwords</code></td><td><code>mb_strtoupper</code>, <code>mb_strtolower</code>, <code>mb_ucfirst</code> (8.4), <code>mb_convert_case</code></td></tr>
+<tr><td>Completar e aparar</td><td><code>str_pad</code>, <code>trim</code></td><td><code>mb_str_pad</code> (8.3), <code>mb_trim</code> (8.4)</td></tr>
+</table>
+</div>
+
+<p>Atalhos: <a href="#tam">Tamanho</a> · <a href="#pedacos">Pedaços</a> · <a href="#procurar">Procurar</a> · <a href="#comparar">Comparar</a> · <a href="#caixa">Maiúsculas</a> · <a href="#espacos">Espaços e preenchimento</a> · <a href="#trocar">Trocar</a> · <a href="#converter">Formatar e converter</a> · <a href="#web">Web e segurança</a></p>
+
+<hr>
+
+<h3 id="tam">Tamanho e contagem</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>strlen(string $texto): int</code></td><td>Tamanho em <strong>bytes</strong>. Letras com acento ocupam 2 bytes (UTF-8): use <code>mb_strlen</code> para contar letras. <a href="strings.html">Strings</a></td><td><code>strlen($texto)</code><br><code>strlen($palavra)</code><br><code>strlen("")</code></td><td><code>6</code><br><code>6</code><br><code>0</code></td></tr>
+<tr><td><code>mb_strlen(string $texto): int</code></td><td>Tamanho em <strong>caracteres</strong> (letras de verdade). <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_strlen($palavra)</code><br><code>mb_strlen("😀")</code></td><td><code>4</code><br><code>1</code></td></tr>
+<tr><td><code>substr_count(string $texto, string $pedaço): int</code></td><td>Quantas vezes o pedaço aparece. <a href="funcoes-string.html">Funções de String</a></td><td><code>substr_count($texto, "a")</code><br><code>substr_count($texto, "na")</code></td><td><code>3</code><br><code>2</code></td></tr>
+<tr><td><code>str_word_count(string $texto): int</code></td><td>Conta palavras, mas só entende letras sem acento. <a href="funcoes-string.html">Funções de String</a></td><td><code>str_word_count("Bom dia, Ana")</code><br><code>str_word_count("Ação rápida")</code></td><td><code>3</code><br><code>4</code></td></tr>
+</table>
+</div>
+
+<h3 id="pedacos">Pedaços</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>substr(string $texto, int $início, ?int $tamanho = null): string</code></td><td>Um pedaço, contando em bytes a partir de 0. Início negativo conta do fim. <a href="funcoes-string.html">Funções de String</a></td><td><code>substr($texto, 2)</code><br><code>substr($texto, 1, 3)</code><br><code>substr($texto, -2)</code><br><code>substr($palavra, 0, 3)</code></td><td><code>'nana'</code><br><code>'ana'</code><br><code>'na'</code><br><code>'Aç'</code></td></tr>
+<tr><td><code>mb_substr(string $texto, int $início, ?int $tamanho = null): string</code></td><td>O mesmo, contando caracteres (seguro com acentos). <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_substr($palavra, 0, 3)</code><br><code>mb_substr($palavra, -1)</code></td><td><code>'Açã'</code><br><code>'o'</code></td></tr>
+<tr><td><code>$texto[$i]</code></td><td>Um byte da posição (negativo conta do fim). <a href="strings.html">Strings</a></td><td><code>$texto[0]</code><br><code>$texto[-1]</code><br><code>$palavra[2]</code></td><td><code>'b'</code><br><code>'a'</code><br><code>"\xA7"</code></td></tr>
+<tr><td><code>str_split(string $texto, int $tamanho = 1): array</code></td><td>Corta em pedaços de N bytes. <a href="funcoes-string.html">Funções de String</a></td><td><code>str_split("abcdef", 2)</code></td><td><code>['ab', 'cd', 'ef']</code></td></tr>
+<tr><td><code>mb_str_split(string $texto, int $tamanho = 1): array</code></td><td>Corta em pedaços de N caracteres. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_str_split($palavra)</code></td><td><code>['A', 'ç', 'ã', 'o']</code></td></tr>
+<tr><td><code>strstr(string $texto, string $pedaço, bool $antes = false): string|false</code></td><td>Do pedaço até o fim (ou o que vem antes dele, com <code>true</code>). <a href="funcoes-string.html">Funções de String</a></td><td><code>strstr("ana@email.com", "@")</code><br><code>strstr("ana@email.com", "@", true)</code></td><td><code>'@email.com'</code><br><code>'ana'</code></td></tr>
+<tr><td><code>strrchr(string $texto, string $caractere): string|false</code></td><td>Da <strong>última</strong> ocorrência do caractere até o fim. <a href="funcoes-string.html">Funções de String</a></td><td><code>strrchr("foto.final.jpg", ".")</code></td><td><code>'.jpg'</code></td></tr>
+<tr><td><code>mb_strimwidth(string $texto, int $início, int $largura, string $marca = ""): string</code></td><td>Encurta para caber na largura, com uma marca no fim (resumos de posts). <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_strimwidth("Aprendendo PHP do zero", 0, 12, "…")</code></td><td><code>'Aprendendo …'</code></td></tr>
+</table>
+</div>
+
+<h3 id="procurar">Procurar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>str_contains(string $texto, string $pedaço): bool</code> <span class="versao">PHP 8.0+</span></td><td>Contém o pedaço? (diferencia maiúsculas) <a href="funcoes-string.html">Funções de String</a></td><td><code>str_contains($texto, "nan")</code><br><code>str_contains($texto, "Ban")</code></td><td><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>str_starts_with(string $texto, string $início): bool</code> <span class="versao">PHP 8.0+</span></td><td>Começa com…? <a href="funcoes-string.html">Funções de String</a></td><td><code>str_starts_with($texto, "ba")</code></td><td><code>true</code></td></tr>
+<tr><td><code>str_ends_with(string $texto, string $fim): bool</code> <span class="versao">PHP 8.0+</span></td><td>Termina com…? <a href="funcoes-string.html">Funções de String</a></td><td><code>str_ends_with("foto.jpg", ".jpg")</code></td><td><code>true</code></td></tr>
+<tr><td><code>strpos(string $texto, string $pedaço, int $aPartirDe = 0): int|false</code></td><td>Posição (em bytes) da primeira ocorrência, ou <code>false</code>. A posição pode ser <code>0</code>: compare com <code>=== false</code>. <a href="funcoes-string.html">Funções de String</a></td><td><code>strpos($texto, "na")</code><br><code>strpos($texto, "na", 3)</code><br><code>strpos($texto, "b")</code><br><code>strpos($texto, "x")</code></td><td><code>2</code><br><code>4</code><br><code>0</code><br><code>false</code></td></tr>
+<tr><td><code>stripos(…): int|false</code></td><td>Como <code>strpos</code>, sem diferenciar maiúsculas. <a href="funcoes-string.html">Funções de String</a></td><td><code>stripos($texto, "NA")</code></td><td><code>2</code></td></tr>
+<tr><td><code>strrpos(…): int|false</code></td><td>Posição da <strong>última</strong> ocorrência. <a href="funcoes-string.html">Funções de String</a></td><td><code>strrpos($texto, "na")</code></td><td><code>4</code></td></tr>
+<tr><td><code>mb_strpos(string $texto, string $pedaço): int|false</code></td><td>Posição contada em caracteres. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>strpos($palavra, "o")</code><br><code>mb_strpos($palavra, "o")</code></td><td><code>5</code><br><code>3</code></td></tr>
+</table>
+</div>
+
+<div class="warning">
+<strong>A armadilha do <code>strpos</code></strong>
+<p><code>strpos($texto, "b")</code> dá <code>0</code> (achou, na posição 0), e <code>0</code> conta como falso num <code>if</code>. Escreva <code>if (strpos($texto, "b") !== false)</code>, ou simplesmente <code>if (str_contains($texto, "b"))</code>.</p>
+</div>
+<h3 id="comparar">Comparar</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>$a === $b / $a == $b</code></td><td>Iguais? (<code>===</code> também confere o tipo.) Diferencia maiúsculas. <a href="operadores-comparacao.html">Comparação</a></td><td><code>"Ana" === "ana"</code><br><code>"10" == "10.0"</code><br><code>"10" === "10.0"</code></td><td><code>false</code><br><code>true</code><br><code>false</code></td></tr>
+<tr><td><code>strcmp(string $a, string $b): int</code></td><td>Compara em ordem alfabética (pelos códigos dos bytes): negativo se <code>$a</code> vem antes, 0 se iguais, positivo se depois. O sinal é o mesmo de <code>$a &lt;=&gt; $b</code>; o número em si não importa. <a href="funcoes-string.html">Funções de String</a></td><td><code>strcmp("Ana", "Bia")</code><br><code>strcmp("Bia", "Ana")</code><br><code>strcmp("ana", "Bia")</code></td><td><code>-1</code><br><code>1</code><br><code>31</code></td></tr>
+<tr><td><code>strcasecmp(string $a, string $b): int</code></td><td>Igual, ignorando maiúsculas (só letras sem acento). <a href="funcoes-string.html">Funções de String</a></td><td><code>strcasecmp("ANA", "ana")</code></td><td><code>0</code></td></tr>
+<tr><td><code>strncmp(string $a, string $b, int $n): int</code></td><td>Compara só os <code>$n</code> primeiros bytes. <a href="funcoes-string.html">Funções de String</a></td><td><code>strncmp("foto1", "foto2", 4)</code></td><td><code>0</code></td></tr>
+<tr><td><code>strnatcmp(string $a, string $b): int</code></td><td>Ordem "natural": números dentro do texto comparados como números. <a href="ordenar-arrays.html">Ordenar Arrays</a></td><td><code>strcmp("foto10", "foto2")</code><br><code>strnatcmp("foto10", "foto2")</code></td><td><code>-1</code><br><code>1</code></td></tr>
+<tr><td><code>similar_text(string $a, string $b, float &amp;$porcento = null): int</code></td><td>Quantos caracteres em comum (e a porcentagem). <a href="funcoes-string.html">Funções de String</a></td><td><code>similar_text("banana", "bacana", $p);</code><br><code>round($p, 1)</code></td><td><br><code>66.7</code></td></tr>
+<tr><td><code>levenshtein(string $a, string $b): int</code></td><td>Quantas trocas de letra transformam um no outro (para "você quis dizer…?"). <a href="funcoes-string.html">Funções de String</a></td><td><code>levenshtein("banana", "bacana")</code></td><td><code>1</code></td></tr>
+</table>
+</div>
+
+<h3 id="caixa">Maiúsculas e minúsculas</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>strtoupper(string $texto): string</code></td><td>Maiúsculas, <strong>só letras sem acento</strong> (desde o PHP 8.2, não depende do idioma). <a href="funcoes-string.html">Funções de String</a></td><td><code>strtoupper("banana")</code><br><code>strtoupper($palavra)</code></td><td><code>'BANANA'</code><br><code>'AçãO'</code></td></tr>
+<tr><td><code>strtolower(string $texto): string</code></td><td>Minúsculas, idem. <a href="funcoes-string.html">Funções de String</a></td><td><code>strtolower("ANA")</code><br><code>strtolower("AÇÃO")</code></td><td><code>'ana'</code><br><code>'aÇÃo'</code></td></tr>
+<tr><td><code>mb_strtoupper(string $texto): string</code></td><td>Maiúsculas de verdade, com acentos. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_strtoupper($palavra)</code></td><td><code>'AÇÃO'</code></td></tr>
+<tr><td><code>mb_strtolower(string $texto): string</code></td><td>Minúsculas com acentos. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_strtolower("AÇÃO")</code></td><td><code>'ação'</code></td></tr>
+<tr><td><code>ucfirst(string $texto): string</code></td><td>Primeira letra maiúscula (sem acento). <a href="funcoes-string.html">Funções de String</a></td><td><code>ucfirst("ana")</code><br><code>ucfirst("ágata")</code></td><td><code>'Ana'</code><br><code>'ágata'</code></td></tr>
+<tr><td><code>mb_ucfirst(string $texto): string</code> <span class="versao">PHP 8.4+</span></td><td>Primeira letra maiúscula, com acento. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_ucfirst("ágata")</code></td><td><code>'Ágata'</code></td></tr>
+<tr><td><code>lcfirst(string $texto): string</code></td><td>Primeira letra minúscula. <a href="funcoes-string.html">Funções de String</a></td><td><code>lcfirst("Ana")</code></td><td><code>'ana'</code></td></tr>
+<tr><td><code>ucwords(string $texto): string</code></td><td>Primeira letra de cada palavra maiúscula. <a href="funcoes-string.html">Funções de String</a></td><td><code>ucwords("ana souza")</code></td><td><code>'Ana Souza'</code></td></tr>
+<tr><td><code>mb_convert_case(string $texto, int $modo): string</code></td><td>Com <code>MB_CASE_TITLE</code>: cada palavra com inicial maiúscula e o resto minúsculo, com acentos. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_convert_case("ÉRICA DA SILVA", MB_CASE_TITLE)</code></td><td><code>'Érica Da Silva'</code></td></tr>
+</table>
+</div>
+
+
+<div class="tryphp" data-goal="out:Olá\, Érica Da Silva!,src:mb_">
+<p class="try-task"><strong>Experimente:</strong> o nome veio do formulário com espaços sobrando e maiúsculas bagunçadas. Faça o programa mostrar <code>Olá, Érica Da Silva!</code>. Dica: <code>trim</code> e <code>mb_convert_case(…, MB_CASE_TITLE)</code>. Tente também com <code>ucwords(strtolower(…))</code> e veja o que acontece com o <code>É</code>.</p>
+<pre class="script">&lt;?php
+$nome = "  érica DA silva ";
+echo "Olá, $nome!\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "  érica DA silva ";
+$limpo = mb_convert_case(trim($nome), MB_CASE_TITLE);
+echo "Olá, $limpo!\n";
+</pre>
+</div>
+
+<h3 id="espacos">Espaços, preenchimento e repetição</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>trim(string $texto, string $caracteres = " \n\r\t\v\x00"): string</code></td><td>Tira espaços (e quebras de linha) do começo e do fim. Com o 2º argumento, tira esses caracteres. <a href="funcoes-string.html">Funções de String</a></td><td><code>trim($nome)</code><br><code>trim("--Ana--", "-")</code></td><td><code>'Ana Souza'</code><br><code>'Ana'</code></td></tr>
+<tr><td><code>ltrim(…) / rtrim(…)</code></td><td>Só do começo (<em>left</em>) / só do fim (<em>right</em>). <a href="funcoes-string.html">Funções de String</a></td><td><code>ltrim($nome)</code><br><code>rtrim("1,2,3,", ",")</code></td><td><code>'Ana Souza&nbsp;&nbsp;'</code><br><code>'1,2,3'</code></td></tr>
+<tr><td><code>mb_trim(string $texto): string</code> <span class="versao">PHP 8.4+</span></td><td>Como <code>trim</code>, entendendo também espaços especiais do Unicode. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_trim("\u{3000}Ana\u{3000}")</code><br><code>trim("\u{3000}Ana\u{3000}")</code></td><td><code>'Ana'</code><br><code>'　Ana　'</code></td></tr>
+<tr><td><code>str_pad(string $texto, int $tamanho, string $com = " ", int $lado = STR_PAD_RIGHT): string</code></td><td>Completa até o tamanho (em bytes). Lados: <code>STR_PAD_LEFT</code>, <code>STR_PAD_BOTH</code>. <a href="funcoes-string.html">Funções de String</a></td><td><code>str_pad("7", 3, "0", STR_PAD_LEFT)</code><br><code>str_pad("Ana", 7, "*", STR_PAD_BOTH)</code><br><code>str_pad($palavra, 6, "*")</code></td><td><code>'007'</code><br><code>'**Ana**'</code><br><code>'Ação'</code></td></tr>
+<tr><td><code>mb_str_pad(…): string</code> <span class="versao">PHP 8.3+</span></td><td>Igual, contando caracteres. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_str_pad($palavra, 6, "*")</code></td><td><code>'Ação**'</code></td></tr>
+<tr><td><code>str_repeat(string $texto, int $vezes): string</code></td><td>Repete o texto. <a href="funcoes-string.html">Funções de String</a></td><td><code>str_repeat("-", 10)</code><br><code>str_repeat("ab", 3)</code></td><td><code>'----------'</code><br><code>'ababab'</code></td></tr>
+<tr><td><code>wordwrap(string $texto, int $largura = 75, string $quebra = "\n", bool $cortar = false): string</code></td><td>Quebra o texto em linhas de até N bytes, nos espaços. <a href="funcoes-string.html">Funções de String</a></td><td><code>wordwrap("Aprendendo PHP do zero", 10, "\n")</code></td><td><code>"Aprendendo\nPHP do\nzero"</code></td></tr>
+<tr><td><code>nl2br(string $texto): string</code></td><td>Põe <code>&lt;br /&gt;</code> antes de cada quebra de linha (para mostrar textos de <code>&lt;textarea&gt;</code> em HTML). <a href="escapar-saida.html">Escapar a Saída</a></td><td><code>nl2br("linha 1\nlinha 2")</code></td><td><code>"linha 1&lt;br /&gt;\nlinha 2"</code></td></tr>
+</table>
+</div>
+
+<h3 id="trocar">Trocar e inverter</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>str_replace(string|array $procura, string|array $troca, string $texto): string</code></td><td>Troca todas as ocorrências (diferencia maiúsculas). Aceita arrays. <a href="funcoes-string.html">Funções de String</a></td><td><code>str_replace("na", "NA", $texto)</code><br><code>str_replace(["a", "n"], ["4", "N"], $texto)</code><br><code>str_replace(",", ".", "10,50")</code></td><td><code>'baNANA'</code><br><code>'b4N4N4'</code><br><code>'10.50'</code></td></tr>
+<tr><td><code>str_ireplace(…): string</code></td><td>Igual, ignorando maiúsculas. <a href="funcoes-string.html">Funções de String</a></td><td><code>str_ireplace("ANA", "Bia", "Oi, ana!")</code></td><td><code>'Oi, Bia!'</code></td></tr>
+<tr><td><code>substr_replace(string $texto, string $troca, int $início, ?int $tamanho = null): string</code></td><td>Troca um trecho por posição. <a href="funcoes-string.html">Funções de String</a></td><td><code>substr_replace("1234567890", "****", 0, 6)</code></td><td><code>'****7890'</code></td></tr>
+<tr><td><code>strtr(string $texto, array $pares): string</code></td><td>Troca vários pedaços de uma vez, sem uma troca afetar a outra. <a href="funcoes-string.html">Funções de String</a></td><td><code>strtr("Olá, {nome}!", ["{nome}" =&gt; "Ana"])</code></td><td><code>'Olá, Ana!'</code></td></tr>
+<tr><td><code>strrev(string $texto): string</code></td><td>Inverte os <strong>bytes</strong> (estraga acentos). <a href="funcoes-string.html">Funções de String</a></td><td><code>strrev($texto)</code><br><code>strrev($palavra)</code></td><td><code>'ananab'</code><br><code>"o\xA3\xC3\xA7\xC3A"</code></td></tr>
+<tr><td><code>preg_replace(string $regex, string $troca, string $texto): string</code></td><td>Troca o que casar com uma expressão regular. <a href="funcoes-string.html">Funções de String</a></td><td><code>preg_replace("/[^0-9]/", "", "(81) 98765-4321")</code></td><td><code>'81987654321'</code></td></tr>
+<tr><td><code>preg_match(string $regex, string $texto, array &amp;$achados = null): int</code></td><td>Casa com a expressão? (1 ou 0) e guarda os pedaços. <a href="funcoes-string.html">Funções de String</a></td><td><code>preg_match("/(\d{2})\/(\d{2})\/(\d{4})/", "Nasceu em 15/03/1997", $m);</code><br><code>$m</code></td><td><br><code>['15/03/1997', '15', '03', '1997']</code></td></tr>
+</table>
+</div>
+
+<p>Expressões regulares (<code>preg_*</code>) são uma pequena linguagem de padrões: <code>[^0-9]</code> = "qualquer coisa que não seja dígito", <code>\d{2}</code> = "dois dígitos". A aula <a href="funcoes-string.html">Funções de String</a> mostra o básico.</p>
+<h3 id="converter">Formatar e converter</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>sprintf(string $formato, mixed ...$valores): string</code></td><td>Monta um texto a partir de um modelo: <code>%s</code> texto, <code>%d</code> inteiro, <code>%.2f</code> decimal com 2 casas (sempre com <strong>ponto</strong>), <code>%05d</code> com zeros à esquerda, <code>%-10s</code> alinhado à esquerda. <a href="sprintf.html">printf e sprintf</a></td><td><code>sprintf("%s tem %d anos", "Ana", 29)</code><br><code>sprintf("%.2f", 3.14159)</code><br><code>sprintf("%05d", 42)</code><br><code>sprintf("[%-6s]", "Ana")</code><br><code>sprintf("%5.1f%%", 12.345)</code></td><td><code>'Ana tem 29 anos'</code><br><code>'3.14'</code><br><code>'00042'</code><br><code>'[Ana&nbsp;&nbsp;&nbsp;]'</code><br><code>' 12.3%'</code></td></tr>
+<tr><td><code>number_format(float $n, int $casas = 0, string $decimal = ".", string $milhar = ","): string</code></td><td>Número formatado; para o Brasil, <code>","</code> e <code>"."</code>. <a href="number-format.html">Formatar Números</a></td><td><code>number_format(1234.5, 2, ",", ".")</code><br><code>number_format(1234.5)</code></td><td><code>'1.234,50'</code><br><code>'1,235'</code></td></tr>
+<tr><td><code>implode(string $sep, array $a) / explode(string $sep, string $t)</code></td><td>Array → texto / texto → array. <a href="ref-array.html#transformar">Referência de Array</a></td><td><code>implode("-", ["a", "b"])</code><br><code>explode(" ", "Ana Souza")</code></td><td><code>'a-b'</code><br><code>['Ana', 'Souza']</code></td></tr>
+<tr><td><code>intval(mixed $v) / (int) $v</code></td><td>Converte para inteiro: lê o número do começo e para no primeiro caractere inválido. <a href="conversao-tipos.html">Conversão de Tipos</a></td><td><code>(int) "42"</code><br><code>(int) "12abc"</code><br><code>(int) "abc"</code><br><code>(int) "3,99"</code></td><td><code>42</code><br><code>12</code><br><code>0</code><br><code>3</code></td></tr>
+<tr><td><code>floatval(mixed $v) / (float) $v</code></td><td>Converte para <code>float</code> (a vírgula não é decimal!). <a href="conversao-tipos.html">Conversão de Tipos</a></td><td><code>(float) "3.99"</code><br><code>(float) "3,99"</code></td><td><code>3.99</code><br><code>3.0</code></td></tr>
+<tr><td><code>is_numeric(mixed $v): bool</code></td><td>É um número (ou texto com um número completo)? <a href="validacao.html">Validar Dados</a></td><td><code>is_numeric("42")</code><br><code>is_numeric("4.2e3")</code><br><code>is_numeric("12abc")</code><br><code>is_numeric(" 42")</code></td><td><code>true</code><br><code>true</code><br><code>false</code><br><code>true</code></td></tr>
+<tr><td><code>ctype_digit(string $t): bool</code></td><td>Só tem dígitos 0–9? (bom para CEP, códigos) <a href="validacao.html">Validar Dados</a></td><td><code>ctype_digit("01234")</code><br><code>ctype_digit("12.5")</code><br><code>ctype_digit("")</code></td><td><code>true</code><br><code>false</code><br><code>false</code></td></tr>
+<tr><td><code>ord(string $c) / chr(int $n)</code></td><td>Código de um byte / byte de um código. <a href="funcoes-string.html">Funções de String</a></td><td><code>ord("A")</code><br><code>chr(97)</code></td><td><code>65</code><br><code>'a'</code></td></tr>
+<tr><td><code>mb_ord(string $c) / mb_chr(int $n)</code></td><td>Código Unicode de um caractere / caractere de um código. <a href="mbstring.html">Acentos e mbstring</a></td><td><code>mb_ord("ç")</code><br><code>mb_chr(231)</code></td><td><code>231</code><br><code>'ç'</code></td></tr>
+</table>
+</div>
+
+<p>Os formatos de <code>sprintf</code> também valem para <code>printf</code> (que escreve direto na tela). O <code>%.2f</code> usa <strong>ponto</strong> mesmo com o sistema em português; para "R$ 1.234,50", use <code>number_format</code>. Detalhes em <a href="sprintf.html">printf e sprintf</a> e <a href="number-format.html">Formatar Números</a>.</p>
+<h3 id="web">Web e segurança</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>O que faz</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>htmlspecialchars(string $texto, int $flags = ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401): string</code></td><td>Troca <code>&amp; &lt; &gt; " '</code> por códigos HTML. <strong>Use sempre</strong> ao mostrar dados do visitante (contra XSS). <a href="escapar-saida.html">Escapar a Saída</a></td><td><code>htmlspecialchars("&lt;b&gt;Ana&lt;/b&gt; &amp; \"Bia\"")</code><br><code>htmlspecialchars("it's")</code></td><td><code>'&amp;lt;b&amp;gt;Ana&amp;lt;/b&amp;gt; &amp;amp; &amp;quot;Bia&amp;quot;'</code><br><code>'it&amp;#039;s'</code></td></tr>
+<tr><td><code>html_entity_decode(string $texto): string</code></td><td>O contrário: códigos HTML viram caracteres. <a href="escapar-saida.html">Escapar a Saída</a></td><td><code>html_entity_decode("&amp;lt;b&amp;gt; &amp;amp; &amp;eacute;")</code></td><td><code>'&lt;b&gt; &amp; é'</code></td></tr>
+<tr><td><code>strip_tags(string $texto, ?string $permitidas = null): string</code></td><td>Remove as tags HTML (não substitui o <code>htmlspecialchars</code>). <a href="escapar-saida.html">Escapar a Saída</a></td><td><code>strip_tags("&lt;p&gt;Olá, &lt;b&gt;Ana&lt;/b&gt;&lt;/p&gt;")</code></td><td><code>'Olá, Ana'</code></td></tr>
+<tr><td><code>urlencode(string $texto): string</code></td><td>Prepara um valor para ir na URL (espaço vira <code>+</code>). <a href="get-post.html">$_GET e $_POST</a></td><td><code>urlencode("café com leite")</code></td><td><code>'caf%C3%A9+com+leite'</code></td></tr>
+<tr><td><code>rawurlencode(string $texto): string</code></td><td>Idem, com espaço como <code>%20</code> (para pedaços do caminho). <a href="get-post.html">$_GET e $_POST</a></td><td><code>rawurlencode("café com leite")</code></td><td><code>'caf%C3%A9%20com%20leite'</code></td></tr>
+<tr><td><code>http_build_query(array $dados): string</code></td><td>Monta a query string inteira a partir de um array. <a href="get-post.html">$_GET e $_POST</a></td><td><code>http_build_query(["busca" =&gt; "café", "pagina" =&gt; 2])</code></td><td><code>'busca=caf%C3%A9&amp;pagina=2'</code></td></tr>
+<tr><td><code>base64_encode(string $t) / base64_decode(string $t)</code></td><td>Codifica bytes em texto seguro (não é criptografia!). <a href="funcoes-string.html">Funções de String</a></td><td><code>base64_encode("Ana")</code><br><code>base64_decode("QW5h")</code></td><td><code>'QW5h'</code><br><code>'Ana'</code></td></tr>
+<tr><td><code>md5(string $t) / hash(string $algo, string $t)</code></td><td>Resumo (hash) de um texto. <strong>Nunca</strong> para senhas: use <code>password_hash</code>. <a href="senhas.html">Senhas</a></td><td><code>md5("Ana")</code><br><code>hash("sha256", "Ana")</code></td><td><code>'9aba45a7f1999a9c5fc96ef2a45810fb'</code><br><code>'dea210f058b407db5c1b5ea89b2e42a57221c003dba55e2f1776a75a3254d386'</code></td></tr>
+<tr><td><code>bin2hex(random_bytes(int $n))</code></td><td>Um código aleatório seguro em hexadecimal (tokens). <a href="csrf.html">CSRF</a></td><td><code>strlen(bin2hex(random_bytes(16)))</code></td><td><code>32</code></td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Qual usar para mostrar dados do visitante?</strong>
+<p><code>htmlspecialchars</code>, sempre, no momento de escrever no HTML: ele mantém o texto como o visitante digitou, só que inofensivo. <code>strip_tags</code> apaga partes do texto e não protege atributos. Veja <a href="escapar-saida.html">Escapar a Saída (XSS)</a>.</p>
+</div>
+
+<hr>
+
+<h2 id="missao">Missão: o endereço do post</h2>
+<p>Blogs mostram posts em endereços como <code>/post/minha-primeira-receita-pao-de-queijo</code> (um "slug"). Monte esse texto a partir do título.</p>
+<div class="tryphp" data-goal="out:minha-primeira-receita-pao-de-queijo">
+<p class="try-task"><strong>Missão:</strong> transforme o título em <code>minha-primeira-receita-pao-de-queijo</code>: tudo minúsculo (<code>mb_strtolower</code>), sem acentos (<code>strtr</code> com um array de trocas), tudo o que não for letra ou número vira um <code>-</code> (<code>preg_replace("/[^a-z0-9]+/", "-", …)</code>) e sem <code>-</code> nas pontas (<code>trim(…, "-")</code>).</p>
+<pre class="script">&lt;?php
+$titulo = "Minha Primeira Receita: Pão de Queijo!";
+$slug = $titulo;
+echo $slug, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$titulo = "Minha Primeira Receita: Pão de Queijo!";
+$slug = mb_strtolower($titulo);
+$slug = strtr($slug, ["á" =&gt; "a", "ã" =&gt; "a", "â" =&gt; "a", "é" =&gt; "e", "ê" =&gt; "e", "í" =&gt; "i", "ó" =&gt; "o", "õ" =&gt; "o", "ô" =&gt; "o", "ú" =&gt; "u", "ç" =&gt; "c"]);
+$slug = preg_replace("/[^a-z0-9]+/", "-", $slug);
+$slug = trim($slug, "-");
+echo $slug, "\n";
+</pre>
+</div>
+<pre class="term" data-cwd="~/ref">$ php missao-s2.php
+minha-primeira-receita-pao-de-queijo</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Quanto dá <code>strlen("Pão")</code>?</p>
+<label><input type="radio" name="q1"> 3</label>
+<label><input type="radio" name="q1"> 4</label>
+<label><input type="radio" name="q1"> 6</label>
+<label><input type="radio" name="q1"> Dá erro.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">2. Qual teste diz corretamente se <code>$email</code> tem <code>"@"</code>?</p>
+<label><input type="radio" name="q2"> <code>if (strpos($email, "@"))</code></label>
+<label><input type="radio" name="q2"> <code>if (strpos($email, "@") == 0)</code></label>
+<label><input type="radio" name="q2"> <code>if (strlen($email, "@"))</code></label>
+<label><input type="radio" name="q2"> <code>if (str_contains($email, "@"))</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. O que <code>(float) "3,99"</code> devolve?</p>
+<label><input type="radio" name="q3"> <code>3.0</code></label>
+<label><input type="radio" name="q3"> <code>3.99</code></label>
+<label><input type="radio" name="q3"> <code>399.0</code></label>
+<label><input type="radio" name="q3"> Um <code>TypeError</code>.</label>
+</div>
+
+<div class="exercise">
+<p>Complete para mostrar o preço como <code>1.234,50</code>:</p>
+<div class="ex-code">echo <input data-answer="number_format">($preco, 2, ",", ".");</div>
+</div>
+
+<div class="exercise">
+<p>Complete para mostrar com segurança um comentário enviado pelo visitante:</p>
+<div class="ex-code">echo <input data-answer="htmlspecialchars">($comentario);</div>
+</div>
+
+<div class="exercise">
+<p>Complete para deixar <code>"7"</code> com três dígitos (<code>"007"</code>):</p>
+<div class="ex-code">str_pad("7", 3, "0", <input data-answer="STR_PAD_LEFT">)</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Sem <code>mb_</code> = bytes; com <code>mb_</code> = letras. Com acento, use <code>mb_strlen</code>, <code>mb_substr</code>, <code>mb_strtoupper</code>, <code>mb_str_pad</code>.</li>
+  <li>Procurar: <code>str_contains</code>, <code>str_starts_with</code>, <code>str_ends_with</code> (8.0); <code>strpos</code> devolve a posição ou <code>false</code> (compare com <code>!== false</code>).</li>
+  <li>Limpar e trocar: <code>trim</code>, <code>str_replace</code>, <code>strtr</code>, <code>preg_replace</code>.</li>
+  <li>Formatar: <code>sprintf</code> (ponto decimal sempre), <code>number_format</code> (padrão brasileiro com <code>","</code> e <code>"."</code>), <code>str_pad</code>.</li>
+  <li>Converter: <code>(int)</code>/<code>(float)</code> leem só o começo e não entendem vírgula; valide com <code>is_numeric</code>/<code>ctype_digit</code>.</li>
+  <li>Web: <code>htmlspecialchars</code> na saída, sempre; <code>urlencode</code>/<code>http_build_query</code> para montar URLs.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
