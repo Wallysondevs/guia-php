@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Interfaces — interface, implements, Countable e JsonSerializable | Guia PHP</title>
+<meta name="description" content="Interfaces em PHP: declarar com interface, cumprir o contrato com implements, várias interfaces numa classe, constantes em interface, as interfaces nativas Countable, JsonSerializable e Stringable, e a comparação interface × classe abstrata, com erros reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Interfaces</span></h1>
+
+<p class="intro">Uma <strong>interface</strong> é um <strong>contrato</strong>: uma lista de métodos que uma classe promete ter, sem dizer como eles funcionam. Ela não tem código, não tem propriedades comuns e não pode ser instanciada. Parece pouco, mas é a ferramenta mais usada do PHP moderno para fazer classes diferentes trabalharem juntas, e é o coração do <strong>polimorfismo</strong>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Declarar uma interface com <code>interface</code> e cumpri-la com <code>implements</code>.</li>
+  <li>Usar a interface como tipo de parâmetro (polimorfismo).</li>
+  <li>Uma classe com várias interfaces, e uma interface que estende outra.</li>
+  <li>Constantes em interfaces.</li>
+  <li>Três interfaces nativas úteis: <code>Countable</code>, <code>JsonSerializable</code> e <code>Stringable</code>.</li>
+  <li>A diferença entre interface e classe abstrata (com tabela).</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: a tomada</h2>
+<p>A tomada da parede não sabe se você vai ligar uma geladeira, um carregador ou um liquidificador. Ela só exige um <strong>padrão</strong>: dois ou três pinos, naquele formato. Qualquer aparelho que siga o padrão funciona, por mais diferente que seja por dentro. E um aparelho pode seguir vários padrões ao mesmo tempo (a tomada brasileira e uma entrada USB).</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Na tomada</th><th>No PHP</th></tr>
+<tr><td>O padrão de pinos</td><td>A <strong>interface</strong> (<code>Pagavel</code>): "tem um método <code>pagar(float $valor): string</code>"</td></tr>
+<tr><td>Cada aparelho que segue o padrão</td><td>Cada classe que <strong>implementa</strong> a interface (<code>Pix</code>, <code>ValePresente</code>)</td></tr>
+<tr><td>A tomada da parede</td><td>A função que pede o tipo da interface: <code>finalizarCompra(Pagavel $forma)</code></td></tr>
+<tr><td>Um aparelho com tomada e USB</td><td>Uma classe que implementa várias interfaces</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2><code>interface</code> e <code>implements</code></h2>
+
+<pre class="file" data-file="pagavel.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+class Pix implements Pagavel
+{
+    public function __construct(private string $chave)
+    {
+    }
+
+    public function pagar(float $valor): string
+    {
+        return "Pix de R$ " . number_format($valor, 2, ",", ".") . " para a chave {$this-&gt;chave}";
+    }
+}
+
+class ValePresente implements Pagavel
+{
+    public function __construct(private float $saldo)
+    {
+    }
+
+    public function pagar(float $valor): string
+    {
+        if ($valor &gt; $this-&gt;saldo) {
+            return "Vale recusado: saldo de R$ " . number_format($this-&gt;saldo, 2, ",", ".");
+        }
+        $this-&gt;saldo -= $valor;
+        return "Vale usado; sobram R$ " . number_format($this-&gt;saldo, 2, ",", ".");
+    }
+}
+
+function finalizarCompra(Pagavel $forma, float $total): void
+{
+    echo $forma-&gt;pagar($total) . "\n";
+}
+
+finalizarCompra(new Pix("ana@exemplo.com"), 79.30);
+finalizarCompra(new ValePresente(100), 79.30);
+finalizarCompra(new ValePresente(50), 79.30);
+var_dump(new Pix("x") instanceof Pagavel);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php pagavel.php
+Pix de R$ 79,30 para a chave ana@exemplo.com
+Vale usado; sobram R$ 20,70
+Vale recusado: saldo de R$ 50,00
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>interface Pagavel</dt><dd>Declara a interface. O nome costuma ser um adjetivo de capacidade (<code>Pagavel</code>, <code>Reembolsavel</code>, <code>Countable</code> = "contável") ou um substantivo (<code>Notificador</code>).</dd>
+  <dt>public function pagar(float $valor): string;</dt><dd>Só a assinatura, terminando em <code>;</code>. Todo método de interface é <code>public</code> e não tem corpo.</dd>
+  <dt>class Pix implements Pagavel</dt><dd><code>implements</code> = "implementa", "cumpre". A classe promete ter todos os métodos da interface, com assinaturas compatíveis. O PHP confere ao ler a classe.</dd>
+  <dt>function finalizarCompra(Pagavel $forma, …)</dt><dd>A função aceita <strong>qualquer</strong> objeto de uma classe que implemente <code>Pagavel</code>. Ela não sabe o que é Pix ou vale-presente; só sabe que pode chamar <code>pagar()</code>.</dd>
+</dl>
+
+<p>Repare que <code>Pix</code> e <code>ValePresente</code> não têm <strong>nada</strong> em comum por dentro: propriedades diferentes, lógica diferente, nenhuma mãe em comum. O que as une é só o contrato. E o <code>instanceof Pagavel</code> responde <code>true</code>, como na herança.</p>
+
+<h3>Polimorfismo</h3>
+<p>O mesmo código (<code>$forma-&gt;pagar($total)</code>) produziu três resultados diferentes, um para cada objeto. Isso é <strong>polimorfismo</strong> ("muitas formas"), o terceiro pilar da POO (<a href="poo.html">O que é POO</a>). O ganho é enorme: amanhã a Ana cria uma classe <code>Cripto implements Pagavel</code>, e a função <code>finalizarCompra</code> funciona com ela <strong>sem mudar uma linha</strong>.</p>
+
+<div class="tryphp" data-goal="out:Boleto de R$ 79\,30 gerado,src:implements Pagavel,semerro">
+<p class="try-task"><strong>Missão:</strong> crie a classe <code>Boleto</code> que implementa <code>Pagavel</code>. O <code>pagar</code> dela devolve <code>"Boleto de R$ 79,30 gerado"</code> (use <code>number_format($valor, 2, ",", ".")</code>). Rode antes de escrever para ver o erro de classe que não existe.</p>
+<pre class="script">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+// crie a classe Boleto aqui
+
+
+function finalizarCompra(Pagavel $forma, float $total): void
+{
+    echo $forma-&gt;pagar($total) . "\n";
+}
+
+finalizarCompra(new Boleto(), 79.30);
+</pre>
+<pre class="solucao">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+class Boleto implements Pagavel
+{
+    public function pagar(float $valor): string
+    {
+        return "Boleto de R$ " . number_format($valor, 2, ",", ".") . " gerado";
+    }
+}
+
+function finalizarCompra(Pagavel $forma, float $total): void
+{
+    echo $forma-&gt;pagar($total) . "\n";
+}
+
+finalizarCompra(new Boleto(), 79.30);
+</pre>
+</div>
+
+<hr>
+
+<h2>Várias interfaces numa classe</h2>
+<p>Uma classe só tem uma mãe, mas pode implementar <strong>quantas interfaces quiser</strong>, separadas por vírgula. Cada interface é uma "capacidade":</p>
+
+<pre class="file" data-file="varias.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+interface Reembolsavel
+{
+    public function reembolsar(float $valor): string;
+}
+
+class Pix implements Pagavel, Reembolsavel
+{
+    public function pagar(float $valor): string
+    {
+        return "Pago via Pix: $valor";
+    }
+
+    public function reembolsar(float $valor): string
+    {
+        return "Devolvido via Pix: $valor";
+    }
+}
+
+class Boleto implements Pagavel
+{
+    public function pagar(float $valor): string
+    {
+        return "Boleto gerado: $valor";
+    }
+}
+
+function devolver(Reembolsavel $forma, float $valor): void
+{
+    echo $forma-&gt;reembolsar($valor) . "\n";
+}
+
+$pix = new Pix();
+$boleto = new Boleto();
+echo $pix-&gt;pagar(50) . "\n";
+devolver($pix, 50);
+var_dump($boleto instanceof Reembolsavel);
+devolver($boleto, 50);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php varias.php
+Pago via Pix: 50
+Devolvido via Pix: 50
+bool(false)
+
+Fatal error: Uncaught TypeError: devolver(): Argument #1 ($forma) must be of type Reembolsavel, Boleto given, called in /home/ana/loja/varias.php on line 43 and defined in /home/ana/loja/varias.php:33
+Stack trace:
+#0 /home/ana/loja/varias.php(43): devolver(Object(Boleto), 50)
+#1 {main}
+  thrown in /home/ana/loja/varias.php on line 33</pre>
+
+<p>O Pix sabe pagar e reembolsar; o boleto só sabe pagar. A função <code>devolver</code> pede <code>Reembolsavel</code>, e o PHP recusa o boleto com um <code>TypeError</code> claro, em vez de deixar o programa tentar chamar um <code>reembolsar()</code> que não existe. Interfaces pequenas e específicas (uma ou duas funções cada) são mais fáceis de combinar do que uma interface gigante.</p>
+
+<h3><code>extends</code> e <code>implements</code> juntos; interface que estende interface</h3>
+<p>Uma classe pode ter uma mãe <strong>e</strong> interfaces (o <code>extends</code> vem primeiro). E uma interface pode estender outra, acrescentando métodos:</p>
+
+<pre class="file" data-file="extends-implements.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+interface Parcelavel extends Pagavel
+{
+    public function parcelas(float $valor, int $vezes): string;
+}
+
+abstract class FormaDePagamento
+{
+    abstract public function nome(): string;
+}
+
+class Cartao extends FormaDePagamento implements Parcelavel
+{
+    public function nome(): string
+    {
+        return "Cartão";
+    }
+
+    public function pagar(float $valor): string
+    {
+        return "{$this-&gt;nome()}: R$ " . number_format($valor, 2, ",", ".");
+    }
+
+    public function parcelas(float $valor, int $vezes): string
+    {
+        return "{$vezes}x de R$ " . number_format($valor / $vezes, 2, ",", ".");
+    }
+}
+
+$cartao = new Cartao();
+echo $cartao-&gt;pagar(150) . "\n";
+echo $cartao-&gt;parcelas(150, 3) . "\n";
+var_dump($cartao instanceof Pagavel, $cartao instanceof FormaDePagamento);
+print_r(class_implements($cartao));
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php extends-implements.php
+Cartão: R$ 150,00
+3x de R$ 50,00
+bool(true)
+bool(true)
+Array
+(
+    [Parcelavel] =&gt; Parcelavel
+    [Pagavel] =&gt; Pagavel
+)</pre>
+
+<p>Quem implementa <code>Parcelavel</code> precisa ter <code>parcelas()</code> <strong>e</strong> <code>pagar()</code> (herdado de <code>Pagavel</code>). A função <code>class_implements</code> lista todas as interfaces do objeto.</p>
+
+<hr>
+
+<h2>Constantes em interfaces</h2>
+<p>Interfaces não têm propriedades comuns, mas podem ter <strong>constantes</strong>, que as classes herdam:</p>
+
+<pre class="file" data-file="constantes.php">&lt;?php
+interface RegrasDeFrete
+{
+    public const float GRATIS_ACIMA = 100.0;
+
+    public function frete(float $subtotal): float;
+}
+
+class Correios implements RegrasDeFrete
+{
+    public function frete(float $subtotal): float
+    {
+        return $subtotal &gt;= self::GRATIS_ACIMA ? 0.0 : 15.0;
+    }
+}
+
+echo RegrasDeFrete::GRATIS_ACIMA . "\n";
+echo Correios::GRATIS_ACIMA . "\n";
+$c = new Correios();
+echo $c-&gt;frete(75.80) . " / " . $c-&gt;frete(120) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php constantes.php
+100
+100
+15 / 0</pre>
+
+<p>A constante pode ser lida pela interface (<code>RegrasDeFrete::GRATIS_ACIMA</code>), pela classe (<code>Correios::GRATIS_ACIMA</code>) ou, dentro da classe, por <code>self::</code>. O tipo <code>float</code> na constante é do PHP 8.3 (veja <a href="static.html">static</a>).</p>
+
+<div class="tip">
+<strong>Propriedades em interface? Só com hooks</strong> <span class="versao">PHP 8.4+</span>
+<p>Uma propriedade comum numa interface dá <code>Fatal error: Interfaces may only include hooked properties</code>. Desde o 8.4, a interface pode exigir uma propriedade que se possa <strong>ler</strong>, com a sintaxe dos property hooks:</p>
+<pre class="file" data-file="hooked.php">&lt;?php
+interface TemNome
+{
+    public string $nome { get; }
+}
+
+class Produto implements TemNome
+{
+    public function __construct(public string $nome)
+    {
+    }
+}
+
+function mostrar(TemNome $coisa): void
+{
+    echo $coisa-&gt;nome . "\n";
+}
+
+mostrar(new Produto("Caneca"));
+</pre>
+<pre class="term" data-cwd="~/loja">$ php hooked.php
+Caneca</pre>
+<p>O <code>{ get; }</code> quer dizer "tem que dar para ler <code>$coisa-&gt;nome</code>". Uma propriedade pública comum já cumpre. Os hooks são explicados em <a href="readonly-hooks.html">readonly e Property Hooks</a>.</p>
+</div>
+
+<hr>
+
+<h2>Interfaces nativas úteis</h2>
+<p>O próprio PHP define várias interfaces. Implementá-las faz seus objetos funcionarem com funções do PHP. Três delas aparecem o tempo todo:</p>
+
+<h3><code>Countable</code>: o objeto funciona com <code>count()</code></h3>
+<p>Normalmente, <code>count()</code> só aceita arrays:</p>
+
+<pre class="file" data-file="sem-countable.php">&lt;?php
+class Carrinho
+{
+    private array $itens = ["Caneca", "Camiseta"];
+}
+echo count(new Carrinho());
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php sem-countable.php
+
+Fatal error: Uncaught TypeError: count(): Argument #1 ($value) must be of type Countable|array, Carrinho given in /home/ana/loja/sem-countable.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/sem-countable.php on line 6</pre>
+
+<p>A mensagem já dá a dica: <code>count()</code> aceita <code>Countable|array</code>. Implementando <code>Countable</code> (um método só: <code>count(): int</code>), o carrinho passa a funcionar com <code>count()</code>:</p>
+
+<pre class="file" data-file="countable.php">&lt;?php
+class Carrinho implements Countable
+{
+    private array $itens = [];
+
+    public function adicionar(string $produto, int $quantidade = 1): void
+    {
+        $this-&gt;itens[$produto] = ($this-&gt;itens[$produto] ?? 0) + $quantidade;
+    }
+
+    public function count(): int
+    {
+        return array_sum($this-&gt;itens);
+    }
+}
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar("Caneca", 2);
+$carrinho-&gt;adicionar("Camiseta");
+$carrinho-&gt;adicionar("Caneca");
+echo "Itens no carrinho: " . count($carrinho) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php countable.php
+Itens no carrinho: 4      « 2 + 1 + 1 canecas e camisetas: o carrinho decide o que "contar" significa</pre>
+
+<h3><code>JsonSerializable</code>: você decide como o objeto vira JSON</h3>
+<p>O <code>json_encode</code> (de <a href="json.html">JSON</a>) transforma um objeto comum usando só as propriedades <strong>públicas</strong>. Com <code>JsonSerializable</code>, você escreve o método <code>jsonSerialize()</code> e devolve exatamente o que quer mostrar:</p>
+
+<pre class="file" data-file="json.php">&lt;?php
+class Produto implements JsonSerializable
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        private float $custo,
+    ) {
+    }
+
+    public function jsonSerialize(): array
+    {
+        return [
+            "nome" =&gt; $this-&gt;nome,
+            "preco" =&gt; $this-&gt;preco,
+            "precoFormatado" =&gt; "R$ " . number_format($this-&gt;preco, 2, ",", "."),
+        ];
+    }
+}
+
+class ProdutoSimples
+{
+    public function __construct(
+        public string $nome,
+        public float $preco,
+        private float $custo,
+    ) {
+    }
+}
+
+echo json_encode(new ProdutoSimples("Caneca", 25.90, 8.0), JSON_UNESCAPED_UNICODE) . "\n";
+echo json_encode(new Produto("Caneca", 25.90, 8.0), JSON_UNESCAPED_UNICODE) . "\n";
+echo json_encode([new Produto("Caneca", 25.90, 8.0), new Produto("Adesivo", 3.50, 1.0)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php json.php
+{"nome":"Caneca","preco":25.9}
+{"nome":"Caneca","preco":25.9,"precoFormatado":"R$ 25,90"}
+[
+    {
+        "nome": "Caneca",
+        "preco": 25.9,
+        "precoFormatado": "R$ 25,90"
+    },
+    {
+        "nome": "Adesivo",
+        "preco": 3.5,
+        "precoFormatado": "R$ 3,50"
+    }
+]</pre>
+
+<p>A primeira linha é o objeto comum: o <code>custo</code> (privado) ficou de fora, e não dá para acrescentar nada. As outras usam o <code>jsonSerialize()</code>: um campo novo (<code>precoFormatado</code>), e o <code>custo</code> continua fora. Isso vai ser muito útil em <a href="api-json.html">Criar uma API JSON</a>.</p>
+
+<h3><code>Stringable</code>: o objeto pode virar texto</h3>
+<p>Toda classe que tem o método mágico <code>__toString()</code> (veja <a href="metodos-magicos.html">Métodos Mágicos</a>) implementa <code>Stringable</code> <strong>automaticamente</strong>, mesmo sem escrever <code>implements</code>. Use-a como tipo para aceitar "texto ou algo que vira texto":</p>
+
+<pre class="file" data-file="stringable.php">&lt;?php
+class Produto
+{
+    public function __construct(public string $nome, public float $preco)
+    {
+    }
+
+    public function __toString(): string
+    {
+        return "{$this-&gt;nome} (R$ " . number_format($this-&gt;preco, 2, ",", ".") . ")";
+    }
+}
+
+function etiqueta(string|Stringable $texto): string
+{
+    return "[ " . $texto . " ]";
+}
+
+$caneca = new Produto("Caneca", 25.90);
+echo $caneca . "\n";
+echo etiqueta($caneca) . "\n";
+echo etiqueta("Promoção") . "\n";
+var_dump($caneca instanceof Stringable);
+</pre>
+
+<pre class="term" data-cwd="~/loja">$ php stringable.php
+Caneca (R$ 25,90)
+[ Caneca (R$ 25,90) ]
+[ Promoção ]
+bool(true)</pre>
+
+<p>O tipo <code>string|Stringable</code> quer dizer "uma string <strong>ou</strong> um objeto <code>Stringable</code>" (tipos com <code>|</code> estão em <a href="tipos-avancados.html">Tipos Avançados</a>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Interface nativa</th><th>Método que você escreve</th><th>O que ganha</th></tr>
+<tr><td><code>Countable</code></td><td><code>count(): int</code></td><td>Funciona com <code>count($obj)</code></td></tr>
+<tr><td><code>JsonSerializable</code></td><td><code>jsonSerialize(): mixed</code></td><td>Controla o resultado de <code>json_encode($obj)</code></td></tr>
+<tr><td><code>Stringable</code></td><td><code>__toString(): string</code></td><td>Funciona com <code>echo</code> e concatenação (automático)</td></tr>
+<tr><td><code>IteratorAggregate</code></td><td><code>getIterator(): Iterator</code></td><td>Funciona com <code>foreach ($obj as …)</code></td></tr>
+<tr><td><code>ArrayAccess</code></td><td><code>offsetGet</code>, <code>offsetSet</code>, <code>offsetExists</code>, <code>offsetUnset</code></td><td>Funciona com <code>$obj["chave"]</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Interface × classe abstrata</h2>
+<p>As duas definem métodos que outras classes precisam ter. A diferença está no que mais elas trazem:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th></th><th>Interface</th><th><a href="abstratas.html">Classe abstrata</a></th></tr>
+<tr><td>Palavra para usar</td><td><code>implements</code></td><td><code>extends</code></td></tr>
+<tr><td>Quantas uma classe pode ter</td><td><strong>Várias</strong></td><td>Uma só</td></tr>
+<tr><td>Métodos com código</td><td>Não</td><td>Sim</td></tr>
+<tr><td>Propriedades</td><td>Não (só com hooks, 8.4+)</td><td>Sim</td></tr>
+<tr><td>Construtor</td><td>Não (na prática)</td><td>Sim</td></tr>
+<tr><td>Constantes</td><td>Sim</td><td>Sim</td></tr>
+<tr><td>Visibilidade dos métodos</td><td>Só <code>public</code></td><td><code>public</code>, <code>protected</code></td></tr>
+<tr><td>Pode ser instanciada?</td><td>Não</td><td>Não</td></tr>
+<tr><td>Relação que expressa</td><td>"<strong>sabe fazer</strong>" (capacidade)</td><td>"<strong>é um</strong>" (família)</td></tr>
+<tr><td>Exemplo</td><td><code>Pagavel</code>, <code>Countable</code></td><td><code>Pagamento</code> com <code>total()</code> pronto</td></tr>
+</table>
+</div>
+
+<p><strong>Qual usar?</strong> Comece pela interface: ela é mais flexível e não amarra ninguém a uma família. Use uma classe abstrata quando as classes compartilham <strong>código</strong> de verdade. E dá para combinar: uma interface como contrato e uma classe abstrata que a implementa parcialmente, com o código comum (<code>abstract class PagamentoBase implements Pagavel</code>).</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Class … contains 1 abstract method … (Interface::metodo)</strong>
+<pre class="file" data-file="faltou.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+class Boleto implements Pagavel
+{
+    public function gerar(float $valor): string
+    {
+        return "Boleto de $valor";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php faltou.php
+
+Fatal error: Class Boleto contains 1 abstract method and must therefore be declared abstract or implement the remaining method (Pagavel::pagar) in /home/ana/loja/faltou.php on line 7
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> a classe disse <code>implements Pagavel</code>, mas não tem o método <code>pagar</code> (tem <code>gerar</code>, que não conta). Para o PHP, os métodos de uma interface são "abstratos", por isso a mensagem é a mesma das <a href="abstratas.html">classes abstratas</a>.</p>
+<p><strong>Como consertar:</strong> escreva o método com o nome e a assinatura da interface (<code>public function pagar(float $valor): string</code>).</p>
+</div>
+
+<div class="cenario">
+<strong>Cannot instantiate interface</strong>
+<pre class="file" data-file="instanciar.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+$p = new Pagavel();
+</pre>
+<pre class="term" data-cwd="~/loja">$ php instanciar.php
+
+Fatal error: Uncaught Error: Cannot instantiate interface Pagavel in /home/ana/loja/instanciar.php:6
+Stack trace:
+#0 {main}
+  thrown in /home/ana/loja/instanciar.php on line 6</pre>
+<p><strong>O que significa:</strong> uma interface é só o contrato; não existe "um <code>Pagavel</code>" sem uma classe concreta. <strong>Como consertar:</strong> <code>new Pix(…)</code>, ou outra classe que implemente a interface.</p>
+</div>
+
+<div class="cenario">
+<strong>Class … cannot extend interface</strong>
+<pre class="file" data-file="extends-interface.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+class Pix extends Pagavel
+{
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php extends-interface.php
+
+Fatal error: Class Pix cannot extend interface Pagavel in /home/ana/loja/extends-interface.php on line 6
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> classe <strong>implementa</strong> interface; <code>extends</code> é para classe mãe (ou para uma interface estender outra interface). <strong>Como consertar:</strong> <code>class Pix implements Pagavel</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Interface function … cannot contain body</strong>
+<pre class="file" data-file="corpo.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string
+    {
+        return "pago";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php corpo.php
+
+Fatal error: Interface function Pagavel::pagar() cannot contain body in /home/ana/loja/corpo.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> interfaces não têm código. <strong>Como consertar:</strong> termine a assinatura com <code>;</code>. Se você quer código comum, use uma <a href="abstratas.html">classe abstrata</a> ou um <a href="traits.html">trait</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>Access type for interface method … must be public</strong>
+<pre class="file" data-file="privado.php">&lt;?php
+interface Pagavel
+{
+    private function pagar(float $valor): string;
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php privado.php
+
+Fatal error: Access type for interface method Pagavel::pagar() must be public in /home/ana/loja/privado.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> métodos de interface são sempre públicos: a interface descreve o que <strong>os outros</strong> podem chamar. Do lado da classe, implementar com <code>protected</code> também é erro: <code>Access level to Pix::pagar() must be public (as in class Pagavel)</code>. <strong>Como consertar:</strong> <code>public</code> nos dois lugares.</p>
+</div>
+
+<div class="cenario">
+<strong>Assinatura diferente da interface</strong>
+<pre class="file" data-file="assinatura.php">&lt;?php
+interface Pagavel
+{
+    public function pagar(float $valor): string;
+}
+
+class Boleto implements Pagavel
+{
+    public function pagar(float $valor, string $vencimento): string
+    {
+        return "Boleto de $valor, vence $vencimento";
+    }
+}
+</pre>
+<pre class="term" data-cwd="~/loja">$ php assinatura.php
+
+Fatal error: Declaration of Boleto::pagar(float $valor, string $vencimento): string must be compatible with Pagavel::pagar(float $valor): string in /home/ana/loja/assinatura.php on line 9
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> quem chama <code>pagar($valor)</code> pela interface não sabe do vencimento; o parâmetro obrigatório a mais quebraria o contrato. <strong>Como consertar:</strong> receba o vencimento no construtor do <code>Boleto</code> (guardando numa propriedade) ou dê um valor padrão: <code>string $vencimento = "em 3 dias"</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>O que faz</th></tr>
+<tr><td><code>interface X { public function f(): tipo; }</code></td><td>Declara um contrato</td></tr>
+<tr><td><code>class A implements X</code></td><td>A classe cumpre o contrato <code>X</code></td></tr>
+<tr><td><code>class A implements X, Y</code></td><td>Várias interfaces</td></tr>
+<tr><td><code>class A extends B implements X</code></td><td>Mãe e interface juntas</td></tr>
+<tr><td><code>interface Y extends X</code></td><td>Interface que acrescenta métodos a outra</td></tr>
+<tr><td><code>public const tipo NOME = valor;</code> (na interface)</td><td>Constante do contrato</td></tr>
+<tr><td><code>function f(X $obj)</code></td><td>Aceita qualquer objeto que implemente <code>X</code></td></tr>
+<tr><td><code>$obj instanceof X</code>, <code>class_implements($obj)</code></td><td>Confere / lista as interfaces</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Missão final</h2>
+<div class="tryphp" data-goal="out:3 itens,out:&quot;total&quot;:79.3,src:implements Countable\, JsonSerializable,semerro">
+<p class="try-task"><strong>Missão:</strong> faça o <code>Carrinho</code> implementar <strong>duas</strong> interfaces nativas: <code>implements Countable, JsonSerializable</code>. Escreva <code>count(): int</code> (quantos preços há em <code>$this-&gt;precos</code>) e <code>jsonSerialize(): array</code>, que devolve <code>["itens" =&gt; count($this-&gt;precos), "total" =&gt; round(array_sum($this-&gt;precos), 2)]</code>. A saída deve ter <code>3 itens</code> e um JSON com <code>"total":79.3</code>.</p>
+<pre class="script">&lt;?php
+class Carrinho
+{
+    private array $precos = [];
+
+    public function adicionar(float $preco): void
+    {
+        $this-&gt;precos[] = $preco;
+    }
+
+    // escreva count e jsonSerialize aqui
+}
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(25.90);
+$carrinho-&gt;adicionar(49.90);
+$carrinho-&gt;adicionar(3.50);
+
+echo count($carrinho) . " itens\n";
+echo json_encode($carrinho) . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+class Carrinho implements Countable, JsonSerializable
+{
+    private array $precos = [];
+
+    public function adicionar(float $preco): void
+    {
+        $this-&gt;precos[] = $preco;
+    }
+
+    public function count(): int
+    {
+        return count($this-&gt;precos);
+    }
+
+    public function jsonSerialize(): array
+    {
+        return ["itens" =&gt; count($this-&gt;precos), "total" =&gt; round(array_sum($this-&gt;precos), 2)];
+    }
+}
+
+$carrinho = new Carrinho();
+$carrinho-&gt;adicionar(25.90);
+$carrinho-&gt;adicionar(49.90);
+$carrinho-&gt;adicionar(3.50);
+
+echo count($carrinho) . " itens\n";
+echo json_encode($carrinho) . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Cumprir o contrato</h3>
+<p>Complete para a classe <code>Pix</code> cumprir a interface <code>Pagavel</code>:</p>
+<div class="ex-code">class Pix <input data-answer="implements Pagavel" aria-label="interface"> { … }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Duas interfaces</h3>
+<p>Complete para a classe implementar <code>Pagavel</code> e <code>Reembolsavel</code>:</p>
+<div class="ex-code">class Pix implements <input data-answer="Pagavel, Reembolsavel|Reembolsavel, Pagavel|Pagavel,Reembolsavel" aria-label="interfaces"> { … }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Funcionar com count()</h3>
+<p>Qual interface nativa faz um objeto funcionar com <code>count($obj)</code>?</p>
+<div class="ex-code">class Carrinho implements <input data-answer="Countable" aria-label="interface nativa"> { … }</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. O que uma interface <strong>não</strong> pode ter?</p>
+<label><input type="radio" name="q4"> Constantes</label>
+<label><input type="radio" name="q4"> Assinaturas de métodos públicos</label>
+<label><input type="radio" name="q4"> Métodos com corpo (código)</label>
+<label><input type="radio" name="q4"> Estender outra interface</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Quantas interfaces uma classe pode implementar?</p>
+<label><input type="radio" name="q5"> Só uma, como a mãe</label>
+<label><input type="radio" name="q5"> Quantas quiser</label>
+<label><input type="radio" name="q5"> Até duas</label>
+<label><input type="radio" name="q5"> Nenhuma, se tiver mãe</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Uma classe com <code>__toString()</code> e sem <code>implements</code> nenhum. Quanto vale <code>$obj instanceof Stringable</code>?</p>
+<label><input type="radio" name="q6"> <code>false</code>: faltou o <code>implements</code></label>
+<label><input type="radio" name="q6"> Dá erro</label>
+<label><input type="radio" name="q6"> <code>null</code></label>
+<label><input type="radio" name="q6"> <code>true</code>: o PHP implementa <code>Stringable</code> automaticamente</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">7. Classes <code>Pix</code>, <code>Boleto</code> e <code>Cripto</code> não têm código em comum, mas todas precisam de <code>pagar()</code>. O que usar?</p>
+<label><input type="radio" name="q7"> Uma interface <code>Pagavel</code></label>
+<label><input type="radio" name="q7"> Uma classe abstrata com o código delas</label>
+<label><input type="radio" name="q7"> Uma classe mãe comum com <code>pagar()</code> vazio</label>
+<label><input type="radio" name="q7"> Propriedades estáticas</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma <strong>interface</strong> é um contrato: assinaturas de métodos públicos, sem código. Não pode ser instanciada.</li>
+  <li><code>class X implements Interface</code>: a classe promete os métodos; se faltar algum, o PHP recusa a classe antes de rodar.</li>
+  <li>Use a interface como <strong>tipo</strong>: a função aceita qualquer classe que a cumpra (<strong>polimorfismo</strong>).</li>
+  <li>Uma classe pode implementar <strong>várias</strong> interfaces; uma interface pode estender outra; interfaces podem ter constantes.</li>
+  <li>Nativas úteis: <code>Countable</code> (<code>count()</code>), <code>JsonSerializable</code> (<code>json_encode</code>), <code>Stringable</code> (automática com <code>__toString</code>).</li>
+  <li>Interface = "sabe fazer"; classe abstrata = "é um", com código comum. Na dúvida, comece pela interface.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
