@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP if, elseif, else — tomar decisões no código | Guia PHP</title>
+<meta name="description" content="A estrutura if do PHP do zero: if, else, elseif e else if, ifs aninhados, o que conta como verdadeiro, comparar com ===, o bug do = no lugar de ==, a sintaxe alternativa com : e endif em templates HTML e os Parse errors reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">if, elseif, else</span></h1>
+
+<p class="intro">Até aqui, seus programas rodavam todas as linhas, de cima para baixo, sempre. Programas de verdade <strong>decidem</strong>: mostram "Aprovada" ou "Reprovada" conforme a nota, "Frete grátis" se a compra passar de 100 reais, a página de login se a pessoa não entrou. A ferramenta para isso é o <code>if</code>.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do <code>if</code>: condição entre parênteses e bloco entre chaves.</li>
+  <li><code>else</code> ("senão") e <code>elseif</code> ("senão, se"), e por que a ordem importa.</li>
+  <li><code>if</code> dentro de <code>if</code>, e <code>if</code> sem chaves (e a armadilha que vem junto).</li>
+  <li>O que o PHP considera verdadeiro e falso, e por que comparar com <code>===</code>.</li>
+  <li>O bug do <code>=</code> no lugar de <code>==</code>, que não dá erro nenhum.</li>
+  <li>A sintaxe alternativa <code>if: … endif;</code>, usada no meio do HTML.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: uma bifurcação no caminho</h2>
+<p>"<strong>Se</strong> estiver chovendo, levo o guarda-chuva. <strong>Senão</strong>, levo os óculos de sol." Você toma decisões assim o dia todo: olha uma <strong>condição</strong> (está chovendo?), e a resposta é sim ou não. Conforme a resposta, faz uma coisa ou outra.</p>
+<p>No PHP, <code>if</code> é "se" em inglês, e <code>else</code> é "senão". A condição é qualquer coisa que dê <code>true</code> (verdadeiro) ou <code>false</code> (falso), normalmente uma comparação como <code>$nota &gt;= 7</code> (veja <a href="operadores-comparacao.html">Comparação</a> e <a href="booleanos.html">Booleanos</a>).</p>
+
+<hr>
+
+<h2><code>if</code>: fazer algo só se…</h2>
+
+<pre class="file" data-file="aprovada.php">&lt;?php
+$nota = 8.5;
+if ($nota &gt;= 7) {
+    echo "Aprovada!\n";
+}
+echo "Fim do boletim.\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>if</dt><dd>A palavra que começa a decisão: "se".</dd>
+  <dt>( $nota &gt;= 7 )</dt><dd>A <strong>condição</strong>, sempre entre parênteses. "A nota é maior ou igual a 7?" O PHP calcula e obtém <code>true</code> ou <code>false</code>.</dd>
+  <dt>{ … }</dt><dd>O <strong>bloco</strong>: as linhas que só rodam se a condição for <code>true</code>. Pode ter quantas linhas você quiser.</dd>
+  <dt>(recuo de 4 espaços)</dt><dd>As linhas de dentro ficam recuadas. O PHP não exige, mas é o que deixa claro, de olho, o que está dentro do <code>if</code>.</dd>
+  <dt>echo "Fim…"</dt><dd>Fora das chaves: roda <strong>sempre</strong>, com qualquer nota.</dd>
+</dl>
+
+<pre class="term">$ php aprovada.php
+Aprovada!
+Fim do boletim.</pre>
+
+<p>Agora troque a primeira linha por <code>$nota = 5;</code> e rode de novo:</p>
+<pre class="term">$ php aprovada.php
+Fim do boletim.          « a condição deu false: o bloco foi pulado</pre>
+
+<p>Repare que não há <code>;</code> depois do <code>)</code> nem depois do <code>}</code>. O <code>;</code> fica só no fim dos comandos <strong>dentro</strong> do bloco.</p>
+
+<hr>
+
+<h2><code>else</code>: senão…</h2>
+<p>Com <code>else</code>, você diz o que fazer quando a condição é falsa. Exatamente <strong>um</strong> dos dois blocos roda, nunca os dois, nunca nenhum.</p>
+
+<pre class="file" data-file="senao.php">&lt;?php
+$nota = 5;
+if ($nota &gt;= 7) {
+    echo "Aprovada!\n";
+} else {
+    echo "Não foi dessa vez.\n";
+}
+</pre>
+<pre class="term">$ php senao.php
+Não foi dessa vez.</pre>
+
+<p>O <code>else</code> não tem condição: ele é "todo o resto". Ele vem logo depois do <code>}</code> do <code>if</code>.</p>
+
+<hr>
+
+<h2><code>elseif</code>: mais de dois caminhos</h2>
+<p>A escola da Ana tem três situações: 7 ou mais, aprovado; de 5 a 7, recuperação; abaixo de 5, reprovado. Para isso, encadeie condições com <code>elseif</code> ("senão, se"):</p>
+
+<pre class="file" data-file="situacao.php">&lt;?php
+$nota = 6;
+if ($nota &gt;= 7) {
+    echo "Aprovado\n";
+} elseif ($nota &gt;= 5) {
+    echo "Recuperação\n";
+} else {
+    echo "Reprovado\n";
+}
+</pre>
+<pre class="term">$ php situacao.php
+Recuperação</pre>
+
+<p>O PHP testa as condições <strong>de cima para baixo</strong> e para na <strong>primeira</strong> verdadeira:</p>
+<ol class="passo">
+  <li><code>6 &gt;= 7</code>? Não. Vai para o próximo.</li>
+  <li><code>6 &gt;= 5</code>? Sim. Roda "Recuperação" e <strong>pula todo o resto</strong>, até o fim do último <code>}</code>.</li>
+</ol>
+<p>Repare que o <code>elseif</code> não precisa testar "<code>$nota &lt; 7</code>": se chegou ali, é porque a condição de cima já deu falso. Você pode ter quantos <code>elseif</code> quiser, e o <code>else</code> no fim é opcional.</p>
+
+<h3>A ordem importa</h3>
+<p>Como o PHP para na primeira condição verdadeira, a ordem das condições muda o resultado:</p>
+<pre class="file" data-file="ordem.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 5) {
+    echo "Recuperação\n";
+} elseif ($nota &gt;= 7) {
+    echo "Aprovado\n";
+}
+</pre>
+<pre class="term">$ php ordem.php
+Recuperação          « errado! 8 também é &gt;= 5, e essa condição veio primeiro</pre>
+<p>A condição <code>$nota &gt;= 7</code> nunca vai ser alcançada com nota alta. A regra: em faixas de valores, comece pela <strong>mais restrita</strong> (a maior nota) e desça.</p>
+
+<h3><code>elseif</code> ou <code>else if</code>?</h3>
+<p>Com chaves, as duas formas funcionam e fazem a mesma coisa: <code>} else if (…) {</code> é um <code>else</code> cujo bloco é outro <code>if</code>. A comunidade PHP (e o guia de estilo PSR-12; veja <a href="psr.html">Padrões PSR</a>) prefere <strong><code>elseif</code></strong>, junto. Na sintaxe alternativa com <code>:</code>, que você vai ver no fim da aula, <strong>só</strong> <code>elseif</code> funciona.</p>
+
+<div class="tryphp" data-goal="out:Frete: R$ 10\,00,src:elseif|else if">
+<p class="try-task"><strong>Missão:</strong> na lojinha da Ana, o frete é grátis para compras a partir de R$ 100, custa R$ 10,00 para compras a partir de R$ 50 e R$ 20,00 para as menores. Com <code>$compra = 75</code>, o programa deve mostrar <code>Frete: R$ 10,00</code>. Acrescente o <code>elseif</code> que falta.</p>
+<pre class="script">&lt;?php
+$compra = 75;
+if ($compra &gt;= 100) {
+    echo "Frete grátis!";
+} else {
+    echo "Frete: R$ 20,00";
+}
+</pre>
+<pre class="solucao">&lt;?php
+$compra = 75;
+if ($compra &gt;= 100) {
+    echo "Frete grátis!";
+} elseif ($compra &gt;= 50) {
+    echo "Frete: R$ 10,00";
+} else {
+    echo "Frete: R$ 20,00";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Condições compostas e <code>if</code> dentro de <code>if</code></h2>
+<p>Para testar duas coisas ao mesmo tempo, use os <a href="operadores-logicos.html">operadores lógicos</a>: <code>&amp;&amp;</code> ("e": as duas precisam ser verdadeiras) e <code>||</code> ("ou": basta uma).</p>
+
+<pre class="file" data-file="composta.php">&lt;?php
+$nota = 8;
+$faltas = 12;
+if ($nota &gt;= 7 &amp;&amp; $faltas &lt;= 10) {
+    echo "Aprovado\n";
+} else {
+    echo "Não aprovado\n";
+}
+</pre>
+<pre class="term">$ php composta.php
+Não aprovado          « nota boa, mas faltas demais</pre>
+
+<p>O problema dessa versão: o aluno não sabe <strong>por que</strong> não passou. Com um <code>if</code> dentro do outro (<code>if</code> <strong>aninhado</strong>), dá para dar a resposta certa a cada caso:</p>
+
+<pre class="file" data-file="aninhado.php">&lt;?php
+$nota = 8;
+$faltas = 12;
+if ($faltas &lt;= 10) {
+    if ($nota &gt;= 7) {
+        echo "Aprovado\n";
+    } else {
+        echo "Reprovado por nota\n";
+    }
+} else {
+    echo "Reprovado por faltas\n";
+}
+</pre>
+<pre class="term">$ php aninhado.php
+Reprovado por faltas</pre>
+
+<p>Cada <code>if</code> de dentro fica recuado mais 4 espaços: assim você enxerga quais chaves fecham o quê. Evite passar de 2 ou 3 níveis; quando o código começa a "andar para a direita", geralmente dá para reescrever com <code>&amp;&amp;</code>, com <code>elseif</code> ou com um <a href="match.html"><code>match</code></a>.</p>
+
+<hr>
+
+<h2><code>if</code> sem chaves (e a armadilha)</h2>
+<p>Se o bloco tem <strong>um único comando</strong>, as chaves são opcionais:</p>
+<pre class="file" data-file="curto.php">&lt;?php
+$nota = 9;
+if ($nota &gt;= 7) echo "Aprovado\n";
+else echo "Reprovado\n";
+</pre>
+<pre class="term">$ php curto.php
+Aprovado</pre>
+
+<p>Parece prático, mas esconde uma armadilha. A Ana quis mostrar duas mensagens para quem passou:</p>
+<pre class="file" data-file="armadilha.php">&lt;?php
+$nota = 3;
+if ($nota &gt;= 7)
+    echo "Aprovado!\n";
+    echo "Parabéns!\n";
+</pre>
+<pre class="term">$ php armadilha.php
+Parabéns!          « com nota 3!</pre>
+
+<p>Sem chaves, o <code>if</code> só "pega" o <strong>primeiro</strong> comando. O segundo <code>echo</code> está recuado, o que engana o olho, mas para o PHP ele está fora do <code>if</code> e roda sempre. O recuo não significa nada para o PHP. <strong>Use chaves sempre</strong>, mesmo com uma linha só.</p>
+
+<hr>
+
+<h2>O que conta como verdadeiro?</h2>
+<p>A condição do <code>if</code> não precisa ser uma comparação. Qualquer valor serve: o PHP o converte para <code>true</code> ou <code>false</code>. Os valores que viram <code>false</code> são poucos, e vale a pena conhecê-los:</p>
+
+<pre class="file" data-file="verdade.php">&lt;?php
+if (0) echo "verdadeiro\n"; else echo "0 é falso\n";
+if ("0") echo "verdadeiro\n"; else echo "\"0\" é falso\n";
+if ("0.0") echo "\"0.0\" é verdadeiro\n";
+if ([]) echo "verdadeiro\n"; else echo "[] é falso\n";
+if (" ") echo "\" \" é verdadeiro\n";
+</pre>
+<pre class="term">$ php verdade.php
+0 é falso
+"0" é falso
+"0.0" é verdadeiro
+[] é falso
+" " é verdadeiro</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Viram <code>false</code> (falsos)</th><th>Todo o resto vira <code>true</code>, inclusive…</th></tr>
+<tr><td><code>false</code>, <code>0</code>, <code>0.0</code>, <code>""</code> (texto vazio), <code>"0"</code>, <code>[]</code> (array vazio), <code>null</code></td><td><code>"0.0"</code>, <code>" "</code> (um espaço), <code>"false"</code>, <code>-1</code>, <code>[0]</code></td></tr>
+</table>
+</div>
+
+<p>Por isso <code>if ($nome)</code> é um jeito comum de perguntar "o nome foi preenchido?". Mas cuidado com o <code>"0"</code>: se alguém digitar o número zero num campo, o <code>if</code> acha que está vazio. E foi assim que o <code>strpos</code> enganou a Ana na aula de <a href="funcoes-string.html#armadilha">Funções de String</a>: a posição <code>0</code> virou <code>false</code>.</p>
+
+<hr>
+
+<h2>Compare com <code>===</code></h2>
+<p>O <code>==</code> compara valores convertendo os tipos se precisar; o <code>===</code> exige valor <strong>e</strong> tipo iguais (veja <a href="operadores-comparacao.html">Comparação (== e ===)</a>). Dados de formulário sempre chegam como texto:</p>
+
+<pre class="file" data-file="estrito.php">&lt;?php
+$idade = "18";          // veio de um formulário: é texto
+if ($idade == 18) {
+    echo "== : igual\n";
+}
+if ($idade === 18) {
+    echo "=== : igual\n";
+} else {
+    echo "=== : diferente (string × int)\n";
+}
+</pre>
+<pre class="term">$ php estrito.php
+== : igual
+=== : diferente (string × int)</pre>
+
+<p>Prefira <code>===</code> e <code>!==</code>: o resultado é previsível. Quando o tipo pode variar (como o texto do formulário), converta antes, de propósito: <code>if ((int) $idade === 18)</code>.</p>
+
+<hr>
+
+<h2>O bug do <code>=</code> no lugar de <code>==</code></h2>
+<p>Esse é o erro mais famoso de quem começa, em qualquer linguagem. Repare no <code>if</code>:</p>
+
+<pre class="file" data-file="atribuicao.php">&lt;?php
+$nota = 5;
+if ($nota = 10) {
+    echo "Nota máxima!\n";
+}
+echo "A nota agora é $nota\n";
+</pre>
+<pre class="term">$ php atribuicao.php
+Nota máxima!            « com nota 5?!
+A nota agora é 10       « e a nota mudou!</pre>
+
+<p>Um <code>=</code> só não compara: ele <strong>atribui</strong> (guarda o valor; veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>). A linha <code>if ($nota = 10)</code> fez duas coisas: guardou <code>10</code> em <code>$nota</code> e usou esse 10 como condição. E 10 é "verdadeiro". Resultado: o bloco roda sempre e a variável é estragada. O PHP não mostra erro nem aviso, porque atribuir dentro de um <code>if</code> é permitido.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Significado</th></tr>
+<tr><td><code>$nota = 10</code></td><td>Guarde 10 em <code>$nota</code></td></tr>
+<tr><td><code>$nota == 10</code></td><td><code>$nota</code> vale 10? (convertendo tipos)</td></tr>
+<tr><td><code>$nota === 10</code></td><td><code>$nota</code> vale 10 e é <code>int</code>?</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Um truque de defesa: a constante à esquerda</strong>
+<p>Algumas pessoas escrevem <code>if (10 === $nota)</code>. Se esquecerem um <code>=</code>, sai <code>if (10 = $nota)</code>, que o PHP recusa, porque não dá para guardar algo dentro do número 10:</p>
+<pre class="term">$ php yoda.php
+
+Parse error: syntax error, unexpected token "=" in /home/ana/php/yoda.php on line 3</pre>
+<p>Esse estilo tem até apelido, "condição Yoda" (pela ordem invertida das frases do personagem). Não é obrigatório; usar sempre <code>===</code> e ler com atenção já resolve.</p>
+</div>
+
+<hr>
+
+<h2>Sintaxe alternativa: <code>if: … endif;</code></h2>
+<p>Quando o PHP está no meio de uma página HTML (veja <a href="php-e-html.html">PHP Dentro do HTML</a>), as chaves ficam perdidas entre as tags. Por isso existe uma segunda forma de escrever o <code>if</code>: os dois-pontos <code>:</code> abrem o bloco, e <code>endif;</code> ("fim do se") fecha.</p>
+
+<pre class="file" data-file="boletim.php">&lt;?php $nota = 8.5; ?&gt;
+&lt;h1&gt;Boletim&lt;/h1&gt;
+&lt;?php if ($nota &gt;= 7): ?&gt;
+    &lt;p class="ok"&gt;Aprovada com &lt;?= $nota ?&gt;!&lt;/p&gt;
+&lt;?php elseif ($nota &gt;= 5): ?&gt;
+    &lt;p class="aviso"&gt;Recuperação.&lt;/p&gt;
+&lt;?php else: ?&gt;
+    &lt;p class="erro"&gt;Reprovada.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>if (…):</dt><dd>Os dois-pontos no lugar do <code>{</code>.</dd>
+  <dt>elseif (…):</dt><dd>Junto, obrigatoriamente: <code>else if</code> aqui dá erro.</dd>
+  <dt>else:</dt><dd>Também com dois-pontos.</dd>
+  <dt>endif;</dt><dd>Fecha tudo, no lugar do <code>}</code>, com ponto e vírgula.</dd>
+  <dt>?&gt; HTML &lt;?php</dt><dd>Entre um pedaço e outro, o PHP "sai" e você escreve HTML puro. Só o HTML do caminho escolhido vai para a página.</dd>
+</dl>
+
+<pre class="term">$ php boletim.php
+&lt;h1&gt;Boletim&lt;/h1&gt;
+    &lt;p class="ok"&gt;Aprovada com 8.5!&lt;/p&gt;</pre>
+
+<p>Os parágrafos de "Recuperação" e "Reprovada" nem aparecem no HTML gerado: o navegador nunca fica sabendo deles. Mudou a nota, muda o HTML.</p>
+
+<div class="tryphp" data-modo="web">
+<p class="try-task"><strong>Experimente:</strong> rode, veja a aba <strong>Resultado</strong> e a aba <strong>Código-fonte HTML</strong>. Depois troque a nota para <code>6</code> e para <code>3</code>.</p>
+<pre class="script">&lt;?php $nota = 8.5; ?&gt;
+&lt;h1&gt;Boletim da Carla&lt;/h1&gt;
+&lt;?php if ($nota &gt;= 7): ?&gt;
+    &lt;p style="color: green"&gt;Aprovada com &lt;?= $nota ?&gt;!&lt;/p&gt;
+&lt;?php elseif ($nota &gt;= 5): ?&gt;
+    &lt;p style="color: orange"&gt;Recuperação.&lt;/p&gt;
+&lt;?php else: ?&gt;
+    &lt;p style="color: red"&gt;Reprovada.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+</pre>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Prefira</th></tr>
+<tr><td>Código PHP "puro" (lógica, cálculos)</td><td>Chaves <code>{ }</code></td></tr>
+<tr><td>Pedaços de HTML que aparecem ou não</td><td><code>if: … endif;</code></td></tr>
+<tr><td>Escolher entre dois valores curtos</td><td>Operador ternário (próxima aula: <a href="ternario.html">Operador Ternário</a>)</td></tr>
+<tr><td>Comparar uma variável com muitos valores fixos</td><td><a href="match.html"><code>match</code></a> ou <a href="switch.html"><code>switch</code></a></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>expecting "(" — esqueceu os parênteses</strong>
+<pre class="file" data-file="sem-parenteses.php">&lt;?php
+$nota = 8;
+if $nota &gt;= 7 {
+    echo "Aprovado\n";
+}
+</pre>
+<pre class="term">$ php sem-parenteses.php
+
+Parse error: syntax error, unexpected variable "$nota", expecting "(" in /home/ana/php/sem-parenteses.php on line 3</pre>
+<p><strong>O que significa:</strong> "variável <code>$nota</code> inesperada, esperava <code>(</code>". Em PHP, a condição do <code>if</code> sempre vai entre parênteses (em Python não precisa, e quem vem de lá esquece).</p>
+<p><strong>Como consertar:</strong> <code>if ($nota &gt;= 7) {</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Unclosed '{' — faltou fechar a chave</strong>
+<pre class="file" data-file="sem-chave.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7) {
+    echo "Aprovado\n";
+</pre>
+<pre class="term">$ php sem-chave.php
+
+Parse error: Unclosed '{' on line 3 in /home/ana/php/sem-chave.php on line 5</pre>
+<p><strong>O que significa:</strong> "chave aberta na linha 3 e não fechada". O PHP chegou ao fim do arquivo (linha 5) procurando o <code>}</code>. A mensagem é boa: ela diz <strong>onde a chave foi aberta</strong>.</p>
+<p><strong>Como consertar:</strong> feche o bloco. Com <code>if</code> aninhados, conte: cada <code>{</code> precisa de um <code>}</code>. Editores mostram o par de cada chave quando você coloca o cursor nela (veja <a href="editores.html">Editores e IDEs</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected token "elseif" — <code>elseif</code> depois do <code>else</code></strong>
+<pre class="file" data-file="ordem-else.php">&lt;?php
+$nota = 3;
+if ($nota &gt;= 7) {
+    echo "Aprovado\n";
+} else {
+    echo "Reprovado\n";
+} elseif ($nota &gt;= 5) {
+    echo "Recuperação\n";
+}
+</pre>
+<pre class="term">$ php ordem-else.php
+
+Parse error: syntax error, unexpected token "elseif", expecting end of file in /home/ana/php/ordem-else.php on line 7</pre>
+<p><strong>O que significa:</strong> o <code>else</code> é sempre o <strong>último</strong>: ele é "todo o resto". Depois dele, a estrutura acabou, e um <code>elseif</code> solto não faz sentido.</p>
+<p><strong>Como consertar:</strong> a ordem é sempre <code>if</code> → <code>elseif</code> (quantos quiser) → <code>else</code> (opcional, no máximo um).</p>
+</div>
+
+<div class="cenario">
+<strong>unexpected token "if", expecting ":" — <code>else if</code> na sintaxe alternativa</strong>
+<pre class="file" data-file="else-if.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7):
+    echo "Aprovado\n";
+else if ($nota &gt;= 5):
+    echo "Recuperação\n";
+endif;
+</pre>
+<pre class="term">$ php else-if.php
+
+Parse error: syntax error, unexpected token "if", expecting ":" in /home/ana/php/else-if.php on line 5</pre>
+<p><strong>O que significa:</strong> na sintaxe com <code>:</code>, o PHP esperava <code>else:</code> e encontrou outro <code>if</code>.</p>
+<p><strong>Como consertar:</strong> escreva <code>elseif</code>, junto.</p>
+</div>
+
+<div class="cenario">
+<strong>O bloco roda sempre: um <code>;</code> depois do <code>if</code></strong>
+<pre class="file" data-file="ponto-virgula.php">&lt;?php
+$nota = 3;
+if ($nota &gt;= 7);
+{
+    echo "Aprovado\n";
+}
+</pre>
+<pre class="term">$ php ponto-virgula.php
+Aprovado            « com nota 3</pre>
+<p><strong>O que significa:</strong> o <code>;</code> logo depois do <code>)</code> é um comando vazio. O <code>if</code> ficou assim: "se a nota for &gt;= 7, não faça nada". As chaves de baixo viraram um bloco solto, que roda sempre. Nenhum erro, nenhum aviso.</p>
+<p><strong>Como consertar:</strong> nunca coloque <code>;</code> depois do <code>)</code> do <code>if</code>. Mantenha a <code>{</code> na mesma linha do <code>if</code>: fica mais fácil de perceber.</p>
+</div>
+
+<div class="cenario">
+<strong>Undefined variable na condição</strong>
+<pre class="file" data-file="indefinida.php">&lt;?php
+if ($naoExiste &gt; 5) { echo "a"; } else { echo "b\n"; }
+</pre>
+<pre class="term">$ php indefinida.php
+
+Warning: Undefined variable $naoExiste in /home/ana/php/indefinida.php on line 2
+b</pre>
+<p><strong>O que significa:</strong> a variável não existe (um erro de digitação ou um campo de formulário que não veio). O PHP avisa, trata como <code>null</code> e segue: <code>null &gt; 5</code> é falso.</p>
+<p><strong>Como consertar:</strong> confira o nome. Para dados que podem não existir, use <code>isset</code> ou <code>??</code> (veja <a href="null-coalescing.html">?? e ?-&gt;</a>).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>Exemplo</th></tr>
+<tr><td><code>if</code></td><td><code>if ($a &gt; 0) { … }</code></td></tr>
+<tr><td><code>if</code> + <code>else</code></td><td><code>if ($a &gt; 0) { … } else { … }</code></td></tr>
+<tr><td><code>if</code> + <code>elseif</code> + <code>else</code></td><td><code>if (…) { … } elseif (…) { … } else { … }</code></td></tr>
+<tr><td><code>else if</code> (com chaves)</td><td>Igual ao <code>elseif</code></td></tr>
+<tr><td>Sintaxe alternativa</td><td><code>if (…): … elseif (…): … else: … endif;</code></td></tr>
+<tr><td>Sem chaves (evite)</td><td><code>if ($a &gt; 0) echo "positivo";</code></td></tr>
+<tr><td>Falsos</td><td><code>false 0 0.0 "" "0" [] null</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Complete o if</h3>
+<p>Complete para mostrar "Maior de idade" quando <code>$idade</code> for 18 ou mais:</p>
+<div class="ex-code">if (<input data-answer="$idade &gt;= 18|$idade&gt;=18|18 &lt;= $idade" aria-label="condição">) { echo "Maior de idade"; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Senão, se</h3>
+<p>Complete com a palavra que encadeia uma nova condição:</p>
+<div class="ex-code">if ($n &gt; 0) { echo "positivo"; } <input data-answer="elseif|else if" aria-label="palavra"> ($n &lt; 0) { echo "negativo"; } else { echo "zero"; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. Fechar na sintaxe alternativa</h3>
+<p>Complete o fechamento:</p>
+<div class="ex-code">&lt;?php if ($logado): ?&gt; &lt;p&gt;Olá!&lt;/p&gt; &lt;?php <input data-answer="endif;|endif" aria-label="fechamento"> ?&gt;</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Com <code>$x = 0;</code>, o que mostra <code>if ($x = 5) { echo "sim"; } else { echo "não"; }</code>?</p>
+<label><input type="radio" name="q4"> <code>não</code></label>
+<label><input type="radio" name="q4"> Parse error</label>
+<label><input type="radio" name="q4"> <code>sim</code></label>
+<label><input type="radio" name="q4"> Nada</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Qual destes valores faz um <code>if</code> rodar o bloco?</p>
+<label><input type="radio" name="q5"> <code>"0"</code></label>
+<label><input type="radio" name="q5"> <code>"0.0"</code></label>
+<label><input type="radio" name="q5"> <code>[]</code></label>
+<label><input type="radio" name="q5"> <code>null</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. Com <code>$nota = 9</code>, o que mostra <code>if ($nota &gt;= 5) { echo "A"; } elseif ($nota &gt;= 7) { echo "B"; } else { echo "C"; }</code>?</p>
+<label><input type="radio" name="q6"> <code>AB</code></label>
+<label><input type="radio" name="q6"> <code>B</code></label>
+<label><input type="radio" name="q6"> <code>C</code></label>
+<label><input type="radio" name="q6"> <code>A</code></label>
+</div>
+
+<div class="tryphp" data-modo="web" data-goal="html:Últimas unidades,src:endif">
+<p class="try-task"><strong>Missão final:</strong> na página de produto da lojinha, mostre <code>Esgotado</code> se o estoque for 0, <code>Últimas unidades!</code> se for menor que 5, e <code>Em estoque</code> nos outros casos. Use a sintaxe alternativa (<code>if:</code>, <code>elseif:</code>, <code>else:</code>, <code>endif;</code>). Com <code>$estoque = 3</code>, a página deve mostrar "Últimas unidades!".</p>
+<pre class="script">&lt;?php $estoque = 3; ?&gt;
+&lt;h2&gt;Maçã — R$ 4,50/kg&lt;/h2&gt;
+&lt;p&gt;Em estoque&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php $estoque = 3; ?&gt;
+&lt;h2&gt;Maçã — R$ 4,50/kg&lt;/h2&gt;
+&lt;?php if ($estoque === 0): ?&gt;
+    &lt;p&gt;Esgotado&lt;/p&gt;
+&lt;?php elseif ($estoque &lt; 5): ?&gt;
+    &lt;p&gt;Últimas unidades!&lt;/p&gt;
+&lt;?php else: ?&gt;
+    &lt;p&gt;Em estoque&lt;/p&gt;
+&lt;?php endif; ?&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>if (condição) { … }</code> roda o bloco só quando a condição é verdadeira.</li>
+  <li><code>else</code> é o "senão"; <code>elseif</code> encadeia novas condições. O PHP para na <strong>primeira</strong> verdadeira, então a ordem importa.</li>
+  <li>Sempre use chaves: sem elas, o <code>if</code> só pega o primeiro comando, e o recuo engana.</li>
+  <li>Falsos: <code>false</code>, <code>0</code>, <code>0.0</code>, <code>""</code>, <code>"0"</code>, <code>[]</code>, <code>null</code>. O resto é verdadeiro.</li>
+  <li>Compare com <code>===</code>. Um <code>=</code> só atribui, e o bug não dá erro nenhum.</li>
+  <li>No meio do HTML, use <code>if: … elseif: … else: … endif;</code> (aqui, <code>else if</code> não funciona).</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
