@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Criar suas Exceções — extends Exception e hierarquias | Guia PHP</title>
+<meta name="description" content="Criar exceções próprias no PHP: class EstoqueInsuficienteException extends Exception, construtor com mensagem e dados extras, parent::__construct, uma hierarquia de exceções da loja, estender InvalidArgumentException, quando criar e os erros reais mais comuns.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Criar suas Exceções</span></h1>
+
+<p class="intro">Na aula anterior, a lojinha da Ana lançava <code>new Exception("Estoque insuficiente…")</code>. Funciona, mas quem captura só tem a mensagem para saber o que aconteceu, e não dá para tratar "estoque acabou" de um jeito e "cartão recusado" de outro. A solução é criar <strong>tipos de exceção próprios</strong>, com nomes que dizem o problema. São classes de uma ou poucas linhas, e são a porta de entrada mais suave para a orientação a objetos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Criar uma exceção com <code>class EstoqueInsuficienteException extends Exception {}</code>.</li>
+  <li>Capturar só o seu tipo, deixando os outros passarem.</li>
+  <li>Dar um construtor à exceção, com a mensagem pronta e dados extras (<code>parent::__construct</code>).</li>
+  <li>Montar uma <strong>hierarquia</strong>: uma exceção "mãe" da loja e várias "filhas".</li>
+  <li>Estender as exceções prontas do PHP (<code>InvalidArgumentException</code>…).</li>
+  <li>Quando vale a pena criar uma exceção, e quando não.</li>
+</ul>
+</div>
+
+<p>Você precisa ter visto <a href="excecoes.html">Exceções (try e catch)</a>. Esta aula usa duas ideias de orientação a objetos, explicadas aqui só o suficiente: <strong>classe</strong> (um "molde" de objetos) e <strong>herança</strong> (<code>extends</code>, "estende": uma classe nova que aproveita tudo de outra). Elas são estudadas a fundo em <a href="classes-objetos.html">Classes e Objetos</a> e <a href="heranca.html">Herança</a>, no Nível 3.</p>
+
+<hr>
+
+<h2>A ideia: etiquetas nos avisos</h2>
+<p>Imagine que todos os avisos da cozinha fossem papeizinhos brancos com um texto. Para saber se é "acabou o ovo" ou "o forno quebrou", você precisa ler cada um. Agora imagine papeizinhos <strong>coloridos</strong>: amarelo é falta de ingrediente, vermelho é equipamento quebrado. Você separa só de olhar, e cada cor vai para a pessoa certa. Criar uma exceção própria é criar uma nova "cor" de aviso.</p>
+
+<hr>
+
+<h2>A exceção mais simples</h2>
+<pre class="file" data-file="simples.php">&lt;?php
+class EstoqueInsuficienteException extends Exception
+{
+}
+
+function vender(string $produto, int $estoque, int $quantidade): int
+{
+    if ($quantidade &gt; $estoque) {
+        throw new EstoqueInsuficienteException("Só há $estoque de $produto");
+    }
+    return $estoque - $quantidade;
+}
+
+try {
+    vender('bolo de cenoura', 2, 5);
+} catch (EstoqueInsuficienteException $e) {
+    echo "Avise o cliente: ", $e-&gt;getMessage(), "\n";
+}
+vender('torta', 1, 3);
+</pre>
+
+<dl class="anatomy">
+  <dt>class</dt><dd>"Classe": vamos criar um novo tipo.</dd>
+  <dt>EstoqueInsuficienteException</dt><dd>O nome. Por costume, em <em>CamelCase</em> (cada palavra com maiúscula) e terminando em <code>Exception</code>. Diga o <strong>problema</strong>, não o lugar: <code>EstoqueInsuficiente</code>, e não <code>ErroNaFuncaoVender</code>.</dd>
+  <dt>extends Exception</dt><dd>"Estende <code>Exception</code>": a classe nova <strong>herda</strong> tudo da <code>Exception</code> (mensagem, código, linha, rastro, <code>getMessage()</code>…). É isso que permite lançá-la.</dd>
+  <dt>{ }</dt><dd>O corpo vazio: não precisamos acrescentar nada. A única novidade é o <strong>nome</strong>, e isso já é muito.</dd>
+</dl>
+
+<pre class="term">$ cd excp
+$ php simples.php
+Avise o cliente: Só há 2 de bolo de cenoura
+
+Fatal error: Uncaught EstoqueInsuficienteException: Só há 1 de torta in /home/ana/excp/simples.php:9
+Stack trace:
+#0 /home/ana/excp/simples.php(19): vender('torta', 1, 3)
+#1 {main}
+  thrown in /home/ana/excp/simples.php on line 9</pre>
+
+<p>A primeira venda foi capturada pelo <code>catch</code> específico. A segunda, sem <code>try</code>, virou o erro fatal, e repare que a mensagem já diz o tipo: <code>Uncaught EstoqueInsuficienteException</code>. Quem ler o registro de erros entende o problema antes mesmo de ler a mensagem.</p>
+
+<div class="tryphp" data-goal="out:Avise o cliente: Só há 2 de bolo,src:class\s+EstoqueInsuficienteException\s+extends\s+Exception,src:catch\s*\(\s*EstoqueInsuficienteException">
+<p class="try-task"><strong>Missão:</strong> crie a classe <code>EstoqueInsuficienteException</code> (filha de <code>Exception</code>), lance-a na função no lugar da <code>Exception</code> genérica e troque o <code>catch</code> para capturar só ela.</p>
+<pre class="script">&lt;?php
+// crie a classe aqui
+
+function vender(string $produto, int $estoque, int $quantidade): int
+{
+    if ($quantidade &gt; $estoque) {
+        throw new Exception("Só há $estoque de $produto");
+    }
+    return $estoque - $quantidade;
+}
+
+try {
+    vender('bolo', 2, 5);
+} catch (Exception $e) {
+    echo "Avise o cliente: ", $e-&gt;getMessage(), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+class EstoqueInsuficienteException extends Exception
+{
+}
+
+function vender(string $produto, int $estoque, int $quantidade): int
+{
+    if ($quantidade &gt; $estoque) {
+        throw new EstoqueInsuficienteException("Só há $estoque de $produto");
+    }
+    return $estoque - $quantidade;
+}
+
+try {
+    vender('bolo', 2, 5);
+} catch (EstoqueInsuficienteException $e) {
+    echo "Avise o cliente: ", $e-&gt;getMessage(), "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Um construtor: mensagem pronta e dados extras</h2>
+<p>Com a classe vazia, cada <code>throw</code> precisa montar a mensagem, e quem captura só recebe texto. Se o <code>catch</code> quiser saber <strong>quantos</strong> faltaram, teria que "ler" a mensagem. Melhor: a exceção guarda os dados e monta a mensagem sozinha. Para isso ela ganha um <strong>construtor</strong> (<code>__construct</code>), a função que roda quando você escreve <code>new</code>:</p>
+
+<pre class="file" data-file="construtor.php">&lt;?php
+class EstoqueInsuficienteException extends Exception
+{
+    public function __construct(
+        public readonly string $produto,
+        public readonly int $pedido,
+        public readonly int $disponivel,
+    ) {
+        parent::__construct("Estoque insuficiente de $produto: pediu $pedido, há $disponivel");
+    }
+}
+
+try {
+    throw new EstoqueInsuficienteException('brigadeiro', 50, 30);
+} catch (EstoqueInsuficienteException $e) {
+    echo $e-&gt;getMessage(), "\n";
+    echo "Falta(m) ", $e-&gt;pedido - $e-&gt;disponivel, " {$e-&gt;produto}(s)\n";
+    echo "Linha: ", $e-&gt;getLine(), "\n";
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>public function __construct(…)</code></td><td>O construtor: recebe os valores passados em <code>new EstoqueInsuficienteException('brigadeiro', 50, 30)</code>. Veja <a href="construtores.html">Construtores</a>.</td></tr>
+<tr><td><code>public readonly string $produto,</code></td><td>Recebe o parâmetro <strong>e</strong> já cria uma propriedade <code>$produto</code> com o valor (a "promoção de construtor", <span class="versao">PHP 8.0+</span>). <code>public</code>: dá para ler de fora (<code>$e-&gt;produto</code>). <code>readonly</code> (<span class="versao">8.1+</span>): ninguém pode mudar depois.</td></tr>
+<tr><td><code>parent::__construct("…")</code></td><td>Chama o construtor da classe <strong>mãe</strong> (<code>Exception</code>) com a mensagem montada. É ele que guarda a mensagem para o <code>getMessage()</code>. Não esqueça esta linha!</td></tr>
+<tr><td><code>$e-&gt;pedido - $e-&gt;disponivel</code></td><td>Quem captura usa os dados, sem precisar interpretar o texto.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php construtor.php
+Estoque insuficiente de brigadeiro: pediu 50, há 30
+Falta(m) 20 brigadeiro(s)
+Linha: 14                     « getLine continua funcionando: herdado da Exception</pre>
+
+<p>Agora o <code>throw</code> ficou curto e sem chance de mensagem mal escrita: <code>throw new EstoqueInsuficienteException($produto, $qtd, $estoque);</code>.</p>
+
+<div class="tryphp" data-goal="out:Faltam 3 pudim(s) para o pedido da Bia,src:parent::__construct">
+<p class="try-task"><strong>Missão:</strong> a exceção já guarda <code>$produto</code> e <code>$disponivel</code>. Acrescente o dado <code>$pedido</code> (int) ao construtor, inclua-o na mensagem e, no <code>catch</code>, mostre <code>Faltam 3 pudim(s) para o pedido da Bia</code> calculando com as propriedades.</p>
+<pre class="script">&lt;?php
+class EstoqueInsuficienteException extends Exception
+{
+    public function __construct(
+        public readonly string $produto,
+        public readonly int $disponivel,
+    ) {
+        parent::__construct("Só há $disponivel de $produto");
+    }
+}
+
+try {
+    throw new EstoqueInsuficienteException('pudim', 2);
+} catch (EstoqueInsuficienteException $e) {
+    echo $e-&gt;getMessage(), "\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+class EstoqueInsuficienteException extends Exception
+{
+    public function __construct(
+        public readonly string $produto,
+        public readonly int $pedido,
+        public readonly int $disponivel,
+    ) {
+        parent::__construct("Pediu $pedido de $produto, só há $disponivel");
+    }
+}
+
+try {
+    throw new EstoqueInsuficienteException('pudim', 5, 2);
+} catch (EstoqueInsuficienteException $e) {
+    echo $e-&gt;getMessage(), "\n";
+    echo "Faltam ", $e-&gt;pedido - $e-&gt;disponivel, " {$e-&gt;produto}(s) para o pedido da Bia\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Uma família de exceções</h2>
+<p>A lojinha tem vários problemas possíveis: produto que não existe, estoque insuficiente, pagamento recusado. Cada um merece um tipo. E todos são "problemas da loja", então podem ter uma <strong>mãe comum</strong>:</p>
+
+<pre class="file" data-file="hierarquia.php">&lt;?php
+class LojaException extends Exception {}
+class EstoqueInsuficienteException extends LojaException {}
+class ProdutoNaoEncontradoException extends LojaException {}
+class PagamentoRecusadoException extends LojaException {}
+
+$catalogo = ['bolo' =&gt; 2, 'torta' =&gt; 0];
+
+function comprar(array $catalogo, string $produto, int $qtd, bool $cartaoOk): string
+{
+    if (!array_key_exists($produto, $catalogo)) {
+        throw new ProdutoNaoEncontradoException("Não vendemos $produto");
+    }
+    if ($catalogo[$produto] &lt; $qtd) {
+        throw new EstoqueInsuficienteException("Só temos {$catalogo[$produto]} $produto(s)");
+    }
+    if (!$cartaoOk) {
+        throw new PagamentoRecusadoException('Cartão recusado');
+    }
+    return "Compra de $qtd $produto(s) aprovada";
+}
+
+$tentativas = [['bolo', 1, true], ['pastel', 1, true], ['torta', 1, true], ['bolo', 2, false]];
+foreach ($tentativas as [$p, $q, $ok]) {
+    try {
+        echo comprar($catalogo, $p, $q, $ok), "\n";
+    } catch (PagamentoRecusadoException $e) {
+        echo "Pagamento: ", $e-&gt;getMessage(), " (tente outro cartão)\n";
+    } catch (LojaException $e) {
+        echo get_class($e), ": ", $e-&gt;getMessage(), "\n";
+    }
+}
+var_dump(new EstoqueInsuficienteException() instanceof LojaException);
+var_dump(new EstoqueInsuficienteException() instanceof Exception);
+print_r(class_parents(new EstoqueInsuficienteException()));
+</pre>
+
+<p>A árvore fica assim:</p>
+<pre class="file" data-file="a família">Throwable
+└── Exception
+    └── LojaException
+        ├── EstoqueInsuficienteException
+        ├── ProdutoNaoEncontradoException
+        └── PagamentoRecusadoException
+</pre>
+
+<pre class="term">$ php hierarquia.php
+Compra de 1 bolo(s) aprovada
+ProdutoNaoEncontradoException: Não vendemos pastel        « caiu no catch da mãe
+EstoqueInsuficienteException: Só temos 0 torta(s)         « também
+Pagamento: Cartão recusado (tente outro cartão)           « tratamento especial
+bool(true)          « uma EstoqueInsuficienteException É uma LojaException
+bool(true)          « …e também É uma Exception
+Array
+(
+    [LojaException] =&gt; LojaException
+    [Exception] =&gt; Exception
+)</pre>
+
+<p>Com a família, quem captura escolhe o nível de detalhe:</p>
+<ul>
+  <li><code>catch (PagamentoRecusadoException $e)</code>: só aquele problema, com tratamento especial.</li>
+  <li><code>catch (LojaException $e)</code>: <strong>qualquer</strong> problema da loja, de uma vez. Se amanhã surgir uma <code>CupomInvalidoException extends LojaException</code>, esse <code>catch</code> já a pega, sem mudar nada.</li>
+  <li>Problemas que <strong>não</strong> são da loja (um <code>TypeError</code>, um <code>JsonException</code>) passam reto e não são confundidos com regras de negócio.</li>
+</ul>
+
+<hr>
+
+<h2>Estender as exceções do PHP</h2>
+<p>A sua exceção não precisa ser filha direta de <code>Exception</code>. Se ela é um caso particular de uma exceção que o PHP já tem (veja a tabela na <a href="excecoes.html">aula anterior</a>), estenda essa:</p>
+
+<pre class="file" data-file="spl.php">&lt;?php
+class QuantidadeInvalidaException extends InvalidArgumentException {}
+
+function quantidade(string $texto): int
+{
+    if (!ctype_digit($texto)) {
+        throw new QuantidadeInvalidaException("Quantidade inválida: '$texto'");
+    }
+    return (int) $texto;
+}
+try {
+    quantidade('dez');
+} catch (InvalidArgumentException $e) {
+    echo get_class($e), " pega como InvalidArgumentException: ", $e-&gt;getMessage(), "\n";
+}
+</pre>
+
+<pre class="term">$ php spl.php
+QuantidadeInvalidaException pega como InvalidArgumentException: Quantidade inválida: 'dez'</pre>
+
+<p>Assim, um código que já captura <code>InvalidArgumentException</code> (de uma biblioteca, por exemplo) continua funcionando com a sua exceção.</p>
+
+<div class="note">
+<strong>E <code>extends Error</code>?</strong>
+<p>Não faça. A família <code>Error</code> é para erros internos do PHP (tipo errado, função inexistente). As suas exceções são da família <code>Exception</code>.</p>
+</div>
+
+<hr>
+
+<h2>Organizar em arquivos</h2>
+<p>Num sistema de verdade, as exceções ficam num arquivo próprio (ou um arquivo por classe), carregado com <code>require_once</code> (aula <a href="include-require.html">include e require</a>):</p>
+
+<pre class="file" data-file="excecoes.php">&lt;?php
+class LojaException extends Exception {}
+
+class EstoqueInsuficienteException extends LojaException
+{
+    public function __construct(
+        public readonly string $produto,
+        public readonly int $pedido,
+        public readonly int $disponivel,
+    ) {
+        parent::__construct("Estoque insuficiente de $produto: pediu $pedido, há $disponivel");
+    }
+}
+</pre>
+
+<pre class="file" data-file="usa-arquivo.php">&lt;?php
+require_once __DIR__ . '/excecoes.php';
+
+try {
+    throw new EstoqueInsuficienteException('pudim', 3, 1);
+} catch (LojaException $e) {
+    echo $e-&gt;getMessage(), "\n";
+}
+</pre>
+
+<pre class="term">$ php usa-arquivo.php
+Estoque insuficiente de pudim: pediu 3, há 1</pre>
+
+<p>No Nível 3 você vai ver o padrão profissional: cada classe no seu arquivo (<code>EstoqueInsuficienteException.php</code>), em <a href="namespaces.html">namespaces</a>, carregadas pelo <a href="autoload.html">autoload</a> sem nenhum <code>require</code>.</p>
+
+<hr>
+
+<h2>Quando criar uma exceção própria?</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Faça</th></tr>
+<tr><td>Quem chama vai querer tratar esse problema de um jeito <strong>diferente</strong> dos outros</td><td>Crie uma exceção própria (<code>PagamentoRecusadoException</code>)</td></tr>
+<tr><td>O problema tem dados úteis para quem trata (quanto faltou, qual produto)</td><td>Exceção própria com construtor e propriedades</td></tr>
+<tr><td>Seu sistema (ou biblioteca) tem vários problemas "de negócio"</td><td>Uma mãe comum (<code>LojaException</code>) e filhas</td></tr>
+<tr><td>Um argumento inválido qualquer, que ninguém vai tratar de forma especial</td><td>Use a pronta: <code>InvalidArgumentException</code></td></tr>
+<tr><td>"Não encontrei" é um resultado normal (buscar um cliente que pode não existir)</td><td>Nem exceção: devolva <code>null</code></td></tr>
+<tr><td>Uma exceção para cada linha do programa</td><td>Não: exceções demais viram ruído. Crie quando o <strong>tipo</strong> fizer diferença para quem captura.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>"Cannot throw objects that do not implement Throwable" (esqueceu o <code>extends</code>)</strong>
+<pre class="file" data-file="sem-extends.php">&lt;?php
+class EstoqueInsuficienteException
+{
+}
+throw new EstoqueInsuficienteException();
+</pre>
+<pre class="term">$ php sem-extends.php
+
+Fatal error: Uncaught Error: Cannot throw objects that do not implement Throwable in /home/ana/excp/sem-extends.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/ana/excp/sem-extends.php on line 5</pre>
+<p><strong>O que significa:</strong> o nome termina em <code>Exception</code>, mas a classe é comum; só objetos da família <code>Throwable</code> podem ser lançados.</p>
+<p><strong>Como consertar:</strong> <code>class EstoqueInsuficienteException extends Exception</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"cannot implement interface Throwable, extend Exception or Error instead"</strong>
+<pre class="term">$ php implements.php      « class EstoqueInsuficienteException implements Throwable
+
+Fatal error: Class EstoqueInsuficienteException cannot implement interface Throwable, extend Exception or Error instead in /home/ana/excp/implements.php on line 2
+Stack trace:
+#0 {main}</pre>
+<p><strong>Como consertar:</strong> a própria mensagem diz: estenda <code>Exception</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>A mensagem saiu vazia (esqueceu o <code>parent::__construct</code>)</strong>
+<pre class="file" data-file="sem-parent.php">&lt;?php
+class EstoqueInsuficienteException extends Exception
+{
+    public function __construct(public readonly string $produto)
+    {
+    }
+}
+try {
+    throw new EstoqueInsuficienteException('bolo');
+} catch (EstoqueInsuficienteException $e) {
+    var_dump($e-&gt;getMessage());
+}
+</pre>
+<pre class="term">$ php sem-parent.php
+string(0) ""</pre>
+<p><strong>O que significa:</strong> o construtor próprio substituiu o da <code>Exception</code>, e ninguém entregou a mensagem a ela.</p>
+<p><strong>Como consertar:</strong> chame <code>parent::__construct("…mensagem…");</code> dentro do seu construtor.</p>
+</div>
+
+<div class="cenario">
+<strong>"Too few arguments to function …::__construct()"</strong>
+<pre class="term">$ php argumentos.php      « o construtor pede (produto, disponível) e alguém passou só um texto
+
+Fatal error: Uncaught ArgumentCountError: Too few arguments to function EstoqueInsuficienteException::__construct(), 1 passed in /home/ana/excp/argumentos.php on line 9 and exactly 2 expected in /home/ana/excp/argumentos.php:4
+Stack trace:
+#0 /home/ana/excp/argumentos.php(9): EstoqueInsuficienteException-&gt;__construct('Estoque acabou')
+#1 {main}
+  thrown in /home/ana/excp/argumentos.php on line 4</pre>
+<p><strong>O que significa:</strong> depois que a exceção ganhou um construtor próprio, o <code>new</code> precisa passar os argumentos <strong>dele</strong>, e não mais uma mensagem.</p>
+<p><strong>Como consertar:</strong> <code>new EstoqueInsuficienteException('bolo', 0)</code>, na ordem do construtor (ou com <a href="parametros.html">argumentos nomeados</a>).</p>
+</div>
+
+<div class="cenario">
+<strong>"Cannot override final method Exception::getMessage()"</strong>
+<pre class="term">$ php final.php      « tentou criar um método getMessage() na exceção
+
+Fatal error: Cannot override final method Exception::getMessage() in /home/ana/excp/final.php on line 4
+Stack trace:
+#0 {main}</pre>
+<p><strong>O que significa:</strong> os métodos <code>get…</code> da <code>Exception</code> são <code>final</code> ("finais"): não podem ser substituídos.</p>
+<p><strong>Como consertar:</strong> passe a mensagem pelo <code>parent::__construct</code>. Para informações extras, crie propriedades ou métodos com <strong>outros</strong> nomes.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Sintaxe</th><th>O que faz</th></tr>
+<tr><td><code>class XException extends Exception {}</code></td><td>Cria uma exceção própria.</td></tr>
+<tr><td><code>class XException extends LojaException {}</code></td><td>Filha de outra exceção sua (hierarquia).</td></tr>
+<tr><td><code>class XException extends InvalidArgumentException {}</code></td><td>Caso particular de uma exceção do PHP.</td></tr>
+<tr><td><code>public function __construct(public readonly int $x) { … }</code></td><td>Construtor que guarda dados na exceção.</td></tr>
+<tr><td><code>parent::__construct($mensagem, $codigo, $anterior)</code></td><td>Entrega mensagem, código e causa à <code>Exception</code>.</td></tr>
+<tr><td><code>$e instanceof LojaException</code></td><td>Pergunta se a exceção é daquela família.</td></tr>
+<tr><td><code>get_class($e)</code>, <code>class_parents($e)</code></td><td>Classe exata e "antepassados".</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. A mãe certa</h3>
+<p>Complete para criar uma exceção própria:</p>
+<div class="ex-code">class CupomInvalidoException <input data-answer="extends Exception" aria-label="herança"> {}</div>
+</div>
+
+<div class="exercise">
+<h3>2. Entregar a mensagem</h3>
+<p>Complete a linha dentro do construtor da exceção:</p>
+<div class="ex-code"><input data-answer="parent::__construct" aria-label="chamada">("Cupom $codigo expirou");</div>
+</div>
+
+<div class="exercise">
+<h3>3. Pegar a família toda</h3>
+<p>Todas as exceções da loja estendem <code>LojaException</code>. Complete para capturar qualquer uma:</p>
+<div class="ex-code">} catch (<input data-answer="LojaException" aria-label="tipo"> $e) {</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. <code>class PagamentoRecusadoException extends LojaException {}</code> e <code>class LojaException extends Exception {}</code>. Qual <code>catch</code> <strong>não</strong> captura uma <code>PagamentoRecusadoException</code>?</p>
+<label><input type="radio" name="q4"> <code>catch (LojaException $e)</code></label>
+<label><input type="radio" name="q4"> <code>catch (InvalidArgumentException $e)</code></label>
+<label><input type="radio" name="q4"> <code>catch (Exception $e)</code></label>
+<label><input type="radio" name="q4"> <code>catch (Throwable $e)</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Por que criar <code>EstoqueInsuficienteException</code> em vez de lançar <code>new Exception("Estoque insuficiente")</code>?</p>
+<label><input type="radio" name="q5"> Porque <code>Exception</code> está obsoleta.</label>
+<label><input type="radio" name="q5"> Porque exceções próprias são mais rápidas.</label>
+<label><input type="radio" name="q5"> Porque só exceções próprias têm mensagem.</label>
+<label><input type="radio" name="q5"> Para quem captura poder tratar esse caso separadamente e receber dados extras.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. A exceção tem construtor próprio, mas <code>getMessage()</code> devolve <code>""</code>. O que falta?</p>
+<label><input type="radio" name="q6"> Chamar <code>parent::__construct($mensagem)</code> no construtor.</label>
+<label><input type="radio" name="q6"> Criar um método <code>getMessage()</code>.</label>
+<label><input type="radio" name="q6"> Usar <code>extends Error</code>.</label>
+<label><input type="radio" name="q6"> Usar <code>readonly</code>.</label>
+</div>
+
+<div class="tryphp" data-goal="out:Desconto de 10%: R$ 90\,00,out:Cupom recusado (CupomExpiradoException): O cupom NATAL25 expirou,out:Cupom recusado (CupomInexistenteException): O cupom XYZ não existe,out:Erro inesperado (TypeError),src:extends\s+LojaException">
+<p class="try-task"><strong>Missão final:</strong> no arquivo <code>excecoes.php</code>, crie <code>LojaException</code> (filha de <code>Exception</code>) e duas filhas dela, <code>CupomInexistenteException</code> e <code>CupomExpiradoException</code>, cada uma com um construtor que recebe o código do cupom e monta a mensagem (<code>O cupom XYZ não existe</code>, <code>O cupom NATAL25 expirou</code>). No <code>index.php</code>, lance a exceção certa na função e complete o <code>catch</code> para mostrar <code>Cupom recusado (Classe): mensagem</code> para qualquer exceção da loja. O último teste provoca um <code>TypeError</code>, que já tem o seu próprio <code>catch</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+require_once __DIR__ . '/excecoes.php';
+
+$cupons = ['PROMO10' =&gt; ['desconto' =&gt; 10, 'valido' =&gt; true],
+           'NATAL25' =&gt; ['desconto' =&gt; 25, 'valido' =&gt; false]];
+
+function aplicar(array $cupons, string $codigo, float $total): float
+{
+    // lance CupomInexistenteException ou CupomExpiradoException aqui
+    return $total * (100 - $cupons[$codigo]['desconto']) / 100;
+}
+
+foreach (['PROMO10', 'NATAL25', 'XYZ', null] as $codigo) {
+    try {
+        $final = aplicar($cupons, $codigo, 100);
+        echo "Desconto de {$cupons[$codigo]['desconto']}%: R$ " . number_format($final, 2, ',', '.') . "\n";
+    } catch (TypeError $e) {
+        echo "Erro inesperado (" . get_class($e) . ")\n";
+    }
+}
+</pre>
+<pre class="script" data-file="excecoes.php">&lt;?php
+// crie as exceções aqui
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require_once __DIR__ . '/excecoes.php';
+
+$cupons = ['PROMO10' =&gt; ['desconto' =&gt; 10, 'valido' =&gt; true],
+           'NATAL25' =&gt; ['desconto' =&gt; 25, 'valido' =&gt; false]];
+
+function aplicar(array $cupons, string $codigo, float $total): float
+{
+    if (!isset($cupons[$codigo])) {
+        throw new CupomInexistenteException($codigo);
+    }
+    if (!$cupons[$codigo]['valido']) {
+        throw new CupomExpiradoException($codigo);
+    }
+    return $total * (100 - $cupons[$codigo]['desconto']) / 100;
+}
+
+foreach (['PROMO10', 'NATAL25', 'XYZ', null] as $codigo) {
+    try {
+        $final = aplicar($cupons, $codigo, 100);
+        echo "Desconto de {$cupons[$codigo]['desconto']}%: R$ " . number_format($final, 2, ',', '.') . "\n";
+    } catch (LojaException $e) {
+        echo "Cupom recusado (" . get_class($e) . "): " . $e-&gt;getMessage() . "\n";
+    } catch (TypeError $e) {
+        echo "Erro inesperado (" . get_class($e) . ")\n";
+    }
+}
+</pre>
+<pre class="solucao" data-file="excecoes.php">&lt;?php
+class LojaException extends Exception {}
+
+class CupomInexistenteException extends LojaException
+{
+    public function __construct(public readonly string $codigo)
+    {
+        parent::__construct("O cupom $codigo não existe");
+    }
+}
+
+class CupomExpiradoException extends LojaException
+{
+    public function __construct(public readonly string $codigo)
+    {
+        parent::__construct("O cupom $codigo expirou");
+    }
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Uma exceção própria é uma classe que estende <code>Exception</code>: <code>class EstoqueInsuficienteException extends Exception {}</code>.</li>
+  <li>O nome diz o problema e termina em <code>Exception</code>; quem captura pode tratá-la separadamente.</li>
+  <li>Um construtor guarda dados (<code>public readonly</code>) e monta a mensagem, entregue com <code>parent::__construct(…)</code>.</li>
+  <li>Uma mãe comum (<code>LojaException</code>) permite capturar a família toda; filhas permitem tratar casos específicos.</li>
+  <li>Casos particulares de exceções do PHP podem estendê-las (<code>extends InvalidArgumentException</code>); nunca estenda <code>Error</code>.</li>
+  <li>Crie exceções quando o <strong>tipo</strong> fizer diferença para quem captura.</li>
+</ul>
+
+<p>Próxima aula: <a href="depuracao.html">Depurar</a>, para encontrar o problema quando a mensagem de erro não basta.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
