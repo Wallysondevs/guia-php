@@ -52,11 +52,40 @@ echo "Olá, Ana!";
 
 ### Outros blocos
 `dl.anatomy`, `div.note/.tip/.warning/.cenario`, `ol.passo`, `div.table-wrap > table.ref`, `.exercise`, `.mc`, `figure`.
+No `.exercise`, `data-answer="a|b"` aceita respostas alternativas; para uma barra vertical **dentro** da resposta (union types `int|string`, o pipe `|>`), escreva `\|`: `data-answer="int\|string|string\|int"`.
 
-## 4. O "simulador": PHP real no navegador (`assets/phpsim.js`) — sendo montado em paralelo
-Não é uma imitação: é o **PHP 8.5.10 oficial compilado para WebAssembly** (pacote `@php-wasm/web-8-5`, licença GPL, o mesmo motor do WordPress Playground), hospedado no próprio site e carregado só quando o leitor roda algo. Tem as extensões comuns (mbstring, json, ctype, PDO + **pdo_sqlite**, sqlite3, date, pcre, session, filter…). Funciona: tudo da linguagem, arquivos num sistema de arquivos em memória, SQLite, sessões e cookies entre requisições da mesma caixa (modo web), `$_GET`/`$_POST`/`$_FILES`. **Não funciona** no navegador: rede de verdade (`curl` para fora, `file_get_contents("https://…")`), MySQL/servidores externos, `exec`/`shell_exec` reais, Composer — essas aulas usam saídas reais do laboratório em `pre.term`. (Confira esta seção quando o agente do simulador terminar: ele vai documentar exatamente o que roda.)
+## 4. O "simulador": PHP real no navegador (`assets/phpsim.js`)
+Não é uma imitação: é o **PHP 8.5.10 oficial compilado para WebAssembly** (`@php-wasm/web-8-5` 3.1.58, licença GPL, o motor do WordPress Playground), hospedado em `assets/php/` e rodando num Web Worker. O leitor só baixa o PHP no **primeiro clique em Rodar** (barra "Carregando o PHP (≈ 7,9 MB, só na primeira vez)…"; depois fica no cache). Cada Rodar começa **limpo**: PHP novo, arquivos da caixa recriados.
 
-Testar suas missões (quando existir): `node tools/testar-missoes.js suas-paginas.html` — roda a solução no mesmo PHP 8.5 (WebAssembly, no Node) e confere as metas.
+**Testar suas missões:** `node tools/testar-missoes.js suas-paginas.html` (sem nomes = todas). Ele usa o **mesmo PHP 8.5.10 em WebAssembly**, no Node, e confere: o código inicial **não** cumpre a meta, a solução **cumpre**, o `&lt;?php` está escapado, as metas existem, a regex é válida. `--nativo` roda também no PHP 8.5.8 do laboratório e mostra as diferenças; `-v` mostra as saídas. Para um `.php` solto: `node tools/sim.js arq.php [args] [--stdin "Ana\n29"] [--com outro.php] [--web --url "/?x=1" --post "a=1"] [--nativo]`. Se faltar `tools/node_modules`: `cd tools && npm install`.
+
+### Modo cli (padrão)
+- Mostra `ana@notebook:~$ php programa.php args`, a saída, os avisos/erros do PHP em vermelho e `[código de saída: N]`. Arquivo padrão: `programa.php` (ou `data-file` na `div`); roda em `/home/ana` (`getcwd()`), com as abas como arquivos ao lado (`require 'funcoes.php'`, `fopen('dados.csv')`).
+- Erros como no laboratório (sem php.ini): `display_errors=1` na saída (`\nWarning: … in /home/ana/programa.php on line N`), **sem** a cópia `PHP Warning:` no stderr, avisos repetidos **não** são escondidos, `memory_limit=128M`.
+- **Entrada (`STDIN`)**: o programa **para e espera** o leitor digitar no terminal (Enter envia, Ctrl+D = fim da entrada, Ctrl+C = parar). Com `data-stdin="Ana\n29"` (`\n` = Enter; um Enter final é acrescentado) a entrada já vem pronta, num campo "Entrada" editável, e cada linha aparece **em negrito no ponto em que o programa a leu**, como se a Ana digitasse. Use `data-stdin` em toda missão que lê `STDIN` (o testador não digita: sem ele o programa recebe fim de arquivo). **`readline()` não existe** (nem no `php` do laboratório): use `trim(fgets(STDIN))`.
+- `data-args` preenche o campo "Argumentos" (`$argv`, separados como no bash, aspas valem).
+- **Limites**: o editor para o programa depois de **30 s** rodando (sem contar a espera por entrada) ou de **2 MB** de saída; `set_time_limit`/`max_execution_time` **não** interrompem nada no WebAssembly. `sleep()`/`usleep()` funcionam (esperam de verdade). Recursão infinita dá o `Fatal error: Allowed memory size of 134217728 bytes exhausted` (com um stack trace enorme — o terminal mostra o começo e o fim).
+
+### Modo web (`data-modo="web"`)
+- O primeiro `pre.script` vira `/home/ana/site/index.php` (ou o nome em `data-file`) de um "`php -S localhost:8000`" em memória (`PHP_SAPI` = `cli-server`); as outras abas ficam ao lado (`login.php`, `comum.php`…). A primeira requisição é `GET /` (ou `data-url="/x.php?a=1"`; com `data-post="a=1&amp;b=2"` vira POST urlencoded para essa URL).
+- **Resultado** (iframe isolado) + **Código-fonte HTML** (com os cabeçalhos da resposta), barra de endereço editável (Enter faz GET), ← voltar, ⟳ recarregar. **Links e formulários funcionam**: GET, POST (urlencoded e `multipart/form-data` com upload → `$_FILES`), `header('Location: …')` é seguido como no navegador (o código 3xx aparece nos cabeçalhos), página 404 igual à do `php -S`. **Cookies e sessões persistem** entre as requisições da mesma caixa até o próximo Rodar.
+- Erros no formato HTML do PHP (`<br />\n<b>Warning</b>:  …`).
+- **Não funciona dentro do Resultado**: arquivos estáticos de outras abas (`<link href="estilo.css">`, `<img src="foto.png">`) — use `<style>` na própria página; `fetch()`/AJAX do JavaScript da página para o PHP; links para fora de `localhost:8000` (o editor avisa).
+- As metas são conferidas **a cada página** que o leitor abre na caixa (uma missão pode pedir "entre e clique em…"). O testador só faz a **primeira** requisição (`data-url`/`data-post`): prefira missões que se cumpram nela, ou aceite o ✗ do testador e confira no navegador.
+
+### Metas: detalhes
+- `out:`/`outre:` no cli = tudo o que o terminal mostra (stdout + stderr, **sem** o eco da entrada digitada); no web = o HTML gerado (da página atual). `html:` = texto visível (sem tags, `<script>`, `<style>`, `<title>`; espaços e quebras de linha contam como um espaço só).
+- `outre:` e `src:` usam a flag `m`: **`^` e `$` valem por linha**. Para "a saída **termina com** X" use `X\n?(?![\s\S])`; para "começa com", `^(?<![\s\S])X`. Sem flag `s`: `.` não pula linha (use `[\s\S]`).
+- `erro:` procura em cada mensagem do PHP (a linha `Warning:/Fatal error:/Parse error:/Deprecated:/Notice:` + o `Stack trace` que vem junto); `semerro` = nenhuma dessas.
+
+### O que roda e o que não roda
+- **Extensões** (`get_loaded_extensions()` no navegador): Core, date, lexbor, uri, pcre, json, SPL, standard, random, Reflection, mbstring, iconv, ctype, filter, hash, session, tokenizer, calendar, bcmath, fileinfo, exif, gd, zlib, zip, Phar, openssl, curl (sem rede), dom, libxml, SimpleXML, xml, xmlreader, xmlwriter, soap, **PDO + pdo_sqlite, sqlite3**, OPcache. **Não tem**: intl (`NumberFormatter`, `IntlDateFormatter` — o laboratório também não), mysqli/pdo_mysql/mysqlnd, pdo_pgsql/pgsql, gmp, bz2, ftp, sockets, posix, pcntl, redis, readline.
+- **Sem rede**: `allow_url_fopen=0` (`file_get_contents("https://…")` dá os dois `Warning` reais do PHP e devolve `false`), `curl_exec`, `curl_multi_exec`, `fsockopen`, `stream_socket_client/server` estão **desligadas** (`Call to undefined function curl_exec()`); `curl_init`/`curl_setopt` existem. MySQL: `new PDO('mysql:…')` → `could not find driver`. Nas aulas de rede, MySQL, Composer e `php -S` use saídas reais do laboratório em `pre.term`.
+- **Sem sistema operacional**: `exec()`, `shell_exec()`, `system()`, `passthru()`, `proc_open()` não rodam comando nenhum (devolvem vazio/`false`, código 1); `mail()` → `Warning: mail(): Sendmail killed by signal 127`.
+- **A "máquina"**: `getenv()` mostra a Ana (`HOME=/home/ana`, `USER=ana`, `LANG=pt_BR.UTF-8`), fuso **UTC** (como o laboratório), `PHP_OS` = `Linux`, mas `php_uname()` = `Emscripten emscripten 4.0.19 #1 wasm32` e `gethostname()` = `emscripten` — não mostre esses dois no editor. `PHP_VERSION` = `8.5.10` (laboratório: `8.5.8`). O sistema de arquivos é só da caixa (`/home/ana`, `/tmp`), em memória, e some no próximo Rodar.
+- **Desempenho**: o PHP leva ~0,5–1 s para carregar do cache e ~0,1–0,2 s por Rodar; o WebAssembly é umas 2–3× mais lento que o nativo (`password_hash` ≈ 0,4 s). Use números pequenos.
+- Só **um programa por vez** na página: rodar outra caixa interrompe o programa que estava esperando entrada.
+- Navegadores: precisa de `DecompressionStream` (Chrome/Edge 80+, Firefox 113+, Safari 16.4+).
 
 ## 5. Fidelidade: o laboratório (`~/guia-php-lab/lab`)
 A máquina da Ana do Guia Bash (usuária `ana`, `notebook`, `/home/ana`, pt_BR) com **PHP 8.5.8** (static-php-cli, perfil "common" — o PHP do navegador é o 8.5.10; diferenças de correção entre eles quase nunca mudam saídas) e **Composer 2.10.3**, em `/opt/php/bin` (no `PATH`).

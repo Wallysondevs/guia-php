@@ -544,6 +544,10 @@ var NIVEIS = [
 
   /* ---------- Exercícios de completar ----------
      <div class="exercise"><div class="ex-code">ls <input data-answer="-a|-A"> ~</div></div> */
+  /* "|" separa respostas alternativas; "\\|" é uma barra vertical dentro da resposta (ex.: int\|string). */
+  function respostas(i) {
+    return i.getAttribute("data-answer").split(/(?<!\\)\|/).map(function (r) { return r.replace(/\\\|/g, "|"); });
+  }
   document.querySelectorAll(".exercise").forEach(function (ex) {
     var inputs = ex.querySelectorAll(".ex-code input");
     if (!inputs.length) return;
@@ -552,7 +556,7 @@ var NIVEIS = [
       i.setAttribute("spellcheck", "false");
       i.setAttribute("autocapitalize", "off");
       var maior = 0;
-      i.getAttribute("data-answer").split("|").forEach(function (r) { maior = Math.max(maior, r.length); });
+      respostas(i).forEach(function (r) { maior = Math.max(maior, r.length); });
       i.style.width = Math.max(4, maior + 2) + "ch";
     });
     var acoes = el("div", { "class": "ex-actions" },
@@ -565,7 +569,7 @@ var NIVEIS = [
     acoes.querySelector(".ex-check").addEventListener("click", function () {
       var tudo = true;
       inputs.forEach(function (i) {
-        var certas = i.getAttribute("data-answer").split("|").map(norm);
+        var certas = respostas(i).map(norm);
         var ok = certas.indexOf(norm(i.value)) !== -1;
         i.classList.toggle("ok", ok);
         i.classList.toggle("bad", !ok);
@@ -576,7 +580,7 @@ var NIVEIS = [
     });
     acoes.querySelector(".ex-show").addEventListener("click", function () {
       inputs.forEach(function (i) {
-        i.value = i.getAttribute("data-answer").split("|")[0];
+        i.value = respostas(i)[0];
         i.classList.remove("bad"); i.classList.add("ok");
       });
       res.textContent = "";
