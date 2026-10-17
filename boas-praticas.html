@@ -200,7 +200,7 @@ echo "&lt;p&gt;Bem-vinda à lojinha.&lt;/p&gt;\n";
 <p>Qualquer visitante agora sabe que o site fica em <code>/home/ana/loja</code> e que o arquivo se chama <code>index.php</code>. Em erros de banco, a mensagem pode mostrar até o nome do banco e do usuário. A configuração de produção é: <strong>não mostrar</strong> (<code>display_errors=0</code>) e <strong>registrar num arquivo</strong> (<code>log_errors=1</code> + <code>error_log</code>). Desligue o servidor (<kbd>Ctrl</kbd>+<kbd>C</kbd>) e ligue de novo com essas opções (o <code>-d</code> muda uma configuração só nesta execução):</p>
 
 <pre class="term">$ php -S localhost:8000 -d display_errors=0 -d log_errors=1 -d error_log=/home/ana/loja/erros.log
-[Fri Oct 16 20:44:44 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+[Fri Oct 16 21:01:44 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
 
 <p>E no outro terminal:</p>
 
@@ -208,7 +208,7 @@ echo "&lt;p&gt;Bem-vinda à lojinha.&lt;/p&gt;\n";
 &lt;p&gt;Olá, !&lt;/p&gt;
 &lt;p&gt;Bem-vinda à lojinha.&lt;/p&gt;
 $ cat erros.log
-[16-Oct-2026 23:44:45 UTC] PHP Warning:  Undefined variable $nome in /home/ana/loja/index.php on line 2</pre>
+[17-Oct-2026 00:01:45 UTC] PHP Warning:  Undefined variable $nome in /home/ana/loja/index.php on line 2</pre>
 
 <p>O visitante não vê nada de interno; você encontra o aviso completo, com data e hora, no <code>erros.log</code>. No servidor de verdade, essas linhas ficam no <code>php.ini</code> de produção:</p>
 
