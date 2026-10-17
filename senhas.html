@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Senhas — password_hash, password_verify e password_needs_rehash | Guia PHP</title>
+<meta name="description" content="Como guardar senhas com segurança em PHP: por que nunca em texto puro nem com md5 ou sha1, password_hash (com o hash real e cada parte explicada), password_verify, password_needs_rehash, um login completo com SQLite e os erros mais comuns, com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Senhas (password_hash)</span></h1>
+
+<p class="intro">A lojinha da Ana vai ter contas de clientes, e conta tem senha. A pergunta desta aula parece simples: <strong>como guardar a senha no banco?</strong> A resposta curta é: você <strong>não guarda a senha</strong>. Guarda um "resumo" dela, feito por <code>password_hash</code>, e confere o login com <code>password_verify</code>. São duas funções e poucas linhas, mas entender o porquê evita o erro mais caro da segurança na web.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Por que senha nunca fica em texto puro no banco, e o que acontece quando o banco vaza.</li>
+  <li>O que é um <em>hash</em> e por que <code>md5</code> e <code>sha1</code> não servem para senhas.</li>
+  <li>Criar o hash com <code>password_hash</code> e ler cada parte dele.</li>
+  <li>Conferir a senha no login com <code>password_verify</code>.</li>
+  <li>Atualizar hashes antigos com <code>password_needs_rehash</code>.</li>
+  <li>Um cadastro e login completos com SQLite.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: a impressão digital</h2>
+<p>Pense na portaria de um prédio que libera a entrada pela impressão digital. O porteiro não guarda o <strong>dedo</strong> de ninguém (nem teria como): guarda um registro da digital. Quando você chega, ele lê o seu dedo de novo e compara com o registro. Se alguém roubar o fichário da portaria, leva só desenhos de digitais, e com eles não dá para "fabricar" o seu dedo.</p>
+<p>Com senhas é igual. O registro da digital se chama <strong>hash</strong>: um texto calculado a partir da senha por uma conta que só funciona em um sentido. Da senha se chega ao hash; do hash <strong>não</strong> se volta à senha. No login, o PHP calcula de novo a partir do que a pessoa digitou e compara.</p>
+
+<h3>Por que não guardar a senha como ela é?</h3>
+<p>Porque bancos de dados vazam: um backup esquecido num servidor, uma falha de SQL injection, um funcionário mal-intencionado, um notebook roubado. Se a tabela tiver as senhas em texto puro, quem pegar o arquivo tem acesso imediato a todas as contas. E pior: como muita gente usa a mesma senha em vários lugares, o vazamento da lojinha vira acesso ao e-mail e ao banco dos clientes.</p>
+<p>A regra profissional é: <strong>nem você, dona do sistema, deve conseguir ler a senha dos seus usuários.</strong> Se alguém pedir "me manda minha senha por e-mail", a resposta certa é "não tenho a sua senha; clique aqui para criar uma nova".</p>
+
+<hr>
+
+<h2>Por que não <code>md5</code> nem <code>sha1</code></h2>
+<p>O PHP tem funções de hash antigas, como <code>md5</code> e <code>sha1</code>. Muitos tutoriais antigos usam <code>md5($senha)</code>. Veja o problema:</p>
+
+<pre class="file" data-file="md5.php">&lt;?php
+echo md5('123456'), "\n";
+echo sha1('123456'), "\n";
+echo md5('girassol2026'), "\n";
+echo md5('girassol2026'), "\n";
+</pre>
+
+<pre class="term">$ php md5.php
+e10adc3949ba59abbe56e057f20f883e
+7c4a8d09ca3762af61e59520943dc26494f8941b
+3c4d43d1b9ed88b555a6b88a0eec1cf2
+3c4d43d1b9ed88b555a6b88a0eec1cf2</pre>
+
+<p>Três problemas aparecem aqui:</p>
+<ol>
+  <li><strong>A mesma senha dá sempre o mesmo hash.</strong> As duas últimas linhas são iguais. Se a Ana e a Bia usarem a mesma senha, o banco mostra isso. E existem tabelas prontas, com bilhões de senhas comuns e seus <code>md5</code>: cole <code>e10adc3949ba59abbe56e057f20f883e</code> num buscador e ele responde <code>123456</code> na hora.</li>
+  <li><strong>É rápido demais.</strong> O <code>md5</code> foi feito para conferir arquivos grandes, então foi pensado para ser veloz. Para senhas isso é ruim: quem roubou o banco consegue testar bilhões de senhas por segundo numa placa de vídeo.</li>
+  <li><strong>Não tem como ficar mais forte com o tempo.</strong> O cálculo é fixo; computadores ficam mais rápidos e o <code>md5</code> continua igual.</li>
+</ol>
+
+<p>Para sentir a diferença de velocidade, a Ana mediu no notebook dela (números pequenos, só para comparar):</p>
+
+<pre class="file" data-file="tempo.php">&lt;?php
+$inicio = hrtime(true);
+for ($i = 0; $i &lt; 100000; $i++) {
+    md5("senha$i");
+}
+$ms = (hrtime(true) - $inicio) / 1e6;
+printf("md5: 100000 senhas em %.0f ms\n", $ms);
+
+$inicio = hrtime(true);
+for ($i = 0; $i &lt; 10; $i++) {
+    password_hash("senha$i", PASSWORD_DEFAULT);
+}
+$ms = (hrtime(true) - $inicio) / 1e6;
+printf("password_hash: 10 senhas em %.0f ms\n", $ms);
+</pre>
+
+<pre class="term">$ php tempo.php
+md5: 100000 senhas em 37 ms
+password_hash: 10 senhas em 2675 ms</pre>
+
+<p>Cem mil <code>md5</code> em 37 milissegundos, contra dez <code>password_hash</code> em 2,7 segundos: cada hash de senha levou cerca de um quarto de segundo. Para a Ana, que faz login uma vez, um quarto de segundo é imperceptível. Para um atacante tentando bilhões de senhas, é a diferença entre minutos e séculos. A lentidão é <strong>de propósito</strong>. (Os números mudam de computador para computador; a proporção é o que importa.)</p>
+
+<div class="warning"><code>md5</code>, <code>sha1</code>, <code>sha256</code>, <code>hash('sha512', …)</code>, "<code>md5</code> duas vezes", "<code>md5</code> com um texto fixo grudado": nenhum serve para senhas. Todos são rápidos. Para senha, só <code>password_hash</code>.</div>
+
+<hr>
+
+<h2>Criar o hash: <code>password_hash</code></h2>
+
+<pre class="file" data-file="hash.php">&lt;?php
+$senha = 'girassol2026';
+
+$hash = password_hash($senha, PASSWORD_DEFAULT);
+
+echo $hash, "\n";
+echo strlen($hash), " caracteres\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>password_hash($senha, …)</dt><dd>"Hash de senha": calcula o hash, com um sal aleatório e um algoritmo lento, e devolve tudo num texto só.</dd>
+  <dt>PASSWORD_DEFAULT</dt><dd>"O algoritmo recomendado pelo PHP nesta versão". Hoje é o <strong>bcrypt</strong>. Se um dia o PHP mudar o padrão, o seu código acompanha sem alteração.</dd>
+</dl>
+
+<pre class="term">$ php hash.php
+$2y$12$Pap3KLoGixAspX8P4ZhtcejkgCOi4nFnqlEoqTUhgVn8q11r6AsNC
+60 caracteres</pre>
+
+<p>Esse texto é o que vai para o banco. Ele parece aleatório, mas tem partes bem definidas:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Parte</th><th>Valor</th><th>Significa</th></tr>
+<tr><td>Algoritmo</td><td><code>$2y$</code></td><td>bcrypt.</td></tr>
+<tr><td>Custo</td><td><code>12$</code></td><td>Quanto trabalho o cálculo dá: 2<sup>12</sup> = 4.096 rodadas. Cada +1 dobra o tempo. O padrão subiu de 10 para 12 no <span class="versao">PHP 8.4</span>.</td></tr>
+<tr><td>Sal (<em>salt</em>)</td><td><code>Pap3KLoGixAspX8P4Zhtce</code></td><td>22 caracteres sorteados na hora. Faz a mesma senha gerar hashes diferentes.</td></tr>
+<tr><td>Hash</td><td><code>jkgCOi4nFnqlEoqTUhgVn8q11r6AsNC</code></td><td>31 caracteres: o resultado do cálculo com a senha, o sal e o custo.</td></tr>
+</table>
+</div>
+
+<p>O <strong>sal</strong> é o que resolve o problema das tabelas prontas. Rode duas vezes com a mesma senha:</p>
+
+<pre class="file" data-file="dois.php">&lt;?php
+echo password_hash('girassol2026', PASSWORD_DEFAULT), "\n";
+echo password_hash('girassol2026', PASSWORD_DEFAULT), "\n";
+</pre>
+
+<pre class="term">$ php dois.php
+$2y$12$E1RoKxAq18QQFD4t8OLKYel0gZVRWoShRsbl9DRwV23WEXVkaKDN6
+$2y$12$OiKObogMlwBPzTvTFW7AY.KmF7fyg6p8Leqz37K2u0S57gPJ2H4fq</pre>
+
+<p>Mesma senha, hashes completamente diferentes (e diferentes do <code>hash.php</code>). Quando <strong>você</strong> rodar, vai ver outros ainda: o sal é sorteado a cada chamada. Não existe tabela pronta que sirva, e duas pessoas com a mesma senha não ficam visíveis no banco.</p>
+
+<div class="tip"><strong>Onde está o sal?</strong> Dentro do próprio hash (a parte depois do custo). Você não precisa guardá-lo numa coluna separada nem inventar o seu: o <code>password_hash</code> sorteia, e o <code>password_verify</code> lê de volta. Na tabela, uma coluna <code>VARCHAR(255)</code> basta para o hash inteiro (o bcrypt usa 60 caracteres, mas outros algoritmos são maiores).</div>
+
+<hr>
+
+<h2>Conferir no login: <code>password_verify</code></h2>
+<p>No login, a pessoa digita a senha e você tem o hash do banco. Não dá para chamar <code>password_hash</code> de novo e comparar (o sal seria outro). Quem faz a conferência é o <code>password_verify</code>: ele lê o algoritmo, o custo e o sal de dentro do hash, refaz o cálculo com a senha digitada e compara.</p>
+
+<pre class="file" data-file="verificar.php">&lt;?php
+$hash = '$2y$12$Pap3KLoGixAspX8P4ZhtcejkgCOi4nFnqlEoqTUhgVn8q11r6AsNC';
+
+var_dump(password_verify('girassol2026', $hash));
+var_dump(password_verify('Girassol2026', $hash));
+var_dump(password_verify('girassol', $hash));
+</pre>
+
+<dl class="anatomy">
+  <dt>'$2y$12$…'</dt><dd>O hash gerado no <code>hash.php</code>, como se viesse do banco. Aspas <strong>simples</strong>: com aspas duplas, o PHP tentaria ler <code>$2y</code> como variável.</dd>
+  <dt>password_verify($senha, $hash)</dt><dd>"Verificar senha": <code>true</code> se a senha corresponde ao hash. A ordem é sempre <strong>senha primeiro, hash depois</strong>.</dd>
+</dl>
+
+<pre class="term">$ php verificar.php
+bool(true)
+bool(false)
+bool(false)</pre>
+
+<p>Só a senha exata passa. Uma letra maiúscula diferente já basta para recusar.</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> rode e compare os dois hashes (diferentes, mesmo com a mesma senha). Depois troque o texto de <code>$digitada</code> por outras tentativas e veja o <code>password_verify</code> mudar. Cada <code>password_hash</code> leva uma fração de segundo de propósito: no editor do guia, que roda o PHP dentro do navegador, pode demorar um pouco mais.</p>
+<pre class="script">&lt;?php
+$senha = 'girassol2026';
+
+$hash1 = password_hash($senha, PASSWORD_DEFAULT);
+$hash2 = password_hash($senha, PASSWORD_DEFAULT);
+
+echo "Hash 1: $hash1\n";
+echo "Hash 2: $hash2\n";
+
+$digitada = 'girassol2026';
+
+echo "Confere com o hash 1? ";
+var_dump(password_verify($digitada, $hash1));
+echo "Confere com o hash 2? ";
+var_dump(password_verify($digitada, $hash2));
+</pre>
+</div>
+
+<hr>
+
+<h2>Ficar mais forte com o tempo: <code>password_needs_rehash</code></h2>
+<p>Os computadores ficam mais rápidos, e o custo que era bom ontem fica fraco amanhã. Foi o que aconteceu no PHP 8.4, quando o custo padrão subiu de 10 para 12. Mas e os hashes que já estão no banco, feitos com custo 10? Você não tem as senhas para refazê-los… exceto no momento do <strong>login</strong>, quando a pessoa digita a senha e ela acabou de ser conferida.</p>
+<p>O <code>password_needs_rehash</code> ("precisa refazer o hash?") responde se um hash foi feito com configurações diferentes das atuais:</p>
+
+<pre class="file" data-file="rehash.php">&lt;?php
+$antigo = password_hash('girassol2026', PASSWORD_DEFAULT, ['cost' =&gt; 10]);
+$atual = password_hash('girassol2026', PASSWORD_DEFAULT);
+
+echo $antigo, "\n";
+echo $atual, "\n";
+
+var_dump(password_needs_rehash($antigo, PASSWORD_DEFAULT));
+var_dump(password_needs_rehash($atual, PASSWORD_DEFAULT));
+var_dump(password_needs_rehash(md5('girassol2026'), PASSWORD_DEFAULT));
+</pre>
+
+<pre class="term">$ php rehash.php
+$2y$10$9f9HyAqNZiTQNAVeT87en.DlxVBpd96Is5hT6TSHYbIzjTIPD2SXm
+$2y$12$0XOpUr.YtpP32bdPx7/e5OEQXo8o//FleRCnRDjovIb4RW5fT5o7y
+bool(true)
+bool(false)
+bool(true)</pre>
+
+<dl class="anatomy">
+  <dt>['cost' =&gt; 10]</dt><dd>O 3º argumento do <code>password_hash</code> aceita opções. Aqui, forçamos o custo antigo para simular um hash de 2023. Repare no <code>$2y$10$</code>.</dd>
+  <dt>password_needs_rehash($hash, PASSWORD_DEFAULT)</dt><dd><code>true</code> se o hash não foi feito com o algoritmo e as opções atuais. O hash antigo (custo 10) precisa; o atual (custo 12) não; e um <code>md5</code> também "precisa", porque nem é bcrypt.</dd>
+</dl>
+
+<p>O uso é sempre o mesmo, logo depois de um <code>password_verify</code> bem-sucedido: se precisa, calcule um hash novo com a senha que a pessoa acabou de digitar e salve no banco. Assim os usuários vão sendo atualizados aos poucos, sem perceber.</p>
+
+<hr>
+
+<h2>Cadastro e login completos</h2>
+<p>Juntando tudo com um banco <a href="pdo.html">SQLite</a> em memória (e <a href="prepared-statements.html">prepared statements</a>, claro):</p>
+
+<pre class="file" data-file="login.php">&lt;?php
+
+declare(strict_types=1);
+
+$pdo = new PDO('sqlite::memory:');
+$pdo-&gt;setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo-&gt;exec('CREATE TABLE usuarios (email TEXT PRIMARY KEY, senha_hash TEXT NOT NULL)');
+
+function cadastrar(PDO $pdo, string $email, string $senha): void
+{
+    $hash = password_hash($senha, PASSWORD_DEFAULT);
+    $consulta = $pdo-&gt;prepare('INSERT INTO usuarios (email, senha_hash) VALUES (?, ?)');
+    $consulta-&gt;execute([$email, $hash]);
+}
+
+function entrar(PDO $pdo, string $email, string $senha): bool
+{
+    $consulta = $pdo-&gt;prepare('SELECT senha_hash FROM usuarios WHERE email = ?');
+    $consulta-&gt;execute([$email]);
+    $hash = $consulta-&gt;fetchColumn();
+
+    if ($hash === false || !password_verify($senha, $hash)) {
+        return false;
+    }
+
+    if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+        $novoHash = password_hash($senha, PASSWORD_DEFAULT);
+        $pdo-&gt;prepare('UPDATE usuarios SET senha_hash = ? WHERE email = ?')
+            -&gt;execute([$novoHash, $email]);
+        echo "(hash de $email atualizado)\n";
+    }
+
+    return true;
+}
+
+cadastrar($pdo, 'ana@lojinha.com', 'girassol2026');
+
+// Um usuário antigo, cadastrado quando o custo era 10
+$antigo = password_hash('bia1234', PASSWORD_DEFAULT, ['cost' =&gt; 10]);
+$pdo-&gt;prepare('INSERT INTO usuarios VALUES (?, ?)')-&gt;execute(['bia@lojinha.com', $antigo]);
+
+foreach ([
+    ['ana@lojinha.com', 'girassol2026'],
+    ['ana@lojinha.com', 'Girassol2026'],
+    ['caio@lojinha.com', 'girassol2026'],
+    ['bia@lojinha.com', 'bia1234'],
+] as [$email, $senha]) {
+    $resultado = entrar($pdo, $email, $senha) ? 'entrou' : 'E-mail ou senha incorretos';
+    echo "$email / $senha: $resultado\n";
+}
+
+foreach ($pdo-&gt;query('SELECT email, senha_hash FROM usuarios') as $linha) {
+    echo $linha['email'], ' → ', $linha['senha_hash'], "\n";
+}
+</pre>
+
+<pre class="term">$ php login.php
+ana@lojinha.com / girassol2026: entrou
+ana@lojinha.com / Girassol2026: E-mail ou senha incorretos
+caio@lojinha.com / girassol2026: E-mail ou senha incorretos
+(hash de bia@lojinha.com atualizado)
+bia@lojinha.com / bia1234: entrou
+ana@lojinha.com → $2y$12$86DB4qzaZ/VZLuReHjhTDeMADLTSygZxKXcNNOB5H9U5higEQi3N.
+bia@lojinha.com → $2y$12$6mByblFtRKoG9.U/F3H4Pe4/v/mFQPFqIkIAjT5vilXzByZ83zHhe</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>Por quê</th></tr>
+<tr><td><code>senha_hash TEXT</code></td><td>A coluna guarda o hash, nunca a senha. O nome deixa isso claro para quem ler o banco.</td></tr>
+<tr><td><code>$hash === false</code></td><td><code>fetchColumn</code> devolve <code>false</code> quando o e-mail não existe (o <code>caio</code>).</td></tr>
+<tr><td>Mesma mensagem para e-mail inexistente e senha errada</td><td>"E-mail ou senha incorretos". Se você disser "e-mail não cadastrado", um atacante descobre quais e-mails têm conta na lojinha.</td></tr>
+<tr><td><code>password_needs_rehash</code> depois do verify</td><td>A Bia tinha um hash de custo 10. No login, ele foi refeito com custo 12: veja o <code>$2y$12$</code> na última linha.</td></tr>
+</table>
+</div>
+
+<p>O projeto <a href="projeto-login.html">Login com Sessão</a> usa estas funções numa página web de verdade, com <a href="sessoes.html">sessões</a> e proteção <a href="csrf.html">CSRF</a> (a próxima aula).</p>
+
+<hr>
+
+<h2>Formas diferentes</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Chamada</th><th>Resultado</th><th>Quando usar</th></tr>
+<tr><td><code>password_hash($s, PASSWORD_DEFAULT)</code></td><td><code>$2y$12$…</code> (bcrypt)</td><td><strong>Sempre</strong>, a não ser que você tenha um motivo.</td></tr>
+<tr><td><code>password_hash($s, PASSWORD_BCRYPT, ['cost' =&gt; 13])</code></td><td><code>$2y$13$4docEuQECsa4fLPoFYivcezHBTorROJq5SANS9jlBqPGJi5P.AKQS</code></td><td>Para escolher o custo. Meça no seu servidor: o ideal é cada hash levar entre 0,1 e 0,5 segundo.</td></tr>
+<tr><td><code>password_hash($s, PASSWORD_ARGON2ID)</code></td><td><code>$argon2id$v=19$m=65536,t=4,p=1$IC5hvs6DZQpB66py7WZWxA$w8wx7NvNv9Ep2/URGqePGmsKQ1hemG2oEzSgxrh5pRA</code></td><td>Argon2id: mais moderno, também gasta memória (dificulta ataques com placas de vídeo). Só existe se o PHP foi compilado com ele (<code>defined('PASSWORD_ARGON2ID')</code>).</td></tr>
+<tr><td><code>md5</code>, <code>sha1</code>, <code>hash()</code>, <code>crypt()</code> direto</td><td>—</td><td><strong>Nunca</strong> para senhas.</td></tr>
+</table>
+</div>
+<p>Todos os hashes acima são conferidos pelo mesmo <code>password_verify</code>: ele reconhece o algoritmo pelo começo do texto. Se o banco tiver uma mistura de bcrypt e Argon2id, tudo continua funcionando.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>password_verify</code> sempre devolve <code>false</code>, até com a senha certa</strong>
+<pre class="file" data-file="erros.php">&lt;?php
+$hash = '$2y$12$Pap3KLoGixAspX8P4ZhtcejkgCOi4nFnqlEoqTUhgVn8q11r6AsNC';
+
+var_dump(password_verify($hash, 'girassol2026'));
+var_dump(password_verify('girassol2026', substr($hash, 0, 50)));
+</pre>
+<pre class="term">$ php erros.php
+bool(false)
+bool(false)</pre>
+<p><strong>O que aconteceu:</strong> duas causas clássicas. Na primeira linha, os argumentos estão trocados (o certo é <code>password_verify($senha, $hash)</code>). Na segunda, o hash está <strong>cortado</strong>: é o que acontece quando a coluna do banco é pequena demais (<code>VARCHAR(50)</code>) e o MySQL corta o texto ao salvar. Nenhuma das duas dá erro: só <code>false</code>.</p>
+<p><strong>Como consertar:</strong> confira a ordem dos argumentos; use <code>VARCHAR(255)</code> na coluna; e confira se o hash no banco tem 60 caracteres e começa com <code>$2y$</code>. Outra causa comum: o hash foi escrito entre <strong>aspas duplas</strong> no código, e o PHP trocou <code>$2y</code> e <code>$12</code> por variáveis (vazias).</p>
+</div>
+
+<div class="cenario">
+<strong>Comparar com <code>password_hash</code> em vez de verificar</strong>
+<pre class="file" data-file="login-errado.php">if (password_hash($digitada, PASSWORD_DEFAULT) === $hashSalvo) {
+</pre>
+<p><strong>O que aconteceu:</strong> nunca é verdadeiro. Cada <code>password_hash</code> sorteia um sal novo, então o hash calculado agora nunca é igual ao salvo. É a missão do fim da aula.</p>
+<p><strong>Como consertar:</strong> <code>if (password_verify($digitada, $hashSalvo)) {</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>"Bcrypt password must not contain null character"</strong>
+<pre class="term">$ php -r 'password_hash("abc\0def", PASSWORD_DEFAULT);'
+
+Fatal error: Uncaught ValueError: Bcrypt password must not contain null character in Command line code:1
+Stack trace:
+#0 Command line code(1): password_hash(Object(SensitiveParameterValue), '2y')
+#1 {main}
+  thrown in Command line code on line 1</pre>
+<p><strong>O que aconteceu:</strong> a senha tinha um caractere nulo (<code>\0</code>), que o bcrypt não aceita: tudo depois dele seria ignorado. O PHP lança um <code>ValueError</code> em vez de criar um hash enganoso. Repare que, no rastro do erro, a senha aparece como <code>Object(SensitiveParameterValue)</code>: o PHP esconde de propósito os argumentos marcados como sensíveis, para a senha não ir parar em logs. Na prática, só acontece se alguém enviar dados estranhos de propósito.</p>
+<p><strong>Como consertar:</strong> <a href="validacao.html">valide</a> a senha antes (tamanho mínimo e máximo, sem caracteres de controle) e trate o erro com uma mensagem amigável.</p>
+</div>
+
+<div class="cenario">
+<strong>Senhas muito longas: o limite de 72 bytes do bcrypt</strong>
+<pre class="file" data-file="limite.php">&lt;?php
+$senha = str_repeat('a', 72);
+$hash = password_hash($senha, PASSWORD_DEFAULT);
+
+var_dump(password_verify($senha . 'qualquer coisa', $hash));
+</pre>
+<pre class="term">$ php limite.php
+bool(true)</pre>
+<p><strong>O que aconteceu:</strong> o bcrypt só usa os primeiros <strong>72 bytes</strong> da senha. Tudo depois disso é ignorado, então uma senha de 72 letras "a" seguida de qualquer coisa confere com o mesmo hash. (Acentos ocupam 2 bytes cada em UTF-8.)</p>
+<p><strong>Como consertar:</strong> limite o tamanho da senha no cadastro (por exemplo, até 64 caracteres), ou use <code>PASSWORD_ARGON2ID</code>, que não tem esse limite. Na prática, senhas de mais de 72 bytes são raras.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Devolve</th><th>Para quê</th></tr>
+<tr><td><code>password_hash($senha, PASSWORD_DEFAULT)</code></td><td><code>string</code> (o hash)</td><td>Cadastro e troca de senha</td></tr>
+<tr><td><code>password_verify($senha, $hash)</code></td><td><code>bool</code></td><td>Login</td></tr>
+<tr><td><code>password_needs_rehash($hash, PASSWORD_DEFAULT)</code></td><td><code>bool</code></td><td>Depois de um login certo: refazer hashes antigos</td></tr>
+<tr><td><code>password_get_info($hash)</code></td><td><code>array</code></td><td>Ver o algoritmo e as opções de um hash (<code>algoName</code> = <code>bcrypt</code>, <code>cost</code> = 12)</td></tr>
+<tr><td><code>PASSWORD_DEFAULT</code> / <code>PASSWORD_BCRYPT</code> / <code>PASSWORD_ARGON2ID</code></td><td>—</td><td>Algoritmo (use o padrão)</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Guardar a senha</h3>
+<p>Complete o cadastro:</p>
+<div class="ex-code">$hash = <input data-answer="password_hash($senha, PASSWORD_DEFAULT)|password_hash($senha,PASSWORD_DEFAULT)" aria-label="chamada">;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Conferir no login</h3>
+<p>Complete com a função que confere a senha digitada contra o hash do banco:</p>
+<div class="ex-code">if (<input data-answer="password_verify" aria-label="função">($digitada, $hashDoBanco)) {</div>
+</div>
+
+<div class="exercise">
+<h3>3. O tamanho da coluna</h3>
+<p>Complete a coluna da tabela com o tamanho recomendado para guardar hashes:</p>
+<div class="ex-code">senha_hash VARCHAR(<input data-answer="255" aria-label="tamanho">) NOT NULL</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Por que <code>md5($senha)</code> não serve para guardar senhas?</p>
+<label><input type="radio" name="q4"> Porque o <code>md5</code> foi removido do PHP 8.</label>
+<label><input type="radio" name="q4"> Porque o hash do <code>md5</code> é grande demais para o banco.</label>
+<label><input type="radio" name="q4"> Porque é rápido demais e sem sal: a mesma senha dá sempre o mesmo hash, encontrável em tabelas prontas.</label>
+<label><input type="radio" name="q4"> Porque o <code>md5</code> guarda a senha em texto puro.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">5. A Ana rodou <code>password_hash('abc', PASSWORD_DEFAULT)</code> duas vezes e recebeu dois textos diferentes. O que isso significa?</p>
+<label><input type="radio" name="q5"> É o esperado: cada chamada sorteia um sal novo, e o <code>password_verify</code> confere os dois.</label>
+<label><input type="radio" name="q5"> O PHP está com defeito.</label>
+<label><input type="radio" name="q5"> Só o primeiro hash vai funcionar no login.</label>
+<label><input type="radio" name="q5"> A senha foi digitada errada na segunda vez.</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">6. Em que momento chamar <code>password_needs_rehash</code>?</p>
+<label><input type="radio" name="q6"> No cadastro, antes do <code>password_hash</code>.</label>
+<label><input type="radio" name="q6"> No login, depois que o <code>password_verify</code> deu <code>true</code> (é quando você tem a senha para refazer o hash).</label>
+<label><input type="radio" name="q6"> Uma vez por dia, para todos os usuários.</label>
+<label><input type="radio" name="q6"> Nunca; o PHP faz sozinho.</label>
+</div>
+
+<div class="tryphp" data-goal="out:Bem-vinda\, Ana!,src:password_verify,semerro">
+<p class="try-task"><strong>Missão final:</strong> a Ana digitou a senha certa, mas este login responde "Senha incorreta". O programador tentou conferir gerando um hash novo e comparando com o salvo. Conserte a condição do <code>if</code> para usar a função certa e fazer aparecer <code>Bem-vinda, Ana!</code>. Depois, troque <code>$tentativa</code> por uma senha errada e confira que ela é recusada.</p>
+<pre class="script">&lt;?php
+// O hash que está salvo no banco para a Ana
+$hashSalvo = '$2y$12$Pap3KLoGixAspX8P4ZhtcejkgCOi4nFnqlEoqTUhgVn8q11r6AsNC';
+
+// O que ela digitou no formulário de login
+$tentativa = 'girassol2026';
+
+if (password_hash($tentativa, PASSWORD_DEFAULT) === $hashSalvo) {
+    echo "Bem-vinda, Ana!\n";
+} else {
+    echo "Senha incorreta\n";
+}
+</pre>
+<pre class="solucao">&lt;?php
+// O hash que está salvo no banco para a Ana
+$hashSalvo = '$2y$12$Pap3KLoGixAspX8P4ZhtcejkgCOi4nFnqlEoqTUhgVn8q11r6AsNC';
+
+// O que ela digitou no formulário de login
+$tentativa = 'girassol2026';
+
+if (password_verify($tentativa, $hashSalvo)) {
+    echo "Bem-vinda, Ana!\n";
+} else {
+    echo "Senha incorreta\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Nunca guarde a senha, nem criptografada de um jeito que dê para "abrir": guarde o hash de <code>password_hash($senha, PASSWORD_DEFAULT)</code>.</li>
+  <li>O hash (<code>$2y$12$…</code>, 60 caracteres) traz junto o algoritmo, o custo e um sal aleatório: a mesma senha gera hashes diferentes a cada vez.</li>
+  <li>No login, <code>password_verify($senha, $hash)</code>. Nunca compare com um <code>password_hash</code> novo.</li>
+  <li>Depois de um login certo, <code>password_needs_rehash</code> diz se vale refazer o hash com as configurações atuais.</li>
+  <li><code>md5</code>, <code>sha1</code> e companhia são rápidos e sem sal: não servem para senha.</li>
+  <li>Coluna <code>VARCHAR(255)</code>, hash entre aspas simples no código, e a mesma mensagem para "e-mail não existe" e "senha errada".</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
