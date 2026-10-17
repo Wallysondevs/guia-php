@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Tipos de Erro — Warning, Notice, Deprecated, Fatal e Parse error | Guia PHP</title>
+<meta name="description" content="Os níveis de erro do PHP (E_WARNING, E_NOTICE, E_DEPRECATED, E_ERROR, E_PARSE), error_reporting, display_errors em desenvolvimento e em produção, ini_set, log_errors e error_log, e os erros que viraram exceções no PHP 8 (Error, TypeError, ValueError, DivisionByZeroError), com as mensagens reais.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Tipos de Erro</span></h1>
+
+<p class="intro">Até aqui você já viu muitas mensagens do PHP: <code>Warning</code>, <code>Fatal error</code>, <code>Deprecated</code>… Elas não são todas iguais. Algumas são só um aviso e o programa continua; outras param tudo. Algumas devem aparecer na tela enquanto você programa e <strong>nunca</strong> na tela do cliente. Nesta aula você vai conhecer os níveis de erro do PHP, decidir quais mostrar e onde guardar os que não devem aparecer.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os níveis: <code>Warning</code>, <code>Notice</code>, <code>Deprecated</code>, <code>Fatal error</code> e <code>Parse error</code>, com exemplos reais de cada um.</li>
+  <li>Quais param o programa e quais não.</li>
+  <li>Escolher o que é relatado com <code>error_reporting</code>.</li>
+  <li>Mostrar (<code>display_errors</code>) ou esconder os erros, e a diferença entre desenvolvimento e produção.</li>
+  <li>Guardar os erros num arquivo (<code>log_errors</code>, <code>error_log</code>), inclusive mensagens suas.</li>
+  <li>Por que no PHP 8 muitos erros viraram <strong>exceções</strong> (<code>Error</code>, <code>TypeError</code>, <code>ValueError</code>, <code>DivisionByZeroError</code>).</li>
+</ul>
+</div>
+
+<p>A aula <a href="erros.html">Lendo Erros do PHP</a>, do Nível 1, ensinou a ler uma mensagem (tipo, texto, arquivo e linha). Aqui o assunto é o que fazer com elas.</p>
+
+<hr>
+
+<h2>A ideia: o painel do carro</h2>
+<p>O painel de um carro tem luzes de cores diferentes. A luz amarela do óleo diz "cuide disso logo", mas o carro continua andando. A luz vermelha do motor diz "pare agora". E tem o aviso do manual: "este modelo de pneu sai de linha no ano que vem". O PHP faz o mesmo:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Nível (constante)</th><th>No carro</th><th>O programa…</th></tr>
+<tr><td><code>Deprecated</code></td><td><code>E_DEPRECATED</code></td><td>"Isto vai deixar de funcionar numa versão futura"</td><td>continua</td></tr>
+<tr><td><code>Notice</code></td><td><code>E_NOTICE</code></td><td>"Reparei numa coisa estranha"</td><td>continua</td></tr>
+<tr><td><code>Warning</code></td><td><code>E_WARNING</code></td><td>Luz amarela: algo deu errado</td><td>continua</td></tr>
+<tr><td><code>Fatal error</code></td><td><code>E_ERROR</code> (ou uma exceção não capturada)</td><td>Luz vermelha</td><td><strong>para</strong></td></tr>
+<tr><td><code>Parse error</code></td><td><code>E_PARSE</code></td><td>O carro nem liga</td><td><strong>nem começa</strong></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Cada nível, com um exemplo real</h2>
+
+<h3>Warning: algo deu errado, mas o PHP seguiu</h3>
+<pre class="file" data-file="warning.php">&lt;?php
+echo "Início\n";
+echo $nome;
+$precos = ['bolo' =&gt; 35];
+echo $precos['torta'];
+echo "Fim\n";
+</pre>
+
+<pre class="term">$ cd erros
+$ php warning.php; echo "código: $?"
+Início
+
+Warning: Undefined variable $nome in /home/ana/erros/warning.php on line 3
+
+Warning: Undefined array key "torta" in /home/ana/erros/warning.php on line 5
+Fim                    « continuou até o fim
+código: 0              « e terminou "com sucesso"</pre>
+
+<p>Variável que não existe, chave de array que não existe, arquivo que não abre (você viu em <a href="arquivos.html">Arquivos</a>): o PHP usa <code>null</code> no lugar, avisa e continua. É perigoso justamente por isso: o programa segue com um valor vazio, e o problema aparece mais adiante, longe da causa. <strong>Trate todo Warning como um bug a consertar.</strong></p>
+
+<h3>Notice: "reparei numa coisa"</h3>
+<p>No PHP 8 sobraram poucos <code>Notice</code> (a maioria virou <code>Warning</code>). Um que ainda aparece:</p>
+
+<pre class="file" data-file="notice.php">&lt;?php
+$fim = end(explode(',', 'a,b,c'));
+echo $fim, "\n";
+</pre>
+
+<pre class="term">$ php notice.php
+
+Notice: Only variables should be passed by reference in /home/ana/erros/notice.php on line 2
+c</pre>
+
+<p>"<em>Só variáveis deveriam ser passadas por referência</em>": a função <code>end</code> quer mexer no array que recebe, e por isso pede uma variável, não o resultado direto de outra função. Funcionou, mas o PHP reclamou. O conserto: <code>$partes = explode(',', 'a,b,c'); $fim = end($partes);</code>.</p>
+
+<h3>Deprecated: "isto vai sair de linha"</h3>
+<p>Um aviso de que você está usando algo que o PHP pretende remover ou mudar. Hoje funciona; numa versão futura, pode virar erro.</p>
+
+<pre class="file" data-file="deprecated.php">&lt;?php
+$texto = null;
+echo strlen($texto), "\n";
+$n = (integer) "42";
+echo $n, "\n";
+</pre>
+
+<pre class="term">$ php deprecated.php
+
+Deprecated: Non-canonical cast (integer) is deprecated, use the (int) cast instead in /home/ana/erros/deprecated.php on line 4
+
+Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /home/ana/erros/deprecated.php on line 3
+0
+42</pre>
+
+<ul>
+  <li>Linha 3: passar <code>null</code> para uma função do PHP que espera texto está obsoleto desde o PHP 8.1. Use <code>strlen($texto ?? '')</code>.</li>
+  <li>Linha 4: o nome longo <code>(integer)</code> está obsoleto desde o <span class="versao">PHP 8.5</span>; use <code>(int)</code> (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</li>
+</ul>
+<p>Repare na ordem: o aviso da linha 4 apareceu <strong>antes</strong> do da linha 3. Ele é detectado quando o PHP lê o arquivo (antes de executar), enquanto o da linha 3 só aparece quando a linha roda. Ao atualizar o PHP de versão, a primeira coisa a fazer é rodar o sistema e caçar os <code>Deprecated</code>.</p>
+
+<h3>Fatal error: o programa para</h3>
+<pre class="file" data-file="fatal.php">&lt;?php
+echo "Antes\n";
+calcular_frete(10);
+echo "Depois\n";
+</pre>
+
+<pre class="term">$ php fatal.php; echo "código: $?"
+Antes
+
+Fatal error: Uncaught Error: Call to undefined function calcular_frete() in /home/ana/erros/fatal.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/fatal.php on line 3
+código: 255            « "Depois" nunca apareceu</pre>
+
+<p>Chamar uma função que não existe não tem como "seguir em frente": o PHP para. Repare no <code>Uncaught Error</code> ("erro não capturado"): no PHP 8, a maioria dos erros fatais é, na verdade, uma <strong>exceção</strong> que ninguém tratou. Isso tem uma consequência boa, que você vai ver no fim da aula. Alguns poucos fatais continuam sendo "fatais de verdade", sem exceção, como o de memória esgotada:</p>
+
+<pre class="term">$ php -d memory_limit=16M memoria.php; echo "código: $?"     « um laço que enche um array
+
+Fatal error: Allowed memory size of 16777216 bytes exhausted (tried to allocate 1052672 bytes) in /home/ana/erros/memoria.php on line 4
+Stack trace:
+#0 {main}
+código: 255</pre>
+
+<p>"<em>O tamanho de memória permitido, de 16 MB, se esgotou</em>". O <code>-d memory_limit=16M</code> mudou a configuração só para essa execução (o padrão costuma ser 128 MB).</p>
+
+<h3>Parse error: o programa nem começa</h3>
+<pre class="file" data-file="parse.php">&lt;?php
+echo "Linha 1\n";
+echo "Linha 2\n"
+echo "Linha 3\n";
+</pre>
+
+<pre class="term">$ php parse.php; echo "código: $?"
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in /home/ana/erros/parse.php on line 4
+código: 255            « nem a "Linha 1" apareceu
+$ php -l parse.php
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in parse.php on line 4
+Errors parsing parse.php</pre>
+
+<p>Antes de executar, o PHP lê o arquivo inteiro para entender a "gramática". Um ponto e vírgula esquecido na linha 3 é percebido na linha 4 ("encontrei <code>echo</code>, esperava <code>,</code> ou <code>;</code>"). Por isso, num <code>Parse error</code>, olhe também a linha <strong>de cima</strong>. O <code>php -l</code> (<em>lint</em>, "verificar") só confere a sintaxe, sem executar nada.</p>
+
+<div class="tryphp" data-goal="semerro,out:Cliente: visitante,out:Torta: R$ 0">
+<p class="try-task"><strong>Missão:</strong> rode e veja os dois <code>Warning</code>. Depois conserte o programa, sem esconder os avisos: use o operador <code>??</code> (<a href="null-coalescing.html">aula ?? e ?-&gt;</a>) para que a falta do nome mostre <code>visitante</code> e a falta do preço mostre <code>0</code>.</p>
+<pre class="script">&lt;?php
+$precos = ['bolo' =&gt; 35];
+echo "Cliente: " . $nome . "\n";
+echo "Torta: R$ " . $precos['torta'] . "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$precos = ['bolo' =&gt; 35];
+echo "Cliente: " . ($nome ?? 'visitante') . "\n";
+echo "Torta: R$ " . ($precos['torta'] ?? 0) . "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Escolher o que relatar: <code>error_reporting</code></h2>
+<p>Cada nível é um número (uma "constante"), e <code>error_reporting</code> diz ao PHP quais níveis ele deve levar em conta:</p>
+
+<pre class="term">$ php constantes.php      « mostra o valor de cada constante
+E_ERROR           1
+E_WARNING         2
+E_PARSE           4
+E_NOTICE          8
+E_DEPRECATED      8192
+E_USER_ERROR      256
+E_USER_WARNING    512
+E_USER_NOTICE     1024
+E_USER_DEPRECATED 16384
+E_ALL             30719</pre>
+
+<p><code>E_ALL</code> é "todos". As de <code>E_USER_…</code> são para erros que <strong>você</strong> dispara com <code>trigger_error</code> (mais abaixo). Para combinar, usa-se <code>&amp;</code> (e) e <code>~</code> (não): <code>E_ALL &amp; ~E_DEPRECATED</code> = "todos, menos os Deprecated".</p>
+
+<pre class="file" data-file="reporting.php">&lt;?php
+error_reporting(E_ALL &amp; ~E_WARNING);
+echo $nome;
+echo "Sem aviso de Warning\n";
+error_reporting(E_ALL);
+echo $nome;
+echo "\n", error_reporting(), " ", E_ALL, "\n";
+</pre>
+
+<pre class="term">$ php reporting.php
+Sem aviso de Warning              « o Warning da linha 3 foi ignorado
+
+Warning: Undefined variable $nome in /home/ana/erros/reporting.php on line 6
+
+30719 30719                       « chamada sem argumento, error_reporting() diz o valor atual</pre>
+
+<div class="warning">
+<strong>Em desenvolvimento, sempre <code>E_ALL</code></strong>
+<p>Desligar níveis de erro não conserta nada: só esconde. A regra é relatar <strong>tudo</strong> (<code>E_ALL</code>, o padrão do PHP 8) e decidir apenas <strong>onde</strong> as mensagens aparecem, que é o assunto da próxima seção.</p>
+</div>
+
+<hr>
+
+<h2>Mostrar ou não: <code>display_errors</code></h2>
+<p><code>display_errors</code> ("mostrar os erros") decide se as mensagens vão para a <strong>saída</strong>: o terminal, ou a página que o visitante vê. No terminal, você já conhece o resultado. Num site, a mensagem vai no meio do HTML, formatada com tags. A Ana rodou esta página no servidor embutido (<code>php -S</code>):</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+$precos = ['bolo' =&gt; 35];
+?&gt;
+&lt;p&gt;Torta: R$ &lt;?= $precos['torta'] ?&gt;&lt;/p&gt;
+</pre>
+
+<pre class="term">$ curl -s localhost:8000/
+&lt;p&gt;Torta: R$ &lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key "torta" in &lt;b&gt;/home/ana/erros/web/index.php&lt;/b&gt; on line &lt;b&gt;4&lt;/b&gt;&lt;br /&gt;
+&lt;/p&gt;</pre>
+
+<p>No navegador, o visitante veria <strong>Warning</strong> em negrito, com o caminho completo do arquivo no servidor. Para você, programando, isso é ótimo. Para o cliente da lojinha, é feio e perigoso: revela como o site é organizado por dentro (pastas, nomes de arquivos, às vezes trechos de SQL), o que ajuda quem quer atacá-lo.</p>
+
+<p>Você pode mudar <code>display_errors</code> dentro do programa com <code>ini_set</code> ("definir configuração"):</p>
+
+<pre class="file" data-file="display.php">&lt;?php
+ini_set('display_errors', '0');
+echo $nome;
+echo "O aviso não apareceu\n";
+</pre>
+
+<pre class="term">$ php display.php
+O aviso não apareceu</pre>
+
+<p>O erro continua acontecendo; só não é mostrado. Mas então como você vai saber que ele aconteceu? Com o <strong>registro</strong> (<em>log</em>).</p>
+
+<h3>Guardar num arquivo: <code>log_errors</code> e <code>error_log</code></h3>
+<pre class="file" data-file="log.php">&lt;?php
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', __DIR__ . '/erros.log');
+echo $nome;
+error_log('Pedido 42 sem endereço');
+echo "Página normal para o visitante\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>ini_set('display_errors', '0')</code></td><td>Não mostra os erros na saída.</td></tr>
+<tr><td><code>ini_set('log_errors', '1')</code></td><td>Liga o registro de erros.</td></tr>
+<tr><td><code>ini_set('error_log', __DIR__ . '/erros.log')</code></td><td>Diz em que arquivo registrar. Sem isso, vai para o registro do servidor (ou, no terminal, para a saída de erros).</td></tr>
+<tr><td><code>error_log('Pedido 42 sem endereço')</code></td><td>A <strong>função</strong> <code>error_log</code> escreve uma mensagem sua no mesmo registro. Ótima para anotar o que aconteceu sem mostrar nada ao visitante.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ php log.php
+Página normal para o visitante              « o visitante não vê nada de errado
+$ cat erros.log
+[16-Oct-2026 23:59:51 UTC] PHP Warning:  Undefined variable $nome in /home/ana/erros/log.php on line 5
+[16-Oct-2026 23:59:51 UTC] Pedido 42 sem endereço</pre>
+
+<p>Cada linha tem a data e a hora (em UTC: o fuso, de novo, como em <a href="datas.html">Datas e Horas</a>), o nível com o prefixo <code>PHP</code> e a mensagem. Em produção, alguém (ou um programa) olha esse arquivo regularmente.</p>
+
+<div class="note">
+<strong>No terminal: <code>PHP Warning:</code> e <code>Warning:</code></strong>
+<p>Com <code>log_errors</code> ligado e sem arquivo definido, o PHP de linha de comando manda o registro para a saída de <strong>erros</strong> (stderr) e a mensagem normal para a saída padrão. Por isso às vezes você vê cada aviso <strong>duas vezes</strong>:</p>
+<pre class="term">$ php -d log_errors=1 warning.php
+Início
+PHP Warning:  Undefined variable $nome in /home/ana/erros/warning.php on line 3          « o registro (stderr)
+
+Warning: Undefined variable $nome in /home/ana/erros/warning.php on line 3               « o display (stdout)
+PHP Warning:  Undefined array key "torta" in /home/ana/erros/warning.php on line 5
+
+Warning: Undefined array key "torta" in /home/ana/erros/warning.php on line 5
+Fim
+$ php -d log_errors=1 warning.php 2&amp;gt;/dev/null      « jogando o stderr fora, sobra só o display
+Início
+
+Warning: Undefined variable $nome in /home/ana/erros/warning.php on line 3
+
+Warning: Undefined array key "torta" in /home/ana/erros/warning.php on line 5
+Fim</pre>
+<p>O PHP do laboratório (e o do editor do guia) vem sem <code>php.ini</code>, com <code>log_errors</code> desligado; em outras instalações (como o PHP do <code>apt</code> no Ubuntu e no Debian), o <code>php.ini</code> liga o <code>log_errors</code>, e aí você verá as mensagens com o prefixo <code>PHP</code>, às vezes em dobro. Confira a sua com o <code>php -i</code> mostrado logo abaixo.</p>
+</div>
+
+<h3>Desenvolvimento × produção</h3>
+<p>As configurações moram no <code>php.ini</code>. O PHP vem com dois modelos prontos, <code>php.ini-development</code> e <code>php.ini-production</code>, e a diferença essencial é esta:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Configuração</th><th>Desenvolvimento (seu computador)</th><th>Produção (o site no ar)</th></tr>
+<tr><td><code>error_reporting</code></td><td><code>E_ALL</code></td><td><code>E_ALL</code> (o modelo de produção tira <code>E_DEPRECATED</code>)</td></tr>
+<tr><td><code>display_errors</code></td><td><code>On</code>: ver tudo na hora</td><td><strong><code>Off</code></strong>: o visitante nunca vê</td></tr>
+<tr><td><code>display_startup_errors</code></td><td><code>On</code></td><td><code>Off</code></td></tr>
+<tr><td><code>log_errors</code></td><td><code>On</code></td><td><strong><code>On</code></strong>: tudo vai para o registro</td></tr>
+<tr><td><code>error_log</code></td><td>(opcional)</td><td>Um arquivo fora da pasta pública, como <code>/var/log/php/erros.log</code></td></tr>
+</table>
+</div>
+
+<p>Para ver o que está valendo na sua máquina, use <code>php --ini</code> (qual <code>php.ini</code> foi carregado) e <code>php -i</code> (todas as configurações). No laboratório da Ana:</p>
+
+<pre class="term">$ php --ini | head -2
+Configuration File (php.ini) Path: "/usr/local/etc/php"
+Loaded Configuration File:         (none)            « nenhum php.ini: valores padrão
+$ php -i | grep -E '^(display_errors|display_startup_errors|error_reporting|log_errors|error_log|html_errors) '
+display_errors =&gt; STDOUT =&gt; STDOUT
+display_startup_errors =&gt; On =&gt; On
+error_log =&gt; no value =&gt; no value
+error_reporting =&gt; no value =&gt; no value              « "sem valor" = o padrão, E_ALL
+html_errors =&gt; Off =&gt; Off
+log_errors =&gt; Off =&gt; Off</pre>
+
+<div class="tip">
+<strong><code>ini_set</code> ou <code>php.ini</code>?</strong>
+<p>O <code>php.ini</code> é o lugar certo para a configuração do servidor. <code>ini_set</code> no começo do programa é útil quando você não tem acesso ao <code>php.ini</code> (hospedagem compartilhada). Mas atenção: <code>ini_set</code> só vale depois que o arquivo começou a rodar, então não esconde um <code>Parse error</code> do próprio arquivo.</p>
+</div>
+
+<div class="tryphp" data-goal="out:Página normal,out:PHP Warning:  Undefined variable $cliente,out:Estoque do bolo acabando">
+<p class="try-task"><strong>Missão:</strong> configure o programa como em produção: não mostrar erros, registrar no arquivo <code>erros.log</code> ao lado do script. Acrescente uma mensagem sua no registro, <code>Estoque do bolo acabando</code>, com <code>error_log</code>. No fim, o programa já mostra o conteúdo do registro (só para você conferir).</p>
+<pre class="script">&lt;?php
+// configure aqui
+
+echo "Página normal\n";
+echo "Olá, $cliente\n";
+
+echo "--- conteúdo do erros.log:\n";
+echo @file_get_contents(__DIR__ . '/erros.log');
+</pre>
+<pre class="solucao">&lt;?php
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', __DIR__ . '/erros.log');
+error_log('Estoque do bolo acabando');
+
+echo "Página normal\n";
+echo "Olá, $cliente\n";
+
+echo "--- conteúdo do erros.log:\n";
+echo @file_get_contents(__DIR__ . '/erros.log');
+</pre>
+</div>
+
+<hr>
+
+<h2>Esconder um aviso com <code>@</code> (e por que evitar)</h2>
+<p>O operador <code>@</code> na frente de uma expressão silencia os avisos <strong>daquela</strong> expressão. O erro ainda pode ser consultado com <code>error_get_last()</code>:</p>
+
+<pre class="file" data-file="arroba.php">&lt;?php
+$conteudo = @file_get_contents('nao-existe.txt');
+var_dump($conteudo);
+print_r(error_get_last());
+</pre>
+
+<pre class="term">$ php arroba.php
+bool(false)
+Array
+(
+    [type] =&gt; 2                     « 2 = E_WARNING
+    [message] =&gt; file_get_contents(nao-existe.txt): Failed to open stream: No such file or directory
+    [file] =&gt; /home/ana/erros/arroba.php
+    [line] =&gt; 2
+)</pre>
+
+<p>O <code>@</code> só é aceitável quando você <strong>trata</strong> a falha logo em seguida (como no <code>if ($conteudo === false)</code>). Espalhar <code>@</code> para "limpar a tela" é o caminho mais rápido para um bug impossível de achar. Prefira perguntar antes (<code>file_exists</code>) ou usar exceções.</p>
+
+<h3>Os seus próprios avisos: <code>trigger_error</code></h3>
+<pre class="term">$ php user.php      « trigger_error('Estoque baixo', E_USER_WARNING); echo "continua\n";
+
+Warning: Estoque baixo in /home/ana/erros/user.php on line 2
+continua</pre>
+<p>Hoje, para erros do seu programa, o normal é lançar uma <a href="excecoes-proprias.html">exceção própria</a>, e <code>trigger_error</code> ficou para casos raros (usar <code>E_USER_ERROR</code> com ele está obsoleto desde o PHP 8.4).</p>
+
+<hr>
+
+<h2>No PHP 8, erros viraram exceções</h2>
+<p>Nas versões antigas, muitos problemas graves eram "fatais de verdade": o programa morria e não havia o que fazer. No PHP 7 e, principalmente, no PHP 8, eles passaram a ser <strong>exceções</strong> da família <code>Error</code>. A diferença prática é enorme: uma exceção pode ser <strong>capturada</strong> com <code>try</code>/<code>catch</code>, e o programa decide o que fazer (mostrar uma mensagem amigável, registrar, tentar outra coisa).</p>
+
+<pre class="file" data-file="excecoes.php">&lt;?php
+$testes = [
+    fn() =&gt; strlen([]),
+    fn() =&gt; str_repeat('x', -1),
+    fn() =&gt; 10 % 0,
+    fn() =&gt; intdiv(10, 0),
+    fn() =&gt; 10 / 0,
+    fn() =&gt; calcular(),
+    fn() =&gt; match (3) { 1 =&gt; 'um', 2 =&gt; 'dois' },
+    fn() =&gt; (function (int $a, int $b) { return $a + $b; })(1),
+    fn() =&gt; null-&gt;nome(),
+];
+foreach ($testes as $t) {
+    try {
+        $t();
+    } catch (Throwable $e) {
+        echo get_class($e), ': ', $e-&gt;getMessage(), "\n";
+    }
+}
+</pre>
+
+<p>Não se preocupe com o <code>fn() =&gt;</code> (são <a href="closures.html">arrow functions</a>, usadas aqui só para guardar cada teste sem executá-lo) nem com o <code>try</code>/<code>catch</code> (a <a href="excecoes.html">próxima aula</a>). Olhe a saída: cada problema virou uma exceção com nome e mensagem.</p>
+
+<pre class="term">$ php excecoes.php
+TypeError: strlen(): Argument #1 ($string) must be of type string, array given
+ValueError: str_repeat(): Argument #2 ($times) must be greater than or equal to 0
+DivisionByZeroError: Modulo by zero
+DivisionByZeroError: Division by zero
+DivisionByZeroError: Division by zero
+Error: Call to undefined function calcular()
+UnhandledMatchError: Unhandled match case 3
+ArgumentCountError: Too few arguments to function {closure:{closure:/home/ana/erros/excecoes.php:10}:10}(), 1 passed in /home/ana/erros/excecoes.php on line 10 and exactly 2 expected
+Error: Call to a member function nome() on null</pre>
+
+<h3>A família <code>Error</code></h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Classe</th><th>Filha de</th><th>Quando acontece</th><th>Exemplo real</th></tr>
+<tr><td><code>Throwable</code></td><td>(interface, a raiz)</td><td>Tudo o que pode ser lançado: <code>Error</code> e <code>Exception</code></td><td></td></tr>
+<tr><td><code>Error</code></td><td><code>Throwable</code></td><td>Erros internos do PHP</td><td><code>Call to undefined function calcular()</code></td></tr>
+<tr><td><code>TypeError</code></td><td><code>Error</code></td><td>Valor do tipo errado num parâmetro ou retorno</td><td><code>strlen(): Argument #1 ($string) must be of type string, array given</code></td></tr>
+<tr><td><code>ArgumentCountError</code></td><td><code>TypeError</code></td><td>Faltam argumentos</td><td><code>Too few arguments to function …, 1 passed … and exactly 2 expected</code></td></tr>
+<tr><td><code>ValueError</code></td><td><code>Error</code></td><td>Tipo certo, valor impossível</td><td><code>str_repeat(): Argument #2 ($times) must be greater than or equal to 0</code></td></tr>
+<tr><td><code>ArithmeticError</code></td><td><code>Error</code></td><td>Erro de conta</td><td><code>intdiv(PHP_INT_MIN, -1)</code></td></tr>
+<tr><td><code>DivisionByZeroError</code></td><td><code>ArithmeticError</code></td><td>Divisão ou resto por zero</td><td><code>Division by zero</code>, <code>Modulo by zero</code></td></tr>
+<tr><td><code>UnhandledMatchError</code></td><td><code>Error</code></td><td><code>match</code> sem braço para o valor</td><td><code>Unhandled match case 3</code></td></tr>
+<tr><td><code>CompileError</code> / <code>ParseError</code></td><td><code>Error</code></td><td>Erro de sintaxe em código carregado (<code>include</code>, <code>eval</code>)</td><td><code>syntax error, unexpected token …</code></td></tr>
+<tr><td><code>Exception</code></td><td><code>Throwable</code></td><td>A outra família: problemas "do programa", que você lança e captura (<code>JsonException</code>, <code>DateMalformedStringException</code>, as suas)</td><td>veja <a href="excecoes.html">Exceções</a></td></tr>
+</table>
+</div>
+
+<p>Quando ninguém captura, a exceção vira o <code>Fatal error: Uncaught …</code> que você já conhece:</p>
+
+<pre class="term">$ php div.php        « echo 10 / 0;
+
+Fatal error: Uncaught DivisionByZeroError: Division by zero in /home/ana/erros/div.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/erros/div.php on line 2
+$ php typeerror.php  « function dobro(int $n): int { … }  echo dobro("abc");
+
+Fatal error: Uncaught TypeError: dobro(): Argument #1 ($n) must be of type int, string given, called in /home/ana/erros/typeerror.php on line 6 and defined in /home/ana/erros/typeerror.php:2
+Stack trace:
+#0 /home/ana/erros/typeerror.php(6): dobro('abc')
+#1 {main}
+  thrown in /home/ana/erros/typeerror.php on line 2</pre>
+
+<div class="note">
+<strong>Warning × exceção</strong>
+<p>Repare que <code>10 / 0</code> é uma exceção (para o programa), mas um arquivo que não abre é só um <code>Warning</code> (segue com <code>false</code>). Os <code>Warning</code> não são exceções e <strong>não</strong> são pegos pelo <code>catch</code>. Se você quiser tratá-los do mesmo jeito, existe uma receita com <code>set_error_handler</code> que transforma todo aviso numa <code>ErrorException</code>:</p>
+<pre class="file" data-file="handler.php">&lt;?php
+set_error_handler(function (int $nivel, string $msg, string $arquivo, int $linha) {
+    throw new ErrorException($msg, 0, $nivel, $arquivo, $linha);
+});
+try {
+    $x = file_get_contents('nao-existe.txt');
+} catch (ErrorException $e) {
+    echo "Peguei: ", $e-&gt;getMessage(), "\n";
+}
+</pre>
+<pre class="term">$ php handler.php
+Peguei: file_get_contents(nao-existe.txt): Failed to open stream: No such file or directory</pre>
+<p>Muitos frameworks fazem exatamente isso por você.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A página fica em branco (a "tela branca")</strong>
+<p><strong>O que significa:</strong> houve um <code>Fatal error</code> ou <code>Parse error</code> com <code>display_errors</code> desligado. O PHP parou e não mostrou nada.</p>
+<p><strong>Como consertar:</strong> olhe o registro de erros (o <code>error_log</code> configurado, ou o do servidor, como <code>/var/log/apache2/error.log</code>). No seu computador, ligue <code>display_errors</code>. Rode <code>php -l arquivo.php</code> para achar erros de sintaxe.</p>
+</div>
+
+<div class="cenario">
+<strong>"Deprecated" aos montes depois de atualizar o PHP</strong>
+<pre class="term">Deprecated: strlen(): Passing null to parameter #1 ($string) of type string is deprecated in /home/ana/erros/deprecated.php on line 3</pre>
+<p><strong>O que significa:</strong> o código usa coisas que a versão nova considera obsoletas. Hoje funciona.</p>
+<p><strong>Como consertar:</strong> corrija um por um (aqui, <code>strlen($texto ?? '')</code>). Não desligue <code>E_DEPRECATED</code> no desenvolvimento: é o aviso antecipado do que vai quebrar na próxima versão.</p>
+</div>
+
+<div class="cenario">
+<strong>"Allowed memory size of … bytes exhausted"</strong>
+<p><strong>O que significa:</strong> o programa tentou usar mais memória que o <code>memory_limit</code>. Quase sempre é um laço sem fim enchendo um array, ou um arquivo enorme lido inteiro.</p>
+<p><strong>Como consertar:</strong> procure o laço; leia arquivos grandes em partes (<code>fgets</code>). Aumentar o <code>memory_limit</code> só resolve se o programa realmente precisa de mais memória.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Item</th><th>O que faz</th></tr>
+<tr><td><code>error_reporting(E_ALL)</code></td><td>Quais níveis são relatados (sem argumento: devolve o valor atual).</td></tr>
+<tr><td><code>ini_set('display_errors', '0'|'1')</code></td><td>Mostrar ou não os erros na saída.</td></tr>
+<tr><td><code>ini_set('log_errors', '1')</code></td><td>Registrar os erros.</td></tr>
+<tr><td><code>ini_set('error_log', $arquivo)</code></td><td>Onde registrar.</td></tr>
+<tr><td><code>error_log($mensagem)</code></td><td>Escreve uma mensagem sua no registro.</td></tr>
+<tr><td><code>@expressão</code></td><td>Silencia os avisos daquela expressão.</td></tr>
+<tr><td><code>error_get_last()</code></td><td>O último erro (array com <code>type</code>, <code>message</code>, <code>file</code>, <code>line</code>).</td></tr>
+<tr><td><code>trigger_error($msg, E_USER_WARNING)</code></td><td>Dispara um aviso seu.</td></tr>
+<tr><td><code>set_error_handler($funcao)</code></td><td>Uma função sua recebe os avisos (por exemplo, para virar <code>ErrorException</code>).</td></tr>
+<tr><td><code>php -l arquivo.php</code></td><td>Confere a sintaxe sem executar.</td></tr>
+<tr><td><code>php -d config=valor</code></td><td>Muda uma configuração só nesta execução.</td></tr>
+<tr><td><code>php --ini</code>, <code>php -i</code></td><td>Qual <code>php.ini</code> e quais configurações estão valendo.</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Todos os níveis</h3>
+<p>Complete para relatar todos os erros:</p>
+<div class="ex-code">error_reporting(<input data-answer="E_ALL" aria-label="constante" size="8">);</div>
+</div>
+
+<div class="exercise">
+<h3>2. Produção</h3>
+<p>Complete para esconder os erros do visitante:</p>
+<div class="ex-code">ini_set('<input data-answer="display_errors" aria-label="configuração">', '0');</div>
+</div>
+
+<div class="exercise">
+<h3>3. Anotar no registro</h3>
+<p>Complete para escrever uma mensagem sua no registro de erros:</p>
+<div class="ex-code"><input data-answer="error_log" aria-label="função">('Pagamento recusado no pedido 42');</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">4. Qual destas mensagens <strong>não</strong> para o programa?</p>
+<label><input type="radio" name="q4"> <code>Parse error: syntax error …</code></label>
+<label><input type="radio" name="q4"> <code>Fatal error: Uncaught Error: Call to undefined function …</code></label>
+<label><input type="radio" name="q4"> <code>Warning: Undefined array key "torta" …</code></label>
+<label><input type="radio" name="q4"> <code>Fatal error: Allowed memory size … exhausted</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">5. Num site no ar (produção), qual é a configuração recomendada?</p>
+<label><input type="radio" name="q5"> <code>display_errors=On</code>, <code>log_errors=Off</code></label>
+<label><input type="radio" name="q5"> <code>display_errors=Off</code>, <code>log_errors=On</code></label>
+<label><input type="radio" name="q5"> <code>error_reporting=0</code>, para não haver erros</label>
+<label><input type="radio" name="q5"> <code>@</code> na frente de todas as linhas</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">6. No PHP 8, <code>intdiv(10, 0)</code> lança qual exceção?</p>
+<label><input type="radio" name="q6"> <code>TypeError</code></label>
+<label><input type="radio" name="q6"> <code>ValueError</code></label>
+<label><input type="radio" name="q6"> Nenhuma: é só um Warning.</label>
+<label><input type="radio" name="q6"> <code>DivisionByZeroError</code></label>
+</div>
+
+<div class="tryphp" data-goal="out:DivisionByZeroError: Division by zero,out:TypeError,out:ValueError,out:Fim do teste">
+<p class="try-task"><strong>Missão final:</strong> cada função de teste provoca um erro diferente. Hoje o programa morre no primeiro. Envolva a chamada de cada teste num <code>try { … } catch (Throwable $e) { … }</code> que mostre <code>get_class($e) . ': ' . $e-&gt;getMessage()</code>, para os três aparecerem e o programa chegar ao <code>Fim do teste</code>.</p>
+<pre class="script">&lt;?php
+function teste1() { return 100 / 0; }
+function teste2() { return strlen([1, 2]); }
+function teste3() { return str_repeat('-', -5); }
+
+foreach (['teste1', 'teste2', 'teste3'] as $teste) {
+    $teste();
+}
+echo "Fim do teste\n";
+</pre>
+<pre class="solucao">&lt;?php
+function teste1() { return 100 / 0; }
+function teste2() { return strlen([1, 2]); }
+function teste3() { return str_repeat('-', -5); }
+
+foreach (['teste1', 'teste2', 'teste3'] as $teste) {
+    try {
+        $teste();
+    } catch (Throwable $e) {
+        echo get_class($e) . ': ' . $e-&gt;getMessage() . "\n";
+    }
+}
+echo "Fim do teste\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>Deprecated</code>, <code>Notice</code> e <code>Warning</code> avisam e o programa continua; <code>Fatal error</code> para; <code>Parse error</code> impede o programa de começar.</li>
+  <li>Todo aviso é um bug: conserte em vez de esconder.</li>
+  <li><code>error_reporting(E_ALL)</code> relata tudo; <code>display_errors</code> decide se aparece na tela; <code>log_errors</code> + <code>error_log</code> guardam num arquivo.</li>
+  <li>Desenvolvimento: mostrar tudo. Produção: <code>display_errors=Off</code> e <code>log_errors=On</code>.</li>
+  <li>No PHP 8, muitos erros são exceções da família <code>Error</code> (<code>TypeError</code>, <code>ValueError</code>, <code>DivisionByZeroError</code>…), filhas de <code>Throwable</code>, e podem ser capturadas.</li>
+</ul>
+
+<p>Próxima aula: <a href="excecoes.html">Exceções (try e catch)</a>.</p>
+
+<div class="pager"></div>
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
