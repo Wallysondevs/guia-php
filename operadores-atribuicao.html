@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Operadores de Atribuição — =, +=, .=, ??= e &amp; | Guia PHP</title>
+<meta name="description" content="Operadores de atribuição em PHP para quem nunca programou: o sinal de igual, os atalhos +=, -=, *=, /=, %=, **= e .=, o ??= para valores padrão, a armadilha do =+ e do = dentro do if, e a ideia da atribuição por referência com &amp;, com saídas reais do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Operadores de Atribuição</span></h1>
+
+<p class="intro">Você já usa um operador de atribuição desde a primeira aula: o <code>=</code>, que guarda um valor numa variável. Mas um programa vive <strong>atualizando</strong> variáveis: o total do carrinho cresce a cada produto, o estoque diminui a cada venda, a mensagem ganha mais uma linha. Para isso, o PHP tem atalhos como <code>+=</code> ("some a isto") e <code>.=</code> ("acrescente este texto"). Nesta aula você aprende todos eles, o <code>??=</code> para valores padrão e a ideia das referências (<code>&amp;</code>).</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Como o <code>=</code> funciona por dentro (e por que <code>$a = $b = 0</code> funciona).</li>
+  <li>Os atalhos <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code> e <code>**=</code>.</li>
+  <li>O <code>.=</code>, para ir montando um texto aos pedaços.</li>
+  <li>O <code>??=</code>, que só atribui se a variável for <code>null</code> ou não existir.</li>
+  <li>As armadilhas do <code>=+</code> e do <code>=</code> dentro do <code>if</code>.</li>
+  <li>A ideia da atribuição por referência, <code>$b = &amp;$a</code>.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. Os operadores das contas (<code>+</code>, <code>*</code>, <code>%</code>…) estão em <a href="operadores-aritmeticos.html">Operadores Aritméticos</a>.</p>
+
+<hr>
+
+<h2>A ideia: abreviações</h2>
+<p>Numa mensagem de celular, muita gente escreve "vc" em vez de "você": é a mesma palavra, só mais curta. Os operadores de atribuição combinados são abreviações. Em vez de escrever <code>$total = $total + 5;</code> (repetindo <code>$total</code>), você escreve <code>$total += 5;</code>. O resultado é idêntico.</p>
+
+<hr>
+
+<h2>1. O <code>=</code>, de novo, com mais detalhes</h2>
+<p>Lembre da aula de <a href="variaveis.html">Variáveis</a>: o <code>=</code> se lê "<strong>recebe</strong>". O PHP calcula tudo do lado direito e guarda o resultado na variável do lado esquerdo. Por isso, o lado esquerdo precisa ser uma variável:</p>
+
+<pre class="term" data-cwd="~/site">$ cat invertido.php
+&lt;?php
+5 = $x;
+$ php invertido.php
+
+Parse error: syntax error, unexpected token "=" in /home/ana/site/invertido.php on line 2</pre>
+
+<p>Um detalhe que vai ser útil: a atribuição, além de guardar o valor, também <strong>devolve</strong> esse valor. É por isso que dá para escrever várias atribuições encadeadas:</p>
+
+<pre class="file" data-file="encadeada.php">&lt;?php
+var_dump($x = 7);
+$a = $b = $c = 0;
+var_dump($a, $b, $c);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php encadeada.php
+int(7)                   « "$x = 7" guardou 7 em $x e devolveu 7 para o var_dump
+int(0)                   « $c = 0 devolveu 0, que foi para $b, que foi para $a
+int(0)
+int(0)</pre>
+
+<p>O encadeamento vai da direita para a esquerda: <code>$a = ($b = ($c = 0))</code>. É prático para zerar vários contadores de uma vez.</p>
+
+<hr>
+
+<h2>2. Os atalhos das contas</h2>
+<p>Cada operador aritmético tem a sua versão "com igual". A regra é sempre a mesma: <code>$x OP= valor</code> é o mesmo que <code>$x = $x OP valor</code>.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Atalho</th><th>É o mesmo que</th><th>Leia como</th><th>Com <code>$x = 10</code>, fica</th></tr>
+<tr><td><code>$x += 5;</code></td><td><code>$x = $x + 5;</code></td><td>some 5 a <code>$x</code></td><td><code>15</code></td></tr>
+<tr><td><code>$x -= 3;</code></td><td><code>$x = $x - 3;</code></td><td>tire 3 de <code>$x</code></td><td><code>7</code></td></tr>
+<tr><td><code>$x *= 2;</code></td><td><code>$x = $x * 2;</code></td><td>multiplique <code>$x</code> por 2</td><td><code>20</code></td></tr>
+<tr><td><code>$x /= 4;</code></td><td><code>$x = $x / 4;</code></td><td>divida <code>$x</code> por 4</td><td><code>2.5</code></td></tr>
+<tr><td><code>$x %= 3;</code></td><td><code>$x = $x % 3;</code></td><td>fique com o resto de <code>$x</code> por 3</td><td><code>1</code></td></tr>
+<tr><td><code>$x **= 2;</code></td><td><code>$x = $x ** 2;</code></td><td>eleve <code>$x</code> ao quadrado</td><td><code>100</code></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="atalhos.php">&lt;?php
+$total = 10;
+$total += 5;  echo $total, "\n";
+$total -= 3;  echo $total, "\n";
+$total *= 2;  echo $total, "\n";
+$total /= 4;  var_dump($total);
+$total **= 2; var_dump($total);
+$n = 17;
+$n %= 5;
+var_dump($n);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php atalhos.php
+15                       « 10 + 5
+12                       « 15 - 3
+24                       « 12 * 2
+int(6)                   « 24 / 4: divisão exata, continua int
+int(36)                  « 6 ao quadrado
+int(2)                   « resto de 17 por 5</pre>
+
+<p>(Duas instruções na mesma linha, como <code>$total += 5;  echo $total, "\n";</code>, são permitidas: o <code>;</code> separa uma da outra. Aqui é só para a tabela ficar compacta.)</p>
+
+<p>Esses atalhos aparecem em todo lugar onde algo "acumula": o total de um carrinho (<code>$total += $preco;</code>), a baixa no estoque (<code>$estoque -= $vendidos;</code>), um desconto (<code>$preco *= 0.9;</code>, que tira 10%).</p>
+
+<div class="tryphp" data-goal="out:Total: 18,semerro,src:\+=,src:\*=">
+<p class="try-task"><strong>Missão:</strong> monte o carrinho da Ana. Comece com <code>$total = 0</code>, some os três produtos (<code>12.5</code>, <code>4</code> e <code>3.5</code>) usando <code>+=</code> e depois dê 10% de desconto com <code>*= 0.9</code>. A saída deve ser <code>Total: 18</code>.</p>
+<pre class="script">&lt;?php
+$total = 0;
+// some os produtos com +=
+
+// dê o desconto com *=
+
+echo "Total: $total\n";
+</pre>
+<pre class="solucao">&lt;?php
+$total = 0;
+$total += 12.5;
+$total += 4;
+$total += 3.5;
+$total *= 0.9;
+echo "Total: $total\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>3. <code>.=</code>: montar um texto aos pedaços</h2>
+<p>O ponto junta textos (aula <a href="operadores-string.html">Operadores de String</a>), e o <code>.=</code> é o atalho de "acrescente no fim": <code>$msg .= "!";</code> é o mesmo que <code>$msg = $msg . "!";</code>.</p>
+
+<pre class="file" data-file="mensagem.php">&lt;?php
+$msg = "Olá";
+$msg .= ", Ana";
+$msg .= "!";
+echo $msg, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php mensagem.php
+Olá, Ana!</pre>
+
+<p>É o jeito clássico de montar um e-mail, um relatório ou um pedaço de HTML linha por linha. Mais tarde, com laços (<a href="foreach.html">foreach</a>), você vai usar <code>.=</code> para gerar uma lista inteira.</p>
+
+<div class="warning">
+<strong><code>+=</code> não junta texto</strong>
+<p>Quem vem de JavaScript costuma escrever <code>+=</code> para acrescentar texto. Em PHP, o <code>+</code> é só para números:</p>
+<pre class="term" data-cwd="~/site">$ cat juntar-errado.php
+&lt;?php
+$nome = "Ana";
+$nome += " Souza";
+$ php juntar-errado.php
+
+Fatal error: Uncaught TypeError: Unsupported operand types: string + string in /home/ana/site/juntar-errado.php:3
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/juntar-errado.php on line 3</pre>
+<p>Para texto, é sempre <code>.=</code>.</p>
+</div>
+
+<hr>
+
+<h2>4. <code>??=</code>: atribuir só se estiver vazio <span class="versao">PHP 7.4+</span></h2>
+<p>O <code>??=</code> é o atalho de "<strong>se não tiver valor, use este</strong>". Ele só atribui quando a variável é <code>null</code> ou nem existe; se já houver um valor, deixa como está. É o irmão do <code>??</code>, explicado em <a href="null-coalescing.html">?? e ?-&gt;</a>.</p>
+
+<pre class="file" data-file="padrao.php">&lt;?php
+$config = ["tema" =&gt; "escuro"];
+$config["idioma"] ??= "pt-BR";
+$config["tema"] ??= "claro";
+print_r($config);
+$nome = null;
+$nome ??= "visitante";
+echo $nome, "\n";
+$vazio = "";
+$vazio ??= "padrão";
+var_dump($vazio);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php padrao.php
+Array
+(
+    [tema] =&gt; escuro     « já tinha valor: ficou "escuro"
+    [idioma] =&gt; pt-BR    « não existia: recebeu o padrão
+)
+visitante                « era null: recebeu o padrão
+string(0) ""             « "" não é null: o ??= não mexeu</pre>
+
+<dl class="anatomy">
+  <dt>$x ??= valor;</dt><dd>É o mesmo que <code>$x = $x ?? valor;</code>: "<code>$x</code> recebe ele mesmo, ou o valor se for null".</dd>
+  <dt>Não dá Warning</dt><dd>Mesmo que <code>$x</code> (ou a chave do array) não exista. Por isso é tão usado para preencher configurações que faltam.</dd>
+  <dt>Só olha o null</dt><dd><code>""</code>, <code>0</code> e <code>false</code> são valores: o <code>??=</code> não os troca (veja <a href="null.html">null</a>).</dd>
+</dl>
+
+<hr>
+
+<h2>5. A armadilha do <code>=</code> no <code>if</code></h2>
+<p>Como a atribuição devolve o valor, ela "funciona" em lugares onde você queria uma <strong>comparação</strong>. O erro mais clássico da programação é escrever um igual só dentro do <code>if</code>:</p>
+
+<pre class="file" data-file="armadilha.php">&lt;?php
+$x = 3;
+if ($x = 5) {
+    echo "x vale $x\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php armadilha.php
+x vale 5                 « $x era 3! o "=" trocou o valor para 5, e 5 é verdadeiro</pre>
+
+<p>O <code>if ($x = 5)</code> não pergunta nada: ele <strong>guarda</strong> 5 em <code>$x</code> e usa o 5 como condição (5 é verdadeiro, aula <a href="booleanos.html">Booleanos</a>). O PHP não reclama. Para comparar, use <code>===</code> (três iguais): <code>if ($x === 5)</code>. A diferença entre <code>=</code>, <code>==</code> e <code>===</code> está em <a href="operadores-comparacao.html">Comparação (== e ===)</a>.</p>
+
+<hr>
+
+<h2>6. Atribuição por referência: <code>&amp;</code> (só a ideia)</h2>
+<p>Normalmente, <code>$b = $a;</code> <strong>copia</strong> o valor: depois disso, mexer em uma não muda a outra. Com um <code>&amp;</code> antes da variável da direita, o PHP faz outra coisa: <code>$b = &amp;$a;</code> cria um <strong>segundo nome para a mesma caixa</strong>. Mexeu numa, mexeu na outra:</p>
+
+<pre class="file" data-file="referencia.php">&lt;?php
+$x = 1;
+$y = $x;
+$y = 5;
+echo "cópia:      x=$x y=$y\n";
+$a = 1;
+$b = &amp;$a;
+$b = 5;
+echo "referência: a=$a b=$b\n";
+$a = 9;
+echo "referência: a=$a b=$b\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php referencia.php
+cópia:      x=1 y=5      « $y é uma caixa separada
+referência: a=5 b=5      « mudar $b mudou $a: é a mesma caixa
+referência: a=9 b=9      « e vice-versa</pre>
+
+<p>Pense numa caixa com <strong>duas etiquetas</strong> coladas: "a" e "b". Não importa por qual etiqueta você pega a caixa, o conteúdo é o mesmo. Um <code>unset($b)</code> arranca só a etiqueta "b"; a caixa e o <code>$a</code> continuam lá.</p>
+
+<p>No dia a dia, você vai encontrar o <code>&amp;</code> em dois lugares: no <code>foreach</code> que modifica os itens de um array (<code>foreach ($precos as &amp;$p)</code>, aula <a href="foreach.html">foreach</a>) e em funções que alteram a variável recebida (aula <a href="parametros.html">Parâmetros</a>). Fora disso, prefira as cópias: referências deixam o código mais difícil de acompanhar.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O total "zerou" em vez de somar: o <code>=+</code></strong>
+<pre class="term" data-cwd="~/site">$ cat invertido2.php
+&lt;?php
+$total = 10;
+$total =+ 5;
+var_dump($total);
+$ php invertido2.php
+int(5)                   « era para ser 15!</pre>
+<p><strong>O que significa:</strong> os sinais foram digitados na ordem errada. <code>=+ 5</code> é lido como <code>= +5</code>: "receba mais-cinco". O PHP não reclama, porque é um código válido.</p>
+<p><strong>Como consertar:</strong> o sinal da conta vem <strong>antes</strong> do igual: <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>.=</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Warning: Undefined variable</code> num <code>+=</code> ou <code>.=</code></strong>
+<pre class="term" data-cwd="~/site">$ php contador.php           « $cont += 1;  var_dump($cont);
+
+Warning: Undefined variable $cont in /home/ana/site/contador.php on line 2
+int(1)</pre>
+<p><strong>O que significa:</strong> <code>$cont += 1</code> precisa ler o valor atual de <code>$cont</code>, que não existe.</p>
+<p><strong>Como consertar:</strong> dê um valor inicial antes: <code>$cont = 0;</code> (para textos, <code>$msg = "";</code>).</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught TypeError: Unsupported operand types: string + string</code></strong>
+<p><strong>O que significa:</strong> você usou <code>+=</code> para juntar textos.</p>
+<p><strong>Como consertar:</strong> use <code>.=</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O <code>if</code> sempre entra (ou nunca entra)</strong>
+<p><strong>O que significa:</strong> provavelmente há um <code>=</code> sozinho na condição: <code>if ($x = 5)</code> atribui em vez de comparar.</p>
+<p><strong>Como consertar:</strong> <code>if ($x === 5)</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Equivale a</th><th>Uso típico</th></tr>
+<tr><td><code>$x = v</code></td><td>—</td><td>guardar um valor</td></tr>
+<tr><td><code>$x += v</code></td><td><code>$x = $x + v</code></td><td>somar ao total</td></tr>
+<tr><td><code>$x -= v</code></td><td><code>$x = $x - v</code></td><td>baixar o estoque</td></tr>
+<tr><td><code>$x *= v</code></td><td><code>$x = $x * v</code></td><td>aplicar desconto ou juros</td></tr>
+<tr><td><code>$x /= v</code></td><td><code>$x = $x / v</code></td><td>dividir em partes</td></tr>
+<tr><td><code>$x %= v</code></td><td><code>$x = $x % v</code></td><td>"dar a volta" num contador</td></tr>
+<tr><td><code>$x **= v</code></td><td><code>$x = $x ** v</code></td><td>potência</td></tr>
+<tr><td><code>$x .= "t"</code></td><td><code>$x = $x . "t"</code></td><td>montar um texto</td></tr>
+<tr><td><code>$x ??= v</code></td><td><code>$x = $x ?? v</code></td><td>valor padrão <span class="versao">7.4+</span></td></tr>
+<tr><td><code>$b = &amp;$a</code></td><td>—</td><td>dois nomes para a mesma variável</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Baixa no estoque</h3>
+<p>Complete para tirar 2 unidades do estoque:</p>
+<div class="ex-code">$estoque <input data-answer="-=" aria-label="operador"> 2;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Acrescentar texto</h3>
+<p>Complete para acrescentar <code>" Souza"</code> no fim de <code>$nome</code>:</p>
+<div class="ex-code">$nome <input data-answer=".=" aria-label="operador"> " Souza";</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">3. Depois de <code>$x = 4; $x *= 3; $x -= 2;</code>, quanto vale <code>$x</code>?</p>
+<label><input type="radio" name="q3"> 4</label>
+<label><input type="radio" name="q3"> 12</label>
+<label><input type="radio" name="q3"> 10</label>
+<label><input type="radio" name="q3"> 6</label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Com <code>$tema = "";</code>, o que <code>$tema ??= "claro";</code> faz?</p>
+<label><input type="radio" name="q4"> Troca <code>$tema</code> para <code>"claro"</code></label>
+<label><input type="radio" name="q4"> Nada: <code>""</code> não é null</label>
+<label><input type="radio" name="q4"> Dá Warning</label>
+<label><input type="radio" name="q4"> Junta os textos: <code>"claro"</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Com <code>$a = 1; $b = &amp;$a; $b = 7;</code>, quanto vale <code>$a</code>?</p>
+<label><input type="radio" name="q5"> 1</label>
+<label><input type="radio" name="q5"> 8</label>
+<label><input type="radio" name="q5"> Dá erro</label>
+<label><input type="radio" name="q5"> 7</label>
+</div>
+
+<h3>Missão final: a lista de compras</h3>
+
+<div class="tryphp" data-goal="out:Lista: arroz\, feijão\, café,semerro,src:\.=">
+<p class="try-task"><strong>Missão:</strong> monte o texto da lista de compras aos pedaços com <code>.=</code>, a partir de <code>$lista = "Lista: ";</code>, acrescentando <code>"arroz"</code>, <code>", feijão"</code> e <code>", café"</code> (um <code>.=</code> para cada). A saída deve ser <code>Lista: arroz, feijão, café</code>.</p>
+<pre class="script">&lt;?php
+$lista = "Lista: ";
+
+echo $lista, "\n";
+</pre>
+<pre class="solucao">&lt;?php
+$lista = "Lista: ";
+$lista .= "arroz";
+$lista .= ", feijão";
+$lista .= ", café";
+echo $lista, "\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>=</code> guarda o valor da direita na variável da esquerda e devolve esse valor (por isso <code>$a = $b = 0</code> funciona).</li>
+  <li><code>$x OP= v</code> é o atalho de <code>$x = $x OP v</code>: <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code>, <code>**=</code>.</li>
+  <li><code>.=</code> acrescenta texto; <code>+=</code> com texto dá <code>TypeError</code>.</li>
+  <li><code>??=</code> atribui só se a variável for null ou não existir, sem Warning.</li>
+  <li>Cuidado com <code>=+</code> (é "recebe mais-…") e com <code>=</code> dentro do <code>if</code> (use <code>===</code>).</li>
+  <li><code>$b = &amp;$a</code> dá um segundo nome à mesma variável; use pouco.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
