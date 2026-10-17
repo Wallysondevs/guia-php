@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projetos — como usar os projetos passo a passo | Guia PHP</title>
+<meta name="description" content="Os projetos do Guia PHP: calculadora, formulário de contato, login com sessão, tarefas com SQLite, mini blog e API REST. Que aulas cada um usa, como as etapas são organizadas e como rodar no seu computador com php -S e curl.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Projetos</span></h1>
+
+<p class="intro">Nas aulas, você aprendeu uma peça de cada vez. Nos projetos, as peças se juntam: cada um é um pequeno sistema que funciona de verdade, construído em etapas, do arquivo vazio até o código completo. É aqui que "eu entendi a aula" vira "eu sei fazer".</p>
+
+<div class="note">
+<strong>Nesta página</strong>
+<ul>
+  <li>Os seis projetos, em que ordem fazer e quais aulas cada um usa.</li>
+  <li>Como uma página de projeto é organizada.</li>
+  <li>Como rodar os projetos no seu computador com o <code>php -S</code> e testar com o navegador ou com o <code>curl</code>.</li>
+  <li>O "esqueleto" que todos os projetos repetem, para você praticar antes de começar.</li>
+</ul>
+</div>
+
+<h2>Os projetos</h2>
+<p>Faça na ordem: cada projeto reaproveita o que o anterior ensinou. Os quatro primeiros pedem só o Nível 1 e a parte de formulários do Nível 2; o login e os seguintes usam banco de dados e sessão.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Projeto</th><th>O que você constrói</th><th>Aulas que ele usa</th></tr>
+<tr><td><a href="projeto-calculadora.html">Calculadora Web</a></td><td>Dois números, quatro operações, resultado no formato <code>1.234,50</code>; validação e divisão por zero</td><td><a href="php-e-html.html">PHP Dentro do HTML</a>, <a href="formularios.html">Formulários</a>, <a href="get-post.html">$_GET e $_POST</a>, <a href="match.html">match</a>, <a href="validacao.html">Validar Dados</a>, <a href="escapar-saida.html">Escapar a Saída</a>, <a href="number-format.html">Formatar Números</a></td></tr>
+<tr><td><a href="projeto-contato.html">Formulário de Contato</a></td><td>Formulário com erros ao lado de cada campo, mensagens salvas em CSV ou JSON, sem envio duplicado</td><td><a href="validacao.html">Validar Dados</a>, <a href="mbstring.html">mbstring</a>, <a href="arquivos.html">Arquivos</a>, <a href="csv.html">CSV</a>, <a href="json.html">JSON</a>, <a href="redirecionar.html">Redirecionamento</a>, <a href="datas.html">Datas</a></td></tr>
+<tr><td><a href="projeto-login.html">Login com Sessão</a></td><td>Cadastro, login, área restrita e logout, com senha em hash, sessão renovada e token CSRF</td><td><a href="sessoes.html">Sessões</a>, <a href="cookies.html">Cookies</a>, <a href="senhas.html">Senhas</a>, <a href="csrf.html">CSRF</a>, <a href="pdo.html">PDO</a>, <a href="prepared-statements.html">Prepared Statements</a>, <a href="include-require.html">include e require</a></td></tr>
+<tr><td><a href="projeto-tarefas.html">Tarefas com SQLite</a></td><td>Lista de tarefas com criar, listar, marcar, editar e excluir (CRUD); uma injeção de SQL demonstrada e evitada</td><td><a href="banco-dados.html">Banco de Dados</a>, <a href="pdo.html">PDO</a>, <a href="crud.html">CRUD com PDO</a>, <a href="prepared-statements.html">Prepared Statements</a></td></tr>
+<tr><td><a href="projeto-blog.html">Mini Blog</a></td><td>Posts no SQLite, página de cada post, formulário de novo post, cabeçalho e rodapé incluídos, paginação</td><td><a href="include-require.html">include e require</a>, <a href="crud.html">CRUD com PDO</a>, <a href="prepared-statements.html">Prepared Statements</a>, <a href="get-post.html">$_GET e $_POST</a>, <a href="escapar-saida.html">Escapar a Saída</a>, <a href="datas.html">Datas</a></td></tr>
+<tr><td><a href="projeto-api.html">API REST</a></td><td>Uma API de tarefas em JSON, com GET, POST, PUT e DELETE e os códigos de status certos, testada com o <code>curl</code></td><td><a href="json.html">JSON</a>, <a href="superglobais.html">$_SERVER</a>, <a href="api-json.html">Criar uma API JSON</a>, <a href="pdo.html">PDO</a>, <a href="prepared-statements.html">Prepared Statements</a></td></tr>
+</table>
+</div>
+
+<p>Se uma aula da lista ainda não foi feita, faça-a antes: o projeto explica cada linha nova, mas não repete a aula inteira.</p>
+
+<h2>Como uma página de projeto é organizada</h2>
+<ol class="passo">
+  <li><strong>Antes de começar:</strong> o que o projeto usa e as aulas de cada coisa; os arquivos do projeto.</li>
+  <li><strong>As etapas:</strong> o projeto cresce uma novidade por vez. Cada etapa mostra só o <strong>código novo</strong>, explica cada parte (tabela ou "anatomia"), mostra a <strong>saída real</strong> (conferida com o PHP 8.5 rodando de verdade) e termina com uma caixa <strong>Experimente</strong>, que tem o arquivo completo daquela etapa e uma missão.</li>
+  <li><strong>Quando dá errado:</strong> as mensagens de erro que aparecem nesse tipo de projeto, com a mensagem completa, o que ela quer dizer e como consertar.</li>
+  <li><strong>O código completo:</strong> a versão final, para copiar e comparar com a sua.</li>
+  <li><strong>Desafios extras</strong> (sem resposta pronta), uma <strong>missão final</strong>, exercícios e resumo.</li>
+</ol>
+
+<h3>As caixas "Experimente" dos projetos</h3>
+<p>Nos projetos, as caixas funcionam no <strong>modo web</strong>: o código roda como uma página de site, servida pelo PHP de verdade dentro do seu navegador (veja <a href="simulador.html">O Editor do Guia</a>).</p>
+<ul>
+  <li>A aba <strong>Resultado</strong> mostra a página como o navegador mostraria. Formulários, links e redirecionamentos funcionam, e a sessão, os cookies e o banco SQLite continuam existindo entre um clique e outro, até você rodar de novo.</li>
+  <li>A aba <strong>Código-fonte HTML</strong> mostra o HTML que o PHP gerou (é o que o <code>curl</code> mostra no terminal).</li>
+  <li>Quando o projeto tem vários arquivos, cada um é uma aba do editor. O primeiro é a página que abre.</li>
+  <li>Muitas caixas já começam com um envio de formulário pronto (por exemplo, "dividir 10 por 4"), para a missão poder ser conferida na hora. Depois disso, use o formulário na aba Resultado à vontade.</li>
+</ul>
+
+<hr>
+
+<h2>Rodando no seu computador</h2>
+<p>Você não precisa instalar um servidor como o Apache para estudar: o próprio PHP tem um servidor embutido (veja <a href="servidor-embutido.html">O Servidor Embutido</a>). A rotina de todo projeto é esta:</p>
+
+<ol class="passo">
+  <li>Crie uma pasta para o projeto e salve os arquivos nela.</li>
+  <li>Num terminal, entre na pasta e suba o servidor. <strong>Deixe esse terminal aberto</strong>: ele é o servidor, e cada visita aparece nele.</li>
+  <li>Abra <code>http://localhost:8000</code> no navegador.</li>
+  <li>Para parar o servidor, volte ao terminal dele e aperte <kbd>Ctrl</kbd>+<kbd>C</kbd>.</li>
+</ol>
+
+<p>Um exemplo pequeno, com o mesmo formato dos projetos (o <code>index.php</code> da caixa logo abaixo):</p>
+
+<pre class="term">$ mkdir ola
+$ cd ola
+$ nano index.php                        « cole o código e salve
+$ php -S localhost:8000
+[Fri Oct 16 21:09:29 2026] PHP 8.5.8 Development Server (http://localhost:8000) started
+[Fri Oct 16 21:09:30 2026] 127.0.0.1:49694 Accepted
+[Fri Oct 16 21:09:30 2026] 127.0.0.1:49694 [200]: GET /
+[Fri Oct 16 21:09:30 2026] 127.0.0.1:49694 Closing
+[Fri Oct 16 21:09:30 2026] 127.0.0.1:49700 Accepted
+[Fri Oct 16 21:09:30 2026] 127.0.0.1:49700 [200]: GET /?nome=Ana
+[Fri Oct 16 21:09:30 2026] 127.0.0.1:49700 Closing</pre>
+
+<p>Cada visita gera três linhas: a conexão aceita (<code>Accepted</code>), o pedido com o código da resposta (<code>[200]: GET /?nome=Ana</code>) e o fim da conexão (<code>Closing</code>). Quando o PHP der um erro fatal, ele também aparece aqui, no fim da linha do pedido.</p>
+
+<h3>Testando com o <code>curl</code></h3>
+<p>Nas páginas dos projetos, as saídas foram conferidas com o <code>curl</code>, um programa de terminal que faz o papel do navegador e mostra o HTML que chegou. Ele é ótimo para ver exatamente o que o PHP respondeu. Use-o num <strong>segundo terminal</strong>, com o servidor rodando no primeiro:</p>
+
+<pre class="term">$ curl -s localhost:8000/
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Olá&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+  &lt;form&gt;
+    &lt;input name="nome" placeholder="Seu nome"&gt;
+    &lt;button&gt;Enviar&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+$ curl -s "localhost:8000/?nome=Ana" | grep Olá
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Olá&lt;/title&gt;&lt;/head&gt;
+  &lt;p&gt;Olá, Ana!&lt;/p&gt;
+$ curl -si "localhost:8000/?nome=Ana" | head -6
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:09:30 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Como aparece nos projetos</th><th>O que faz</th></tr>
+<tr><td><code>curl -s URL</code></td><td>Busca a página (GET) e mostra o HTML. O <code>-s</code> (<em>silent</em>) esconde a barra de progresso.</td></tr>
+<tr><td><code>curl -s -d 'a=10&amp;b=4' URL</code></td><td>Envia um formulário por <strong>POST</strong> com esses campos, como um clique no botão.</td></tr>
+<tr><td><code>curl -si URL</code></td><td>O <code>-i</code> mostra também os <strong>cabeçalhos</strong> da resposta (código, <code>Location</code>, <code>Set-Cookie</code>…).</td></tr>
+<tr><td><code>curl -sL URL</code></td><td>O <code>-L</code> segue redirecionamentos, como o navegador.</td></tr>
+<tr><td><code>curl -c jar.txt -b jar.txt URL</code></td><td>Guarda (<code>-c</code>) e devolve (<code>-b</code>) os cookies num arquivo: é assim que o <code>curl</code> "continua logado" entre um comando e outro.</td></tr>
+<tr><td><code>… | grep texto</code></td><td>Mostra só as linhas do HTML que contêm o texto, para não encher a tela.</td></tr>
+<tr><td><code>… | tail -5</code>, <code>… | head -8</code></td><td>Só as últimas 5 / as primeiras 8 linhas.</td></tr>
+</table>
+</div>
+
+<div class="tip">
+<strong>Navegador ou curl?</strong>
+<p>Use o navegador para <strong>usar</strong> o projeto, e o <code>curl</code> quando quiser <strong>ver por dentro</strong>: os cabeçalhos de um redirecionamento, o cookie da sessão, o HTML exato de um campo escapado. No navegador, o equivalente é a ferramenta do desenvolvedor (<kbd>F12</kbd>, aba Rede).</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/?nome=Ana">
+<p class="try-task"><strong>Caixa livre:</strong> este é o <code>index.php</code> do exemplo. A caixa já abre com <code>?nome=Ana</code>; clique em voltar ou rode de novo e use o formulário com o seu nome. Veja também a aba Código-fonte HTML.</p>
+<pre class="script">&lt;?php
+$nome = trim($_GET['nome'] ?? '');
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Olá&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;?php if ($nome === ''): ?&gt;
+  &lt;form&gt;
+    &lt;input name="nome" placeholder="Seu nome"&gt;
+    &lt;button&gt;Enviar&lt;/button&gt;
+  &lt;/form&gt;
+&lt;?php else: ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<h3>O esqueleto de todo projeto</h3>
+<p>Repare na forma do arquivo, porque ela vai se repetir em todos os projetos:</p>
+<ol>
+  <li><strong>No topo, só PHP:</strong> ler o que chegou (<code>$_GET</code>, <code>$_POST</code>), validar, gravar, redirecionar. Nada é impresso aqui.</li>
+  <li><strong>Embaixo, o HTML:</strong> com pedacinhos de PHP só para <strong>mostrar</strong> (<code>&lt;?= … ?&gt;</code>) e decidir o que aparece (<code>&lt;?php if (…): ?&gt; … &lt;?php endif; ?&gt;</code>).</li>
+  <li><strong>Tudo que veio do usuário passa por <code>htmlspecialchars</code></strong> antes de ir para a página.</li>
+</ol>
+<p>Essa separação não é enfeite: funções como <code>header()</code> (redirecionar) e <code>session_start()</code> só funcionam <strong>antes</strong> de a página começar a sair. Com o PHP todo no topo, isso fica garantido.</p>
+
+<div class="tryphp" data-modo="web" data-url="/?nome=Ana" data-goal="html:Olá\, ANA!">
+<p class="try-task"><strong>Missão:</strong> mostre o nome em letras maiúsculas: <code>Olá, ANA!</code>. Use <code>mb_strtoupper($nome)</code> (a versão que entende acentos: experimente depois com "Zé") e não tire o <code>htmlspecialchars</code>.</p>
+<pre class="script">&lt;?php
+$nome = trim($_GET['nome'] ?? '');
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Olá&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;?php if ($nome === ''): ?&gt;
+  &lt;form&gt;
+    &lt;input name="nome" placeholder="Seu nome"&gt;
+    &lt;button&gt;Enviar&lt;/button&gt;
+  &lt;/form&gt;
+&lt;?php else: ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars($nome) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = trim($_GET['nome'] ?? '');
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Olá&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;?php if ($nome === ''): ?&gt;
+  &lt;form&gt;
+    &lt;input name="nome" placeholder="Seu nome"&gt;
+    &lt;button&gt;Enviar&lt;/button&gt;
+  &lt;/form&gt;
+&lt;?php else: ?&gt;
+  &lt;p&gt;Olá, &lt;?= htmlspecialchars(mb_strtoupper($nome)) ?&gt;!&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Failed to listen on localhost:8000 (reason: Address in use)</strong>
+<pre class="term">$ php -S localhost:8000
+[Fri Oct 16 21:09:30 2026] Failed to listen on localhost:8000 (reason: Address in use)</pre>
+<p><strong>O que significa:</strong> "endereço em uso": outro programa já está usando a porta 8000, quase sempre um <code>php -S</code> de outro projeto, esquecido noutro terminal. <strong>Como consertar:</strong> pare o outro (<kbd>Ctrl</kbd>+<kbd>C</kbd> no terminal dele) ou use outra porta: <code>php -S localhost:8001</code> e <code>http://localhost:8001</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O navegador mostra o código PHP, ou baixa o arquivo</strong>
+<p>Você abriu o arquivo direto (endereço começando com <code>file://</code>). Só o servidor executa o PHP: abra <code>http://localhost:8000</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Qualquer endereço mostra o <code>index.php</code></strong>
+<pre class="term">$ curl -s localhost:8000/nada.php
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Olá&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+  &lt;form&gt;
+    &lt;input name="nome" placeholder="Seu nome"&gt;
+    &lt;button&gt;Enviar&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+<p>Não existe <code>nada.php</code>, mas o servidor embutido, quando não acha o arquivo pedido, responde com o <code>index.php</code> da pasta. Se um link "não funciona" e você sempre volta à página inicial, confira o nome do arquivo no link.</p>
+</div>
+
+<div class="cenario">
+<strong>Mudei o código e nada mudou</strong>
+<p>Confira se você salvou o arquivo, se o servidor está rodando <strong>na pasta certa</strong> (a pasta onde você deu o <code>php -S</code>) e recarregue a página. Num formulário, recarregar com <kbd>F5</kbd> depois de um envio pode reenviar os dados: abra o endereço de novo em vez disso.</p>
+</div>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<p>Complete o comando que sobe o servidor embutido na porta 8000:</p>
+<div class="ex-code">php <input data-answer="-S"> localhost:8000</div>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">Qual opção do <code>curl</code> envia um formulário por POST?</p>
+<label><input type="radio" name="q1"> <code>-s</code></label>
+<label><input type="radio" name="q1"> <code>-i</code></label>
+<label><input type="radio" name="q1"> <code>-d 'campo=valor'</code></label>
+<label><input type="radio" name="q1"> <code>-L</code></label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">Por que os projetos põem todo o PHP de "processar" no topo do arquivo, antes do HTML?</p>
+<label><input type="radio" name="q2"> Porque <code>header()</code> e <code>session_start()</code> só funcionam antes de a página começar a ser enviada</label>
+<label><input type="radio" name="q2"> Porque o PHP só lê a primeira parte do arquivo</label>
+<label><input type="radio" name="q2"> Porque o HTML fica mais rápido</label>
+<label><input type="radio" name="q2"> É só gosto pessoal</label>
+</div>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Seis projetos, na ordem: calculadora, contato, login, tarefas, blog e API.</li>
+  <li>Cada um cresce em etapas: código novo explicado, saída real e uma caixa Experimente com missão.</li>
+  <li>No seu computador: <code>php -S localhost:8000</code> na pasta do projeto, <code>http://localhost:8000</code> no navegador, <kbd>Ctrl</kbd>+<kbd>C</kbd> para parar.</li>
+  <li>O <code>curl</code> mostra a resposta por dentro: <code>-d</code> envia POST, <code>-i</code> mostra cabeçalhos, <code>-L</code> segue redirecionamentos, <code>-c</code>/<code>-b</code> guardam cookies.</li>
+</ul>
+<p>Comece pela <a href="projeto-calculadora.html">Calculadora Web</a>.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
