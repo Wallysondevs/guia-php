@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Editores e IDEs — VS Code, Intelephense, PhpStorm e Sublime | Guia PHP</title>
+<meta name="description" content="Onde escrever código PHP: editor de código × IDE, VS Code com a extensão PHP Intelephense, PhpStorm, Sublime Text e outros. Configurar o executável do PHP e a versão 8.5, formatar o código, salvar em UTF-8 sem BOM, o terminal integrado e php -l para conferir a sintaxe.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Editores e IDEs</span></h1>
+
+<p class="intro">Um programa PHP é um arquivo de texto comum. Dá para escrevê-lo até no Bloco de Notas, mas um <strong>editor de código</strong> ajuda muito: pinta cada parte do código com uma cor, avisa do erro antes de você rodar, completa nomes de funções e arruma o alinhamento. Nesta aula você vai conhecer as opções mais usadas, configurar o VS Code para PHP e aprender os cuidados com o arquivo (codificação, fim de linha) que evitam erros misteriosos.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A diferença entre editor de texto, editor de código e IDE.</li>
+  <li>Configurar o VS Code para PHP com a extensão <strong>PHP Intelephense</strong>.</li>
+  <li>O que oferecem o PhpStorm, o Sublime Text e outros.</li>
+  <li>Dizer ao editor onde está o executável do PHP e qual a versão.</li>
+  <li>Formatar o código automaticamente.</li>
+  <li>Salvar em UTF-8 sem BOM, e o erro que o BOM provoca.</li>
+  <li>Conferir a sintaxe com <code>php -l</code>.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>A ideia: caneta, caderno e estojo completo</h2>
+<p>Dá para escrever uma redação numa folha solta com qualquer caneta (o <strong>editor de texto</strong> simples, como o Bloco de Notas). Um caderno com pauta e margem ajuda a manter tudo alinhado (o <strong>editor de código</strong>). E um estojo completo, com régua, corretivo e marca-texto, faz quase tudo por você (a <strong>IDE</strong>, de <em>Integrated Development Environment</em>, "ambiente de desenvolvimento integrado").</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Tipo</th><th>Exemplos</th><th>O que faz</th></tr>
+<tr><td>Editor de texto</td><td>Bloco de Notas, TextEdit, gedit</td><td>Só edita texto. Sem cores, sem avisos.</td></tr>
+<tr><td>Editor de código</td><td>VS Code, Sublime Text, Zed, Vim, Notepad++</td><td>Cores, números de linha, abas, terminal; com extensões, avisos de erro e preenchimento automático.</td></tr>
+<tr><td>IDE</td><td>PhpStorm, NetBeans</td><td>Tudo isso e mais: entende o projeto inteiro, refatora (renomeia uma função em todos os arquivos), depura, roda testes, conversa com o banco de dados.</td></tr>
+</table>
+</div>
+
+<p>Para quem está começando, um editor de código bem configurado é o ideal: é leve, gratuito e mostra o que importa. O guia usa o VS Code como exemplo, mas qualquer um serve.</p>
+
+<div class="note">
+<strong>Sem capturas de tela</strong>
+<p>Os editores mudam a aparência a cada atualização, então esta aula descreve os menus e as configurações pelo nome, em vez de mostrar imagens. Os nomes dos menus estão na versão em português, quando ela existe; se o seu editor estiver em inglês, a tabela de atalhos no fim da aula ajuda.</p>
+</div>
+
+<hr>
+
+<h2>VS Code + PHP Intelephense</h2>
+<p>O <strong>Visual Studio Code</strong> (ou VS Code) é um editor gratuito da Microsoft, para Windows, macOS e Linux, e o mais usado hoje. Sozinho, ele já pinta o código PHP e confere a sintaxe; com a extensão certa, ele passa a "entender" o PHP.</p>
+
+<ol class="passo">
+  <li><strong>Instale o VS Code.</strong> Baixe em <a href="https://code.visualstudio.com">code.visualstudio.com</a>. No Linux, há pacotes <code>.deb</code> e <code>.rpm</code> no mesmo site (e o Snap: <code>sudo snap install code --classic</code>).</li>
+  <li><strong>Abra a pasta do projeto</strong>, não um arquivo solto: menu <strong>Arquivo → Abrir Pasta…</strong> e escolha a pasta <code>site</code>. Assim o editor enxerga todos os arquivos e o terminal já começa nessa pasta.</li>
+  <li><strong>Instale a extensão PHP Intelephense.</strong> Clique no ícone de Extensões na barra lateral (ou <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>), pesquise <code>intelephense</code> e instale a <strong>PHP Intelephense</strong>, de Ben Mewburn (o identificador é <code>bmewburn.vscode-intelephense-client</code>).</li>
+  <li><strong>Desative o suporte embutido</strong>, como a própria documentação da Intelephense recomenda, para não ter sugestões repetidas: em Extensões, pesquise <code>@builtin php</code>, abra <strong>PHP Language Features</strong> e clique em <strong>Desabilitar</strong>. (Deixe ligada a <strong>PHP Language Basics</strong>, que cuida das cores.)</li>
+</ol>
+
+<h3>O que a Intelephense faz</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Recurso</th><th>Como aparece</th></tr>
+<tr><td>Erros de sintaxe na hora</td><td>Um sublinhado vermelho ondulado onde falta um <code>;</code> ou sobra uma aspa, antes de você rodar. Passe o mouse para ler a mensagem.</td></tr>
+<tr><td>Preenchimento automático</td><td>Ao digitar <code>str_</code>, aparece a lista <code>str_contains</code>, <code>str_replace</code>…; <kbd>Enter</kbd> completa.</td></tr>
+<tr><td>Ajuda das funções</td><td>Ao abrir os parênteses, mostra quais valores a função espera, em que ordem e de que tipo.</td></tr>
+<tr><td>Ir para a definição</td><td><kbd>F12</kbd> (ou <kbd>Ctrl</kbd>+clique) sobre o nome de uma função leva até onde ela foi criada.</td></tr>
+<tr><td>Avisos de nomes desconhecidos</td><td>Sublinha uma função que não existe, como <code>strlenn</code>.</td></tr>
+<tr><td>Formatação</td><td>Arruma espaços e recuos (veja <a href="#formatar">Formatar o código</a>).</td></tr>
+</table>
+</div>
+
+<p>A versão gratuita faz tudo isso; uma licença paga ("Premium") acrescenta recursos como renomear em todo o projeto. Para o guia, a gratuita basta.</p>
+
+<h3>Configurando: a versão e o executável do PHP</h3>
+<p>As configurações do VS Code ficam num arquivo <code>settings.json</code>. Para abri-lo: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> (a "paleta de comandos"), digite <code>settings json</code> e escolha <strong>Preferências: Abrir Configurações do Usuário (JSON)</strong>. Acrescente, entre as chaves que já existem:</p>
+
+<pre class="file" data-file="settings.json (trecho)">{
+    "intelephense.environment.phpVersion": "8.5.0",
+    "php.validate.executablePath": "/usr/bin/php",
+    "[php]": {
+        "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    "files.encoding": "utf8",
+    "files.eol": "\n"
+}</pre>
+
+<dl class="anatomy">
+  <dt>intelephense.environment.phpVersion</dt><dd>Para qual versão do PHP você escreve. Com <code>"8.5.0"</code>, a extensão aceita recursos novos como o <code>|&gt;</code> e avisa quando você usa algo que não existe nessa versão. Se o seu servidor tem o 8.4, ponha <code>"8.4.0"</code>.</dd>
+  <dt>php.validate.executablePath</dt><dd>Onde está o programa <code>php</code>. O VS Code usa esse PHP de verdade para conferir a sintaxe ao salvar. Descubra o caminho com <code>which php</code> (Linux e macOS) ou <code>where.exe php</code> (Windows). No Windows, as barras são dobradas: <code>"C:\\php\\php.exe"</code>.</dd>
+  <dt>"[php]": { … }</dt><dd>Ajustes que valem só para arquivos PHP: usar a Intelephense para formatar, formatar ao salvar, recuo de 4 espaços.</dd>
+  <dt>files.encoding / files.eol</dt><dd>Salvar em UTF-8 e com o fim de linha do Linux (<code>\n</code>). Explicado em <a href="#arquivo">Os cuidados com o arquivo</a>.</dd>
+</dl>
+
+<p>Para descobrir o caminho do PHP, pergunte ao terminal. No laboratório do guia:</p>
+
+<pre class="term">$ which php
+/opt/php/bin/php           « no laboratório; num Ubuntu com apt, /usr/bin/php</pre>
+
+<h3>O terminal dentro do editor</h3>
+<p>O VS Code tem um terminal embutido: menu <strong>Terminal → Novo Terminal</strong> (ou <kbd>Ctrl</kbd>+<kbd>'</kbd>). Ele abre já na pasta do projeto. O fluxo de trabalho do guia fica assim: o código em cima, o terminal embaixo; você salva (<kbd>Ctrl</kbd>+<kbd>S</kbd>) e roda <code>php ola.php</code>. Para páginas web, abra um segundo terminal (o ícone <strong>+</strong> do painel), ligue o <code>php -S localhost:8000</code> nele (aula <a href="servidor-embutido.html">O Servidor Embutido</a>) e use o navegador.</p>
+
+<hr>
+
+<h2>Outras opções</h2>
+
+<h3>PhpStorm</h3>
+<p>A IDE da JetBrains feita só para PHP, muito usada por profissionais. Entende o projeto inteiro sem configurar nada: refatoração segura, depurador integrado, testes, Composer, banco de dados, Git. É <strong>paga</strong> (assinatura), com período de teste e licença gratuita para estudantes e professores (programa educacional da JetBrains). Download em <a href="https://www.jetbrains.com/phpstorm/">jetbrains.com/phpstorm</a>.</p>
+<p>Para configurar o PHP: <strong>Settings → PHP</strong>, escolha o <strong>PHP language level</strong> (8.5) e, em <strong>CLI Interpreter</strong>, clique em <strong>…</strong> e aponte para o executável do <code>php</code>. A formatação é <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd>, já no padrão PSR-12 (o padrão de estilo da comunidade; veja <a href="psr.html">Padrões PSR</a>).</p>
+
+<h3>Sublime Text</h3>
+<p>Um editor rápido e leve, de <a href="https://www.sublimetext.com">sublimetext.com</a>. Pode ser avaliado de graça por tempo indeterminado (de vez em quando aparece um lembrete para comprar). Para ter os recursos da Intelephense, instale o <strong>Package Control</strong> (menu <strong>Tools → Install Package Control</strong>) e, depois, os pacotes <strong>LSP</strong> e <strong>LSP-intelephense</strong>.</p>
+
+<h3>E os outros</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Editor</th><th>Observação</th></tr>
+<tr><td>Zed</td><td>Editor novo e rápido (macOS, Linux, Windows); tem extensão de PHP que usa a Intelephense.</td></tr>
+<tr><td>Vim e Neovim</td><td>Editores de terminal, presentes em todo servidor Linux. Com um plugin de LSP, usam a mesma Intelephense.</td></tr>
+<tr><td>Notepad++</td><td>Editor simples e gratuito para Windows; pinta o PHP, mas não avisa erros.</td></tr>
+<tr><td>NetBeans</td><td>IDE gratuita da Apache, com suporte a PHP; mais pesada.</td></tr>
+<tr><td>Kate, gedit, TextEdit, Bloco de Notas</td><td>Servem para um arquivo rápido. No TextEdit (Mac), use <strong>Formatar → Converter em Texto Simples</strong>, senão ele salva em formato de documento.</td></tr>
+</table>
+</div>
+
+<h3>Qual escolher?</h3>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Sugestão</th></tr>
+<tr><td>Está começando, quer algo gratuito</td><td><strong>VS Code + PHP Intelephense</strong></td></tr>
+<tr><td>Computador fraco</td><td>Sublime Text, Zed ou Vim</td></tr>
+<tr><td>Vai trabalhar com PHP profissionalmente, em projetos grandes</td><td>PhpStorm (vale testar no período gratuito)</td></tr>
+<tr><td>Edita arquivos direto num servidor, pelo SSH</td><td>Vim ou nano</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="formatar">Formatar o código</h2>
+<p>O PHP não liga para espaços e recuos: um programa todo numa linha só funciona igual. Mas pessoas leem código, e código bagunçado esconde erros. <strong>Formatar</strong> é arrumar espaços, recuos e quebras de linha num padrão. Compare:</p>
+
+<pre class="file" data-file="antes.php">&lt;?php
+$nota=7.5;
+if($nota&gt;=7){
+echo "Aprovada\n";
+    }else{echo "Recuperação\n";}
+</pre>
+
+<pre class="file" data-file="depois.php (formatado no padrão PSR-12)">&lt;?php
+$nota = 7.5;
+if ($nota &gt;= 7) {
+    echo "Aprovada\n";
+} else {
+    echo "Recuperação\n";
+}
+</pre>
+
+<p>Os dois fazem a mesma coisa. No segundo, dá para ver de relance o que está dentro do <code>if</code> e o que está dentro do <code>else</code>, graças ao <strong>recuo</strong> de 4 espaços. Como formatar:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Editor</th><th>Formatar o arquivo</th></tr>
+<tr><td>VS Code</td><td><kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd> (Windows e Linux) ou <kbd>Shift</kbd>+<kbd>Option</kbd>+<kbd>F</kbd> (Mac); ou automático ao salvar, com <code>editor.formatOnSave</code></td></tr>
+<tr><td>PhpStorm</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd> (Mac: <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>L</kbd>)</td></tr>
+<tr><td>Qualquer editor, pelo terminal</td><td>Ferramentas como o <strong>PHP CS Fixer</strong> e o <strong>PHP_CodeSniffer</strong>, instaladas com o Composer (aula <a href="composer.html">Composer</a>)</td></tr>
+</table>
+</div>
+
+<p>Experimente: o código abaixo está bagunçado, mas funciona. Rode, arrume os espaços e o recuo à mão (o editor do guia não formata sozinho) e rode de novo: a saída não muda.</p>
+
+<div class="tryphp">
+<pre class="script">&lt;?php
+$nota=7.5;
+if($nota&gt;=7){
+echo "Aprovada\n";
+    }else{echo "Recuperação\n";}
+</pre>
+</div>
+
+<hr>
+
+<h2 id="arquivo">Os cuidados com o arquivo</h2>
+
+<h3>Extensão <code>.php</code></h3>
+<p>Salve sempre com a extensão <code>.php</code>. No Windows, ative a exibição de extensões no Explorador (menu <strong>Exibir → Mostrar → Extensões de nomes de arquivos</strong>), senão um <code>ola.php.txt</code> parece <code>ola.php</code>.</p>
+
+<h3>Codificação: UTF-8 sem BOM</h3>
+<p>O computador guarda letras como números, e a <strong>codificação</strong> é a tabela que diz qual número é qual letra. O padrão da web é o <strong>UTF-8</strong>, que tem todos os acentos. O VS Code mostra a codificação no canto inferior direito da janela (<code>UTF-8</code>); clicando ali, dá para trocar.</p>
+
+<p>Alguns editores (principalmente no Windows) gravam no começo do arquivo três bytes invisíveis chamados <strong>BOM</strong> (<em>Byte Order Mark</em>, "marca de ordem dos bytes"). Para o PHP, esses bytes estão <strong>antes</strong> do <code>&lt;?php</code>, ou seja, são HTML comum, e são enviados ao navegador logo de cara. Isso quebra tudo o que precisa acontecer antes da primeira saída, como mudar cabeçalhos, iniciar sessões e redirecionar. Veja um arquivo com BOM:</p>
+
+<pre class="file" data-file="bom.php (salvo com BOM) · erro de propósito">&lt;?php
+header("Content-Type: text/plain; charset=utf-8");
+echo "Olá!\n";
+</pre>
+
+<pre class="term">$ file bom.php
+bom.php: PHP script, Unicode text, UTF-8 (with BOM) text     « o comando file denuncia o BOM
+$ curl -i localhost:8000/bom.php
+HTTP/1.1 200 OK
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:05:11 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Content-type: text/html; charset=UTF-8                        « o header() não funcionou: continua text/html
+
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Cannot modify header information - headers already sent by (output started at /home/ana/bom/bom.php:1) in &lt;b&gt;/home/ana/bom/bom.php&lt;/b&gt; on line &lt;b&gt;2&lt;/b&gt;&lt;br /&gt;
+Olá!</pre>
+
+<p>"Não é possível modificar a informação de cabeçalho: os cabeçalhos já foram enviados (a saída começou em <code>bom.php:1</code>)". A linha 1 parece começar com <code>&lt;?php</code>, mas os três bytes invisíveis vieram antes (eles estão grudados no começo da linha do <code>&lt;br /&gt;</code>, só que não aparecem). A aula <a href="redirecionar.html">header e Redirecionamento</a> explica os cabeçalhos.</p>
+
+<p><strong>Como evitar:</strong> salve em "UTF-8" (no VS Code, é o padrão), e nunca em "UTF-8 com BOM". Para consertar um arquivo, no VS Code clique na codificação no canto inferior direito → <strong>Salvar com Codificação</strong> → <strong>UTF-8</strong>.</p>
+
+<h3>Fim de linha: LF ou CRLF</h3>
+<p>O Linux e o macOS terminam cada linha com um caractere (<strong>LF</strong>, o <code>\n</code>); o Windows, tradicionalmente, com dois (<strong>CRLF</strong>, <code>\r\n</code>). O PHP aceita os dois no código, mas scripts que rodam em servidores Linux (como os com <code>#!/usr/bin/env php</code> no começo, aula <a href="linha-comando.html">PHP na Linha de Comando</a>) falham com CRLF. O VS Code mostra <code>LF</code> ou <code>CRLF</code> no canto inferior direito; prefira <code>LF</code>.</p>
+
+<hr>
+
+<h2>Conferindo a sintaxe sem rodar: <code>php -l</code></h2>
+<p>O que o editor faz quando sublinha um erro é parecido com isto: o PHP tem uma opção <code>-l</code> (de <em>lint</em>, o nome que programadores dão a "procurar defeitos") que lê o arquivo e confere a sintaxe <strong>sem executar</strong> nada. É útil antes de enviar um arquivo para o servidor, ou num editor sem extensão de PHP.</p>
+
+<pre class="term">$ php -l e.php
+No syntax errors detected in e.php                 « "nenhum erro de sintaxe encontrado"
+$ echo $?
+0
+$ php -l a.php
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in a.php on line 3
+Errors parsing a.php                               « "erros ao analisar a.php"
+$ echo $?
+255</pre>
+
+<p>O <code>a.php</code> tem um <code>;</code> faltando no fim da linha 2. O PHP só percebe na linha 3, quando encontra o <code>echo</code> seguinte sem que a instrução anterior tivesse terminado: por isso a mensagem fala em "<code>echo</code> inesperado" e aponta a linha 3. É o mesmo erro que o editor sublinharia em vermelho. A aula <a href="erros.html">Lendo Erros do PHP</a> desmonta essa mensagem.</p>
+
+<div class="warning">
+<strong>O <code>-l</code> não pega todo erro</strong>
+<p>Ele confere só a <strong>sintaxe</strong> (a "gramática"). Uma função com o nome errado (<code>strlenn("Ana")</code>) ou uma variável inexistente passam no <code>php -l</code> e só dão erro quando o programa roda. Editores com Intelephense avisam alguns desses casos; testes automáticos (aula <a href="phpunit.html">Testes com PHPUnit</a>) pegam o resto.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>VS Code: "Cannot validate since a PHP installation could not be found"</strong>
+<p><strong>O que aconteceu:</strong> o VS Code tentou conferir a sintaxe com o PHP de verdade e não o encontrou: o PHP não está instalado ou não está no <code>PATH</code>.</p>
+<p><strong>Como resolver:</strong> instale o PHP (<a href="instalar-linux.html">Linux</a>, <a href="instalar-windows-mac.html">Windows e macOS</a>) e/ou preencha <code>php.validate.executablePath</code> com o caminho completo do executável. Reinicie o VS Code.</p>
+</div>
+
+<div class="cenario">
+<strong>O editor sublinha <code>|&gt;</code> ou <code>array_first</code> como erro, mas o código roda</strong>
+<p><strong>O que aconteceu:</strong> a extensão acha que você usa uma versão mais antiga do PHP e não conhece os recursos do 8.5.</p>
+<p><strong>Como resolver:</strong> ajuste <code>"intelephense.environment.phpVersion": "8.5.0"</code> e atualize a extensão.</p>
+</div>
+
+<div class="cenario">
+<strong>Sugestões repetidas ou dois avisos para o mesmo erro</strong>
+<p><strong>O que aconteceu:</strong> duas extensões de PHP estão ativas ao mesmo tempo (por exemplo, a embutida <strong>PHP Language Features</strong> e a Intelephense, ou duas extensões de "PHP IntelliSense").</p>
+<p><strong>Como resolver:</strong> deixe só a Intelephense: desabilite a embutida (<code>@builtin php</code>) e desinstale as outras.</p>
+</div>
+
+<div class="cenario">
+<strong>Acentos aparecem como <code>Ã©</code> ou <code>�</code></strong>
+<p><strong>O que aconteceu:</strong> o arquivo foi salvo numa codificação antiga (como "Windows 1252" ou "ISO 8859-1") e lido como UTF-8, ou o contrário.</p>
+<p><strong>Como resolver:</strong> no VS Code, clique na codificação no canto inferior direito → <strong>Reabrir com Codificação</strong> (escolha a antiga, para ver o texto certo) e depois <strong>Salvar com Codificação → UTF-8</strong>. A aula <a href="mbstring.html">Acentos e mbstring</a> fala mais sobre acentos.</p>
+</div>
+
+<div class="cenario">
+<strong>"Mudei o código e nada mudou"</strong>
+<p><strong>O que aconteceu:</strong> o arquivo não foi salvo (no VS Code, a aba mostra um círculo branco no lugar do <code>×</code>), ou você está editando outro arquivo com o mesmo nome em outra pasta.</p>
+<p><strong>Como resolver:</strong> <kbd>Ctrl</kbd>+<kbd>S</kbd> (ou ative <strong>Arquivo → Salvamento Automático</strong>). Confira o caminho do arquivo passando o mouse sobre a aba.</p>
+</div>
+
+<hr>
+
+<h2>Referência: atalhos do VS Code</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Ação</th><th>Windows e Linux</th><th>macOS</th></tr>
+<tr><td>Salvar</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td><kbd>Cmd</kbd>+<kbd>S</kbd></td></tr>
+<tr><td>Paleta de comandos (Command Palette)</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td></tr>
+<tr><td>Abrir arquivo da pasta pelo nome</td><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td><kbd>Cmd</kbd>+<kbd>P</kbd></td></tr>
+<tr><td>Terminal integrado</td><td><kbd>Ctrl</kbd>+<kbd>'</kbd></td><td><kbd>Ctrl</kbd>+<kbd>'</kbd></td></tr>
+<tr><td>Formatar documento (Format Document)</td><td><kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd></td><td><kbd>Shift</kbd>+<kbd>Option</kbd>+<kbd>F</kbd></td></tr>
+<tr><td>Comentar/descomentar linha</td><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td><kbd>Cmd</kbd>+<kbd>/</kbd></td></tr>
+<tr><td>Ir para a definição</td><td><kbd>F12</kbd></td><td><kbd>F12</kbd></td></tr>
+<tr><td>Extensões</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td></tr>
+<tr><td>Ver os problemas encontrados (Problems)</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td></tr>
+</table>
+</div>
+
+<p>Para fechar, faça o trabalho de um editor: encontre os erros. Este programa tem <strong>dois</strong> erros de sintaxe, o tipo de coisa que a Intelephense sublinharia em vermelho. Rode, leia a mensagem (ela mostra um erro de cada vez), conserte e rode de novo até funcionar.</p>
+
+<div class="tryphp" data-goal="out:Lista de compras:,out:- café,semerro">
+<p class="try-task"><strong>Missão:</strong> conserte os dois erros (uma aspa e um ponto e vírgula faltando) para a saída mostrar a lista de compras completa, sem nenhuma mensagem de erro.</p>
+<pre class="script">&lt;?php
+echo "Lista de compras:\n";
+echo "- pão\n"
+echo "- leite\n";
+echo "- café\n;
+</pre>
+<pre class="solucao">&lt;?php
+echo "Lista de compras:\n";
+echo "- pão\n";
+echo "- leite\n";
+echo "- café\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Qual extensão do VS Code esta aula recomenda para PHP?</p>
+<label><input type="radio" name="q1"> PHP Debug</label>
+<label><input type="radio" name="q1"> PHP Intelephense</label>
+<label><input type="radio" name="q1"> Live Server</label>
+<label><input type="radio" name="q1"> Prettier</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">2. Um arquivo dá <code>Cannot modify header information - headers already sent by (output started at …:1)</code>, mas a linha 1 é só <code>&lt;?php</code>. Qual a causa mais provável?</p>
+<label><input type="radio" name="q2"> Falta um <code>;</code> na linha 1.</label>
+<label><input type="radio" name="q2"> A versão do PHP é antiga.</label>
+<label><input type="radio" name="q2"> O servidor está desligado.</label>
+<label><input type="radio" name="q2"> O arquivo foi salvo em UTF-8 <strong>com BOM</strong>.</label>
+</div>
+
+<div class="exercise">
+<h3>3. Conferir a sintaxe</h3>
+<p>Complete o comando que confere a sintaxe do arquivo <code>loja.php</code> sem executá-lo:</p>
+<div class="ex-code">php <input data-answer="-l loja.php|-l" aria-label="opção"></div>
+</div>
+
+<div class="exercise">
+<h3>4. A versão para a Intelephense</h3>
+<p>Complete a configuração para a extensão entender o PHP 8.5:</p>
+<div class="ex-code">"intelephense.environment.phpVersion": "<input data-answer="8.5.0|8.5" aria-label="versão">"</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Editor de código (VS Code, Sublime, Zed, Vim) para começar; IDE (PhpStorm) para projetos grandes.</li>
+  <li>VS Code: instale a <strong>PHP Intelephense</strong>, desabilite a <strong>PHP Language Features</strong> embutida e configure <code>intelephense.environment.phpVersion</code> = <code>"8.5.0"</code> e <code>php.validate.executablePath</code> (descubra com <code>which php</code> / <code>where.exe php</code>).</li>
+  <li>Abra a <strong>pasta</strong> do projeto e use o terminal integrado para <code>php arquivo.php</code> e <code>php -S</code>.</li>
+  <li>Formate com <kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>F</kbd> ou ao salvar; recuo de 4 espaços (PSR-12).</li>
+  <li>Salve em <strong>UTF-8 sem BOM</strong> e com fim de linha <strong>LF</strong>. O BOM causa "headers already sent … output started at …:1".</li>
+  <li><code>php -l arquivo.php</code> confere a sintaxe sem executar.</li>
+  <li>Próximo passo: <a href="simulador.html">O Editor do Guia</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
