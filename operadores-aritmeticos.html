@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Operadores Aritméticos — + - * / % ** e ++ | Guia PHP</title>
+<meta name="description" content="Operadores aritméticos em PHP para quem nunca programou: soma, subtração, multiplicação, divisão, resto (%) e potência (**), a ordem das contas, divisão que dá float, intdiv, % com negativos, incremento e decremento antes e depois (++$a e $a++) e o incremento de strings com o Deprecated do PHP 8.5.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Operadores Aritméticos</span></h1>
+
+<p class="intro">O caixa da lojinha precisa somar os produtos, dar desconto, dividir em parcelas e contar quantas vendas foram feitas no dia. Para isso, o PHP tem os <strong>operadores aritméticos</strong>: os sinais das contas. Alguns são iguais aos da escola (<code>+</code> e <code>-</code>), outros mudam (<code>*</code> no lugar de ×, <code>/</code> no lugar de ÷), e há alguns novos: o resto (<code>%</code>), a potência (<code>**</code>) e o incremento (<code>++</code>). Nesta aula você aprende todos eles, a ordem em que o PHP faz as contas e algumas surpresas que pegam quem está começando.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Os operadores <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>%</code> e <code>**</code>.</li>
+  <li>A ordem das contas (multiplicação antes da soma) e o uso de parênteses.</li>
+  <li>Quando a divisão dá <code>int</code> e quando dá <code>float</code>; o <code>intdiv</code>.</li>
+  <li>Como o resto (<code>%</code>) funciona, inclusive com números negativos.</li>
+  <li>A diferença entre <code>++$a</code> e <code>$a++</code> (incremento antes e depois).</li>
+  <li>O que acontece com <code>$s++</code> quando <code>$s</code> é um texto, e o aviso do PHP 8.5.</li>
+</ul>
+</div>
+
+<p>Os programas desta aula rodaram com o <strong>PHP 8.5</strong> na máquina fictícia da Ana, na pasta <code>~/site</code>. Os tipos de número (<code>int</code> e <code>float</code>) e as surpresas dos decimais estão em <a href="numeros.html">int e float</a>.</p>
+
+<hr>
+
+<h2>A ideia: uma calculadora com símbolos de teclado</h2>
+<p>O teclado não tem as teclas × e ÷. Por isso, as linguagens de programação usam o asterisco (<code>*</code>) para multiplicar e a barra (<code>/</code>) para dividir, como nas planilhas. Os números ao redor de um operador se chamam <strong>operandos</strong>: em <code>7 + 3</code>, o operador é <code>+</code> e os operandos são <code>7</code> e <code>3</code>.</p>
+
+<hr>
+
+<h2>1. Os seis operadores</h2>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Nome</th><th>Exemplo</th><th>Resultado</th></tr>
+<tr><td><code>+</code></td><td>Soma (adição)</td><td><code>7 + 3</code></td><td><code>10</code></td></tr>
+<tr><td><code>-</code></td><td>Subtração</td><td><code>7 - 3</code></td><td><code>4</code></td></tr>
+<tr><td><code>*</code></td><td>Multiplicação</td><td><code>7 * 3</code></td><td><code>21</code></td></tr>
+<tr><td><code>/</code></td><td>Divisão</td><td><code>7 / 3</code></td><td><code>2.3333333333333335</code></td></tr>
+<tr><td><code>%</code></td><td>Resto da divisão (módulo)</td><td><code>7 % 3</code></td><td><code>1</code></td></tr>
+<tr><td><code>**</code></td><td>Potência (exponenciação)</td><td><code>7 ** 3</code></td><td><code>343</code></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="contas.php">&lt;?php
+var_dump(7 + 3);
+var_dump(7 - 3);
+var_dump(7 * 3);
+var_dump(7 / 3);
+var_dump(7 % 3);
+var_dump(7 ** 3);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php contas.php
+int(10)
+int(4)
+int(21)
+float(2.3333333333333335)       « a divisão não exata dá float
+int(1)                          « 7 dividido por 3 dá 2 e sobra 1
+int(343)                        « 7 × 7 × 7</pre>
+
+<p>Os espaços em volta do operador são opcionais (<code>7+3</code> também funciona), mas deixam a conta mais legível. O resultado de uma conta pode ir direto para o <code>echo</code> ou para uma variável:</p>
+
+<pre class="file" data-file="caixa.php">&lt;?php
+$cadernos = 3;
+$precoCaderno = 12.5;
+$total = $cadernos * $precoCaderno;
+$parcela = $total / 3;
+echo "Total: $total\n";
+echo "3 parcelas de $parcela\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php caixa.php
+Total: 37.5
+3 parcelas de 12.5</pre>
+
+<p>Repare: <code>3 * 12.5</code> deu <code>37.5</code>, um float. Basta um operando float para o resultado ser float (aula <a href="numeros.html">int e float</a>).</p>
+
+<hr>
+
+<h2>2. A ordem das contas</h2>
+<p>Como na escola, o PHP não faz as contas simplesmente da esquerda para a direita. Ele segue uma ordem de prioridade, chamada <strong>precedência</strong>:</p>
+
+<ol>
+  <li><strong>Parênteses</strong> <code>( )</code>: o que está dentro vem primeiro.</li>
+  <li><strong>Potência</strong> <code>**</code>.</li>
+  <li><strong>Multiplicação, divisão e resto</strong> <code>* / %</code>, da esquerda para a direita.</li>
+  <li><strong>Soma e subtração</strong> <code>+ -</code>, da esquerda para a direita.</li>
+</ol>
+
+<pre class="file" data-file="ordem.php">&lt;?php
+var_dump(2 + 3 * 4);
+var_dump((2 + 3) * 4);
+var_dump(10 - 4 - 3);
+var_dump(100 / 10 / 2);
+var_dump(2 ** 3 ** 2);
+var_dump(-2 ** 2);
+var_dump((-2) ** 2);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php ordem.php
+int(14)                  « 3 * 4 primeiro, depois + 2
+int(20)                  « os parênteses mandam: 5 * 4
+int(3)                   « (10 - 4) - 3: da esquerda para a direita
+int(5)                   « (100 / 10) / 2
+int(512)                 « 2 ** (3 ** 2) = 2 ** 9: a potência vai da DIREITA para a esquerda
+int(-4)                  « -(2 ** 2): a potência vem antes do sinal de menos!
+int(4)                   « com parênteses, (-2) ao quadrado</pre>
+
+<p>As duas últimas pegam muita gente: <code>-2 ** 2</code> dá <code>-4</code>, porque o PHP calcula <code>2 ** 2</code> primeiro e depois aplica o sinal. <strong>Na dúvida, use parênteses</strong>: eles nunca atrapalham e deixam a intenção clara. A tabela completa de prioridades, incluindo os outros operadores, está em <a href="precedencia.html">Precedência</a>.</p>
+
+<div class="tryphp" data-goal="out:Total: 41.5,semerro,src:\*">
+<p class="try-task"><strong>Missão:</strong> a cliente levou 3 cadernos de R$ 12,50 e 2 canetas de R$ 2,00. O programa calcula o total errado, porque faltam multiplicações. Corrija a conta usando as variáveis para mostrar <code>Total: 41.5</code>.</p>
+<pre class="script">&lt;?php
+$cadernos = 3;
+$precoCaderno = 12.5;
+$canetas = 2;
+$precoCaneta = 2;
+$total = $cadernos + $precoCaderno + $canetas + $precoCaneta;
+echo "Total: $total\n";
+</pre>
+<pre class="solucao">&lt;?php
+$cadernos = 3;
+$precoCaderno = 12.5;
+$canetas = 2;
+$precoCaneta = 2;
+$total = $cadernos * $precoCaderno + $canetas * $precoCaneta;
+echo "Total: $total\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>3. Divisão: <code>/</code> e <code>intdiv</code></h2>
+<p>A divisão com <code>/</code> devolve <code>int</code> só quando a conta é exata entre inteiros. Nos outros casos, devolve <code>float</code>:</p>
+
+<pre class="file" data-file="divisao.php">&lt;?php
+var_dump(6 / 3);
+var_dump(7 / 2);
+var_dump(intdiv(7, 2));
+var_dump(intdiv(-7, 2));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php divisao.php
+int(2)                   « exata: int
+float(3.5)               « não exata: float
+int(3)                   « intdiv: só a parte inteira
+int(-3)                  « corta em direção ao zero (não é -4)</pre>
+
+<p>Em muitas linguagens, <code>7 / 2</code> entre inteiros dá <code>3</code>. No PHP, dá <code>3.5</code>. Quando você quer só a parte inteira ("quantas caixas cheias?"), use <code>intdiv</code>. Dividir por zero com <code>/</code>, <code>%</code> ou <code>intdiv</code> dá <code>DivisionByZeroError</code>; a mensagem completa e o <code>fdiv</code> estão em <a href="numeros.html">int e float</a>.</p>
+
+<hr>
+
+<h2>4. O resto: <code>%</code></h2>
+<p>O operador <code>%</code> (chamado <strong>módulo</strong>) devolve o que <strong>sobra</strong> de uma divisão inteira. Pense em 7 balas para 3 crianças: cada uma ganha 2, e sobra 1. <code>7 % 3</code> é <code>1</code>.</p>
+
+<p>Parece pouco útil, mas aparece o tempo todo:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Pergunta</th><th>Conta</th><th>Exemplo</th></tr>
+<tr><td>O número é par?</td><td><code>$n % 2 === 0</code></td><td><code>10 % 2</code> → <code>0</code> (par); <code>7 % 2</code> → <code>1</code> (ímpar)</td></tr>
+<tr><td>É múltiplo de 5?</td><td><code>$n % 5 === 0</code></td><td>pintar uma linha da tabela a cada 5</td></tr>
+<tr><td>Quantos minutos sobram depois das horas cheias?</td><td><code>$minutos % 60</code></td><td><code>135 % 60</code> → <code>15</code></td></tr>
+<tr><td>Qual o último algarismo?</td><td><code>$n % 10</code></td><td><code>1234 % 10</code> → <code>4</code></td></tr>
+</table>
+</div>
+
+<h3>Resto com números negativos</h3>
+<p>No PHP, o resto tem <strong>o sinal do primeiro número</strong> (o dividendo):</p>
+
+<pre class="file" data-file="negativos.php">&lt;?php
+var_dump(-7 % 3);
+var_dump(7 % -3);
+var_dump(-7 % -3);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php negativos.php
+int(-1)                  « primeiro número negativo: resto negativo
+int(1)                   « primeiro número positivo: resto positivo
+int(-1)</pre>
+
+<p>Isso importa no teste de "é ímpar?": <code>-7 % 2</code> dá <code>-1</code>, não <code>1</code>. Por isso, teste ímpar com <code>$n % 2 !== 0</code> em vez de <code>$n % 2 === 1</code>.</p>
+
+<h3>Resto com decimais: use <code>fmod</code></h3>
+<p>O <code>%</code> trabalha só com inteiros. Se receber um float, ele corta a parte decimal antes, e o PHP 8.5 avisa que perdeu informação:</p>
+
+<pre class="term" data-cwd="~/site">$ php resto-float.php        « var_dump(7.5 % 2);
+
+Deprecated: Implicit conversion from float 7.5 to int loses precision in /home/ana/site/resto-float.php on line 2
+int(1)</pre>
+
+<p><em>Implicit conversion from float 7.5 to int loses precision</em> = "conversão implícita de float 7.5 para int perde precisão". Para o resto com decimais, use <code>fmod(7.5, 2)</code>, que dá <code>float(1.5)</code>.</p>
+
+<hr>
+
+<h2>5. Potência: <code>**</code></h2>
+<p><code>$a ** $b</code> é "<code>$a</code> elevado a <code>$b</code>": <code>2 ** 10</code> é 2 multiplicado por ele mesmo 10 vezes, <code>1024</code>. O expoente pode ser negativo ou decimal: <code>2 ** -1</code> dá <code>0.5</code> e <code>9 ** 0.5</code> (raiz quadrada) dá <code>3.0</code>. Existe também a função <code>pow(2, 10)</code>, que faz o mesmo, e <code>sqrt(16)</code> para a raiz quadrada.</p>
+
+<hr>
+
+<h2>6. Os sinais <code>-</code> e <code>+</code> sozinhos</h2>
+<p>Na frente de um único valor, <code>-</code> troca o sinal (<code>-$x</code>) e <code>+</code> não muda nada, mas converte para número: <code>+"5"</code> dá <code>int(5)</code>. São os operadores <strong>unários</strong> (de um operando só).</p>
+
+<hr>
+
+<h2>7. Incremento e decremento: <code>++</code> e <code>--</code></h2>
+<p>Somar 1 a uma variável é tão comum (contar visitas, itens, voltas de um laço) que existe um atalho: <code>$a++</code> faz o mesmo que <code>$a = $a + 1</code>. E <code>$a--</code> subtrai 1. Mas há um detalhe: o <code>++</code> pode vir <strong>antes</strong> ou <strong>depois</strong> da variável, e isso muda o valor que a expressão <strong>devolve</strong>:</p>
+
+<pre class="file" data-file="incremento.php">&lt;?php
+$a = 5;
+echo $a++, "\n";
+echo $a, "\n";
+$b = 5;
+echo ++$b, "\n";
+echo $b, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php incremento.php
+5                        « $a++: mostrou o valor ANTIGO (5) e depois somou
+6                        « agora $a vale 6
+6                        « ++$b: somou PRIMEIRO e mostrou o novo (6)
+6</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Escrita</th><th>Nome</th><th>O que faz</th><th>Com <code>$a = 5</code>, a expressão vale</th><th>Depois, <code>$a</code> vale</th></tr>
+<tr><td><code>++$a</code></td><td>pré-incremento</td><td>soma 1, depois devolve</td><td><code>6</code></td><td><code>6</code></td></tr>
+<tr><td><code>$a++</code></td><td>pós-incremento</td><td>devolve, depois soma 1</td><td><code>5</code></td><td><code>6</code></td></tr>
+<tr><td><code>--$a</code></td><td>pré-decremento</td><td>subtrai 1, depois devolve</td><td><code>4</code></td><td><code>4</code></td></tr>
+<tr><td><code>$a--</code></td><td>pós-decremento</td><td>devolve, depois subtrai 1</td><td><code>5</code></td><td><code>4</code></td></tr>
+</table>
+</div>
+
+<p>Pense numa catraca de ônibus com contador: <code>$a++</code> é "anote o número que está no visor e <em>depois</em> gire a catraca"; <code>++$a</code> é "gire a catraca e anote o número novo".</p>
+
+<p>Quando o <code>++</code> está sozinho na linha (<code>$visitas++;</code>), não há diferença: ninguém usa o valor devolvido. A diferença só aparece quando a expressão é usada (num <code>echo</code>, numa conta, numa atribuição). O lugar mais comum do <code>++</code> é o laço <code>for</code> (aula <a href="for.html">for</a>): <code>for ($i = 1; $i &lt;= 10; $i++)</code>.</p>
+
+<div class="warning">
+<strong>Não misture <code>++</code> com outras contas na mesma linha</strong>
+<p>Uma linha como <code>$j = $i++ + ++$i;</code> funciona (com <code>$i = 1</code>, dá <code>$j = 4</code> e <code>$i = 3</code>), mas ninguém consegue ler isso sem parar para pensar. Incremente numa linha, calcule na outra.</p>
+</div>
+
+<h3><code>++</code> em <code>null</code>, <code>bool</code> e <code>float</code></h3>
+<p>Com um float, o <code>++</code> soma 1 normalmente (<code>1.5</code> vira <code>2.5</code>). Com <code>null</code>, o <code>++</code> dá <code>1</code>. Já nos outros casos, o PHP 8.5 avisa que nada aconteceu:</p>
+
+<pre class="file" data-file="estranhos.php">&lt;?php
+$n = null;
+$n--;
+var_dump($n);
+$t = true;
+$t++;
+var_dump($t);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php estranhos.php
+
+Warning: Decrement on type null has no effect, this will change in the next major version of PHP in /home/ana/site/estranhos.php on line 3
+NULL
+
+Warning: Increment on type bool has no effect, this will change in the next major version of PHP in /home/ana/site/estranhos.php on line 6
+bool(true)</pre>
+
+<p><em>Decrement on type null has no effect</em> = "decremento em null não tem efeito"; <em>this will change in the next major version</em> = "isto vai mudar na próxima versão principal". Use <code>++</code> e <code>--</code> só com números.</p>
+
+<hr>
+
+<h2>8. <code>++</code> em texto: o "contador de letras"</h2>
+<p>O PHP tem uma herança curiosa da linguagem Perl: <code>++</code> numa string de letras e números "avança" o texto como um hodômetro de carro. <code>"a"</code> vira <code>"b"</code>, <code>"z"</code> vira <code>"aa"</code>, <code>"A9"</code> vira <code>"B0"</code>. Mas, no PHP 8.5, isso dá aviso:</p>
+
+<pre class="file" data-file="letras.php">&lt;?php
+$s = "a";
+$s++;
+var_dump($s);
+$s = "z";
+$s++;
+var_dump($s);
+$s = "A9";
+$s++;
+var_dump($s);
+$s = "5";
+$s++;
+var_dump($s);
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php letras.php
+
+Deprecated: Increment on non-numeric string is deprecated, use str_increment() instead in /home/ana/site/letras.php on line 3
+string(1) "b"
+
+Deprecated: Increment on non-numeric string is deprecated, use str_increment() instead in /home/ana/site/letras.php on line 6
+string(2) "aa"                  « como o hodômetro: z volta para a e "vai um"
+
+Deprecated: Increment on non-numeric string is deprecated, use str_increment() instead in /home/ana/site/letras.php on line 9
+string(2) "B0"
+int(6)                       « "5" é numérico: virou o número 6, sem aviso</pre>
+
+<p><em>Increment on non-numeric string is deprecated, use str_increment() instead</em> = "incremento em string não numérica está obsoleto; use <code>str_increment()</code> no lugar". O comportamento ainda funciona, mas vai deixar de existir. Para "avançar" um texto de propósito, use as funções criadas para isso <span class="versao">PHP 8.3+</span>:</p>
+
+<pre class="file" data-file="str-increment.php">&lt;?php
+var_dump(str_increment("a"));
+var_dump(str_increment("Az"));
+var_dump(str_decrement("b"));
+</pre>
+
+<pre class="term" data-cwd="~/site">$ php str-increment.php
+string(1) "b"
+string(2) "Ba"
+string(1) "a"</pre>
+
+<p>E o <code>--</code> em texto? Ele <strong>nunca</strong> funcionou para letras: <code>"b"--</code> continua <code>"b"</code>, e o PHP 8.5 avisa <code>Deprecated: Decrement on non-numeric string has no effect and is deprecated</code>. Use <code>str_decrement</code>.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>A conta deu um número diferente do esperado</strong>
+<p><strong>O que significa:</strong> quase sempre é a ordem das contas: <code>$a + $b / 2</code> divide só o <code>$b</code>; <code>-2 ** 2</code> dá <code>-4</code>.</p>
+<p><strong>Como consertar:</strong> coloque parênteses no que deve ser feito primeiro: <code>($a + $b) / 2</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Fatal error: Uncaught TypeError: Unsupported operand types: array + int</code></strong>
+<pre class="term" data-cwd="~/site">$ php array-soma.php         « var_dump([] + 1);
+
+Fatal error: Uncaught TypeError: Unsupported operand types: array + int in /home/ana/site/array-soma.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/ana/site/array-soma.php on line 2</pre>
+<p><strong>O que significa:</strong> um dos operandos não é número (aqui, um array; com <code>"abc"</code> é <code>string + int</code>).</p>
+<p><strong>Como consertar:</strong> mostre os operandos com <code>var_dump</code>. Para somar os itens de um array, use <code>array_sum</code> (aula <a href="funcoes-array.html">Funções de Array</a>). Textos com números: veja <a href="conversao-tipos.html">Conversão de Tipos</a>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Deprecated: Increment on non-numeric string is deprecated</code></strong>
+<p><strong>O que significa:</strong> você usou <code>++</code> numa variável que tem texto. Às vezes é de propósito (avançar letras); às vezes é um número que chegou como texto com algo a mais, como <code>"5 itens"</code>.</p>
+<p><strong>Como consertar:</strong> para letras, <code>str_increment($s)</code>; para números, converta antes: <code>$n = (int) $n; $n++;</code>.</p>
+</div>
+
+<div class="cenario">
+<strong><code>Deprecated: Implicit conversion from float ... to int loses precision</code></strong>
+<p><strong>O que significa:</strong> o <code>%</code> (ou outro lugar que exige inteiro) recebeu um número com casas decimais.</p>
+<p><strong>Como consertar:</strong> para resto com decimais, <code>fmod</code>; para inteiros, arredonde antes com <code>round</code>.</p>
+</div>
+
+<hr>
+
+<h2>Referência rápida</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Operador</th><th>Faz</th><th>Exemplo → resultado</th></tr>
+<tr><td><code>$a + $b</code></td><td>Soma</td><td><code>7 + 3</code> → <code>10</code></td></tr>
+<tr><td><code>$a - $b</code></td><td>Subtração</td><td><code>7 - 3</code> → <code>4</code></td></tr>
+<tr><td><code>$a * $b</code></td><td>Multiplicação</td><td><code>7 * 3</code> → <code>21</code></td></tr>
+<tr><td><code>$a / $b</code></td><td>Divisão</td><td><code>7 / 2</code> → <code>3.5</code></td></tr>
+<tr><td><code>intdiv($a, $b)</code></td><td>Divisão inteira</td><td><code>intdiv(7, 2)</code> → <code>3</code></td></tr>
+<tr><td><code>$a % $b</code></td><td>Resto (sinal do primeiro)</td><td><code>-7 % 3</code> → <code>-1</code></td></tr>
+<tr><td><code>fmod($a, $b)</code></td><td>Resto com decimais</td><td><code>fmod(7.5, 2)</code> → <code>1.5</code></td></tr>
+<tr><td><code>$a ** $b</code></td><td>Potência</td><td><code>2 ** 10</code> → <code>1024</code></td></tr>
+<tr><td><code>-$a</code></td><td>Troca o sinal</td><td><code>-(-5)</code> → <code>5</code></td></tr>
+<tr><td><code>++$a</code> / <code>$a++</code></td><td>Soma 1 (devolve o novo / o antigo)</td><td></td></tr>
+<tr><td><code>--$a</code> / <code>$a--</code></td><td>Subtrai 1 (devolve o novo / o antigo)</td><td></td></tr>
+<tr><td><code>str_increment($s)</code></td><td>Avança um texto <span class="versao">8.3+</span></td><td><code>"Az"</code> → <code>"Ba"</code></td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. Elevar ao quadrado</h3>
+<p>Complete para calcular 5 ao quadrado:</p>
+<div class="ex-code">echo 5 <input data-answer="**" aria-label="operador"> 2;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Par ou ímpar</h3>
+<p>Complete para obter o resto de <code>$n</code> dividido por 2:</p>
+<div class="ex-code">$resto = $n <input data-answer="%" aria-label="operador"> 2;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. Quanto vale <code>2 + 3 * 4</code>?</p>
+<label><input type="radio" name="q3"> 20</label>
+<label><input type="radio" name="q3"> 14</label>
+<label><input type="radio" name="q3"> 24</label>
+<label><input type="radio" name="q3"> 9</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. Com <code>$a = 10;</code>, o que <code>echo $a++;</code> mostra?</p>
+<label><input type="radio" name="q4"> 10 (e depois <code>$a</code> vale 11)</label>
+<label><input type="radio" name="q4"> 11</label>
+<label><input type="radio" name="q4"> 10 (e <code>$a</code> continua 10)</label>
+<label><input type="radio" name="q4"> 1</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Quanto vale <code>-2 ** 2</code> no PHP?</p>
+<label><input type="radio" name="q5"> 4</label>
+<label><input type="radio" name="q5"> Dá erro</label>
+<label><input type="radio" name="q5"> 0</label>
+<label><input type="radio" name="q5"> -4</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">6. Quanto vale <code>-10 % 3</code>?</p>
+<label><input type="radio" name="q6"> 1</label>
+<label><input type="radio" name="q6"> 2</label>
+<label><input type="radio" name="q6"> -1</label>
+<label><input type="radio" name="q6"> -3</label>
+</div>
+
+<h3>Missão final: minutos em horas</h3>
+
+<div class="tryphp" data-goal="out:135 minutos = 2h15min,semerro,src:intdiv|/,src:%">
+<p class="try-task"><strong>Missão:</strong> o curso de PHP da Ana tem <code>135</code> minutos de vídeo. Calcule as horas cheias (com <code>intdiv</code>) e os minutos que sobram (com <code>%</code>), sem escrever 2 e 15 à mão, para mostrar <code>135 minutos = 2h15min</code>. Depois troque para <code>200</code> minutos e confira (deve dar <code>3h20min</code>).</p>
+<pre class="script">&lt;?php
+$minutos = 135;
+$horas = 0;    // calcule
+$resto = 0;    // calcule
+echo "$minutos minutos = {$horas}h{$resto}min\n";
+</pre>
+<pre class="solucao">&lt;?php
+$minutos = 135;
+$horas = intdiv($minutos, 60);
+$resto = $minutos % 60;
+echo "$minutos minutos = {$horas}h{$resto}min\n";
+</pre>
+</div>
+
+<p>(As chaves em <code>{$horas}h</code> separam o nome da variável da letra <code>h</code> grudada nela; veja <a href="interpolacao.html">Interpolação</a>.)</p>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>+ - * /</code> são as quatro operações; <code>%</code> é o resto; <code>**</code> é a potência.</li>
+  <li>Ordem: parênteses, depois <code>**</code>, depois <code>* / %</code>, depois <code>+ -</code>. <code>-2 ** 2</code> é <code>-4</code>. Na dúvida, parênteses.</li>
+  <li><code>/</code> dá float quando a divisão não é exata; <code>intdiv</code> dá só a parte inteira.</li>
+  <li>O resto tem o sinal do primeiro número; para decimais, <code>fmod</code>.</li>
+  <li><code>++$a</code> soma e devolve o novo; <code>$a++</code> devolve o antigo e depois soma. Sozinhos na linha, são iguais.</li>
+  <li><code>++</code> em texto não numérico dá <code>Deprecated</code> no PHP 8.5; use <code>str_increment</code>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
