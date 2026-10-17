@@ -1,0 +1,1697 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projeto Mini Blog — posts no SQLite, include, formulário e paginação | Guia PHP</title>
+<meta name="description" content="Projeto passo a passo: um mini blog em PHP 8.5 com posts no SQLite, lista e página de cada post, formulário de novo post com validação, cabeçalho e rodapé com include, paginação com LIMIT e OFFSET, htmlspecialchars e prepared statements. Saídas reais do php -S.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>Projeto <span class="hl">Mini Blog</span></h1>
+
+<p class="intro">A Ana quer um blog para contar o que está aprendendo (e guardar a receita do pão de queijo da vó). Neste projeto você vai construí-lo do zero: os posts ficam num banco SQLite, a página inicial lista os mais recentes, cada post tem a sua página, um formulário publica posts novos, e todas as páginas compartilham o mesmo cabeçalho e rodapé. São várias páginas PHP trabalhando juntas, como num site de verdade.</p>
+
+<div class="note">
+<strong>Você vai praticar</strong>
+<ul>
+  <li>Guardar e ler dados com <a href="pdo.html">PDO</a> e <a href="prepared-statements.html">prepared statements</a> no SQLite.</li>
+  <li>Repartir o site em arquivos com <a href="include-require.html">include e require</a> (cabeçalho, rodapé, funções).</li>
+  <li>Mostrar dados com segurança com <code>htmlspecialchars</code> (<a href="escapar-saida.html">XSS</a>).</li>
+  <li>Receber um <a href="formularios.html">formulário</a>, <a href="validacao.html">validar</a> e <a href="redirecionar.html">redirecionar</a>.</li>
+  <li>Ler parâmetros da URL com <a href="get-post.html">$_GET</a> e dividir a lista em páginas (<code>LIMIT</code>/<code>OFFSET</code>).</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>O que vamos construir</h2>
+<p>Sete arquivos pequenos, cada um com uma tarefa, na pasta <code>~/blog</code>:</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Arquivo</th><th>Papel</th><th>Etapa</th></tr>
+<tr><td><code>banco.php</code></td><td>Conecta ao SQLite e cria a tabela com 5 posts de exemplo na primeira vez</td><td>1</td></tr>
+<tr><td><code>index.php</code></td><td>Página inicial: os posts mais recentes, 3 por página</td><td>1, 2 e 5</td></tr>
+<tr><td><code>funcoes.php</code></td><td>Funções usadas em todas as páginas (<code>e()</code>, <code>dataBr()</code>, <code>resumo()</code>)</td><td>2</td></tr>
+<tr><td><code>cabecalho.php</code> e <code>rodape.php</code></td><td>O começo e o fim do HTML, iguais em todas as páginas</td><td>2</td></tr>
+<tr><td><code>post.php</code></td><td>Um post inteiro: <code>post.php?id=3</code></td><td>3</td></tr>
+<tr><td><code>novo.php</code></td><td>Formulário para publicar um post</td><td>4</td></tr>
+</table>
+</div>
+<p>O blog pronto, visto pelo <code>curl</code> (o <code>sed</code> mostra só o miolo da página, entre <code>&lt;main&gt;</code> e <code>&lt;/main&gt;</code>):</p>
+<pre class="term" data-cwd="~/blog">$ curl -s localhost:8000/ | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=5"&gt;Meu blog agora tem banco de dados&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;12/10/2026&lt;/p&gt;
+    &lt;p&gt;Os posts agora ficam num arquivo SQLite.
+O PHP lê com PDO e…&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=4"&gt;Arrays são listas&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;09/10/2026&lt;/p&gt;
+    &lt;p&gt;Um array guarda vários valores numa variável só.
+Com foreac…&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=3"&gt;Aprendendo PHP: variáveis&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;06/10/2026&lt;/p&gt;
+    &lt;p&gt;Variáveis começam com cifrão, como $nome.
+O PHP descobre o …&lt;/p&gt;
+  &lt;/article&gt;
+
+&lt;nav&gt;
+    Página 1 de 2      &lt;a href="index.php?pagina=2"&gt;Mais antigos →&lt;/a&gt;
+  &lt;/nav&gt;
+&lt;/main&gt;</pre>
+
+<ol class="passo">
+  <li><a href="#etapa1">O banco e a primeira lista</a> (SQLite, <code>foreach</code>, <code>htmlspecialchars</code>).</li>
+  <li><a href="#etapa2">Cabeçalho e rodapé com include</a> (<code>include</code>, <code>require</code>, funções comuns).</li>
+  <li><a href="#etapa3">A página do post</a> (<code>$_GET["id"]</code>, prepared statement, 404).</li>
+  <li><a href="#etapa4">Escrever um post</a> (formulário, validação, <code>INSERT</code>, redirecionamento).</li>
+  <li><a href="#etapa5">Paginação</a> (<code>COUNT</code>, <code>LIMIT</code>, <code>OFFSET</code>).</li>
+</ol>
+
+<h3>Antes de começar</h3>
+<p>Você vai precisar de <a href="php-e-html.html">PHP dentro do HTML</a>, <a href="foreach.html">foreach</a>, <a href="funcoes.html">funções</a> e do básico de <a href="banco-dados.html">banco de dados</a> (o <a href="projeto-tarefas.html">projeto Tarefas com SQLite</a> é um bom aquecimento). Crie a pasta e deixe o servidor rodando num terminal; os <code>curl</code> vão em outro:</p>
+<pre class="term">$ mkdir blog
+$ cd blog
+$ php -S localhost:8000</pre>
+<p>Com o servidor ligado, abra <code>http://localhost:8000/</code> no navegador para ver cada etapa de verdade.</p>
+
+<hr>
+
+<h2 id="etapa1">Etapa 1 · O banco e a primeira lista</h2>
+<p>O <code>banco.php</code> abre (ou cria) o arquivo <code>blog.sqlite</code>. Na primeira vez, cria a tabela <code>posts</code> e grava 5 posts de exemplo, para o blog não começar vazio:</p>
+<pre class="file" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$novo = !file_exists($arquivo);</code></td><td>Guarda se o banco ainda não existia (ao conectar, o SQLite cria o arquivo vazio).</td></tr>
+<tr><td><code>PDO::FETCH_ASSOC</code></td><td>Cada linha vem como array associativo: <code>$post["titulo"]</code>.</td></tr>
+<tr><td><code>id INTEGER PRIMARY KEY AUTOINCREMENT</code></td><td>Um número único para cada post, escolhido pelo banco.</td></tr>
+<tr><td><code>criado_em TEXT</code></td><td>A data no formato <code>2026-10-12 10:45:00</code> (ano primeiro). Nesse formato, ordem alfabética = ordem de data, e o <code>ORDER BY</code> funciona.</td></tr>
+<tr><td><code>$st = $pdo-&gt;prepare(…); foreach (…) $st-&gt;execute($post);</code></td><td>Um prepared statement preparado uma vez e executado 5 vezes, uma por post. Os <code>?</code> recebem os valores do array, na ordem.</td></tr>
+<tr><td><code>"…\n…"</code> e <code>\$nome</code></td><td>Entre aspas duplas, <code>\n</code> é uma quebra de linha e <code>\$</code> é um cifrão de verdade (sem <code>\</code>, o PHP procuraria a variável <code>$nome</code>; veja <a href="interpolacao.html">Interpolação</a>).</td></tr>
+<tr><td><code>return $pdo;</code></td><td>Quem fizer <code>$pdo = require __DIR__ . "/banco.php";</code> recebe a conexão.</td></tr>
+</table>
+</div>
+<p>A primeira página só lista tudo:</p>
+<pre class="file" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Blog da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Blog da Ana&lt;/h1&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;h2&gt;&lt;?= htmlspecialchars($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p&gt;&lt;?= htmlspecialchars($post["conteudo"]) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<ul>
+  <li><code>query(…)-&gt;fetchAll()</code>: roda o SQL e traz <strong>todas</strong> as linhas num array. Aqui não há nada vindo do visitante no SQL, então <code>query</code> basta; com dados do visitante, sempre <code>prepare</code>.</li>
+  <li><code>ORDER BY criado_em DESC</code>: do mais novo para o mais antigo (<code>DESC</code> = decrescente).</li>
+  <li><code>foreach (…): … endforeach;</code> é a sintaxe alternativa, mais fácil de ler no meio do HTML (<a href="php-e-html.html">PHP dentro do HTML</a>).</li>
+  <li><code>&lt;?= htmlspecialchars(…) ?&gt;</code>: escreve o texto do banco <strong>escapado</strong>. Quem escreveu o post pode ter posto HTML ou um <code>&lt;script&gt;</code>; a etapa 4 mostra o que acontece.</li>
+</ul>
+<pre class="term" data-cwd="~/blog">$ ls
+banco.php
+index.php
+$ curl -s localhost:8000/
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Blog da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Blog da Ana&lt;/h1&gt;
+  &lt;h2&gt;Meu blog agora tem banco de dados&lt;/h2&gt;
+  &lt;p&gt;Os posts agora ficam num arquivo SQLite.
+O PHP lê com PDO e prepared statements.&lt;/p&gt;
+  &lt;h2&gt;Arrays são listas&lt;/h2&gt;
+  &lt;p&gt;Um array guarda vários valores numa variável só.
+Com foreach dá para percorrer todos.&lt;/p&gt;
+  &lt;h2&gt;Aprendendo PHP: variáveis&lt;/h2&gt;
+  &lt;p&gt;Variáveis começam com cifrão, como $nome.
+O PHP descobre o tipo sozinho.&lt;/p&gt;
+  &lt;h2&gt;Pão de queijo da vó&lt;/h2&gt;
+  &lt;p&gt;Ingredientes: polvilho, queijo, ovos, leite e óleo.
+Asse por 25 minutos a 180 graus.&lt;/p&gt;
+  &lt;h2&gt;Olá, mundo!&lt;/h2&gt;
+  &lt;p&gt;Este é o primeiro post do meu blog.
+Aqui vou contar o que estou aprendendo.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+$ ls
+banco.php
+blog.sqlite
+index.php
+$ sqlite3 blog.sqlite "SELECT id, titulo, criado_em FROM posts"
+1|Olá, mundo!|2026-10-01 09:00:00
+2|Pão de queijo da vó|2026-10-03 18:30:00
+3|Aprendendo PHP: variáveis|2026-10-06 20:15:00
+4|Arrays são listas|2026-10-09 21:00:00
+5|Meu blog agora tem banco de dados|2026-10-12 10:45:00</pre>
+<p>O <code>blog.sqlite</code> nasceu na primeira visita. O programa <code>sqlite3</code> confirma o que está gravado (a ordem do banco é a de inserção; a página inverte com <code>DESC</code>). Repare também que a quebra de linha dentro do texto não aparece no navegador: em HTML, uma quebra de linha vale um espaço. Na etapa 3 o <code>nl2br</code> resolve isso.</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:12/10/2026,html:01/10/2026">
+<p class="try-task"><strong>Missão (etapa 1):</strong> mostre a data de cada post logo abaixo do título, no formato brasileiro (<code>12/10/2026</code>). Dica: <code>date("d/m/Y", strtotime($post["criado_em"]))</code>. O <code>strtotime</code> transforma o texto da data num número (segundos desde 1970) e o <code>date</code> o formata (<a href="datas.html">Datas e Horas</a>).</p>
+<pre class="script" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Blog da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Blog da Ana&lt;/h1&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;h2&gt;&lt;?= htmlspecialchars($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p&gt;&lt;?= htmlspecialchars($post["conteudo"]) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Blog da Ana&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Blog da Ana&lt;/h1&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;h2&gt;&lt;?= htmlspecialchars($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p&gt;&lt;?= date("d/m/Y", strtotime($post["criado_em"])) ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;?= htmlspecialchars($post["conteudo"]) ?&gt;&lt;/p&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa2">Etapa 2 · Cabeçalho e rodapé com include</h2>
+<p>Um blog tem várias páginas (início, post, novo post) com o mesmo topo e o mesmo rodapé. Copiar esse HTML em cada arquivo seria um convite ao erro: mudou o menu, tem de mudar em todos. A solução é pôr cada pedaço repetido num arquivo e <strong>incluí-lo</strong>. Primeiro, as funções que todas as páginas usam:</p>
+<pre class="file" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Função</th><th>Para quê</th></tr>
+<tr><td><code>e(?string $texto)</code></td><td>Um apelido curto para <code>htmlspecialchars</code>, que vamos escrever dezenas de vezes. <code>ENT_QUOTES</code> escapa também as aspas (importante dentro de <code>value="…"</code>). O <code>?string</code> aceita <code>null</code>, tratado como texto vazio.</td></tr>
+<tr><td><code>dataBr(string $iso)</code></td><td><code>"2026-10-12 10:45:00"</code> → <code>"12/10/2026"</code>.</td></tr>
+<tr><td><code>resumo(string $texto, int $tamanho = 60)</code></td><td>Os primeiros 60 caracteres, com <code>…</code> no fim, para a lista. <code>mb_strimwidth</code> conta letras, não bytes, e não corta um <code>ç</code> no meio (<a href="ref-string.html#pedacos">referência</a>).</td></tr>
+<tr><td><code>date_default_timezone_set("America/Sao_Paulo")</code></td><td>Sem isso, o <code>date()</code> usa o fuso UTC (3 horas à frente de Brasília) e um post das 22h sairia com a data do dia seguinte.</td></tr>
+</table>
+</div>
+<p>O cabeçalho usa uma variável <code>$titulo</code>, que cada página define antes de incluí-lo:</p>
+<pre class="file" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="file" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<p>E a página inicial agora só cuida do que é dela:</p>
+<pre class="file" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+
+$titulo = "Início";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+    &lt;p&gt;&lt;?= e(resumo($post["conteudo"])) ?&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>$pdo = require __DIR__ . "/banco.php";</code></td><td><code>require</code>: se o arquivo faltar, o programa <strong>para</strong> com erro fatal. Use para o que é indispensável (sem banco, não há blog).</td></tr>
+<tr><td><code>require __DIR__ . "/funcoes.php";</code></td><td>As funções <code>e</code>, <code>dataBr</code>, <code>resumo</code> passam a existir nesta página.</td></tr>
+<tr><td><code>$titulo = "Início";</code></td><td>Define a variável que o <code>cabecalho.php</code> vai usar. O arquivo incluído enxerga as variáveis de quem o incluiu, como se o código dele estivesse colado ali.</td></tr>
+<tr><td><code>include __DIR__ . "/cabecalho.php";</code></td><td><code>include</code>: se o arquivo faltar, só um <code>Warning</code>, e o resto da página continua. Para pedaços de HTML, é a escolha comum.</td></tr>
+<tr><td><code>__DIR__</code></td><td>A pasta deste arquivo. Com ela o caminho funciona não importa de onde o PHP foi chamado (<a href="include-require.html">include e require</a>).</td></tr>
+<tr><td><code>&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;</code></td><td>Cada título vira um link para a página do post (etapa 3). O <code>id</code> é um número que veio do banco, não do visitante.</td></tr>
+</table>
+</div>
+<pre class="term" data-cwd="~/blog">$ curl -s localhost:8000/
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Início | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=5"&gt;Meu blog agora tem banco de dados&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;12/10/2026&lt;/p&gt;
+    &lt;p&gt;Os posts agora ficam num arquivo SQLite.
+O PHP lê com PDO e…&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=4"&gt;Arrays são listas&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;09/10/2026&lt;/p&gt;
+    &lt;p&gt;Um array guarda vários valores numa variável só.
+Com foreac…&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=3"&gt;Aprendendo PHP: variáveis&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;06/10/2026&lt;/p&gt;
+    &lt;p&gt;Variáveis começam com cifrão, como $nome.
+O PHP descobre o …&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=2"&gt;Pão de queijo da vó&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;03/10/2026&lt;/p&gt;
+    &lt;p&gt;Ingredientes: polvilho, queijo, ovos, leite e óleo.
+Asse po…&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=1"&gt;Olá, mundo!&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;01/10/2026&lt;/p&gt;
+    &lt;p&gt;Este é o primeiro post do meu blog.
+Aqui vou contar o que e…&lt;/p&gt;
+  &lt;/article&gt;
+&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · 2026&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+<p>O navegador recebe uma página só: ele nem sabe que ela foi montada com três arquivos. O <code>&lt;title&gt;</code> traz "Início", que veio da variável <code>$titulo</code>.</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Feito com PHP pela Ana">
+<p class="try-task"><strong>Missão (etapa 2):</strong> a página está sem rodapé (e sem o <code>&lt;/body&gt;</code> e o <code>&lt;/html&gt;</code> que ficam nele). Inclua o <code>rodape.php</code> no fim do <code>index.php</code>. Olhe as outras abas: são os arquivos que a página usa. Depois, experimente mudar o menu no <code>cabecalho.php</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+
+$titulo = "Início";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+    &lt;p&gt;&lt;?= e(resumo($post["conteudo"])) ?&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;?php endforeach; ?&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="script" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+
+$titulo = "Início";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+    &lt;p&gt;&lt;?= e(resumo($post["conteudo"])) ?&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa3">Etapa 3 · A página do post</h2>
+<p>Os links da lista apontam para <code>post.php?id=3</code>. O <code>post.php</code> lê o <code>id</code> da URL, busca o post e mostra o texto inteiro:</p>
+<pre class="file" data-file="post.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$id = (int) ($_GET["id"] ?? 0);
+$st = $pdo-&gt;prepare("SELECT * FROM posts WHERE id = ?");
+$st-&gt;execute([$id]);
+$post = $st-&gt;fetch();
+
+if ($post === false) {
+    http_response_code(404);
+    $titulo = "Post não encontrado";
+    include __DIR__ . "/cabecalho.php";
+    echo '&lt;p&gt;Esse post não existe. &lt;a href="index.php"&gt;Voltar ao início&lt;/a&gt;&lt;/p&gt;';
+    include __DIR__ . "/rodape.php";
+    exit;
+}
+
+$titulo = $post["titulo"];
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;article&gt;
+  &lt;h2&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;?= nl2br(e($post["conteudo"])) ?&gt;&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>(int) ($_GET["id"] ?? 0)</code></td><td>Lê o <code>id</code> da URL; se não veio, <code>0</code>. O <code>(int)</code> transforma <code>"3"</code> em <code>3</code> e qualquer lixo (<code>"abc"</code>) em <code>0</code>, que não existe no banco.</td></tr>
+<tr><td><code>prepare("… WHERE id = ?")</code> + <code>execute([$id])</code></td><td>O valor vai separado do SQL: mesmo sem o <code>(int)</code>, ninguém conseguiria injetar SQL pela URL (<a href="prepared-statements.html">SQL Injection</a>).</td></tr>
+<tr><td><code>$st-&gt;fetch()</code></td><td>Uma linha (array) ou <code>false</code>, se nenhum post tem esse id.</td></tr>
+<tr><td><code>http_response_code(404);</code></td><td>Avisa ao navegador (e ao Google) que a página não existe, mesmo mostrando uma mensagem amigável.</td></tr>
+<tr><td><code>echo '&lt;p&gt;Esse post …';</code></td><td>Aspas simples por fora, para poder usar aspas duplas no HTML sem escapar.</td></tr>
+<tr><td><code>exit;</code></td><td>Termina aqui: o resto do arquivo (que usaria <code>$post</code>) não roda.</td></tr>
+<tr><td><code>$titulo = $post["titulo"];</code></td><td>A aba do navegador mostra o título do post.</td></tr>
+<tr><td><code>nl2br(e($post["conteudo"]))</code></td><td>Primeiro escapa, <strong>depois</strong> põe <code>&lt;br /&gt;</code> nas quebras de linha. Na ordem contrária, o <code>e()</code> escaparia os próprios <code>&lt;br /&gt;</code>.</td></tr>
+</table>
+</div>
+<pre class="term" data-cwd="~/blog">$ curl -s 'localhost:8000/post.php?id=3' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+&lt;article&gt;
+  &lt;h2&gt;Aprendendo PHP: variáveis&lt;/h2&gt;
+  &lt;p class="data"&gt;06/10/2026&lt;/p&gt;
+  &lt;p&gt;Variáveis começam com cifrão, como $nome.&lt;br /&gt;
+O PHP descobre o tipo sozinho.&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;/main&gt;
+$ curl -si 'localhost:8000/post.php?id=99' | sed -n '1p;/&lt;main&gt;/,/&lt;\/main&gt;/p'
+HTTP/1.1 404 Not Found
+&lt;main&gt;
+&lt;p&gt;Esse post não existe. &lt;a href="index.php"&gt;Voltar ao início&lt;/a&gt;&lt;/p&gt;&lt;/main&gt;</pre>
+
+<div class="cenario">
+<strong>Quando dá errado: usar o resultado sem conferir</strong>
+<p>Sem o <code>if ($post === false)</code>, um id que não existe faz o <code>$post</code> valer <code>false</code>, e cada <code>$post["…"]</code> vira um aviso, até o erro fatal no <code>dataBr</code>:</p>
+<pre class="term" data-cwd="~/blog">$ curl -s "localhost:8000/post.php?id=99"
+&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Trying to access array offset on false in &lt;b&gt;/home/ana/blog/post.php&lt;/b&gt; on line &lt;b&gt;10&lt;/b&gt;&lt;br /&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+&lt;article&gt;
+  &lt;h2&gt;&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Trying to access array offset on false in &lt;b&gt;/home/ana/blog/post.php&lt;/b&gt; on line &lt;b&gt;14&lt;/b&gt;&lt;br /&gt;
+&lt;/h2&gt;
+  &lt;p class="data"&gt;&lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Trying to access array offset on false in &lt;b&gt;/home/ana/blog/post.php&lt;/b&gt; on line &lt;b&gt;15&lt;/b&gt;&lt;br /&gt;
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught TypeError: dataBr(): Argument #1 ($iso) must be of type string, null given, called in /home/ana/blog/post.php on line 15 and defined in /home/ana/blog/funcoes.php:11
+Stack trace:
+#0 /home/ana/blog/post.php(15): dataBr(NULL)
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/blog/funcoes.php&lt;/b&gt; on line &lt;b&gt;11&lt;/b&gt;&lt;br /&gt;</pre>
+<p><strong>O que significa:</strong> "tentando acessar uma posição de array em <code>false</code>" (<a href="ref-erros.html#variaveis">referência de erros</a>). <code>$false["titulo"]</code> vale <code>null</code>, e o <code>dataBr</code>, que exige <code>string</code>, recusou o <code>null</code>. <strong>Como consertar:</strong> todo <code>fetch()</code> pode dar <code>false</code>; confira logo depois e responda 404. Visitantes chegam a ids inexistentes o tempo todo: links antigos, posts apagados, gente mexendo na URL.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/post.php?id=99" data-goal="html:Esse post não existe.">
+<p class="try-task"><strong>Missão (etapa 3):</strong> a caixa abre <code>post.php?id=99</code> e a página quebra. Acrescente a conferência do <code>false</code>: código 404, o cabeçalho com o título "Post não encontrado", a mensagem <code>Esse post não existe.</code> com um link para o início, o rodapé e <code>exit</code>. Depois, mude o endereço na barra do resultado para <code>/post.php?id=2</code>.</p>
+<pre class="script" data-file="post.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$id = (int) ($_GET["id"] ?? 0);
+$st = $pdo-&gt;prepare("SELECT * FROM posts WHERE id = ?");
+$st-&gt;execute([$id]);
+$post = $st-&gt;fetch();
+
+$titulo = $post["titulo"];
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;article&gt;
+  &lt;h2&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;?= nl2br(e($post["conteudo"])) ?&gt;&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="script" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="post.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$id = (int) ($_GET["id"] ?? 0);
+$st = $pdo-&gt;prepare("SELECT * FROM posts WHERE id = ?");
+$st-&gt;execute([$id]);
+$post = $st-&gt;fetch();
+
+if ($post === false) {
+    http_response_code(404);
+    $titulo = "Post não encontrado";
+    include __DIR__ . "/cabecalho.php";
+    echo '&lt;p&gt;Esse post não existe. &lt;a href="index.php"&gt;Voltar ao início&lt;/a&gt;&lt;/p&gt;';
+    include __DIR__ . "/rodape.php";
+    exit;
+}
+
+$titulo = $post["titulo"];
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;article&gt;
+  &lt;h2&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;?= nl2br(e($post["conteudo"])) ?&gt;&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2 id="etapa4">Etapa 4 · Escrever um post</h2>
+<p>O <code>novo.php</code> faz duas coisas no mesmo arquivo: num <strong>GET</strong> (o visitante clicou em "Novo post") mostra o formulário; num <strong>POST</strong> (clicou em "Publicar") valida e grava. Se algo estiver errado, mostra o formulário de novo, com os erros e com o que a pessoa já tinha digitado.</p>
+<pre class="file" data-file="novo.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$erros = [];
+$tituloPost = "";
+$conteudo = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $tituloPost = trim($_POST["titulo"] ?? "");
+    $conteudo = trim($_POST["conteudo"] ?? "");
+
+    if ($tituloPost === "") {
+        $erros[] = "Escreva um título.";
+    } elseif (mb_strlen($tituloPost) &gt; 120) {
+        $erros[] = "O título pode ter no máximo 120 letras.";
+    }
+    if (mb_strlen($conteudo) &lt; 10) {
+        $erros[] = "O texto precisa de pelo menos 10 letras.";
+    }
+
+    if (!$erros) {
+        $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+        $st-&gt;execute([$tituloPost, $conteudo, date("Y-m-d H:i:s")]);
+        header("Location: post.php?id=" . $pdo-&gt;lastInsertId());
+        exit;
+    }
+}
+
+$titulo = "Novo post";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;h2&gt;Novo post&lt;/h2&gt;
+
+&lt;?php if ($erros): ?&gt;
+  &lt;ul class="erros"&gt;
+  &lt;?php foreach ($erros as $erro): ?&gt;
+    &lt;li&gt;&lt;?= e($erro) ?&gt;&lt;/li&gt;
+  &lt;?php endforeach; ?&gt;
+  &lt;/ul&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Título&lt;br&gt;&lt;input name="titulo" value="&lt;?= e($tituloPost) ?&gt;" maxlength="120"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Texto&lt;br&gt;&lt;textarea name="conteudo" rows="8" cols="50"&gt;&lt;?= e($conteudo) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Publicar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$_SERVER["REQUEST_METHOD"] === "POST"</code></td><td>Só processa quando o formulário foi enviado (<a href="ref-superglobais.html#server">$_SERVER</a>).</td></tr>
+<tr><td><code>trim($_POST["titulo"] ?? "")</code></td><td>Lê o campo (ou <code>""</code> se não veio) e tira espaços das pontas: um título só de espaços conta como vazio.</td></tr>
+<tr><td><code>$erros[] = "…";</code></td><td>Junta <strong>todos</strong> os problemas numa lista, para mostrar de uma vez.</td></tr>
+<tr><td><code>if (!$erros)</code></td><td>Array vazio conta como falso: "se não há erros".</td></tr>
+<tr><td><code>date("Y-m-d H:i:s")</code></td><td>Agora, no mesmo formato das datas de exemplo.</td></tr>
+<tr><td><code>header("Location: post.php?id=" . $pdo-&gt;lastInsertId()); exit;</code></td><td>Depois de gravar, manda o navegador para a página do post novo (código <code>302</code>). Assim, um F5 na página seguinte não publica o post duas vezes. Esse padrão tem nome: <strong>POST → redirecionamento → GET</strong> (<a href="redirecionar.html">header e Redirecionamento</a>).</td></tr>
+<tr><td><code>value="&lt;?= e($tituloPost) ?&gt;"</code> e o texto dentro do <code>&lt;textarea&gt;</code></td><td>Devolvem ao formulário o que a pessoa digitou (escapado: um título com aspas não quebra o <code>value="…"</code>).</td></tr>
+<tr><td><code>$tituloPost</code> (e não <code>$titulo</code>)</td><td>O nome <code>$titulo</code> já é usado pelo cabeçalho. Veja o cenário abaixo.</td></tr>
+</table>
+</div>
+
+<p>Publicando pelo <code>curl</code> (<code>-d</code> envia como um formulário). Primeiro, a resposta crua; depois, a página para onde ela manda:</p>
+<pre class="term" data-cwd="~/blog">$ curl -si localhost:8000/novo.php -d 'titulo=Testando o formulário&amp;conteudo=Escrevi este post pelo curl.' | head -7
+HTTP/1.1 302 Found
+Host: localhost:8000
+Date: Sat, 17 Oct 2026 00:12:08 GMT
+Connection: close
+X-Powered-By: PHP/8.5.8
+Location: post.php?id=6
+Content-type: text/html; charset=UTF-8
+$ curl -s 'localhost:8000/post.php?id=6' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+&lt;article&gt;
+  &lt;h2&gt;Testando o formulário&lt;/h2&gt;
+  &lt;p class="data"&gt;16/10/2026&lt;/p&gt;
+  &lt;p&gt;Escrevi este post pelo curl.&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;/main&gt;</pre>
+<p>Com dados inválidos, nada é gravado e os erros aparecem acima do formulário, que mantém o texto digitado:</p>
+<pre class="term" data-cwd="~/blog">$ curl -s localhost:8000/novo.php -d 'titulo=&amp;conteudo=Oi' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+&lt;h2&gt;Novo post&lt;/h2&gt;
+
+  &lt;ul class="erros"&gt;
+      &lt;li&gt;Escreva um título.&lt;/li&gt;
+      &lt;li&gt;O texto precisa de pelo menos 10 letras.&lt;/li&gt;
+    &lt;/ul&gt;
+
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Título&lt;br&gt;&lt;input name="titulo" value="" maxlength="120"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Texto&lt;br&gt;&lt;textarea name="conteudo" rows="8" cols="50"&gt;Oi&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Publicar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/main&gt;</pre>
+<p>E se alguém tentar publicar código JavaScript no título? O <code>-L</code> faz o <code>curl</code> seguir o redirecionamento, como um navegador:</p>
+<pre class="term" data-cwd="~/blog">$ curl -sL localhost:8000/novo.php -d 'titulo=&lt;script&gt;alert(1)&lt;/script&gt;&amp;conteudo=Um teste de segurança.' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+&lt;article&gt;
+  &lt;h2&gt;&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;&lt;/h2&gt;
+  &lt;p class="data"&gt;16/10/2026&lt;/p&gt;
+  &lt;p&gt;Um teste de segurança.&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;/main&gt;
+$ sqlite3 blog.sqlite 'SELECT id, titulo, criado_em FROM posts WHERE id &gt; 5'
+6|Testando o formulário|2026-10-16 21:12:08
+7|&lt;script&gt;alert(1)&lt;/script&gt;|2026-10-16 21:12:08</pre>
+<p>O banco guarda o texto <strong>exatamente</strong> como veio (o prepared statement cuida de o SQL não quebrar), e o <code>e()</code> o transforma em <code>&amp;lt;script&amp;gt;</code> na hora de mostrar: o navegador exibe o texto, sem executar nada. Essa é a divisão de tarefas: <strong>prepared statement na entrada do banco, <code>htmlspecialchars</code> na saída para o HTML</strong>.</p>
+
+<div class="cenario">
+<strong>Quando dá errado: a variável do formulário com o nome da do cabeçalho</strong>
+<p>Se o <code>novo.php</code> usasse <code>$titulo</code> para o título digitado (em vez de <code>$tituloPost</code>), a linha <code>$titulo = "Novo post";</code>, que prepara o cabeçalho, apagaria o que a pessoa escreveu. Ela digita "Minha horta", erra o texto e…</p>
+<pre class="term" data-cwd="~/blog">$ curl -s localhost:8000/novo.php -d 'titulo=Minha horta&amp;conteudo=Oi' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+&lt;h2&gt;Novo post&lt;/h2&gt;
+
+  &lt;ul class="erros"&gt;
+      &lt;li&gt;O texto precisa de pelo menos 10 letras.&lt;/li&gt;
+    &lt;/ul&gt;
+
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Título&lt;br&gt;&lt;input name="titulo" value="Novo post" maxlength="120"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Texto&lt;br&gt;&lt;textarea name="conteudo" rows="8" cols="50"&gt;Oi&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Publicar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;/main&gt;</pre>
+<p>…o campo volta com <code>Novo post</code>. Nenhuma mensagem de erro: o PHP fez exatamente o que foi mandado. Arquivos incluídos compartilham as variáveis com quem os inclui, então os nomes precisam ser combinados. (Em sistemas maiores, isso se resolve com funções que recebem parâmetros, ou com um sistema de <em>templates</em>.)</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-url="/novo.php" data-post="titulo=&amp;conteudo=Oi" data-goal="html:Escreva um título.,html:O texto precisa de pelo menos 10 letras.">
+<p class="try-task"><strong>Missão (etapa 4):</strong> a caixa envia um post com título vazio e o texto "Oi", e o <code>novo.php</code> publica assim mesmo (veja o post sem título no resultado). Escreva a validação no lugar do comentário: título obrigatório (até 120 letras, com <code>mb_strlen</code>) e texto com pelo menos 10 letras. Depois, preencha o formulário no resultado e publique um post de verdade.</p>
+<pre class="script" data-file="novo.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$erros = [];
+$tituloPost = "";
+$conteudo = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $tituloPost = trim($_POST["titulo"] ?? "");
+    $conteudo = trim($_POST["conteudo"] ?? "");
+
+    // valide aqui: título obrigatório (até 120 letras) e texto com pelo menos 10 letras
+
+    if (!$erros) {
+        $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+        $st-&gt;execute([$tituloPost, $conteudo, date("Y-m-d H:i:s")]);
+        header("Location: post.php?id=" . $pdo-&gt;lastInsertId());
+        exit;
+    }
+}
+
+$titulo = "Novo post";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;h2&gt;Novo post&lt;/h2&gt;
+
+&lt;?php if ($erros): ?&gt;
+  &lt;ul class="erros"&gt;
+  &lt;?php foreach ($erros as $erro): ?&gt;
+    &lt;li&gt;&lt;?= e($erro) ?&gt;&lt;/li&gt;
+  &lt;?php endforeach; ?&gt;
+  &lt;/ul&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Título&lt;br&gt;&lt;input name="titulo" value="&lt;?= e($tituloPost) ?&gt;" maxlength="120"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Texto&lt;br&gt;&lt;textarea name="conteudo" rows="8" cols="50"&gt;&lt;?= e($conteudo) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Publicar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="script" data-file="post.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$id = (int) ($_GET["id"] ?? 0);
+$st = $pdo-&gt;prepare("SELECT * FROM posts WHERE id = ?");
+$st-&gt;execute([$id]);
+$post = $st-&gt;fetch();
+
+if ($post === false) {
+    http_response_code(404);
+    $titulo = "Post não encontrado";
+    include __DIR__ . "/cabecalho.php";
+    echo '&lt;p&gt;Esse post não existe. &lt;a href="index.php"&gt;Voltar ao início&lt;/a&gt;&lt;/p&gt;';
+    include __DIR__ . "/rodape.php";
+    exit;
+}
+
+$titulo = $post["titulo"];
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;article&gt;
+  &lt;h2&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;?= nl2br(e($post["conteudo"])) ?&gt;&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="script" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="novo.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$erros = [];
+$tituloPost = "";
+$conteudo = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $tituloPost = trim($_POST["titulo"] ?? "");
+    $conteudo = trim($_POST["conteudo"] ?? "");
+
+    if ($tituloPost === "") {
+        $erros[] = "Escreva um título.";
+    } elseif (mb_strlen($tituloPost) &gt; 120) {
+        $erros[] = "O título pode ter no máximo 120 letras.";
+    }
+    if (mb_strlen($conteudo) &lt; 10) {
+        $erros[] = "O texto precisa de pelo menos 10 letras.";
+    }
+
+    if (!$erros) {
+        $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+        $st-&gt;execute([$tituloPost, $conteudo, date("Y-m-d H:i:s")]);
+        header("Location: post.php?id=" . $pdo-&gt;lastInsertId());
+        exit;
+    }
+}
+
+$titulo = "Novo post";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;h2&gt;Novo post&lt;/h2&gt;
+
+&lt;?php if ($erros): ?&gt;
+  &lt;ul class="erros"&gt;
+  &lt;?php foreach ($erros as $erro): ?&gt;
+    &lt;li&gt;&lt;?= e($erro) ?&gt;&lt;/li&gt;
+  &lt;?php endforeach; ?&gt;
+  &lt;/ul&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Título&lt;br&gt;&lt;input name="titulo" value="&lt;?= e($tituloPost) ?&gt;" maxlength="120"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Texto&lt;br&gt;&lt;textarea name="conteudo" rows="8" cols="50"&gt;&lt;?= e($conteudo) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Publicar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+</div>
+
+<div class="warning">
+<strong>Falta uma proteção</strong>
+<p>Qualquer pessoa que achar o <code>novo.php</code> pode publicar no blog da Ana, e outro site poderia até enviar o formulário em nome de quem estiver com o blog aberto. Num blog de verdade, o <code>novo.php</code> exige login (<a href="projeto-login.html">projeto Login com Sessão</a>) e um token contra CSRF (<a href="csrf.html">CSRF e Segurança de Formulários</a>). Os dois estão nos <a href="#desafios">desafios</a>.</p>
+</div>
+
+<hr>
+
+<h2 id="etapa5">Etapa 5 · Paginação</h2>
+<p>Com 100 posts, a página inicial ficaria enorme. A solução é mostrar alguns por vez (aqui, 3) e links para as próximas "páginas". O SQL faz o trabalho pesado: <code>LIMIT 3</code> = "no máximo 3 linhas"; <code>OFFSET 3</code> = "pule as 3 primeiras".</p>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Página</th><th><code>OFFSET</code> = (página − 1) × 3</th><th>Posts mostrados</th></tr>
+<tr><td>1</td><td>0</td><td>5, 4, 3</td></tr>
+<tr><td>2</td><td>3</td><td>2, 1</td></tr>
+</table>
+</div>
+<p>O começo do <code>index.php</code> fica assim (o resto da página não muda, só ganha os links no fim):</p>
+<pre class="file" data-file="index.php (trecho novo)">$porPagina = 3;
+$total = (int) $pdo-&gt;query("SELECT COUNT(*) FROM posts")-&gt;fetchColumn();
+$paginas = max(1, (int) ceil($total / $porPagina));
+$pagina = (int) ($_GET["pagina"] ?? 1);
+$pagina = min(max($pagina, 1), $paginas);
+
+$st = $pdo-&gt;prepare("SELECT * FROM posts ORDER BY criado_em DESC LIMIT ? OFFSET ?");
+$st-&gt;bindValue(1, $porPagina, PDO::PARAM_INT);
+$st-&gt;bindValue(2, ($pagina - 1) * $porPagina, PDO::PARAM_INT);
+$st-&gt;execute();
+$posts = $st-&gt;fetchAll();</pre>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linha</th><th>O que faz</th></tr>
+<tr><td><code>SELECT COUNT(*) …</code> + <code>fetchColumn()</code></td><td>Quantos posts existem (5). <code>fetchColumn</code> pega o primeiro valor da primeira linha.</td></tr>
+<tr><td><code>ceil($total / $porPagina)</code></td><td>5 / 3 = 1,67 → arredonda <strong>para cima</strong>: 2 páginas. O <code>max(1, …)</code> garante 1 página mesmo com o blog vazio.</td></tr>
+<tr><td><code>min(max($pagina, 1), $paginas)</code></td><td>Prende o número entre 1 e o total: <code>?pagina=99</code> vira 2, <code>?pagina=-5</code> ou <code>?pagina=abc</code> viram 1. Nunca confie num número vindo da URL.</td></tr>
+<tr><td><code>bindValue(1, $porPagina, PDO::PARAM_INT)</code></td><td>Liga o 1º <code>?</code> a um valor, dizendo que é <strong>inteiro</strong>. Com <code>execute([...])</code> os valores iriam como texto, e o MySQL recusa texto no <code>LIMIT</code>; com <code>PARAM_INT</code> funciona em qualquer banco.</td></tr>
+</table>
+</div>
+<pre class="file" data-file="index.php (os links, antes do rodapé)">&lt;nav&gt;
+  &lt;?php if ($pagina &gt; 1): ?&gt;
+    &lt;a href="index.php?pagina=&lt;?= $pagina - 1 ?&gt;"&gt;← Mais novos&lt;/a&gt;
+  &lt;?php endif; ?&gt;
+  Página &lt;?= $pagina ?&gt; de &lt;?= $paginas ?&gt;
+  &lt;?php if ($pagina &lt; $paginas): ?&gt;
+    &lt;a href="index.php?pagina=&lt;?= $pagina + 1 ?&gt;"&gt;Mais antigos →&lt;/a&gt;
+  &lt;?php endif; ?&gt;
+&lt;/nav&gt;</pre>
+<pre class="term" data-cwd="~/blog">$ curl -s 'localhost:8000/index.php?pagina=2' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=2"&gt;Pão de queijo da vó&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;03/10/2026&lt;/p&gt;
+    &lt;p&gt;Ingredientes: polvilho, queijo, ovos, leite e óleo.
+Asse po…&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=1"&gt;Olá, mundo!&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;01/10/2026&lt;/p&gt;
+    &lt;p&gt;Este é o primeiro post do meu blog.
+Aqui vou contar o que e…&lt;/p&gt;
+  &lt;/article&gt;
+
+&lt;nav&gt;
+      &lt;a href="index.php?pagina=1"&gt;← Mais novos&lt;/a&gt;
+    Página 2 de 2  &lt;/nav&gt;
+&lt;/main&gt;
+$ curl -s 'localhost:8000/index.php?pagina=99' | grep Página
+    Página 2 de 2  &lt;/nav&gt;
+$ curl -s 'localhost:8000/index.php?pagina=abc' | grep Página
+    Página 1 de 2      &lt;a href="index.php?pagina=2"&gt;Mais antigos →&lt;/a&gt;</pre>
+<p>Os espaços sobrando em volta de "Página 2 de 2" vêm das linhas com <code>&lt;?php if … ?&gt;</code>; o navegador os junta num espaço só, então não aparecem.</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?pagina=2" data-goal="html:Página 2 de 2,html:← Mais novos,html:Olá\, mundo!">
+<p class="try-task"><strong>Missão (etapa 5):</strong> a caixa pede <code>index.php?pagina=2</code>, mas a página ainda mostra os 5 posts. Acrescente a paginação (3 por página) e os links. Na página 2 devem aparecer só "Pão de queijo da vó" e "Olá, mundo!", com <code>Página 2 de 2</code> e o link <code>← Mais novos</code>. Clique nos links do resultado para navegar.</p>
+<pre class="script" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$posts = $pdo-&gt;query("SELECT * FROM posts ORDER BY criado_em DESC")-&gt;fetchAll();
+
+$titulo = "Início";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+    &lt;p&gt;&lt;?= e(resumo($post["conteudo"])) ?&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="script" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$porPagina = 3;
+$total = (int) $pdo-&gt;query("SELECT COUNT(*) FROM posts")-&gt;fetchColumn();
+$paginas = max(1, (int) ceil($total / $porPagina));
+$pagina = (int) ($_GET["pagina"] ?? 1);
+$pagina = min(max($pagina, 1), $paginas);
+
+$st = $pdo-&gt;prepare("SELECT * FROM posts ORDER BY criado_em DESC LIMIT ? OFFSET ?");
+$st-&gt;bindValue(1, $porPagina, PDO::PARAM_INT);
+$st-&gt;bindValue(2, ($pagina - 1) * $porPagina, PDO::PARAM_INT);
+$st-&gt;execute();
+$posts = $st-&gt;fetchAll();
+
+$titulo = "Início";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+    &lt;p&gt;&lt;?= e(resumo($post["conteudo"])) ?&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;?php endforeach; ?&gt;
+
+&lt;nav&gt;
+  &lt;?php if ($pagina &gt; 1): ?&gt;
+    &lt;a href="index.php?pagina=&lt;?= $pagina - 1 ?&gt;"&gt;← Mais novos&lt;/a&gt;
+  &lt;?php endif; ?&gt;
+  Página &lt;?= $pagina ?&gt; de &lt;?= $paginas ?&gt;
+  &lt;?php if ($pagina &lt; $paginas): ?&gt;
+    &lt;a href="index.php?pagina=&lt;?= $pagina + 1 ?&gt;"&gt;Mais antigos →&lt;/a&gt;
+  &lt;?php endif; ?&gt;
+&lt;/nav&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2 id="completo">O código completo</h2>
+<p>Os sete arquivos na pasta <code>~/blog</code>. Para rodar: <code>php -S localhost:8000</code> nessa pasta e <code>http://localhost:8000/</code> no navegador. Para recomeçar com os posts de exemplo, apague o <code>blog.sqlite</code>.</p>
+<pre class="file" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="file" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<pre class="file" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="file" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="file" data-file="index.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$porPagina = 3;
+$total = (int) $pdo-&gt;query("SELECT COUNT(*) FROM posts")-&gt;fetchColumn();
+$paginas = max(1, (int) ceil($total / $porPagina));
+$pagina = (int) ($_GET["pagina"] ?? 1);
+$pagina = min(max($pagina, 1), $paginas);
+
+$st = $pdo-&gt;prepare("SELECT * FROM posts ORDER BY criado_em DESC LIMIT ? OFFSET ?");
+$st-&gt;bindValue(1, $porPagina, PDO::PARAM_INT);
+$st-&gt;bindValue(2, ($pagina - 1) * $porPagina, PDO::PARAM_INT);
+$st-&gt;execute();
+$posts = $st-&gt;fetchAll();
+
+$titulo = "Início";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;article&gt;
+    &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+    &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+    &lt;p&gt;&lt;?= e(resumo($post["conteudo"])) ?&gt;&lt;/p&gt;
+  &lt;/article&gt;
+&lt;?php endforeach; ?&gt;
+
+&lt;nav&gt;
+  &lt;?php if ($pagina &gt; 1): ?&gt;
+    &lt;a href="index.php?pagina=&lt;?= $pagina - 1 ?&gt;"&gt;← Mais novos&lt;/a&gt;
+  &lt;?php endif; ?&gt;
+  Página &lt;?= $pagina ?&gt; de &lt;?= $paginas ?&gt;
+  &lt;?php if ($pagina &lt; $paginas): ?&gt;
+    &lt;a href="index.php?pagina=&lt;?= $pagina + 1 ?&gt;"&gt;Mais antigos →&lt;/a&gt;
+  &lt;?php endif; ?&gt;
+&lt;/nav&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="file" data-file="post.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$id = (int) ($_GET["id"] ?? 0);
+$st = $pdo-&gt;prepare("SELECT * FROM posts WHERE id = ?");
+$st-&gt;execute([$id]);
+$post = $st-&gt;fetch();
+
+if ($post === false) {
+    http_response_code(404);
+    $titulo = "Post não encontrado";
+    include __DIR__ . "/cabecalho.php";
+    echo '&lt;p&gt;Esse post não existe. &lt;a href="index.php"&gt;Voltar ao início&lt;/a&gt;&lt;/p&gt;';
+    include __DIR__ . "/rodape.php";
+    exit;
+}
+
+$titulo = $post["titulo"];
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;article&gt;
+  &lt;h2&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/h2&gt;
+  &lt;p class="data"&gt;&lt;?= dataBr($post["criado_em"]) ?&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;?= nl2br(e($post["conteudo"])) ?&gt;&lt;/p&gt;
+&lt;/article&gt;
+&lt;p&gt;&lt;a href="index.php"&gt;← Voltar&lt;/a&gt;&lt;/p&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="file" data-file="novo.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$erros = [];
+$tituloPost = "";
+$conteudo = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $tituloPost = trim($_POST["titulo"] ?? "");
+    $conteudo = trim($_POST["conteudo"] ?? "");
+
+    if ($tituloPost === "") {
+        $erros[] = "Escreva um título.";
+    } elseif (mb_strlen($tituloPost) &gt; 120) {
+        $erros[] = "O título pode ter no máximo 120 letras.";
+    }
+    if (mb_strlen($conteudo) &lt; 10) {
+        $erros[] = "O texto precisa de pelo menos 10 letras.";
+    }
+
+    if (!$erros) {
+        $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+        $st-&gt;execute([$tituloPost, $conteudo, date("Y-m-d H:i:s")]);
+        header("Location: post.php?id=" . $pdo-&gt;lastInsertId());
+        exit;
+    }
+}
+
+$titulo = "Novo post";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;h2&gt;Novo post&lt;/h2&gt;
+
+&lt;?php if ($erros): ?&gt;
+  &lt;ul class="erros"&gt;
+  &lt;?php foreach ($erros as $erro): ?&gt;
+    &lt;li&gt;&lt;?= e($erro) ?&gt;&lt;/li&gt;
+  &lt;?php endforeach; ?&gt;
+  &lt;/ul&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post"&gt;
+  &lt;p&gt;&lt;label&gt;Título&lt;br&gt;&lt;input name="titulo" value="&lt;?= e($tituloPost) ?&gt;" maxlength="120"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;label&gt;Texto&lt;br&gt;&lt;textarea name="conteudo" rows="8" cols="50"&gt;&lt;?= e($conteudo) ?&gt;&lt;/textarea&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;button&gt;Publicar&lt;/button&gt;&lt;/p&gt;
+&lt;/form&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+
+<h2 id="desafios">Desafios extras</h2>
+<ol>
+  <li><strong>Busca.</strong> Uma página <code>busca.php?busca=PHP</code> que procura no título e no texto (missão abaixo).</li>
+  <li><strong>Só a Ana publica.</strong> Proteja o <code>novo.php</code> com login, como no <a href="projeto-login.html">projeto Login com Sessão</a>: sem <code>$_SESSION["usuario"]</code>, redirecione para o login.</li>
+  <li><strong>Token CSRF.</strong> Um campo oculto com um código aleatório guardado na sessão e conferido com <code>hash_equals</code> no POST (<a href="csrf.html">CSRF</a>).</li>
+  <li><strong>Editar e apagar.</strong> <code>editar.php?id=3</code> (o mesmo formulário, preenchido, com <code>UPDATE</code>) e um botão "Apagar" que envia um POST com <code>DELETE FROM posts WHERE id = ?</code>.</li>
+  <li><strong>Comentários.</strong> Uma tabela <code>comentarios</code> (<code>post_id</code>, <code>nome</code>, <code>texto</code>, <code>criado_em</code>) e um formulário no fim do <code>post.php</code>.</li>
+  <li><strong>Endereços bonitos.</strong> Uma coluna <code>slug</code> (<code>pao-de-queijo-da-vo</code>; veja a missão da <a href="ref-string.html#missao">referência de String</a>) e <code>post.php?slug=…</code>.</li>
+  <li><strong>Uma API.</strong> <code>api.php</code> devolvendo os posts em JSON, como no <a href="projeto-api.html">projeto da API REST</a>.</li>
+</ol>
+
+<div class="tryphp" data-modo="web" data-url="/busca.php?busca=PHP" data-goal="html:Busca por &quot;PHP&quot;: 2 post(s).,html:Aprendendo PHP: variáveis">
+<p class="try-task"><strong>Missão final:</strong> complete o <code>busca.php</code>. Se <code>$busca</code> não estiver vazia, procure os posts que têm o texto no título <strong>ou</strong> no conteúdo, com um prepared statement: <code>WHERE titulo LIKE ? OR conteudo LIKE ?</code> e o valor <code>"%$busca%"</code> (no <code>LIKE</code>, <code>%</code> quer dizer "qualquer coisa"). Mostre <code>Busca por "PHP": 2 post(s).</code> antes da lista (com <code>e()</code> e <code>count()</code>).</p>
+<pre class="script" data-file="busca.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$busca = trim($_GET["busca"] ?? "");
+$posts = [];
+// se $busca não estiver vazia, procure os posts com o texto no título ou no conteúdo
+
+$titulo = "Busca";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;form method="get" action="busca.php"&gt;
+  &lt;input name="busca" value="&lt;?= e($busca) ?&gt;"&gt; &lt;button&gt;Buscar&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+$arquivo = __DIR__ . "/blog.sqlite";
+$novo = !file_exists($arquivo);
+
+$pdo = new PDO("sqlite:$arquivo");
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+if ($novo) {
+    $pdo-&gt;exec("CREATE TABLE posts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo    TEXT NOT NULL,
+        conteudo  TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )");
+    $exemplos = [
+        ["Olá, mundo!", "Este é o primeiro post do meu blog.\nAqui vou contar o que estou aprendendo.", "2026-10-01 09:00:00"],
+        ["Pão de queijo da vó", "Ingredientes: polvilho, queijo, ovos, leite e óleo.\nAsse por 25 minutos a 180 graus.", "2026-10-03 18:30:00"],
+        ["Aprendendo PHP: variáveis", "Variáveis começam com cifrão, como \$nome.\nO PHP descobre o tipo sozinho.", "2026-10-06 20:15:00"],
+        ["Arrays são listas", "Um array guarda vários valores numa variável só.\nCom foreach dá para percorrer todos.", "2026-10-09 21:00:00"],
+        ["Meu blog agora tem banco de dados", "Os posts agora ficam num arquivo SQLite.\nO PHP lê com PDO e prepared statements.", "2026-10-12 10:45:00"],
+    ];
+    $st = $pdo-&gt;prepare("INSERT INTO posts (titulo, conteudo, criado_em) VALUES (?, ?, ?)");
+    foreach ($exemplos as $post) {
+        $st-&gt;execute($post);
+    }
+}
+
+return $pdo;
+</pre>
+<pre class="script" data-file="funcoes.php">&lt;?php
+date_default_timezone_set("America/Sao_Paulo");   // horário de Brasília em date()
+
+// Escapa um texto para mostrar no HTML (contra XSS)
+function e(?string $texto): string
+{
+    return htmlspecialchars($texto ?? "", ENT_QUOTES);
+}
+
+// "2026-10-12 10:45:00" -&gt; "12/10/2026"
+function dataBr(string $iso): string
+{
+    return date("d/m/Y", strtotime($iso));
+}
+
+// Os primeiros caracteres do texto, com "…" se foi cortado
+function resumo(string $texto, int $tamanho = 60): string
+{
+    return mb_strimwidth($texto, 0, $tamanho, "…");
+}
+</pre>
+<pre class="script" data-file="cabecalho.php">&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;&lt;?= e($titulo) ?&gt; | Blog da Ana&lt;/title&gt;
+&lt;style&gt;
+  body { font-family: sans-serif; max-width: 40rem; margin: auto; padding: 0 1rem; }
+  .data { color: #666; font-size: .9em; }
+  .erros { color: #b00; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;header&gt;
+  &lt;h1&gt;&lt;a href="index.php"&gt;Blog da Ana&lt;/a&gt;&lt;/h1&gt;
+  &lt;nav&gt;&lt;a href="index.php"&gt;Início&lt;/a&gt; · &lt;a href="novo.php"&gt;Novo post&lt;/a&gt;&lt;/nav&gt;
+&lt;/header&gt;
+&lt;main&gt;
+</pre>
+<pre class="script" data-file="rodape.php">&lt;/main&gt;
+&lt;footer&gt;
+  &lt;p&gt;Feito com PHP pela Ana · &lt;?= date("Y") ?&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao" data-file="busca.php">&lt;?php
+$pdo = require __DIR__ . "/banco.php";
+require __DIR__ . "/funcoes.php";
+
+$busca = trim($_GET["busca"] ?? "");
+$posts = [];
+if ($busca !== "") {
+    $st = $pdo-&gt;prepare("SELECT * FROM posts WHERE titulo LIKE ? OR conteudo LIKE ? ORDER BY criado_em DESC");
+    $st-&gt;execute(["%$busca%", "%$busca%"]);
+    $posts = $st-&gt;fetchAll();
+}
+
+$titulo = "Busca";
+include __DIR__ . "/cabecalho.php";
+?&gt;
+&lt;form method="get" action="busca.php"&gt;
+  &lt;input name="busca" value="&lt;?= e($busca) ?&gt;"&gt; &lt;button&gt;Buscar&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($busca !== ""): ?&gt;
+  &lt;p&gt;Busca por "&lt;?= e($busca) ?&gt;": &lt;?= count($posts) ?&gt; post(s).&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;?php foreach ($posts as $post): ?&gt;
+  &lt;h2&gt;&lt;a href="post.php?id=&lt;?= $post["id"] ?&gt;"&gt;&lt;?= e($post["titulo"]) ?&gt;&lt;/a&gt;&lt;/h2&gt;
+&lt;?php endforeach; ?&gt;
+&lt;?php include __DIR__ . "/rodape.php"; ?&gt;
+</pre>
+</div>
+<pre class="term" data-cwd="~/blog">$ curl -s 'localhost:8000/busca.php?busca=PHP' | sed -n '/&lt;main&gt;/,/&lt;\/main&gt;/p'
+&lt;main&gt;
+&lt;form method="get" action="busca.php"&gt;
+  &lt;input name="busca" value="PHP"&gt; &lt;button&gt;Buscar&lt;/button&gt;
+&lt;/form&gt;
+  &lt;p&gt;Busca por "PHP": 2 post(s).&lt;/p&gt;
+  &lt;h2&gt;&lt;a href="post.php?id=5"&gt;Meu blog agora tem banco de dados&lt;/a&gt;&lt;/h2&gt;
+  &lt;h2&gt;&lt;a href="post.php?id=3"&gt;Aprendendo PHP: variáveis&lt;/a&gt;&lt;/h2&gt;
+&lt;/main&gt;</pre>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">1. Qual a diferença entre <code>include</code> e <code>require</code> quando o arquivo não existe?</p>
+<label><input type="radio" name="q1"> Nenhuma.</label>
+<label><input type="radio" name="q1"> <code>include</code> dá um aviso e continua; <code>require</code> para o programa.</label>
+<label><input type="radio" name="q1"> <code>require</code> dá um aviso e continua; <code>include</code> para o programa.</label>
+<label><input type="radio" name="q1"> Os dois criam o arquivo vazio.</label>
+</div>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">2. Com 3 posts por página, qual o <code>OFFSET</code> da página 4?</p>
+<label><input type="radio" name="q2"> 4</label>
+<label><input type="radio" name="q2"> 12</label>
+<label><input type="radio" name="q2"> 9</label>
+<label><input type="radio" name="q2"> 3</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">3. Por que o <code>novo.php</code> redireciona para o post depois de gravar, em vez de mostrar a página ali mesmo?</p>
+<label><input type="radio" name="q3"> Para que atualizar a página (F5) não envie o formulário de novo e publique o post duas vezes.</label>
+<label><input type="radio" name="q3"> Porque o PHP não consegue mostrar HTML depois de um <code>INSERT</code>.</label>
+<label><input type="radio" name="q3"> Para economizar memória.</label>
+<label><input type="radio" name="q3"> Porque o SQLite exige.</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Onde se usa o <code>htmlspecialchars</code> (a nossa <code>e()</code>)?</p>
+<label><input type="radio" name="q4"> Antes de gravar no banco, para o banco guardar o texto escapado.</label>
+<label><input type="radio" name="q4"> Só no título.</label>
+<label><input type="radio" name="q4"> Em lugar nenhum: o prepared statement já protege.</label>
+<label><input type="radio" name="q4"> Na hora de escrever cada dado no HTML.</label>
+</div>
+
+<div class="exercise">
+<p>Complete para pegar só o número de posts de <code>SELECT COUNT(*) FROM posts</code>:</p>
+<div class="ex-code">$total = $pdo-&gt;query("SELECT COUNT(*) FROM posts")-&gt;<input data-answer="fetchColumn">();</div>
+</div>
+
+<div class="exercise">
+<p>Complete para mostrar as quebras de linha do texto no HTML, com segurança:</p>
+<div class="ex-code">&lt;?= <input data-answer="nl2br">(e($post["conteudo"])) ?&gt;</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Um site é um conjunto de páginas PHP que compartilham arquivos: <code>require</code> para o indispensável (banco, funções), <code>include</code> para pedaços de HTML (cabeçalho, rodapé), sempre com <code>__DIR__</code>.</li>
+  <li>Arquivos incluídos enxergam as variáveis de quem os inclui (<code>$titulo</code>): combine os nomes.</li>
+  <li>Banco: <code>query</code> sem dados do visitante; <code>prepare</code> + <code>execute</code>/<code>bindValue</code> com eles. <code>fetch()</code> pode dar <code>false</code>: responda 404.</li>
+  <li>Saída: <code>htmlspecialchars</code> em tudo que veio do banco ou do visitante; <code>nl2br</code> depois dele.</li>
+  <li>Formulário: o mesmo arquivo mostra (GET) e processa (POST); junte os erros num array; depois de gravar, <code>header("Location: …")</code> + <code>exit</code>.</li>
+  <li>Paginação: <code>COUNT(*)</code>, <code>ceil</code>, prender a página entre 1 e o total, <code>LIMIT ? OFFSET ?</code> com <code>PDO::PARAM_INT</code>.</li>
+</ul>
+<p>Próximo projeto: a <a href="projeto-api.html">API REST</a>, em que o PHP devolve dados em JSON em vez de páginas.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
