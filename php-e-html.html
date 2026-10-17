@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Dentro do HTML — &lt;?php ?&gt;, &lt;?= ?&gt;, listas e tabelas | Guia PHP</title>
+<meta name="description" content="Misturar PHP e HTML na mesma página: abrir e fechar &lt;?php ?&gt;, escrever valores com &lt;?= ?&gt;, gerar listas e tabelas a partir de dados, a sintaxe alternativa foreach: endforeach, o que o navegador recebe no código-fonte e por que usar htmlspecialchars desde o começo.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Dentro do HTML</span></h1>
+
+<p class="intro">O PHP nasceu para isto: um arquivo que é quase todo HTML, com "buracos" onde o PHP coloca informações que mudam. Nesta aula você vai abrir e fechar o PHP no meio de uma página, escrever valores com o atalho <code>&lt;?= ?&gt;</code>, gerar listas e tabelas a partir de dados e conferir, no código-fonte, exatamente o que chega ao navegador.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Alternar entre HTML e PHP com <code>&lt;?php</code> e <code>?&gt;</code>.</li>
+  <li>Escrever um valor no meio do HTML com <code>&lt;?= … ?&gt;</code>.</li>
+  <li>Gerar os itens de uma lista e as linhas de uma tabela a partir de dados.</li>
+  <li>A sintaxe "de modelo": <code>foreach: … endforeach;</code> e <code>if: … endif;</code>.</li>
+  <li>Ler o código-fonte que o navegador recebe.</li>
+  <li>Proteger a página com <code>htmlspecialchars</code>.</li>
+</ul>
+</div>
+
+<div class="tip">
+<strong>Um pouquinho de HTML</strong>
+<p>HTML é feito de <strong>marcas</strong> (<em>tags</em>) entre <code>&lt; &gt;</code> que dizem o que cada pedaço do texto é. As desta aula: <code>&lt;h1&gt;</code> e <code>&lt;h2&gt;</code> (títulos), <code>&lt;p&gt;</code> (parágrafo), <code>&lt;ul&gt;</code> (lista) com <code>&lt;li&gt;</code> (item), <code>&lt;table&gt;</code> (tabela) com <code>&lt;tr&gt;</code> (linha), <code>&lt;th&gt;</code> (cabeçalho) e <code>&lt;td&gt;</code> (célula). Quase toda marca abre e fecha: <code>&lt;p&gt;texto&lt;/p&gt;</code>.</p>
+</div>
+
+<hr>
+
+<h2>A ideia: um formulário de papel com lacunas</h2>
+<p>Pense numa carta-modelo do banco: "Prezado(a) <u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>, seu saldo é R$ <u>&nbsp;&nbsp;&nbsp;&nbsp;</u>." O texto fixo é igual para todos; só as lacunas mudam. Uma página PHP é essa carta: o HTML é o texto fixo, e os trechos de PHP preenchem as lacunas antes de a carta ser enviada.</p>
+
+<p>Você já viu na aula <a href="como-funciona.html">Como o PHP Funciona</a> que o PHP lê o arquivo de cima para baixo. A regra completa é simples:</p>
+<ul>
+  <li>Tudo o que está <strong>fora</strong> de <code>&lt;?php … ?&gt;</code> é copiado para a saída como está.</li>
+  <li>Tudo o que está <strong>dentro</strong> é executado. Só o que o código manda escrever (com <code>echo</code> ou <code>&lt;?=</code>) vai para a saída.</li>
+</ul>
+
+<hr>
+
+<h2>Abrindo e fechando o PHP</h2>
+<p>Num arquivo, você pode entrar e sair do PHP quantas vezes quiser. Esta é a página de perfil da Ana:</p>
+
+<pre class="file" data-file="perfil.php">&lt;?php
+$nome = "Ana";
+$cidade = "Recife";
+$idade = 29;
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Perfil de &lt;?= $nome ?&gt;&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;&lt;?= $nome ?&gt;&lt;/h1&gt;
+  &lt;p&gt;Mora em &lt;?= $cidade ?&gt; e tem &lt;?= $idade ?&gt; anos.&lt;/p&gt;
+  &lt;p&gt;Daqui a 10 anos, terá &lt;?= $idade + 10 ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Linhas</th><th>O que acontece</th></tr>
+<tr><td>1 a 5</td><td>Um bloco de PHP no topo prepara os dados: três <strong>variáveis</strong> (caixinhas com nome, começando com <code>$</code>; aula <a href="variaveis.html">Variáveis</a>). Nada é escrito ainda. O <code>?&gt;</code> da linha 5 fecha o PHP.</td></tr>
+<tr><td>6 a 9</td><td>HTML comum, copiado como está.</td></tr>
+<tr><td>10</td><td><code>&lt;?= $nome ?&gt;</code> escreve o valor de <code>$nome</code> dentro do título da aba.</td></tr>
+<tr><td>13 a 15</td><td>Mais lacunas preenchidas. Na linha 15, o PHP faz uma conta antes de escrever: <code>$idade + 10</code>.</td></tr>
+</table>
+</div>
+
+<h3>O atalho <code>&lt;?= … ?&gt;</code></h3>
+
+<dl class="anatomy">
+  <dt>&lt;?=</dt><dd>Abre o PHP e já manda escrever. É um atalho para <code>&lt;?php echo</code>.</dd>
+  <dt>$idade + 10</dt><dd>O que escrever: uma variável, um texto entre aspas, uma conta, o resultado de uma função…</dd>
+  <dt>?&gt;</dt><dd>Fecha o PHP. Aqui o <code>;</code> é dispensável: o <code>?&gt;</code> já termina a instrução.</dd>
+</dl>
+
+<p>Estas três linhas escrevem a mesma coisa:</p>
+
+<pre class="file" data-file="trecho">&lt;p&gt;&lt;?= $nome ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;?php echo $nome; ?&gt;&lt;/p&gt;
+&lt;p&gt;&lt;?php echo $nome ?&gt;&lt;/p&gt;</pre>
+
+<p>Dentro do HTML, prefira o <code>&lt;?=</code>: é mais curto e deixa claro que ali há "uma lacuna". Ele funciona sempre, independente da configuração do PHP (ao contrário da marca curta <code>&lt;?</code>, vista em <a href="primeiro-script.html">Olá, Mundo</a>).</p>
+
+<h3>O que o navegador recebe</h3>
+<p>Com o servidor embutido ligado na pasta (<code>php -S localhost:8000</code>), o <code>curl</code> mostra o HTML que sai do PHP, o mesmo que o navegador mostra em "Exibir código-fonte da página" (<kbd>Ctrl</kbd>+<kbd>U</kbd>):</p>
+
+<pre class="term">$ curl localhost:8000/perfil.php
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Perfil de Ana&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Ana&lt;/h1&gt;
+  &lt;p&gt;Mora em Recife e tem 29 anos.&lt;/p&gt;
+  &lt;p&gt;Daqui a 10 anos, terá 39.&lt;/p&gt;     « a conta virou o resultado
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>Nenhum <code>&lt;?</code>, nenhum <code>$</code>: só HTML puro, com as lacunas preenchidas. Repare também que o bloco do topo (linhas 1 a 5) não deixou nem uma linha em branco: o PHP "engole" a quebra de linha que vem logo depois de um <code>?&gt;</code>.</p>
+
+<p>Experimente a mesma página. Depois de rodar, alterne entre as abas <strong>Resultado</strong> e <strong>Código-fonte HTML</strong> da caixa:</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Mora em Salvador e tem 30 anos.,html:terá 40.">
+<p class="try-task"><strong>Missão:</strong> a Ana se mudou e fez aniversário. Mude só as variáveis do topo para que a página diga <code>Mora em Salvador e tem 30 anos.</code> Repare que a conta da linha de baixo se ajusta sozinha.</p>
+<pre class="script">&lt;?php
+$nome = "Ana";
+$cidade = "Recife";
+$idade = 29;
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Perfil de &lt;?= $nome ?&gt;&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;&lt;?= $nome ?&gt;&lt;/h1&gt;
+  &lt;p&gt;Mora em &lt;?= $cidade ?&gt; e tem &lt;?= $idade ?&gt; anos.&lt;/p&gt;
+  &lt;p&gt;Daqui a 10 anos, terá &lt;?= $idade + 10 ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$nome = "Ana";
+$cidade = "Salvador";
+$idade = 30;
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Perfil de &lt;?= $nome ?&gt;&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;&lt;?= $nome ?&gt;&lt;/h1&gt;
+  &lt;p&gt;Mora em &lt;?= $cidade ?&gt; e tem &lt;?= $idade ?&gt; anos.&lt;/p&gt;
+  &lt;p&gt;Daqui a 10 anos, terá &lt;?= $idade + 10 ?&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Gerando uma lista</h2>
+<p>O poder de verdade aparece quando os dados são muitos. A Ana guarda a lista de compras numa <strong>lista</strong> do PHP (um <em>array</em>, aula <a href="arrays.html">Arrays Indexados</a>) e quer um item <code>&lt;li&gt;</code> para cada coisa. Em vez de escrever cada <code>&lt;li&gt;</code> à mão, ela pede ao PHP para <strong>repetir</strong> a linha do item uma vez para cada elemento:</p>
+
+<pre class="file" data-file="lista.php">&lt;?php
+$compras = ["pão", "leite", "café", "banana"];
+?&gt;
+&lt;h2&gt;Lista de compras&lt;/h2&gt;
+&lt;ul&gt;
+&lt;?php foreach ($compras as $item): ?&gt;
+  &lt;li&gt;&lt;?= $item ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;p&gt;Total: &lt;?= count($compras) ?&gt; itens.&lt;/p&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>["pão", "leite", "café", "banana"]</dt><dd>Uma lista com quatro textos, guardada em <code>$compras</code>.</dd>
+  <dt>&lt;?php foreach ($compras as $item): ?&gt;</dt><dd>"Para cada elemento de <code>$compras</code>, chamado de <code>$item</code> a cada volta…" (<em>for each</em> = "para cada"). Os dois-pontos <code>:</code> no fim abrem o trecho que vai se repetir.</dd>
+  <dt>&lt;li&gt;&lt;?= $item ?&gt;&lt;/li&gt;</dt><dd>O trecho repetido: HTML com uma lacuna. A cada volta, <code>$item</code> vale um elemento diferente.</dd>
+  <dt>&lt;?php endforeach; ?&gt;</dt><dd>"Fim do para cada": marca onde termina o trecho repetido.</dd>
+  <dt>count($compras)</dt><dd>Uma função que conta os elementos da lista: <code>4</code>.</dd>
+</dl>
+
+<pre class="term">$ curl localhost:8000/lista.php
+&lt;h2&gt;Lista de compras&lt;/h2&gt;
+&lt;ul&gt;
+  &lt;li&gt;pão&lt;/li&gt;           « uma volta para cada item
+  &lt;li&gt;leite&lt;/li&gt;
+  &lt;li&gt;café&lt;/li&gt;
+  &lt;li&gt;banana&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Total: 4 itens.&lt;/p&gt;</pre>
+
+<p>Três linhas de modelo viraram quatro itens. Com mil produtos, seriam mil itens, sem mudar o modelo. O <code>foreach</code> tem uma aula inteira, <a href="foreach.html">foreach</a>; aqui basta entender a ideia de "repetir um pedaço do HTML".</p>
+
+<div class="tryphp" data-modo="web" data-goal="out:&lt;li&gt;arroz&lt;/li&gt;,html:Total: 5 itens.">
+<p class="try-task"><strong>Missão:</strong> acrescente <code>"arroz"</code> à lista (depois de <code>"banana"</code>, separado por vírgula) e rode. Confira na aba <strong>Código-fonte HTML</strong> que apareceu um <code>&lt;li&gt;arroz&lt;/li&gt;</code> novo e que o total mudou sozinho.</p>
+<pre class="script">&lt;?php
+$compras = ["pão", "leite", "café", "banana"];
+?&gt;
+&lt;h2&gt;Lista de compras&lt;/h2&gt;
+&lt;ul&gt;
+&lt;?php foreach ($compras as $item): ?&gt;
+  &lt;li&gt;&lt;?= $item ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;p&gt;Total: &lt;?= count($compras) ?&gt; itens.&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$compras = ["pão", "leite", "café", "banana", "arroz"];
+?&gt;
+&lt;h2&gt;Lista de compras&lt;/h2&gt;
+&lt;ul&gt;
+&lt;?php foreach ($compras as $item): ?&gt;
+  &lt;li&gt;&lt;?= $item ?&gt;&lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;p&gt;Total: &lt;?= count($compras) ?&gt; itens.&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Gerando uma tabela, com decisão</h2>
+<p>As notas da turma estão guardadas com o nome de cada aluno (um <em>array associativo</em>, aula <a href="arrays-associativos.html">Arrays Associativos</a>). A tabela tem uma linha por aluno e, na última coluna, uma <strong>decisão</strong>: "Aprovado" se a nota for 7 ou mais, "Recuperação" se não.</p>
+
+<pre class="file" data-file="tabela.php">&lt;?php
+$notas = [
+    "Ana" =&gt; 9.5,
+    "Bruno" =&gt; 6.0,
+    "Carla" =&gt; 7.5,
+];
+?&gt;
+&lt;table&gt;
+  &lt;tr&gt;&lt;th&gt;Aluno&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($notas as $aluno =&gt; $nota): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= $aluno ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= $nota ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?php if ($nota &gt;= 7): ?&gt;Aprovado&lt;?php else: ?&gt;Recuperação&lt;?php endif; ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>"Ana" =&gt; 9.5</code></td><td>Guarda a nota <code>9.5</code> com o nome <code>"Ana"</code> (em PHP, decimais usam <strong>ponto</strong>).</td></tr>
+<tr><td><code>foreach ($notas as $aluno =&gt; $nota):</code></td><td>Para cada par, coloca o nome em <code>$aluno</code> e a nota em <code>$nota</code>.</td></tr>
+<tr><td><code>if ($nota &gt;= 7): ?&gt;Aprovado</code></td><td>Se a nota for maior ou igual a 7, escreve "Aprovado" (aula <a href="if-else.html">if, elseif, else</a>).</td></tr>
+<tr><td><code>&lt;?php else: ?&gt;Recuperação</code></td><td>Senão, escreve "Recuperação".</td></tr>
+<tr><td><code>&lt;?php endif; ?&gt;</code></td><td>Fim da decisão.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl localhost:8000/tabela.php
+&lt;table&gt;
+  &lt;tr&gt;&lt;th&gt;Aluno&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Ana&lt;/td&gt;
+    &lt;td&gt;9.5&lt;/td&gt;
+    &lt;td&gt;Aprovado&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Bruno&lt;/td&gt;
+    &lt;td&gt;6&lt;/td&gt;                 « 6.0 é escrito como 6
+    &lt;td&gt;Recuperação&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td&gt;Carla&lt;/td&gt;
+    &lt;td&gt;7.5&lt;/td&gt;
+    &lt;td&gt;Aprovado&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</pre>
+
+<p>Repare na nota do Bruno: <code>6.0</code> saiu como <code>6</code>, porque o PHP escreve números da forma mais curta. Para mostrar sempre com casas decimais (e com vírgula, como no Brasil), use <code>number_format($nota, 1, ",", ".")</code> (aula <a href="number-format.html">Formatar Números</a>).</p>
+
+<div class="tryphp" data-modo="web" data-goal="html:Davi 5.5 Recuperação">
+<p class="try-task"><strong>Missão:</strong> a turma ganhou um aluno novo. Acrescente <code>"Davi" =&gt; 5.5,</code> à lista de notas e rode: a tabela deve ganhar uma linha <code>Davi | 5.5 | Recuperação</code>.</p>
+<pre class="script">&lt;?php
+$notas = [
+    "Ana" =&gt; 9.5,
+    "Bruno" =&gt; 6.0,
+    "Carla" =&gt; 7.5,
+];
+?&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Aluno&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($notas as $aluno =&gt; $nota): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= $aluno ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= $nota ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?php if ($nota &gt;= 7): ?&gt;Aprovado&lt;?php else: ?&gt;Recuperação&lt;?php endif; ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$notas = [
+    "Ana" =&gt; 9.5,
+    "Bruno" =&gt; 6.0,
+    "Carla" =&gt; 7.5,
+    "Davi" =&gt; 5.5,
+];
+?&gt;
+&lt;table border="1"&gt;
+  &lt;tr&gt;&lt;th&gt;Aluno&lt;/th&gt;&lt;th&gt;Nota&lt;/th&gt;&lt;th&gt;Situação&lt;/th&gt;&lt;/tr&gt;
+&lt;?php foreach ($notas as $aluno =&gt; $nota): ?&gt;
+  &lt;tr&gt;
+    &lt;td&gt;&lt;?= $aluno ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?= $nota ?&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;?php if ($nota &gt;= 7): ?&gt;Aprovado&lt;?php else: ?&gt;Recuperação&lt;?php endif; ?&gt;&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/table&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Formas diferentes de misturar</h2>
+<p>Há dois estilos para gerar HTML com PHP. O primeiro é o que você viu: <strong>HTML com lacunas</strong>. O segundo é o contrário: <strong>PHP que escreve HTML</strong> com <code>echo</code>:</p>
+
+<pre class="file" data-file="echohtml.php">&lt;?php
+$nome = "Ana";
+echo "&lt;h1&gt;Olá, $nome!&lt;/h1&gt;\n";
+echo "&lt;p&gt;Esta página foi montada só com echo.&lt;/p&gt;\n";
+</pre>
+
+<pre class="term">$ curl localhost:8000/echohtml.php
+&lt;h1&gt;Olá, Ana!&lt;/h1&gt;
+&lt;p&gt;Esta página foi montada só com echo.&lt;/p&gt;</pre>
+
+<p>Dentro de aspas duplas, o PHP troca <code>$nome</code> pelo valor (isso se chama <strong>interpolação</strong>, aula <a href="interpolacao.html">Interpolação</a>). Funciona, mas com páginas grandes o HTML fica preso dentro de aspas, sem as cores do editor, e as próprias aspas do HTML (<code>class="…"</code>) brigam com as do PHP.</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Estilo</th><th>Exemplo</th><th>Quando usar</th></tr>
+<tr><td>HTML com lacunas <code>&lt;?= ?&gt;</code></td><td><code>&lt;p&gt;Olá, &lt;?= $nome ?&gt;!&lt;/p&gt;</code></td><td><strong>Páginas e modelos.</strong> O HTML fica legível e o editor o colore.</td></tr>
+<tr><td>Sintaxe de modelo</td><td><code>&lt;?php foreach (…): ?&gt; … &lt;?php endforeach; ?&gt;</code></td><td>Repetições e decisões no meio do HTML. As palavras <code>endforeach</code>/<code>endif</code> deixam claro o que está fechando.</td></tr>
+<tr><td><code>echo</code> com HTML</td><td><code>echo "&lt;p&gt;Olá, $nome!&lt;/p&gt;";</code></td><td>Trechos curtos dentro de um bloco PHP maior.</td></tr>
+<tr><td>Chaves <code>{ }</code></td><td><code>&lt;?php foreach (…) { ?&gt; … &lt;?php } ?&gt;</code></td><td>Funciona igual à sintaxe de modelo, mas um <code>&lt;?php } ?&gt;</code> solto no meio do HTML é difícil de acompanhar. Prefira a de modelo.</td></tr>
+</table>
+</div>
+
+<p>Em projetos maiores, o costume é separar: um arquivo PHP prepara os dados (consulta o banco, faz as contas) e outro arquivo, o <strong>modelo</strong> (<em>template</em>), só tem HTML com lacunas. Os frameworks levam essa ideia adiante com linguagens de modelo próprias (o Blade, do Laravel; o Twig, do Symfony).</p>
+
+<hr>
+
+<h2>Segurança desde o começo: <code>htmlspecialchars</code></h2>
+<p>Até aqui, os dados foram escritos por você. Num site de verdade, muitos vêm de <strong>visitantes</strong>: nomes, comentários, buscas. E um visitante mal-intencionado pode digitar HTML, ou até JavaScript, no lugar de um nome. Veja um comentário assim sendo escrito na página com e sem proteção:</p>
+
+<pre class="file" data-file="xss.php">&lt;?php
+$comentario = "&lt;b&gt;Adorei!&lt;/b&gt; &lt;script&gt;alert('invadido')&lt;/script&gt;";
+?&gt;
+&lt;p&gt;Sem proteção: &lt;?= $comentario ?&gt;&lt;/p&gt;
+&lt;p&gt;Com proteção: &lt;?= htmlspecialchars($comentario) ?&gt;&lt;/p&gt;
+</pre>
+
+<pre class="term">$ curl localhost:8000/xss.php
+&lt;p&gt;Sem proteção: &lt;b&gt;Adorei!&lt;/b&gt; &lt;script&gt;alert('invadido')&lt;/script&gt;&lt;/p&gt;             « o script entrou na página
+&lt;p&gt;Com proteção: &amp;lt;b&amp;gt;Adorei!&amp;lt;/b&amp;gt; &amp;lt;script&amp;gt;alert(&amp;#039;invadido&amp;#039;)&amp;lt;/script&amp;gt;&lt;/p&gt;   « virou texto inofensivo</pre>
+
+<p>Sem proteção, o <code>&lt;script&gt;</code> foi parar no HTML, e o navegador de <strong>todo</strong> visitante executaria esse código (aqui, só uma janelinha; na vida real, roubar a sessão de quem está logado). Esse ataque se chama <strong>XSS</strong> (<em>cross-site scripting</em>). Com <code>htmlspecialchars</code>, os caracteres especiais do HTML viram <strong>entidades</strong>: <code>&lt;</code> vira <code>&amp;lt;</code>, <code>&gt;</code> vira <code>&amp;gt;</code>, a aspa simples vira <code>&amp;#039;</code>. O navegador mostra esses códigos como os próprios caracteres, na tela, mas não os trata como marcas. O visitante vê o texto exatamente como foi digitado, sem nada ser executado.</p>
+
+<div class="warning">
+<strong>A regra do guia</strong>
+<p>Todo dado que não foi escrito por você no código (o que vem de formulários, do endereço, do banco de dados, de arquivos) passa por <code>htmlspecialchars</code> antes de ir para o HTML. Os exemplos do guia seguem essa regra a partir daqui. A aula <a href="escapar-saida.html">Escapar a Saída (XSS)</a> mostra os detalhes.</p>
+</div>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>O <code>&lt;?= $nome ?&gt;</code> aparece na página, ou a lacuna fica vazia</strong>
+<p><strong>O que aconteceu:</strong> o arquivo não passou pelo PHP: ele termina em <code>.html</code>, ou foi aberto com dois cliques (<code>file://</code>). No código-fonte aparece o <code>&lt;?=</code> cru; na tela, o navegador esconde a marca que não conhece e a lacuna fica vazia.</p>
+<p><strong>Como resolver:</strong> extensão <code>.php</code> e abrir pelo servidor (<code>http://localhost:8000/…</code>). Veja <a href="introducao.html">O que é PHP</a>.</p>
+</div>
+
+<div class="cenario">
+<strong>"syntax error, unexpected end of file" num modelo</strong>
+<pre class="file" data-file="lista-erro.php · erro de propósito">&lt;?php $compras = ["pão", "leite"]; ?&gt;
+&lt;ul&gt;
+&lt;?php foreach ($compras as $item): ?&gt;
+  &lt;li&gt;&lt;?= $item ?&gt;&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+<pre class="term" data-cwd="~/html">$ php lista-erro.php
+
+Parse error: syntax error, unexpected end of file in /home/ana/html/lista-erro.php on line 6</pre>
+<p><strong>O que aconteceu:</strong> "fim de arquivo inesperado". O <code>foreach:</code> abriu um trecho de repetição e o arquivo acabou (a linha 6 é a linha vazia depois do <code>&lt;/ul&gt;</code>) sem o <code>endforeach;</code>. A mensagem não diz o que falta; quando aparecer "unexpected end of file", procure algo que abriu e não fechou. Rode a caixa abaixo para ver o mesmo erro no editor.</p>
+<p><strong>Como resolver:</strong> todo <code>foreach (…):</code> precisa de um <code>&lt;?php endforeach; ?&gt;</code>, e todo <code>if (…):</code>, de um <code>&lt;?php endif; ?&gt;</code>.</p>
+</div>
+
+<div class="tryphp" data-modo="web">
+<pre class="script">&lt;?php $compras = ["pão", "leite"]; ?&gt;
+&lt;ul&gt;
+&lt;?php foreach ($compras as $item): ?&gt;
+  &lt;li&gt;&lt;?= $item ?&gt;&lt;/li&gt;
+&lt;/ul&gt;
+</pre>
+</div>
+
+<div class="cenario">
+<strong>Espaços e linhas em branco a mais no código-fonte</strong>
+<p><strong>O que aconteceu:</strong> o PHP engole só a quebra de linha que vem <strong>imediatamente</strong> depois de um <code>?&gt;</code>. Se houver espaços entre o <code>?&gt;</code> e o fim da linha, a quebra não é engolida e uma linha só de espaços aparece na saída:</p>
+<pre class="term">$ curl -s localhost:8000/espaco.php | cat -A
+&lt;p&gt;A&lt;/p&gt;$
+&lt;p&gt;B&lt;/p&gt;$
+     $                    « espaços depois do ?&gt; da linha 4
+&lt;p&gt;C&lt;/p&gt;$</pre>
+<p>(O <code>cat -A</code> mostra o fim de cada linha como <code>$</code>, para enxergar os espaços.) No navegador, isso não muda nada na tela. Mas, antes de um <code>header()</code>, até um espaço causa o "headers already sent" visto em <a href="primeiro-script.html">Olá, Mundo</a>.</p>
+<p><strong>Como resolver:</strong> configure o editor para apagar espaços no fim das linhas (no VS Code, <code>"files.trimTrailingWhitespace": true</code>).</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>&lt;?php … ?&gt;</code></td><td>Executa o código; só o que for escrito vai para a saída.</td></tr>
+<tr><td><code>&lt;?= valor ?&gt;</code></td><td>Escreve o valor (atalho de <code>&lt;?php echo valor ?&gt;</code>).</td></tr>
+<tr><td><code>&lt;?php foreach ($lista as $item): ?&gt; … &lt;?php endforeach; ?&gt;</code></td><td>Repete o trecho para cada elemento.</td></tr>
+<tr><td><code>&lt;?php foreach ($lista as $chave =&gt; $valor): ?&gt;</code></td><td>Idem, com a chave e o valor.</td></tr>
+<tr><td><code>&lt;?php if (condição): ?&gt; … &lt;?php else: ?&gt; … &lt;?php endif; ?&gt;</code></td><td>Escreve um trecho ou outro.</td></tr>
+<tr><td><code>htmlspecialchars($texto)</code></td><td>Troca <code>&lt; &gt; &amp; " '</code> por entidades: o texto aparece, mas não vira HTML.</td></tr>
+<tr><td><code>count($lista)</code></td><td>Quantos elementos a lista tem.</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>U</kbd> no navegador / <code>curl URL</code></td><td>Ver o HTML que o PHP gerou.</td></tr>
+</table>
+</div>
+
+<p>Para fechar, proteja uma lacuna. O nome do produto tem um <code>&amp;</code>, um dos caracteres especiais do HTML:</p>
+
+<div class="tryphp" data-modo="web" data-goal="out:Café &amp;amp; Pão,src:htmlspecialchars">
+<p class="try-task"><strong>Missão:</strong> passe <code>$produto</code> por <code>htmlspecialchars</code> antes de escrever. Na tela, nada muda (continua <code>Café &amp; Pão</code>); mas na aba <strong>Código-fonte HTML</strong> o <code>&amp;</code> deve aparecer como <code>&amp;amp;</code>, o jeito correto de escrevê-lo em HTML.</p>
+<pre class="script">&lt;?php
+$produto = "Café &amp; Pão";
+$preco = "12,90";
+?&gt;
+&lt;h1&gt;Promoção do dia&lt;/h1&gt;
+&lt;p&gt;&lt;?= $produto ?&gt; por R$ &lt;?= $preco ?&gt;&lt;/p&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$produto = "Café &amp; Pão";
+$preco = "12,90";
+?&gt;
+&lt;h1&gt;Promoção do dia&lt;/h1&gt;
+&lt;p&gt;&lt;?= htmlspecialchars($produto) ?&gt; por R$ &lt;?= htmlspecialchars($preco) ?&gt;&lt;/p&gt;
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. O atalho</h3>
+<p>Complete para escrever o valor de <code>$nome</code> no meio do HTML:</p>
+<div class="ex-code">&lt;p&gt;<input data-answer="&lt;?=" aria-label="abertura"> $nome ?&gt;&lt;/p&gt;</div>
+</div>
+
+<div class="exercise">
+<h3>2. Fim da repetição</h3>
+<p>Complete a linha que fecha um <code>foreach (…):</code> no meio do HTML:</p>
+<div class="ex-code">&lt;?php <input data-answer="endforeach;|endforeach" aria-label="palavra"> ?&gt;</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">3. O arquivo tem <code>&lt;p&gt;&lt;?= 2 + 3 ?&gt;&lt;/p&gt;</code>. O que aparece no código-fonte, no navegador?</p>
+<label><input type="radio" name="q3"> <code>&lt;p&gt;&lt;?= 2 + 3 ?&gt;&lt;/p&gt;</code></label>
+<label><input type="radio" name="q3"> <code>&lt;p&gt;5&lt;/p&gt;</code></label>
+<label><input type="radio" name="q3"> <code>&lt;p&gt;2 + 3&lt;/p&gt;</code></label>
+<label><input type="radio" name="q3"> <code>5</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">4. Por que usar <code>htmlspecialchars</code> ao escrever o nome que um visitante digitou?</p>
+<label><input type="radio" name="q4"> Para deixar o nome em maiúsculas.</label>
+<label><input type="radio" name="q4"> Para a página carregar mais rápido.</label>
+<label><input type="radio" name="q4"> Porque o PHP dá erro sem ele.</label>
+<label><input type="radio" name="q4"> Para que HTML ou JavaScript digitados apareçam como texto, em vez de serem executados (XSS).</label>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Fora de <code>&lt;?php … ?&gt;</code>, tudo é copiado para a saída; dentro, só sai o que for escrito.</li>
+  <li><code>&lt;?= valor ?&gt;</code> preenche uma lacuna no HTML.</li>
+  <li><code>foreach (…): … endforeach;</code> repete um pedaço do HTML para cada elemento; <code>if (…): … else: … endif;</code> escolhe um pedaço.</li>
+  <li>O navegador recebe só o HTML gerado: confira com <kbd>Ctrl</kbd>+<kbd>U</kbd>, com o <code>curl</code> ou com a aba Código-fonte HTML do editor.</li>
+  <li>Prefira HTML com lacunas a <code>echo</code> com HTML dentro de aspas.</li>
+  <li>Dados que não foram escritos por você passam por <code>htmlspecialchars</code> antes de ir para a página.</li>
+  <li>Próximo passo: as regras gerais da linguagem, em <a href="sintaxe.html">Sintaxe</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
