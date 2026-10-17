@@ -46,10 +46,10 @@ function rodarWeb(arquivos, opts) {
   const caminho = opts.url || "/" + (arquivos[0].nome === "index.php" ? "" : arquivos[0].nome);
   const post = opts.post !== null && opts.post !== undefined ? "--data-binary " + q(opts.post) + " -H 'Content-Type: application/x-www-form-urlencoded'" : "";
   const script = [LIMPAR, "mkdir -p site && cd site", escreverArquivos(arquivos),
-    "(php -S localhost:8000 >/tmp/srv.log 2>&1 &)",
+    "php -S localhost:8000 >/tmp/srv.log 2>&1 & SRV=$!",
     "for i in $(seq 1 30); do curl -s -o /dev/null localhost:8000/ && break; sleep 0.1; done",
     "curl -s -L -o /tmp/corpo -w '%{http_code}' " + post + " " + q("http://localhost:8000" + (caminho.startsWith("/") ? caminho : "/" + caminho)) + " > /tmp/status",
-    'pkill -f "php -S" 2>/dev/null', "echo @@STATUS@@$(cat /tmp/status)", "echo @@CORPO@@", "cat /tmp/corpo", "echo", "echo @@FIM@@", "php -r 'echo PHP_VERSION;'"].join("\n");
+    "kill $SRV 2>/dev/null; wait $SRV 2>/dev/null", "echo @@STATUS@@$(cat /tmp/status)", "echo @@CORPO@@", "cat /tmp/corpo", "echo", "echo @@FIM@@", "php -r 'echo PHP_VERSION;'"].join("\n");
   const s = rodarLab(script, true); // -N: localhost próprio (a porta 8000 não briga com os autores)
   const m = /@@STATUS@@(\d*)\n@@CORPO@@\n([\s\S]*)\n@@FIM@@\n?([\d.]*)/.exec(s);
   if (!m) return { html: s, status: null, versao: "?" };
