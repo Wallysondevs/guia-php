@@ -28,7 +28,7 @@
   <li>Arredondar: <code>round</code>, <code>ceil</code>, <code>floor</code>, e por que o <code>printf</code> às vezes arredonda diferente.</li>
   <li>A regra de ouro: <strong>calcule com números, formate só no fim</strong>.</li>
   <li>Converter <code>"1.234,56"</code> (digitado por um brasileiro) de volta para número.</li>
-  <li>O <code>NumberFormatter</code> da extensão intl, e quando ele está disponível.</li>
+  <li>O <code>NumberFormatter</code> da extensão intl: moeda, por extenso, porcentagem, e quando ele está disponível.</li>
 </ul>
 </div>
 
@@ -227,17 +227,57 @@ $decimal = new NumberFormatter("pt_BR", NumberFormatter::DECIMAL);
 echo $decimal-&gt;format(1234.567), "\n";
 </pre>
 
-<div class="warning">
-<strong>Exemplo ilustrativo: não roda no laboratório nem no editor do guia</strong>
-<p>A extensão intl é grande (carrega os dados de todos os idiomas) e não vem no PHP do laboratório da Ana nem no editor deste guia. Por isso a saída acima <strong>não foi conferida</strong> aqui. Num servidor com intl instalada (no Ubuntu: <code>sudo apt install php-intl</code>), a primeira linha mostra o valor como <code>R$ 1.234,50</code> (com um espaço especial, não separável, entre o <code>R$</code> e o número) e a segunda, <code>1.234,567</code>. No laboratório, o que aparece é isto:</p>
+<p>A extensão intl é grande (carrega as regras de todos os idiomas) e nem todo PHP a tem. O laboratório da Ana tem dois PHPs: o <code>php</code> de sempre, sem intl, e o <code>php-completo</code>, com intl. Veja a diferença:</p>
+
 <pre class="term">$ php -m | grep intl
 $ php intl.php
 
 Fatal error: Uncaught Error: Class "NumberFormatter" not found in /home/ana/php/intl.php:2
 Stack trace:
 #0 {main}
-  thrown in /home/ana/php/intl.php on line 2</pre>
-<p>O <code>php -m | grep intl</code> não mostrou nada: a extensão não está instalada. "Classe NumberFormatter não encontrada" é sempre esse o motivo.</p>
+  thrown in /home/ana/php/intl.php on line 2
+$ php-completo -m | grep intl
+intl
+$ php-completo intl.php
+R$ 1.234,50
+1.234,567</pre>
+
+<p>O <code>php -m | grep intl</code> não mostrou nada: sem a extensão, a classe não existe ("Classe NumberFormatter não encontrada"). Com intl, o valor sai no padrão brasileiro, com o <code>R$</code> incluído.</p>
+
+<dl class="anatomy">
+  <dt>new NumberFormatter("pt_BR", …)</dt><dd>Cria um "formatador" para o português do Brasil. O <code>new</code> cria um objeto (assunto de <a href="classes-objetos.html">Classes e Objetos</a>).</dd>
+  <dt>NumberFormatter::CURRENCY</dt><dd>O estilo: moeda (<em>currency</em>). Outros: <code>DECIMAL</code>, <code>PERCENT</code>, <code>SPELLOUT</code> (por extenso).</dd>
+  <dt>-&gt;formatCurrency(1234.5, "BRL")</dt><dd>Formata o valor na moeda indicada pelo código internacional: <code>BRL</code> (real), <code>USD</code> (dólar), <code>EUR</code> (euro).</dd>
+</dl>
+
+<p>Outras coisas que o intl sabe fazer:</p>
+<pre class="file" data-file="intl2.php">&lt;?php
+$moeda = new NumberFormatter("pt_BR", NumberFormatter::CURRENCY);
+echo $moeda-&gt;formatCurrency(1234.5, "USD"), "\n";
+$us = new NumberFormatter("en_US", NumberFormatter::CURRENCY);
+echo $us-&gt;formatCurrency(1234.5, "USD"), "\n";
+$extenso = new NumberFormatter("pt_BR", NumberFormatter::SPELLOUT);
+echo $extenso-&gt;format(1234), "\n";
+$pct = new NumberFormatter("pt_BR", NumberFormatter::PERCENT);
+echo $pct-&gt;format(0.875), "\n";
+$decimal = new NumberFormatter("pt_BR", NumberFormatter::DECIMAL);
+var_dump($decimal-&gt;parse("1.234,56"));
+</pre>
+<pre class="term">$ php-completo intl2.php
+US$ 1.234,50                      « dólar, escrito do jeito brasileiro
+$1,234.50                         « dólar, do jeito americano
+mil duzentos e trinta e quatro    « por extenso (cheques, recibos)
+88%                               « porcentagem: 0.875 vira 88% (arredondado)
+float(1234.56)                    « o caminho de volta: texto brasileiro → número</pre>
+
+<div class="warning">
+<strong>O espaço depois do <code>R$</code> não é um espaço comum</strong>
+<p>O intl coloca entre <code>R$</code> e o número um <strong>espaço não separável</strong> (U+00A0, o mesmo da aula de <a href="mbstring.html">mbstring</a>), para o navegador nunca quebrar a linha ali. Ele parece igual, mas <code>"R$ 1.234,50" === $moeda-&gt;formatCurrency(1234.5, "BRL")</code> dá <code>false</code>. Cuidado ao comparar textos ou ao escrever testes.</p>
+</div>
+
+<div class="note">
+<strong>No editor do guia não há intl</strong>
+<p>O PHP que roda no navegador não tem a extensão intl, por isso não há caixa "Experimente" nesta seção: os exemplos acima foram rodados no <code>php-completo</code> do laboratório. Num servidor seu, instale com <code>sudo apt install php-intl</code> (Ubuntu/Debian; veja <a href="instalar-linux.html">Instalar no Linux</a>) e confira com <code>php -m</code>.</p>
 </div>
 
 <p>Para um site em português, <code>number_format</code> resolve 99% dos casos e funciona em qualquer PHP. O <code>NumberFormatter</code> vale a pena quando o mesmo site atende vários países.</p>
@@ -383,7 +423,7 @@ echo "Com desconto: R$ " . number_format($comDesconto, 2, ",", "."), "\n";
   <li><code>round</code> arredonda (o meio vai para longe do zero), <code>ceil</code> sobe, <code>floor</code> desce, <code>intval</code> corta.</li>
   <li>O <code>printf</code> pode arredondar diferente nos "empates"; para dinheiro, use <code>round</code>/<code>number_format</code>, ou trabalhe em centavos.</li>
   <li>Texto brasileiro para número: tire os pontos, troque a vírgula por ponto, converta com <code>(float)</code>.</li>
-  <li><code>NumberFormatter</code> precisa da extensão intl (não disponível no laboratório nem no editor do guia).</li>
+  <li><code>NumberFormatter</code> (extensão intl) formata conforme o país, por extenso e em porcentagem; não está no editor do guia nem em todo PHP.</li>
 </ul>
 
 <div class="pager"></div>
