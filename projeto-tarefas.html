@@ -1,0 +1,1947 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Projeto Tarefas — CRUD completo com SQLite e PDO | Guia PHP</title>
+<meta name="description" content="Projeto passo a passo: uma lista de tarefas em PHP com banco SQLite. Criar, listar, marcar como feita, editar e excluir (CRUD) com PDO e prepared statements, Post/Redirect/Get e saída escapada. Inclui a demonstração real de uma injeção de SQL e por que o prepared statement a impede.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP Projeto <span class="hl">Tarefas com SQLite</span></h1>
+
+<p class="intro">A Ana vive esquecendo coisas. Neste projeto você faz para ela uma lista de tarefas que fica guardada num banco de dados: ela adiciona, marca como feita, corrige e apaga. Essas quatro operações têm um nome famoso, <strong>CRUD</strong> (<em>Create, Read, Update, Delete</em>: criar, ler, atualizar, apagar), e estão por trás de quase todo sistema: loja, blog, agenda, rede social. Quem faz um CRUD bem feito sabe fazer os outros.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>Criar o banco SQLite e a tabela a partir do PHP, com PDO.</li>
+  <li><strong>R</strong>: ler as linhas com <code>query</code> + <code>fetchAll</code> e mostrar numa lista.</li>
+  <li><strong>C</strong>: inserir com <code>prepare</code> + <code>execute</code> e voltar para a lista (Post/Redirect/Get).</li>
+  <li><strong>U</strong>: marcar como feita e editar o título com <code>UPDATE … WHERE id = ?</code>.</li>
+  <li><strong>D</strong>: excluir com <code>DELETE … WHERE id = ?</code>.</li>
+  <li>Ver uma injeção de SQL apagar a tabela inteira, e o prepared statement impedir o mesmo ataque.</li>
+</ul>
+</div>
+
+<h2>Antes de começar</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O que usamos</th><th>Aula</th></tr>
+<tr><td>Tabelas, linhas, <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code></td><td><a href="banco-dados.html">Banco de Dados: o Básico</a></td></tr>
+<tr><td><code>new PDO('sqlite:…')</code>, <code>query</code>, <code>fetchAll</code></td><td><a href="pdo.html">Conectar com PDO</a></td></tr>
+<tr><td>O CRUD em PDO</td><td><a href="crud.html">CRUD com PDO</a></td></tr>
+<tr><td><code>prepare</code> + <code>execute</code>, o perigo da concatenação</td><td><a href="prepared-statements.html">Prepared Statements e SQL Injection</a></td></tr>
+<tr><td>Post/Redirect/Get, <code>htmlspecialchars</code></td><td><a href="projeto-contato.html">Projeto Formulário de Contato</a></td></tr>
+</table>
+</div>
+
+<p>O projeto tem dois arquivos: <code>banco.php</code> (a conexão) e <code>index.php</code> (a página, que faz tudo). Uma página só, com um campo escondido <code>acao</code> em cada formulário dizendo o que fazer, mantém o projeto pequeno e fácil de seguir.</p>
+
+<pre class="term">$ mkdir tarefas
+$ cd tarefas
+$ php -S localhost:8000
+[Fri Oct 16 21:04:16 2026] PHP 8.5.8 Development Server (http://localhost:8000) started</pre>
+
+<p>O <code>sqlite3</code> que aparece em alguns comandos é o programa de terminal do SQLite, para espiar o banco por fora do PHP (no Debian/Ubuntu: <code>sudo apt install sqlite3</code>). Ele é opcional: tudo funciona sem ele.</p>
+
+<hr>
+
+<h2>As etapas</h2>
+
+<ol class="passo">
+
+<li>
+<h3>Etapa 1 · O banco e a tabela</h3>
+<p>O <code>banco.php</code> abre o arquivo do banco, cria a tabela <code>tarefas</code> se ela não existir e, só na primeira vez, põe três tarefas de exemplo para a lista não começar vazia.</p>
+
+<pre class="file" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$primeiraVez = !file_exists($arquivo)</code></td><td>Antes de conectar, olha se o arquivo do banco já existe. O <code>new PDO</code> cria o arquivo, então a pergunta tem que vir antes.</td></tr>
+<tr><td><code>new PDO('sqlite:' . $arquivo)</code></td><td>Conecta ao banco. Desde o PHP 8, o PDO já avisa os erros com exceções (<code>PDOException</code>), o que é o que queremos.</td></tr>
+<tr><td><code>PDO::FETCH_ASSOC</code></td><td>Cada linha lida vira um array associativo: <code>$t['titulo']</code>.</td></tr>
+<tr><td><code>id INTEGER PRIMARY KEY AUTOINCREMENT</code></td><td>Um número único para cada tarefa, que o banco escolhe sozinho (1, 2, 3…) e nunca reutiliza.</td></tr>
+<tr><td><code>feita INTEGER NOT NULL DEFAULT 0</code></td><td>O SQLite não tem tipo "booleano": usamos <code>0</code> (pendente) e <code>1</code> (feita). Se ninguém disser nada, é <code>0</code>.</td></tr>
+<tr><td><code>criada_em TEXT</code></td><td>A data como texto <code>2026-10-16 21:04:16</code>: nesse formato, ordenar o texto é o mesmo que ordenar a data.</td></tr>
+<tr><td><code>$exemplo-&gt;execute([…])</code> três vezes</td><td>Um <code>prepare</code> pode ser executado várias vezes com valores diferentes.</td></tr>
+</table>
+</div>
+
+<p>Para ver o banco funcionando antes de existir uma página, um script de teste no terminal:</p>
+<pre class="file" data-file="teste.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas')-&gt;fetchAll();
+
+foreach ($tarefas as $t) {
+    echo $t['id'], '. ', $t['titulo'], $t['feita'] ? ' (feita)' : '', "\n";
+}
+</pre>
+<pre class="term">$ php teste.php
+1. Comprar pão
+2. Pagar a conta de luz
+3. Estudar PHP (feita)
+$ php teste.php
+1. Comprar pão
+2. Pagar a conta de luz
+3. Estudar PHP (feita)          « as de exemplo não se repetem: o banco já existia
+$ sqlite3 tarefas.sqlite .schema
+CREATE TABLE tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+);
+CREATE TABLE sqlite_sequence(name,seq);</pre>
+<p>A tabela <code>sqlite_sequence</code> foi criada pelo próprio SQLite: é onde ele anota o último <code>id</code> usado, por causa do <code>AUTOINCREMENT</code>.</p>
+
+<div class="tryphp" data-goal="out:Total: 3 tarefa(s)">
+<p class="try-task"><strong>Missão:</strong> no fim do <code>teste.php</code>, mostre quantas tarefas existem: <code>$pdo-&gt;query('SELECT COUNT(*) FROM tarefas')-&gt;fetchColumn()</code> devolve o número direto (<code>fetchColumn</code> = "pegue a primeira coluna"). A saída deve terminar com <code>Total: 3 tarefa(s)</code>.</p>
+<pre class="script" data-file="teste.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas')-&gt;fetchAll();
+
+foreach ($tarefas as $t) {
+    echo $t['id'], '. ', $t['titulo'], $t['feita'] ? ' (feita)' : '', "\n";
+}
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="teste.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas')-&gt;fetchAll();
+
+foreach ($tarefas as $t) {
+    echo $t['id'], '. ', $t['titulo'], $t['feita'] ? ' (feita)' : '', "\n";
+}
+
+$total = $pdo-&gt;query('SELECT COUNT(*) FROM tarefas')-&gt;fetchColumn();
+echo "Total: $total tarefa(s)\n";
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 2 · R de <em>Read</em>: mostrar a lista</h3>
+<p>A primeira versão do <code>index.php</code> só lê e mostra:</p>
+
+<pre class="file" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<dl class="anatomy">
+  <dt>$pdo-&gt;query('SELECT … ORDER BY feita, id')</dt><dd>Roda um SQL <strong>fixo</strong> (sem nada vindo do usuário, por isso pode ser <code>query</code> direto). <code>ORDER BY feita, id</code>: primeiro as pendentes (0), depois as feitas (1); dentro de cada grupo, na ordem de criação.</dd>
+  <dt>-&gt;fetchAll()</dt><dd>Busca todas as linhas de uma vez, num array de arrays.</dd>
+  <dt>array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0)</dt><dd>Separa as pendentes, para contar (veja <a href="closures.html">Arrow Functions</a>). No PHP 8.1+, o SQLite devolve <code>feita</code> como número (<code>int(0)</code> ou <code>int(1)</code>); versões antigas devolviam texto (<code>"0"</code>). O <code>==</code> funciona nos dois casos.</dd>
+  <dt>'&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;'</dt><dd>Tarefa feita aparece riscada. Repare: o <code>&lt;s&gt;</code> é nosso e não é escapado; o título, que veio do usuário, é.</dd>
+</dl>
+
+<pre class="term">$ curl -s localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;2 pendente(s) de 3 tarefa(s).&lt;/p&gt;
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;</pre>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?ver=pendentes" data-goal="html:2 pendente(s) de 2 tarefa(s).">
+<p class="try-task"><strong>Missão:</strong> faça a página aceitar <code>?ver=pendentes</code> no endereço: nesse caso, o SQL ganha <code>WHERE feita = 0</code> e só as pendentes aparecem. Use um <code>if</code> com <code>($_GET['ver'] ?? '') === 'pendentes'</code> e duas consultas fixas. (Não cole o valor do <code>$_GET</code> no SQL: a etapa 7 mostra por quê.)</p>
+<pre class="script" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+if (($_GET['ver'] ?? '') === 'pendentes') {
+    $tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas WHERE feita = 0 ORDER BY id')-&gt;fetchAll();
+} else {
+    $tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+}
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 3 · C de <em>Create</em>: adicionar tarefas</h3>
+<p>Um formulário no topo da lista. O campo escondido <code>acao</code> diz ao PHP o que o formulário quer:</p>
+
+<pre class="file" data-file="index.php">&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;</pre>
+
+<p>E, no topo do arquivo, o tratamento do envio:</p>
+<pre class="file" data-file="index.php">function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+}</pre>
+
+<dl class="anatomy">
+  <dt>$pdo-&gt;prepare('INSERT … VALUES (?, ?)')</dt><dd>Prepara o SQL com dois "buracos". O texto do SQL é sempre o mesmo, não importa o que a Ana digite.</dd>
+  <dt>$sql-&gt;execute([$novo, date(…)])</dt><dd>Envia os valores separados, na ordem dos <code>?</code>. O banco os trata como <strong>dados</strong>, nunca como comandos.</dd>
+  <dt>feita</dt><dd>Não aparece no <code>INSERT</code>: vale o <code>DEFAULT 0</code> da tabela.</dd>
+  <dt>voltar()</dt><dd>Post/Redirect/Get: depois de gravar, volta para a lista com um GET. O <kbd>F5</kbd> não duplica a tarefa.</dd>
+</dl>
+
+<pre class="term">$ curl -si -d 'acao=criar&amp;titulo=Ligar para a Carla' localhost:8000/ | grep -E 'HTTP|Location'
+HTTP/1.1 303 See Other
+Location: index.php
+$ curl -s localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;3 pendente(s) de 4 tarefa(s).&lt;/p&gt;
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Ligar para a Carla&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;
+$ curl -s -d 'acao=criar&amp;titulo=   ' localhost:8000/ | grep erro
+  &lt;p class="erro"&gt;Escreva a tarefa (até 100 caracteres).&lt;/p&gt;
+$ curl -sL -d 'acao=criar&amp;titulo=&lt;b&gt;Urgente&lt;/b&gt;' localhost:8000/ | grep 'class="tarefa"'
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Ligar para a Carla&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&amp;lt;b&amp;gt;Urgente&amp;lt;/b&amp;gt;&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;
+$ sqlite3 tarefas.sqlite 'SELECT id, titulo FROM tarefas'
+1|Comprar pão
+2|Pagar a conta de luz
+3|Estudar PHP
+4|Ligar para a Carla
+5|&lt;b&gt;Urgente&lt;/b&gt;</pre>
+
+<p>Repare nos dois últimos comandos: o banco guarda exatamente o que foi digitado (<code>&lt;b&gt;Urgente&lt;/b&gt;</code>), e a página escapa <strong>na hora de mostrar</strong>. Essa é a divisão certa: o prepared statement protege o banco; o <code>htmlspecialchars</code> protege a página. Uma proteção não substitui a outra.</p>
+
+<div class="tryphp" data-modo="web" data-post="acao=criar&amp;titulo=Comprar pão" data-goal="html:Essa tarefa já está na lista.">
+<p class="try-task"><strong>Missão:</strong> não deixe cadastrar uma tarefa repetida. Antes do <code>INSERT</code>, conte quantas tarefas têm o mesmo título (<code>SELECT COUNT(*) FROM tarefas WHERE titulo = ?</code>, com <code>prepare</code>/<code>execute</code>/<code>fetchColumn</code>); se for mais que zero, o erro é <code>Essa tarefa já está na lista.</code> A caixa tenta cadastrar "Comprar pão" de novo.</p>
+<pre class="script" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $busca = $pdo-&gt;prepare('SELECT COUNT(*) FROM tarefas WHERE titulo = ?');
+            $busca-&gt;execute([$novo]);
+            if ($busca-&gt;fetchColumn() &gt; 0) {
+                $erro = 'Essa tarefa já está na lista.';
+            }
+        }
+        if (!$erro) {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 4 · U de <em>Update</em>: marcar como feita</h3>
+<p>Cada tarefa ganha um botão. Ele é um pequeno formulário POST que leva a ação e o <code>id</code> da tarefa:</p>
+
+<pre class="file" data-file="index.php">&lt;form method="post" action="index.php" style="display:inline"&gt;
+  &lt;input type="hidden" name="acao" value="alternar"&gt;
+  &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+  &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+&lt;/form&gt;</pre>
+<pre class="file" data-file="index.php">    $id = (int) ($_POST['id'] ?? 0);
+
+    // ...
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td>Botão dentro de <code>&lt;form method="post"&gt;</code></td><td>Mudar dados é sempre POST, nunca um link (GET): links são seguidos por robôs, pré-carregados por navegadores e podem ser disparados por outros sites (veja a etapa 4 do <a href="projeto-login.html">projeto de login</a>).</td></tr>
+<tr><td><code>(int) ($_POST['id'] ?? 0)</code></td><td>O <code>id</code> chega como texto; o <code>(int)</code> garante um número inteiro (<code>"abc"</code> vira <code>0</code>, que não é id de ninguém).</td></tr>
+<tr><td><code>SET feita = 1 - feita</code></td><td>Um truque de conta: se era 0, vira 1; se era 1, vira 0. O mesmo botão marca e desmarca.</td></tr>
+<tr><td><code>WHERE id = ?</code></td><td>Só a tarefa daquele <code>id</code>. Um <code>UPDATE</code> sem <code>WHERE</code> muda <strong>todas</strong> as linhas da tabela.</td></tr>
+</table>
+</div>
+
+<pre class="term">$ curl -s localhost:8000/ | grep -A4 'value="alternar"' | head -5
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="1"&gt;
+      &lt;button&gt;Feito!&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+$ curl -si -d 'acao=alternar&amp;id=1' localhost:8000/ | grep -E 'HTTP|Location'
+HTTP/1.1 303 See Other
+Location: index.php
+$ curl -s localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;1 pendente(s) de 3 tarefa(s).&lt;/p&gt;
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Comprar pão&lt;/s&gt;&lt;/span&gt;         « feita: foi para baixo, riscada
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;
+$ curl -sL -d 'acao=alternar&amp;id=1' localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;2 pendente(s) de 3 tarefa(s).&lt;/p&gt;
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;              « desfeita: voltou
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;</pre>
+
+<div class="tryphp" data-modo="web" data-post="acao=todas" data-goal="html:0 pendente(s) de 3 tarefa(s).">
+<p class="try-task"><strong>Missão:</strong> um botão <strong>Marcar todas como feitas</strong> (formulário com <code>acao</code> = <code>todas</code>) e a ação correspondente: <code>$pdo-&gt;exec('UPDATE tarefas SET feita = 1');</code> seguido de <code>voltar();</code>. Aqui o <code>UPDATE</code> sem <code>WHERE</code> é de propósito! A caixa já envia <code>acao=todas</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'todas') {
+        $pdo-&gt;exec('UPDATE tarefas SET feita = 1');
+        voltar();
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="todas"&gt;
+  &lt;button&gt;Marcar todas como feitas&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 5 · U de novo: editar o título</h3>
+<p>Para corrigir um título, cada tarefa ganha um link <code>editar</code> que abre <code>index.php?editar=2</code>. Nessa visita, a linha da tarefa 2 aparece como um formulário já preenchido. Abrir o formulário é só <strong>ler</strong> (GET); salvar é <strong>mudar</strong> (POST).</p>
+
+<pre class="file" data-file="index.php">// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}</pre>
+<pre class="file" data-file="index.php">    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }</pre>
+<p>Na lista, um <code>if</code> escolhe entre mostrar a linha normal ou o formulário de edição:</p>
+<pre class="file" data-file="index.php">&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    ... a linha normal, agora com o link:
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+&lt;?php endif; ?&gt;</pre>
+
+<dl class="anatomy">
+  <dt>$sql-&gt;fetch() ?: null</dt><dd><code>fetch</code> devolve a linha ou <code>false</code> se o <code>id</code> não existe. O <code>?:</code> troca o <code>false</code> por <code>null</code>: "nenhuma tarefa em edição".</dd>
+  <dt>$editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo]</dt><dd>Se o título novo for inválido, o formulário de edição reaparece com o erro e com o que foi digitado, em vez de sumir.</dd>
+  <dt>UPDATE … SET titulo = ? WHERE id = ?</dt><dd>Dois <code>?</code>, dois valores no <code>execute</code>, na mesma ordem.</dd>
+</dl>
+
+<pre class="term">$ curl -s 'localhost:8000/?editar=2' | grep -B1 -A4 'value="editar"'
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="2"&gt;
+      &lt;input name="titulo" value="Pagar a conta de luz" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+$ curl -s 'localhost:8000/?editar=99' | grep -c 'value="editar"'
+0                                              « id inexistente: nenhum formulário de edição
+$ curl -s -d 'acao=editar&amp;id=2&amp;titulo=' localhost:8000/ | grep -E 'erro|name="titulo"'
+  &lt;p class="erro"&gt;Escreva a tarefa (até 100 caracteres).&lt;/p&gt;
+  &lt;input name="titulo" value="" placeholder="Nova tarefa" maxlength="100"&gt;
+      &lt;input name="titulo" value="" maxlength="100"&gt;      « o formulário de edição continua aberto
+$ curl -sL -d 'acao=editar&amp;id=2&amp;titulo=Pagar a luz e a água' localhost:8000/ | grep 'class="tarefa"'
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Pagar a luz e a água&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;</pre>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?editar=99" data-goal="html:Tarefa não encontrada.">
+<p class="try-task"><strong>Missão:</strong> com <code>?editar=99</code> (uma tarefa que não existe), a página hoje fica calada. Depois do <code>fetch</code>, se <code>$editando</code> ficou <code>null</code>, ponha em <code>$erro</code> a mensagem <code>Tarefa não encontrada.</code></p>
+<pre class="script" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+    if ($editando === null) {
+        $erro = 'Tarefa não encontrada.';
+    }
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 6 · D de <em>Delete</em>: excluir</h3>
+<p>O último botão de cada tarefa. Mesmo padrão do "Feito!": um formulário POST com a ação e o <code>id</code>.</p>
+
+<pre class="file" data-file="index.php">&lt;form method="post" action="index.php" style="display:inline"&gt;
+  &lt;input type="hidden" name="acao" value="excluir"&gt;
+  &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+  &lt;button&gt;excluir&lt;/button&gt;
+&lt;/form&gt;</pre>
+<pre class="file" data-file="index.php">    if ($acao === 'excluir') {
+        $sql = $pdo-&gt;prepare('DELETE FROM tarefas WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }</pre>
+
+<pre class="term">$ curl -sL -d 'acao=excluir&amp;id=3' localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;2 pendente(s) de 2 tarefa(s).&lt;/p&gt;
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+$ sqlite3 tarefas.sqlite 'SELECT id, titulo, feita FROM tarefas'
+1|Comprar pão|0
+2|Pagar a conta de luz|0</pre>
+
+<div class="warning">
+<strong>Cuidado com o <code>WHERE</code></strong>
+<p><code>DELETE FROM tarefas</code> sem <code>WHERE</code> apaga a tabela inteira, sem perguntar e sem "desfazer". Sempre que escrever <code>UPDATE</code> ou <code>DELETE</code>, escreva o <code>WHERE</code> primeiro. Num sistema de verdade, muitas vezes nem se apaga: marca-se a linha como "excluída" (uma coluna <code>excluida_em</code>), para poder recuperar.</p>
+</div>
+
+<div class="tryphp" data-modo="web" data-post="acao=limpar" data-goal="html:2 pendente(s) de 2 tarefa(s).">
+<p class="try-task"><strong>Missão:</strong> um botão <strong>Limpar concluídas</strong> no fim da lista (<code>acao</code> = <code>limpar</code>) que apaga só as feitas: <code>DELETE FROM tarefas WHERE feita = 1</code>. A caixa já envia <code>acao=limpar</code>: sobram as 2 pendentes.</p>
+<pre class="script" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'excluir') {
+        $sql = $pdo-&gt;prepare('DELETE FROM tarefas WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="excluir"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;excluir&lt;/button&gt;
+    &lt;/form&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'limpar') {
+        $pdo-&gt;exec('DELETE FROM tarefas WHERE feita = 1');
+        voltar();
+    }
+
+    if ($acao === 'excluir') {
+        $sql = $pdo-&gt;prepare('DELETE FROM tarefas WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="excluir"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;excluir&lt;/button&gt;
+    &lt;/form&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="limpar"&gt;
+  &lt;button&gt;Limpar concluídas&lt;/button&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+</li>
+
+<li>
+<h3>Etapa 7 · A prova: injeção de SQL</h3>
+<p>Todos os SQL com valores de fora usaram <code>prepare</code> + <code>execute</code>. Para ver o que isso evita, troque (só para testar!) o <code>excluir</code> pela versão "ingênua", que <strong>cola</strong> o valor no texto do SQL:</p>
+<pre class="file" data-file="index.php">    if ($acao === 'excluir') {
+        $pdo-&gt;exec('DELETE FROM tarefas WHERE id = ' . $_POST['id']); // ERRADO!
+        voltar();
+    }</pre>
+<p>Com um <code>id</code> normal, funciona igual. Agora, com o banco recém-criado (3 tarefas), dois envios "estranhos":</p>
+<pre class="term">$ curl -s localhost:8000/ | grep pendente
+&lt;p&gt;2 pendente(s) de 3 tarefa(s).&lt;/p&gt;
+$ curl -s -d 'acao=excluir&amp;id=abc' localhost:8000/ | head -8
+&lt;br /&gt;
+&lt;b&gt;Fatal error&lt;/b&gt;:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: abc in /home/ana/tarefas/index.php:53
+Stack trace:
+#0 /home/ana/tarefas/index.php(53): PDO-&amp;gt;exec('DELETE FROM tar...')
+#1 {main}
+  thrown in &lt;b&gt;/home/ana/tarefas/index.php&lt;/b&gt; on line &lt;b&gt;53&lt;/b&gt;&lt;br /&gt;
+$ curl -sL -d 'acao=excluir&amp;id=0 OR 1=1' localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;0 pendente(s) de 0 tarefa(s).&lt;/p&gt;          « TODAS as tarefas sumiram
+$ sqlite3 tarefas.sqlite 'SELECT COUNT(*) FROM tarefas'
+0</pre>
+<p>O que aconteceu: o SQL montado foi <code>DELETE FROM tarefas WHERE id = 0 OR 1=1</code>. "id é 0 <strong>ou</strong> 1 é igual a 1" é verdade para toda linha, e o banco apagou tudo. No primeiro envio, <code>abc</code> virou o nome de uma coluna que não existe (<code>no such column: abc</code>): o texto do usuário foi lido como <strong>parte do comando</strong>. Isso é a <strong>injeção de SQL</strong>, um dos ataques mais antigos e mais comuns da web.</p>
+<p>A mesma tentativa contra a versão correta, também com o banco recém-criado:</p>
+<pre class="term">$ curl -sL -d 'acao=excluir&amp;id=0 OR 1=1' localhost:8000/ | grep -E 'pendente|class="tarefa"'
+&lt;p&gt;2 pendente(s) de 3 tarefa(s).&lt;/p&gt;
+    &lt;span class="tarefa"&gt;Comprar pão&lt;/span&gt;
+    &lt;span class="tarefa"&gt;Pagar a conta de luz&lt;/span&gt;
+    &lt;span class="tarefa"&gt;&lt;s&gt;Estudar PHP&lt;/s&gt;&lt;/span&gt;
+$ sqlite3 tarefas.sqlite 'SELECT COUNT(*) FROM tarefas'
+3</pre>
+<p>Nada apagado: com o prepared statement, <code>0 OR 1=1</code> é só um <strong>valor</strong> procurado na coluna <code>id</code> (e o <code>(int)</code> ainda o reduz a <code>0</code>), nunca um pedaço de SQL. A regra, sem exceção: <strong>valor que vem de fora entra no SQL só por <code>?</code></strong>. Mais em <a href="prepared-statements.html">Prepared Statements e SQL Injection</a>.</p>
+</li>
+
+</ol>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+
+<div class="cenario">
+<strong>Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: …</strong>
+<p>O SQL fala de uma coluna que a tabela não tem. Pode ser um erro de digitação (<code>titlo</code>), uma coluna que você acrescentou ao <code>CREATE TABLE</code> <strong>depois</strong> de o banco já existir (o <code>IF NOT EXISTS</code> não altera tabelas existentes: apague o <code>tarefas.sqlite</code> para recomeçar, ou use <code>ALTER TABLE</code>), ou, como na etapa 7, um valor colado no SQL.</p>
+</div>
+
+<div class="cenario">
+<strong>SQLSTATE[HY000]: General error: 1 no such table: tarefas</strong>
+<p>O PHP abriu um arquivo de banco diferente do que você imagina, um arquivo novo e vazio. Acontece com caminhos relativos (<code>new PDO('sqlite:tarefas.sqlite')</code>), que dependem da pasta de onde o PHP foi chamado. Use sempre <code>__DIR__ . '/tarefas.sqlite'</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>SQLSTATE[HY000]: General error: 8 attempt to write a readonly database</strong>
+<p>O PHP consegue ler o arquivo, mas não escrever. Num servidor, o usuário do PHP (<code>www-data</code>) precisa de permissão de escrita no arquivo <strong>e na pasta</strong> (o SQLite cria arquivos temporários ao lado).</p>
+</div>
+
+<div class="cenario">
+<strong>A lista não muda depois de clicar, ou muda duas vezes com F5</strong>
+<p>Faltou o <code>voltar()</code> (Post/Redirect/Get) depois de gravar, ou o <code>exit</code> dentro dele. Confira no terminal do servidor: cada clique deve aparecer como <code>[303]: POST /</code> seguido de <code>[200]: GET /index.php</code>.</p>
+</div>
+
+<hr>
+
+<h2>O código completo</h2>
+<pre class="file" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="file" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'excluir') {
+        $sql = $pdo-&gt;prepare('DELETE FROM tarefas WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="excluir"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;excluir&lt;/button&gt;
+    &lt;/form&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<h2>Desafios extras</h2>
+<ol>
+  <li><strong>Data de entrega:</strong> uma coluna <code>prazo TEXT</code> (formato <code>2026-10-20</code>), um <code>&lt;input type="date"&gt;</code> no formulário e as tarefas atrasadas em vermelho. Lembre que mudar o <code>CREATE TABLE</code> não altera um banco que já existe.</li>
+  <li><strong>Token CSRF:</strong> traga as funções <code>token_csrf()</code> e <code>conferir_csrf()</code> do <a href="projeto-login.html">projeto de login</a> e proteja todos os formulários.</li>
+  <li><strong>Uma lista por pessoa:</strong> junte com o projeto de login: coluna <code>usuario_id</code> na tabela e <code>WHERE usuario_id = ?</code> em <strong>todos</strong> os SQL (inclusive no <code>UPDATE</code> e no <code>DELETE</code>, senão um usuário apaga a tarefa do outro mandando outro <code>id</code>).</li>
+  <li><strong>Confirmar antes de excluir:</strong> <code>&lt;form … onsubmit="return confirm('Excluir esta tarefa?')"&gt;</code> (um toque de JavaScript).</li>
+  <li><strong>API:</strong> a mesma tabela servida como JSON; é o assunto de <a href="api-json.html">Criar uma API JSON</a> e do <a href="projeto-api.html">projeto API REST</a>.</li>
+</ol>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?busca=conta" data-goal="html:Pagar a conta de luz,html:1 pendente(s) de 1 tarefa(s).">
+<p class="try-task"><strong>Missão final:</strong> uma busca. Acrescente um formulário GET com o campo <code>busca</code> e, quando ele vier preenchido, troque a consulta da lista por <code>SELECT … WHERE titulo LIKE ? ORDER BY feita, id</code>, executada com <code>['%' . $busca . '%']</code> (o <code>%</code> do <code>LIKE</code> quer dizer "qualquer coisa": <code>%conta%</code> acha "conta" em qualquer lugar do título). A caixa abre com <code>?busca=conta</code>.</p>
+<pre class="script" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'excluir') {
+        $sql = $pdo-&gt;prepare('DELETE FROM tarefas WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}
+
+$tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="excluir"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;excluir&lt;/button&gt;
+    &lt;/form&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="script" data-file="banco.php">&lt;?php
+// Conexão com o banco SQLite e criação da tabela
+date_default_timezone_set('America/Sao_Paulo');
+
+$arquivo = __DIR__ . '/tarefas.sqlite';
+$primeiraVez = !file_exists($arquivo);
+
+$pdo = new PDO('sqlite:' . $arquivo);
+$pdo-&gt;setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+$pdo-&gt;exec('CREATE TABLE IF NOT EXISTS tarefas (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo    TEXT    NOT NULL,
+    feita     INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT    NOT NULL
+)');
+
+// Só para testar: quando o banco acaba de ser criado, três tarefas de exemplo.
+if ($primeiraVez) {
+    $exemplo = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, feita, criada_em) VALUES (?, ?, ?)');
+    $exemplo-&gt;execute(['Comprar pão', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Pagar a conta de luz', 0, date('Y-m-d H:i:s')]);
+    $exemplo-&gt;execute(['Estudar PHP', 1, date('Y-m-d H:i:s')]);
+}
+</pre>
+<pre class="solucao" data-file="index.php">&lt;?php
+require __DIR__ . '/banco.php';
+
+function e(string $texto): string
+{
+    return htmlspecialchars($texto);
+}
+
+function voltar(): never
+{
+    header('Location: index.php', true, 303);
+    exit;
+}
+
+$erro = '';
+$novo = '';
+$editando = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $acao = $_POST['acao'] ?? '';
+    $id = (int) ($_POST['id'] ?? 0);
+
+    if ($acao === 'criar') {
+        $novo = trim($_POST['titulo'] ?? '');
+        if ($novo === '' || mb_strlen($novo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+        } else {
+            $sql = $pdo-&gt;prepare('INSERT INTO tarefas (titulo, criada_em) VALUES (?, ?)');
+            $sql-&gt;execute([$novo, date('Y-m-d H:i:s')]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'alternar') {
+        $sql = $pdo-&gt;prepare('UPDATE tarefas SET feita = 1 - feita WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+
+    if ($acao === 'editar') {
+        $titulo = trim($_POST['titulo'] ?? '');
+        if ($titulo === '' || mb_strlen($titulo) &gt; 100) {
+            $erro = 'Escreva a tarefa (até 100 caracteres).';
+            $editando = ['id' =&gt; $id, 'titulo' =&gt; $titulo];
+        } else {
+            $sql = $pdo-&gt;prepare('UPDATE tarefas SET titulo = ? WHERE id = ?');
+            $sql-&gt;execute([$titulo, $id]);
+            voltar();
+        }
+    }
+
+    if ($acao === 'excluir') {
+        $sql = $pdo-&gt;prepare('DELETE FROM tarefas WHERE id = ?');
+        $sql-&gt;execute([$id]);
+        voltar();
+    }
+}
+
+// Tarefa aberta para edição: index.php?editar=3
+if ($editando === null &amp;&amp; isset($_GET['editar'])) {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo FROM tarefas WHERE id = ?');
+    $sql-&gt;execute([(int) $_GET['editar']]);
+    $editando = $sql-&gt;fetch() ?: null;
+}
+
+$busca = trim($_GET['busca'] ?? '');
+if ($busca !== '') {
+    $sql = $pdo-&gt;prepare('SELECT id, titulo, feita FROM tarefas WHERE titulo LIKE ? ORDER BY feita, id');
+    $sql-&gt;execute(['%' . $busca . '%']);
+    $tarefas = $sql-&gt;fetchAll();
+} else {
+    $tarefas = $pdo-&gt;query('SELECT id, titulo, feita FROM tarefas ORDER BY feita, id')-&gt;fetchAll();
+}
+$pendentes = count(array_filter($tarefas, fn($t) =&gt; $t['feita'] == 0));
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+&lt;title&gt;Tarefas&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Tarefas da Ana&lt;/h1&gt;
+&lt;p&gt;&lt;?= $pendentes ?&gt; pendente(s) de &lt;?= count($tarefas) ?&gt; tarefa(s).&lt;/p&gt;
+&lt;?php if ($erro): ?&gt;
+  &lt;p class="erro"&gt;&lt;?= e($erro) ?&gt;&lt;/p&gt;
+&lt;?php endif; ?&gt;
+
+&lt;form method="post" action="index.php"&gt;
+  &lt;input type="hidden" name="acao" value="criar"&gt;
+  &lt;input name="titulo" value="&lt;?= e($novo) ?&gt;" placeholder="Nova tarefa" maxlength="100"&gt;
+  &lt;button&gt;Adicionar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;form method="get" action="index.php"&gt;
+  &lt;input name="busca" value="&lt;?= e($busca) ?&gt;" placeholder="Buscar"&gt;
+  &lt;button&gt;Buscar&lt;/button&gt;
+&lt;/form&gt;
+
+&lt;ul&gt;
+&lt;?php foreach ($tarefas as $t): ?&gt;
+  &lt;li&gt;
+&lt;?php if ($editando &amp;&amp; $editando['id'] == $t['id']): ?&gt;
+    &lt;form method="post" action="index.php"&gt;
+      &lt;input type="hidden" name="acao" value="editar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;input name="titulo" value="&lt;?= e($editando['titulo']) ?&gt;" maxlength="100"&gt;
+      &lt;button&gt;Salvar&lt;/button&gt; &lt;a href="index.php"&gt;Cancelar&lt;/a&gt;
+    &lt;/form&gt;
+&lt;?php else: ?&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="alternar"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;&lt;?= $t['feita'] ? 'Desfazer' : 'Feito!' ?&gt;&lt;/button&gt;
+    &lt;/form&gt;
+    &lt;span class="tarefa"&gt;&lt;?= $t['feita'] ? '&lt;s&gt;' . e($t['titulo']) . '&lt;/s&gt;' : e($t['titulo']) ?&gt;&lt;/span&gt;
+    &lt;a href="index.php?editar=&lt;?= $t['id'] ?&gt;"&gt;editar&lt;/a&gt;
+    &lt;form method="post" action="index.php" style="display:inline"&gt;
+      &lt;input type="hidden" name="acao" value="excluir"&gt;
+      &lt;input type="hidden" name="id" value="&lt;?= $t['id'] ?&gt;"&gt;
+      &lt;button&gt;excluir&lt;/button&gt;
+    &lt;/form&gt;
+&lt;?php endif; ?&gt;
+  &lt;/li&gt;
+&lt;?php endforeach; ?&gt;
+&lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<p>Complete o <code>UPDATE</code> seguro que troca o título da tarefa:</p>
+<div class="ex-code">$sql = $pdo-&gt;<input data-answer="prepare">('UPDATE tarefas SET titulo = ? WHERE id = ?');<br>$sql-&gt;<input data-answer="execute">([$titulo, $id]);</div>
+</div>
+
+<div class="exercise">
+<p>Complete o SQL que marca/desmarca uma tarefa com o mesmo botão:</p>
+<div class="ex-code">UPDATE tarefas SET feita = <input data-answer="1 - feita|1-feita"> WHERE id = ?</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">O que significa a letra U de CRUD, e qual comando SQL faz isso?</p>
+<label><input type="radio" name="q1"> <em>Use</em>: <code>SELECT</code></label>
+<label><input type="radio" name="q1"> <em>Update</em> (atualizar): <code>UPDATE</code></label>
+<label><input type="radio" name="q1"> <em>Upload</em>: <code>INSERT</code></label>
+<label><input type="radio" name="q1"> <em>Undo</em> (desfazer): <code>DELETE</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">Com <code>$pdo-&gt;exec('DELETE FROM tarefas WHERE id = ' . $_POST['id'])</code>, alguém envia <code>id=0 OR 1=1</code>. O que acontece?</p>
+<label><input type="radio" name="q2"> Nada: não existe tarefa com id 0</label>
+<label><input type="radio" name="q2"> O PDO recusa o valor e dá erro</label>
+<label><input type="radio" name="q2"> Só a tarefa 1 é apagada</label>
+<label><input type="radio" name="q2"> Todas as tarefas são apagadas, porque <code>1=1</code> é verdade para toda linha</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">Por que o botão "excluir" é um formulário POST e não um link <code>&lt;a href="?excluir=3"&gt;</code>?</p>
+<label><input type="radio" name="q3"> Porque ações que mudam dados não devem ser disparadas por um simples GET (robôs, pré-carregamento, outros sites)</label>
+<label><input type="radio" name="q3"> Porque o PHP não lê <code>$_GET</code> dentro de um <code>if</code></label>
+<label><input type="radio" name="q3"> Porque links não funcionam com SQLite</label>
+<label><input type="radio" name="q3"> Tanto faz: é só uma questão de aparência</label>
+</div>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>new PDO('sqlite:' . __DIR__ . '/arquivo.sqlite')</code> + <code>CREATE TABLE IF NOT EXISTS</code> deixam o banco pronto, sem instalar servidor.</li>
+  <li>CRUD: <code>INSERT</code> (criar), <code>SELECT</code> (ler), <code>UPDATE</code> (atualizar), <code>DELETE</code> (apagar).</li>
+  <li>Valor que vem de fora: sempre <code>prepare</code> com <code>?</code> + <code>execute([...])</code>. SQL fixo pode usar <code>query</code>/<code>exec</code>.</li>
+  <li><code>UPDATE</code> e <code>DELETE</code> sempre com <code>WHERE</code> (a não ser que você queira mesmo mexer em todas as linhas).</li>
+  <li>Ações que mudam dados: formulário POST + Post/Redirect/Get. Ler (como abrir a edição) pode ser GET.</li>
+  <li>O banco guarda o texto como veio; a página escapa na hora de mostrar.</li>
+</ul>
+<p>Próximo projeto: <a href="projeto-blog.html">Mini Blog</a>, com posts no SQLite, páginas separadas e paginação.</p>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

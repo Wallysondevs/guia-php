@@ -1717,8 +1717,8 @@ exit;
   <li><strong>Proteger as mensagens:</strong> leve o <code>mensagens.php</code> do <a href="projeto-contato.html">projeto de contato</a> para cá e tranque-o com a área restrita.</li>
 </ol>
 
-<div class="tryphp" data-modo="web" data-url="/login.php" data-goal="html:Conta criada em">
-<p class="try-task"><strong>Missão final:</strong> crie a página <strong>Minha conta</strong> (aba <code>conta.php</code>): protegida como o painel, ela busca no banco o nome, o e-mail e a data de criação da conta pelo <code>id</code> guardado na sessão (prepared statement!) e mostra <code>Conta criada em …</code>. No painel, acrescente o link <code>&lt;a href="conta.php"&gt;Minha conta&lt;/a&gt;</code>. Rode, entre com <code>ana@exemplo.com</code> / <code>cafe-com-pao</code> e clique no link.</p>
+<div class="tryphp" data-modo="web" data-url="/conta.php" data-goal="html:Entrar,src:WHERE id = \?">
+<p class="try-task"><strong>Missão final:</strong> crie a página <strong>Minha conta</strong> (aba <code>conta.php</code>): protegida como o painel, ela busca no banco o nome, o e-mail e a data de criação da conta pelo <code>id</code> guardado na sessão (<code>SELECT nome, email, criado_em FROM usuarios WHERE id = ?</code>, com prepared statement) e mostra <code>Conta criada em …</code>. No painel, acrescente o link <code>&lt;a href="conta.php"&gt;Minha conta&lt;/a&gt;</code>. A caixa abre o <code>conta.php</code> sem login: com a proteção pronta, você deve cair na página <strong>Entrar</strong>. Depois entre com <code>ana@exemplo.com</code> / <code>cafe-com-pao</code> e clique em <strong>Minha conta</strong> para ver os seus dados.</p>
 <pre class="script" data-file="login.php">&lt;?php
 require __DIR__ . '/comum.php';
 
