@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP Sintaxe — instruções, ;, blocos { }, maiúsculas e espaços | Guia PHP</title>
+<meta name="description" content="As regras de escrita do PHP: instruções e ponto e vírgula, blocos entre chaves, onde maiúsculas e minúsculas importam (variáveis e constantes sim, funções e palavras-chave não, com saídas reais), espaços e quebras de linha, o $ das variáveis, nomes válidos, palavras reservadas e o padrão de estilo PSR-12.">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">Sintaxe</span></h1>
+
+<p class="intro">Toda língua tem gramática: no português, a frase termina com ponto, o nome próprio começa com maiúscula. A <strong>sintaxe</strong> é a gramática de uma linguagem de programação: as regras de como as instruções são escritas. O PHP é bem mais rígido que um leitor humano: um <code>;</code> faltando e ele se recusa a rodar. Nesta aula você vai conhecer as regras básicas, de uma vez por todas, para errar menos e entender as mensagens quando errar.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>O que é uma instrução e por que ela termina com <code>;</code>.</li>
+  <li>O que são blocos <code>{ }</code> e por que toda chave aberta precisa ser fechada.</li>
+  <li>Onde maiúsculas e minúsculas fazem diferença (variáveis, constantes) e onde não fazem (funções, palavras do PHP).</li>
+  <li>O papel dos espaços e das quebras de linha.</li>
+  <li>As regras para nomes de variáveis e o <code>$</code>.</li>
+  <li>O que são palavras reservadas.</li>
+  <li>O padrão de escrita da comunidade, o PSR-12.</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Instruções e o ponto e vírgula</h2>
+<p>Uma <strong>instrução</strong> (<em>statement</em>) é uma ordem completa para o PHP: "escreva isto", "guarde aquilo", "some estes números". No português, cada frase termina com um ponto. No PHP, cada instrução termina com <strong>ponto e vírgula</strong>:</p>
+
+<pre class="file" data-file="instrucoes.php">&lt;?php
+$preco = 10;                     // instrução 1: guarda 10 em $preco
+$quantidade = 3;                 // instrução 2
+$total = $preco * $quantidade;   // instrução 3: faz a conta e guarda
+echo "Total: $total\n";          // instrução 4: escreve
+</pre>
+
+<p>(O que vem depois de <code>//</code> é um <strong>comentário</strong>, uma anotação para quem lê, que o PHP ignora. Aula própria: <a href="comentarios.html">Comentários</a>.)</p>
+
+<p>O PHP executa as instruções <strong>uma de cada vez, de cima para baixo</strong>, na ordem em que aparecem. Por isso a conta da linha 4 já encontra <code>$preco</code> e <code>$quantidade</code> com valor: elas foram criadas antes.</p>
+
+<p>O <code>;</code> é o único jeito de o PHP saber onde uma instrução acaba. Quando ele falta, o PHP "emenda" a instrução com a seguinte e se perde:</p>
+
+<pre class="file" data-file="a.php · erro de propósito">&lt;?php
+echo "Olá, mundo!"
+echo "Tchau!";
+</pre>
+
+<pre class="term" data-cwd="~/t">$ php a.php
+
+Parse error: syntax error, unexpected token "echo", expecting "," or ";" in /home/ana/t/a.php on line 3</pre>
+
+<p>Lembre-se da dica da aula <a href="primeiro-script.html">Olá, Mundo</a>: o PHP aponta a linha onde <strong>percebeu</strong> o problema (a 3, onde encontrou um <code>echo</code> sem que a instrução anterior tivesse terminado), e o <code>;</code> que falta está no fim da linha <strong>anterior</strong>.</p>
+
+<div class="note">
+<strong>Duas exceções</strong>
+<ul>
+  <li>A última instrução antes de um <code>?&gt;</code> dispensa o <code>;</code> (o <code>?&gt;</code> já termina a instrução). É por isso que <code>&lt;?= $nome ?&gt;</code> não tem ponto e vírgula.</li>
+  <li>Linhas que abrem ou fecham um bloco, como <code>if (…) {</code> e <code>}</code>, não levam <code>;</code>: elas não são instruções, são a "moldura" de um grupo de instruções (próxima seção).</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>Blocos: chaves <code>{ }</code></h2>
+<p>Às vezes várias instruções precisam andar juntas: "<strong>se</strong> a nota for 7 ou mais, faça <strong>isto e isto</strong>". As <strong>chaves</strong> agrupam instruções num <strong>bloco</strong>, como um parêntese grande:</p>
+
+<pre class="file" data-file="bloco.php">&lt;?php
+$nota = 8;
+if ($nota &gt;= 7) {
+    echo "Aprovada!\n";
+    echo "Parabéns, Ana.\n";
+}
+echo "Fim do boletim.\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>if ($nota &gt;= 7)</dt><dd>Uma <strong>condição</strong>: "se a nota for maior ou igual a 7". O <code>if</code> tem aula própria, <a href="if-else.html">if, elseif, else</a>.</dd>
+  <dt>{</dt><dd>Abre o bloco: o que vem a seguir só roda se a condição for verdadeira.</dd>
+  <dt>as duas linhas com echo</dt><dd>As instruções do bloco, cada uma com o seu <code>;</code>. Elas ficam <strong>recuadas</strong> 4 espaços, para os olhos verem que estão "dentro".</dd>
+  <dt>}</dt><dd>Fecha o bloco. Sem <code>;</code> depois.</dd>
+  <dt>a última linha</dt><dd>Está fora do bloco: roda sempre.</dd>
+</dl>
+
+<pre class="term" data-cwd="~/sx">$ php bloco.php
+Aprovada!
+Parabéns, Ana.
+Fim do boletim.</pre>
+
+<p>O recuo é só para quem lê: o PHP se guia pelas chaves. Mas um código sem recuo, ou com recuo errado, engana as pessoas, e é aí que os erros nascem. Os blocos aparecem em decisões (<code>if</code>), repetições (<code>for</code>, <code>while</code>, <code>foreach</code>), funções e classes.</p>
+
+<h3>Toda chave aberta precisa ser fechada</h3>
+<p>O PHP confere se as chaves formam pares. Dois arquivos com erro de propósito, um com chave faltando e outro com chave sobrando:</p>
+
+<pre class="file" data-file="chave.php · erro de propósito">&lt;?php
+if (10 &gt; 5) {
+    echo "dez é maior\n";
+</pre>
+
+<pre class="file" data-file="chave2.php · erro de propósito">&lt;?php
+echo "a\n";
+}
+echo "b\n";
+</pre>
+
+<p>As mensagens são diretas:</p>
+
+<pre class="term" data-cwd="~/sx">$ php chave.php
+
+Parse error: Unclosed '{' on line 2 in /home/ana/sx/chave.php on line 4
+$ php chave2.php
+
+Parse error: Unmatched '}' in /home/ana/sx/chave2.php on line 3</pre>
+
+<ul>
+  <li><code>Unclosed '{' on line 2</code>: "<code>{</code> não fechada, aberta na linha 2". O arquivo acabou (linha 4) com uma chave ainda aberta. A mensagem diz onde ela foi <strong>aberta</strong>.</li>
+  <li><code>Unmatched '}'</code>: "<code>}</code> sem par", na linha 3. Há uma chave fechando algo que nunca foi aberto.</li>
+</ul>
+
+<p>Os editores de código ajudam: ao colocar o cursor numa chave, eles destacam o par dela.</p>
+
+<hr>
+
+<h2>Maiúsculas e minúsculas</h2>
+<p>Aqui o PHP tem uma regra que surpreende: <strong>às vezes</strong> maiúsculas e minúsculas fazem diferença, às vezes não. O termo técnico é <strong>sensível a maiúsculas</strong> (<em>case-sensitive</em>).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>O quê</th><th>Diferencia maiúsculas?</th><th>Exemplo</th></tr>
+<tr><td><strong>Variáveis</strong></td><td><strong>Sim</strong></td><td><code>$nome</code>, <code>$Nome</code> e <code>$NOME</code> são três variáveis diferentes</td></tr>
+<tr><td><strong>Constantes</strong></td><td><strong>Sim</strong></td><td><code>TAXA</code> e <code>taxa</code> são diferentes</td></tr>
+<tr><td>Palavras do PHP (<code>echo</code>, <code>if</code>, <code>else</code>, <code>function</code>…)</td><td>Não</td><td><code>echo</code>, <code>ECHO</code> e <code>Echo</code> funcionam</td></tr>
+<tr><td>Funções (as do PHP e as suas)</td><td>Não</td><td><code>strtoupper</code> e <code>STRTOUPPER</code> funcionam</td></tr>
+<tr><td>Nomes de classes</td><td>Não</td><td>(aula <a href="classes-objetos.html">Classes e Objetos</a>)</td></tr>
+</table>
+</div>
+
+<h3>Variáveis: diferenciam</h3>
+<pre class="file" data-file="caixa.php">&lt;?php
+$nome = "Ana";
+$Nome = "Bruno";
+$NOME = "Carla";
+echo $nome, " ", $Nome, " ", $NOME, "\n";
+echo $nOME;
+</pre>
+
+<pre class="term" data-cwd="~/sx">$ php caixa.php
+Ana Bruno Carla                       « três variáveis diferentes
+
+Warning: Undefined variable $nOME in /home/ana/sx/caixa.php on line 6</pre>
+
+<p>As vírgulas no <code>echo</code> separam várias coisas a escrever (aula <a href="echo-print.html">echo e print</a>). E <code>$nOME</code> nunca foi criada: o PHP avisa com <code>Warning: Undefined variable</code> ("variável não definida"). É um <strong>aviso</strong>, não um erro fatal: o programa continua, usando "nada" no lugar da variável. Esse é um dos erros mais comuns de iniciante: criar <code>$total</code> e depois escrever <code>$Total</code>.</p>
+
+<h3>Funções e palavras do PHP: não diferenciam</h3>
+<pre class="file" data-file="funcoes.php">&lt;?php
+function saudar()
+{
+    echo "Olá!\n";
+}
+saudar();
+SAUDAR();
+Saudar();
+echo STRTOUPPER("php"), "\n";
+ECHO "fim\n";
+</pre>
+
+<pre class="term" data-cwd="~/sx">$ php funcoes.php
+Olá!
+Olá!                « SAUDAR() chamou a mesma função
+Olá!
+PHP
+fim</pre>
+
+<p>As três chamadas acharam a mesma função <code>saudar</code> (você vai criar funções em <a href="funcoes.html">Funções</a>), e <code>STRTOUPPER</code> e <code>ECHO</code> funcionaram. O mesmo vale para <code>IF</code>, <code>ELSE</code> e companhia:</p>
+
+<pre class="file" data-file="palavras.php">&lt;?php
+IF (10 &gt; 5) {
+    ECHO "dez é maior\n";
+} ELSE {
+    ECHO "cinco é maior\n";
+}
+</pre>
+
+<pre class="term" data-cwd="~/sx">$ php palavras.php
+dez é maior</pre>
+
+<p><strong>Funciona, mas não faça.</strong> O costume (e o padrão PSR-12) é escrever palavras do PHP sempre em <strong>minúsculas</strong> e chamar cada função exatamente como ela foi declarada. Código com maiúsculas misturadas confunde quem lê e as ferramentas que buscam por nome.</p>
+
+<h3>Constantes: diferenciam</h3>
+<pre class="file" data-file="constante.php">&lt;?php
+define("TAXA", 5);
+echo TAXA, "\n";
+echo taxa, "\n";
+</pre>
+
+<pre class="term" data-cwd="~/sx">$ php constante.php
+5
+
+Fatal error: Uncaught Error: Undefined constant "taxa" in /home/ana/sx/constante.php:4
+Stack trace:
+#0 {main}
+  thrown in /home/ana/sx/constante.php on line 4</pre>
+
+<p>Uma <strong>constante</strong> é um valor com nome que não muda (aula <a href="constantes.html">Constantes</a>). <code>TAXA</code> existe; <code>taxa</code>, não. Repare na diferença de gravidade: variável inexistente gera um <code>Warning</code> e o programa segue; constante inexistente gera um <code>Fatal error</code> e o programa para.</p>
+
+<div class="tryphp" data-goal="out:Total: 30,semerro">
+<p class="try-task"><strong>Missão:</strong> o programa deveria mostrar <code>Total: 30</code>, mas dá um aviso e mostra <code>Total: </code> vazio. Rode, leia o aviso (qual variável ele diz que não existe?) e conserte o nome.</p>
+<pre class="script">&lt;?php
+$preco = 10;
+$quantidade = 3;
+$total = $preco * $quantidade;
+echo "Total: $Total\n";
+</pre>
+<pre class="solucao">&lt;?php
+$preco = 10;
+$quantidade = 3;
+$total = $preco * $quantidade;
+echo "Total: $total\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Espaços e quebras de linha</h2>
+<p>Fora das aspas, o PHP é tolerante com espaços: entre os pedaços de uma instrução, um espaço, dez espaços ou uma quebra de linha valem o mesmo. Até nenhum espaço, quando não há perigo de confusão:</p>
+
+<pre class="file" data-file="espacos.php">&lt;?php
+echo"colado\n";
+echo     "espaçado\n"    ;
+echo "a\n"; echo "b\n"; echo "c\n";
+echo
+    "em várias linhas\n"
+;
+</pre>
+
+<pre class="term" data-cwd="~/sx">$ php espacos.php
+colado
+espaçado
+a
+b
+c
+em várias linhas</pre>
+
+<p>Tudo funcionou: instrução sem espaço, com espaços demais, três instruções numa linha, uma instrução em três linhas. O que <strong>não</strong> pode é colocar espaço <strong>dentro</strong> de uma palavra ou de um nome, porque aí ela vira duas:</p>
+
+<pre class="term" data-cwd="~/sx">$ php ecoq.php                « o arquivo tem: e cho "oi";
+
+Parse error: syntax error, unexpected identifier "cho" in /home/ana/sx/ecoq.php on line 2</pre>
+
+<p>E, <strong>dentro das aspas</strong>, cada espaço conta: <code>"a  b"</code> escreve dois espaços entre as letras.</p>
+
+<p>Ser tolerante não quer dizer que tanto faz. A regra de ouro: <strong>uma instrução por linha</strong>, um espaço em volta de <code>=</code> e dos operadores (<code>$total = $preco * $quantidade;</code>), recuo de 4 espaços dentro de blocos. Seus olhos (e os de quem for ler o seu código) agradecem.</p>
+
+<hr>
+
+<h2>Variáveis: o <code>$</code> e as regras dos nomes</h2>
+<p>Toda variável começa com <code>$</code> (cifrão). É assim que o PHP sabe que <code>$nome</code> é uma variável e <code>nome</code> seria outra coisa (uma constante ou uma função). O <code>$</code> faz parte do nome e está sempre lá: ao criar, ao usar, ao mudar. A aula <a href="variaveis.html">Variáveis</a> explica tudo sobre elas; aqui ficam as regras de escrita do nome:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Válido</th><th>Inválido</th></tr>
+<tr><td>Começa com <code>$</code> seguido de letra ou <code>_</code></td><td><code>$nome</code>, <code>$_contador</code></td><td><code>$1lugar</code></td></tr>
+<tr><td>Depois: letras, números e <code>_</code></td><td><code>$aluno2</code>, <code>$nome_completo</code></td><td><code>$nome-completo</code> (o <code>-</code> é subtração)</td></tr>
+<tr><td>Sem espaços</td><td><code>$nomeCompleto</code></td><td><code>$nome completo</code></td></tr>
+<tr><td>Acentos são aceitos (mas evite)</td><td><code>$ação</code></td><td></td></tr>
+</table>
+</div>
+
+<pre class="file" data-file="nomes.php">&lt;?php
+$nomeCompleto = "Ana Souza";
+$nome_completo = "Ana Souza";
+$_contador = 1;
+$ação = "comprar";
+$class = "3º ano";
+echo "$nomeCompleto | $nome_completo | $_contador | $ação | $class\n";
+</pre>
+
+<pre class="term" data-cwd="~/sx">$ php nomes.php
+Ana Souza | Ana Souza | 1 | comprar | 3º ano</pre>
+
+<p>Todos esses nomes funcionam. O acento funciona, mas evite: outras pessoas podem não conseguir digitá-lo, e alguns programas o estragam. O costume no PHP é o <strong>camelCase</strong> (<code>$nomeCompleto</code>, cada palavra nova com maiúscula, como as corcovas de um camelo); <code>$nome_completo</code> também aparece bastante. Escolha um e seja coerente. E os erros dos nomes inválidos:</p>
+
+<pre class="term" data-cwd="~/sx">$ php num.php                 « $1lugar = "Ana";
+
+Parse error: syntax error, unexpected integer "1", expecting variable or "{" or "$" in /home/ana/sx/num.php on line 2
+$ php espaco.php              « $nome completo = "Ana";
+
+Parse error: syntax error, unexpected identifier "completo" in /home/ana/sx/espaco.php on line 2</pre>
+
+<hr>
+
+<h2>Palavras reservadas</h2>
+<p>Algumas palavras têm significado especial no PHP: <code>echo</code>, <code>if</code>, <code>else</code>, <code>function</code>, <code>class</code>, <code>return</code>… São as <strong>palavras reservadas</strong> (ou palavras-chave). Elas não podem ser usadas como nome de função, de classe ou de constante:</p>
+
+<pre class="term" data-cwd="~/sx">$ php reserv.php              « function echo() { }
+
+Parse error: syntax error, unexpected token "echo", expecting "(" in /home/ana/sx/reserv.php on line 2
+$ php reserv2.php             « function list() { }
+
+Parse error: syntax error, unexpected token "list", expecting "(" in /home/ana/sx/reserv2.php on line 2</pre>
+
+<p>O PHP esperava o nome da função e encontrou uma palavra dele. Já em <strong>variáveis</strong> não há problema, graças ao <code>$</code>: o <code>$class</code> do exemplo anterior funcionou. As palavras reservadas mais comuns:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Grupo</th><th>Palavras</th></tr>
+<tr><td>Escrever</td><td><code>echo</code>, <code>print</code></td></tr>
+<tr><td>Decisões</td><td><code>if</code>, <code>else</code>, <code>elseif</code>, <code>switch</code>, <code>case</code>, <code>default</code>, <code>match</code></td></tr>
+<tr><td>Repetições</td><td><code>for</code>, <code>foreach</code>, <code>as</code>, <code>while</code>, <code>do</code>, <code>break</code>, <code>continue</code></td></tr>
+<tr><td>Funções</td><td><code>function</code>, <code>fn</code>, <code>return</code>, <code>static</code>, <code>global</code></td></tr>
+<tr><td>Classes</td><td><code>class</code>, <code>new</code>, <code>extends</code>, <code>interface</code>, <code>trait</code>, <code>enum</code>, <code>public</code>, <code>private</code>, <code>protected</code>, <code>readonly</code></td></tr>
+<tr><td>Erros</td><td><code>try</code>, <code>catch</code>, <code>finally</code>, <code>throw</code></td></tr>
+<tr><td>Arquivos e nomes</td><td><code>include</code>, <code>require</code>, <code>namespace</code>, <code>use</code></td></tr>
+<tr><td>Outras</td><td><code>list</code>, <code>array</code>, <code>isset</code>, <code>unset</code>, <code>empty</code>, <code>exit</code>, <code>die</code>, <code>and</code>, <code>or</code>, <code>xor</code>, <code>const</code>, <code>instanceof</code></td></tr>
+</table>
+</div>
+
+<p>Não precisa decorar: o editor colore as palavras reservadas com uma cor própria, e o PHP avisa com um <code>Parse error</code> se você tropeçar numa. A lista completa está no manual do PHP, em "List of Keywords".</p>
+
+<hr>
+
+<h2>O padrão de estilo: PSR-12</h2>
+<p>O PHP aceita muitas formas de escrever a mesma coisa. Para que o código de pessoas diferentes tenha a mesma cara, a comunidade criou recomendações chamadas <strong>PSR</strong> (<em>PHP Standards Recommendations</em>). A de estilo é a <strong>PSR-12</strong> (atualizada pelo <strong>PER Coding Style</strong>). Algumas regras que o guia segue desde já:</p>
+
+<ul>
+  <li>Arquivos começam com <code>&lt;?php</code> e, se só têm PHP, não terminam com <code>?&gt;</code>.</li>
+  <li>Recuo de <strong>4 espaços</strong> (não tabulação).</li>
+  <li>Palavras do PHP em minúsculas: <code>if</code>, <code>true</code>, <code>null</code>.</li>
+  <li>Uma instrução por linha.</li>
+  <li>Um espaço depois de <code>if</code>, <code>for</code>, <code>foreach</code>, <code>while</code>, antes do parêntese: <code>if ($nota &gt;= 7) {</code>.</li>
+  <li>Em <code>if</code> e laços, a chave abre na mesma linha; em funções e classes, na linha de baixo.</li>
+  <li>Linhas de até 120 caracteres (de preferência, 80).</li>
+</ul>
+
+<p>Ninguém confere isso à mão: os editores formatam sozinhos (aula <a href="editores.html">Editores e IDEs</a>) e ferramentas como o PHP CS Fixer corrigem projetos inteiros. A aula <a href="psr.html">Padrões PSR</a> mostra as outras recomendações.</p>
+
+<hr>
+
+<h2>Quando dá errado</h2>
+<p>Os erros de sintaxe vêm todos como <code>Parse error</code> e impedem o programa de começar: nenhuma linha roda. Um resumo dos que você viu nesta aula:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Mensagem</th><th>Causa mais comum</th><th>Onde procurar</th></tr>
+<tr><td><code>unexpected token "echo", expecting "," or ";"</code></td><td>Faltou <code>;</code></td><td>No fim da linha <strong>anterior</strong> à indicada</td></tr>
+<tr><td><code>unexpected end of file</code></td><td>Algo abriu e não fechou: aspas, parêntese, <code>foreach:</code></td><td>Do fim do arquivo para cima</td></tr>
+<tr><td><code>Unclosed '{' on line N</code></td><td>Chave aberta na linha N e nunca fechada</td><td>Na linha N e no bloco dela</td></tr>
+<tr><td><code>Unmatched '}'</code></td><td>Chave fechando sem ter sido aberta</td><td>Na linha indicada; às vezes falta o <code>{</code> lá em cima</td></tr>
+<tr><td><code>unexpected identifier "…"</code></td><td>Espaço no meio de um nome ou palavra</td><td>Na linha indicada</td></tr>
+<tr><td><code>unexpected integer "1", expecting variable</code></td><td>Nome de variável começando com número</td><td>Na linha indicada</td></tr>
+</table>
+</div>
+
+<p>E os dois que não são de sintaxe (o programa roda até chegar neles):</p>
+
+<div class="cenario">
+<strong>"Undefined variable $Total" e o valor sai vazio</strong>
+<p><strong>O que aconteceu:</strong> maiúscula ou minúscula diferente da usada na criação (<code>$total</code> × <code>$Total</code>), ou um erro de digitação. Como variáveis diferenciam maiúsculas, para o PHP é outra variável, que nunca recebeu valor.</p>
+<p><strong>Como resolver:</strong> copie o nome exato de onde a variável foi criada. Escolher um estilo só (camelCase) evita a maioria desses casos.</p>
+</div>
+
+<div class="cenario">
+<strong>"Undefined constant" e o programa para</strong>
+<p><strong>O que aconteceu:</strong> a constante foi escrita com maiúsculas diferentes, ou você esqueceu o <code>$</code> de uma variável (<code>echo nome;</code> procura uma constante <code>nome</code>).</p>
+<p><strong>Como resolver:</strong> confira o <code>$</code> e as maiúsculas. A aula <a href="erros.html">Lendo Erros do PHP</a> mostra esse e outros erros comuns.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Regra</th><th>Resumo</th></tr>
+<tr><td><code>;</code></td><td>Termina cada instrução (dispensável antes de <code>?&gt;</code>; não vai depois de <code>{</code> nem de <code>}</code>).</td></tr>
+<tr><td><code>{ }</code></td><td>Agrupam instruções num bloco; sempre aos pares.</td></tr>
+<tr><td>Ordem</td><td>As instruções rodam de cima para baixo.</td></tr>
+<tr><td>Variáveis e constantes</td><td>Diferenciam maiúsculas.</td></tr>
+<tr><td>Palavras do PHP, funções, classes</td><td>Não diferenciam (mas escreva sempre igual).</td></tr>
+<tr><td>Espaços e quebras de linha</td><td>Livres entre os pedaços; proibidos dentro de nomes; contam dentro de aspas.</td></tr>
+<tr><td><code>$nome</code></td><td><code>$</code> + letra ou <code>_</code> + letras, números, <code>_</code>.</td></tr>
+<tr><td>Palavras reservadas</td><td>Não podem ser nome de função, classe ou constante.</td></tr>
+<tr><td>Estilo</td><td>PSR-12: 4 espaços, minúsculas, uma instrução por linha.</td></tr>
+</table>
+</div>
+
+<p>Para fechar, aplique as regras. Este programa tem três erros: uma chave, um ponto e vírgula e um nome de variável. Conserte um de cada vez, lendo a mensagem do PHP a cada rodada:</p>
+
+<div class="tryphp" data-goal="outre:^Nota: 8\nAprovada!\nFim do boletim\.,semerro">
+<p class="try-task"><strong>Missão:</strong> faça o programa escrever, sem nenhum aviso, as três linhas <code>Nota: 8</code>, <code>Aprovada!</code> e <code>Fim do boletim.</code></p>
+<pre class="script">&lt;?php
+$nota = 8;
+echo "Nota: $Nota\n"
+if ($nota &gt;= 7) {
+    echo "Aprovada!\n";
+
+echo "Fim do boletim.\n";
+</pre>
+<pre class="solucao">&lt;?php
+$nota = 8;
+echo "Nota: $nota\n";
+if ($nota &gt;= 7) {
+    echo "Aprovada!\n";
+}
+echo "Fim do boletim.\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="mc" data-answer="3">
+<p class="mc-q">1. Qual destes pares se refere à <strong>mesma</strong> coisa no PHP?</p>
+<label><input type="radio" name="q1"> <code>$nome</code> e <code>$Nome</code></label>
+<label><input type="radio" name="q1"> <code>TAXA</code> e <code>taxa</code> (constantes)</label>
+<label><input type="radio" name="q1"> <code>strlen()</code> e <code>STRLEN()</code></label>
+<label><input type="radio" name="q1"> <code>$total</code> e <code>$Total</code></label>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">2. Qual destes nomes de variável é <strong>inválido</strong>?</p>
+<label><input type="radio" name="q2"> <code>$_preco</code></label>
+<label><input type="radio" name="q2"> <code>$2turma</code></label>
+<label><input type="radio" name="q2"> <code>$turma2</code></label>
+<label><input type="radio" name="q2"> <code>$nomeDaTurma</code></label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">3. A mensagem é <code>Parse error: Unclosed '{' on line 5 in … on line 12</code>. O que aconteceu?</p>
+<label><input type="radio" name="q3"> Falta um <code>;</code> na linha 12.</label>
+<label><input type="radio" name="q3"> Há uma <code>}</code> a mais na linha 5.</label>
+<label><input type="radio" name="q3"> A linha 12 tem um espaço no meio de um nome.</label>
+<label><input type="radio" name="q3"> Uma <code>{</code> aberta na linha 5 nunca foi fechada; o arquivo acabou na linha 12.</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">4. O que acontece com <code>echo "a"; echo "b";</code> escrito numa linha só?</p>
+<label><input type="radio" name="q4"> Funciona: escreve <code>ab</code>. Mas o costume é uma instrução por linha.</label>
+<label><input type="radio" name="q4"> Parse error: só pode haver uma instrução por linha.</label>
+<label><input type="radio" name="q4"> Só o primeiro <code>echo</code> roda.</label>
+<label><input type="radio" name="q4"> Escreve <code>a</code> e <code>b</code> em linhas separadas.</label>
+</div>
+
+<div class="exercise">
+<h3>5. O recuo do PSR-12</h3>
+<p>Quantos espaços de recuo o padrão PSR-12 usa dentro de um bloco?</p>
+<div class="ex-code"><input data-answer="4|quatro" aria-label="número de espaços"> espaços</div>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li>Cada instrução termina com <code>;</code>, e as instruções rodam de cima para baixo.</li>
+  <li><code>{ }</code> agrupam instruções em blocos; toda chave aberta precisa ser fechada (<code>Unclosed '{'</code>, <code>Unmatched '}'</code>).</li>
+  <li>Variáveis e constantes diferenciam maiúsculas; palavras do PHP, funções e classes não (mas escreva sempre igual, em minúsculas).</li>
+  <li>Espaços e quebras de linha são livres entre os pedaços, proibidos dentro de nomes e contam dentro de aspas.</li>
+  <li>Variáveis: <code>$</code> + letra ou <code>_</code>, depois letras, números e <code>_</code>; prefira camelCase.</li>
+  <li>Palavras reservadas não podem ser nome de função ou classe.</li>
+  <li>Estilo: PSR-12 (4 espaços, uma instrução por linha); deixe o editor formatar.</li>
+  <li>Próximo passo: <a href="comentarios.html">Comentários</a>.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
