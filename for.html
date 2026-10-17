@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP for — repetir contando | Guia PHP</title>
+<meta name="description" content="O laço for em PHP para iniciantes: as três partes (início; condição; passo), contar para frente e para trás, de 2 em 2, a tabuada, laço dentro de laço, gerar as opções de 1 a 31 de um select no HTML, for com arrays, for × while e os erros reais (Undefined array key, ponto e vírgula a mais, laço sem fim).">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem("tema");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Tópicos"></nav>
+<main class="main">
+<div class="content">
+
+<div class="pager"></div>
+
+<h1>PHP <span class="hl">for</span></h1>
+
+<p class="intro">O <code>for</code> ("para") é o laço de <strong>contar</strong>: de 1 até 10, de 10 até 1, de 5 em 5. Ele junta numa única linha as três coisas que todo contador precisa: onde começa, até onde vai e de quanto em quanto anda. Por isso é o laço preferido quando você <strong>sabe quantas vezes</strong> quer repetir.</p>
+
+<div class="note">
+<strong>Você vai aprender</strong>
+<ul>
+  <li>A anatomia do <code>for</code>: <strong>início</strong>, <strong>condição</strong> e <strong>passo</strong>, e em que ordem cada um roda.</li>
+  <li>Contar para frente, para trás e pulando números.</li>
+  <li>Fazer a tabuada e uma tabela com um <code>for</code> dentro de outro.</li>
+  <li>Gerar as opções de 1 a 31 de um <code>&lt;select&gt;</code> numa página web.</li>
+  <li>Usar o <code>for</code> com arrays, e quando o <code>foreach</code> é melhor.</li>
+  <li>As diferenças entre <code>for</code> e <code>while</code>, e os erros mais comuns.</li>
+</ul>
+</div>
+
+<p>Esta aula vem depois de <a href="while.html">while e do-while</a>; se você já leu, vai perceber que o <code>for</code> é um <code>while</code> "organizado". Os exemplos rodam na pasta <code>~/site</code> da Ana.</p>
+
+<hr>
+
+<h2>A ideia antes do código: as voltas na pista</h2>
+<p>A Ana decidiu correr 5 voltas na pista do parque. Antes de começar, ela já sabe três coisas:</p>
+<ol>
+  <li><strong>Início:</strong> começa na volta 1.</li>
+  <li><strong>Condição:</strong> continua enquanto a volta for no máximo 5.</li>
+  <li><strong>Passo:</strong> a cada volta completada, soma 1 no contador.</li>
+</ol>
+<p>Com essas três informações, qualquer pessoa sabe exatamente quantas vezes ela vai correr. O <code>for</code> pede essas mesmas três coisas, nessa ordem, separadas por ponto e vírgula.</p>
+
+<hr>
+
+<h2>Anatomia do <code>for</code></h2>
+
+<pre class="file" data-file="contar.php">&lt;?php
+for ($i = 1; $i &lt;= 5; $i++) {
+    echo "Volta número $i\n";
+}
+echo "Depois do laço, \$i vale $i\n";
+</pre>
+
+<dl class="anatomy">
+  <dt>for</dt><dd>"Para". Começa o laço.</dd>
+  <dt>$i = 1;</dt><dd><strong>Início</strong>: cria o contador. Roda <strong>uma vez só</strong>, antes de tudo. O nome <code>$i</code> (de "índice") é uma tradição; pode ser <code>$volta</code>, <code>$dia</code>, o que fizer sentido.</dd>
+  <dt>$i &lt;= 5;</dt><dd><strong>Condição</strong>: testada <strong>antes de cada volta</strong>. Se for verdadeira, o corpo roda; se for falsa, o laço acaba.</dd>
+  <dt>$i++</dt><dd><strong>Passo</strong>: roda <strong>depois de cada volta</strong>. <code>$i++</code> soma 1 (veja <a href="operadores-atribuicao.html">Operadores de Atribuição</a>). Repare: depois do passo não vai ponto e vírgula.</dd>
+  <dt>{ … }</dt><dd>O corpo, repetido a cada volta.</dd>
+</dl>
+
+<pre class="term">$ php contar.php
+Volta número 1
+Volta número 2
+Volta número 3
+Volta número 4
+Volta número 5
+Depois do laço, $i vale 6</pre>
+
+<h3>A ordem exata das coisas</h3>
+<p>É aqui que muita gente se confunde, então vale seguir volta por volta:</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Passo</th><th><code>$i</code></th><th>O que acontece</th></tr>
+<tr><td>Início</td><td>1</td><td><code>$i = 1</code> (só desta vez)</td></tr>
+<tr><td>Condição</td><td>1</td><td><code>1 &lt;= 5</code>? Sim → roda o corpo: "Volta número 1"</td></tr>
+<tr><td>Passo</td><td>2</td><td><code>$i++</code></td></tr>
+<tr><td>Condição</td><td>2</td><td><code>2 &lt;= 5</code>? Sim → "Volta número 2"</td></tr>
+<tr><td>…</td><td>…</td><td>(o mesmo para 3, 4 e 5)</td></tr>
+<tr><td>Passo</td><td>6</td><td><code>$i++</code> depois da volta 5</td></tr>
+<tr><td>Condição</td><td>6</td><td><code>6 &lt;= 5</code>? <strong>Não</strong> → o laço termina</td></tr>
+</table>
+</div>
+
+<p>Por isso, depois do laço, <code>$i</code> vale <strong>6</strong>, e não 5: foi o 6 que fez a condição falhar. E, como <code>if</code> e laços não criam escopo em PHP, o <code>$i</code> continua existindo depois do laço (veja <a href="escopo.html">Escopo</a>).</p>
+
+<div class="tryphp">
+<p class="try-task"><strong>Experimente:</strong> mude o <code>5</code> para <code>3</code>; depois troque o <code>&lt;=</code> por <code>&lt;</code> e veja que sai uma volta a menos. Por fim, comece com <code>$i = 0</code>: quantas voltas saem agora?</p>
+<pre class="script">&lt;?php
+for ($i = 1; $i &lt;= 5; $i++) {
+    echo "Volta número $i\n";
+}
+echo "Depois do laço, \$i vale $i\n";
+</pre>
+</div>
+
+<hr>
+
+<h2>Contar de outros jeitos</h2>
+<p>Mudando o início, a condição e o passo, o mesmo <code>for</code> conta de qualquer jeito:</p>
+
+<pre class="file" data-file="variacoes.php">&lt;?php
+for ($i = 10; $i &gt;= 1; $i--) {
+    echo $i, " ";
+}
+echo "Feliz Ano Novo!\n";
+
+for ($i = 0; $i &lt;= 20; $i += 5) {
+    echo $i, " ";
+}
+echo "\n";
+
+for ($i = 2; $i &lt;= 10; $i += 2) {
+    echo $i, " ";
+}
+echo "\n";
+</pre>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Laço</th><th>Início</th><th>Condição</th><th>Passo</th></tr>
+<tr><td>Contagem regressiva</td><td><code>$i = 10</code></td><td><code>$i &gt;= 1</code> ("maior ou igual")</td><td><code>$i--</code> (diminui 1)</td></tr>
+<tr><td>De 5 em 5</td><td><code>$i = 0</code></td><td><code>$i &lt;= 20</code></td><td><code>$i += 5</code> (soma 5)</td></tr>
+<tr><td>Só os pares</td><td><code>$i = 2</code></td><td><code>$i &lt;= 10</code></td><td><code>$i += 2</code></td></tr>
+</table>
+</div>
+
+<pre class="term">$ php variacoes.php
+10 9 8 7 6 5 4 3 2 1 Feliz Ano Novo!
+0 5 10 15 20
+2 4 6 8 10 </pre>
+
+<p>Quando conta para trás, tudo vira ao contrário: a condição usa <code>&gt;=</code> e o passo diminui. Esquecer de inverter um dos dois é um erro clássico (veja <a href="#erros">Quando dá errado</a>).</p>
+
+<hr>
+
+<h2>A tabuada</h2>
+<p>O contador não serve só para ser mostrado: ele pode entrar em contas. A tabuada do 7:</p>
+
+<pre class="file" data-file="tabuada.php">&lt;?php
+$numero = 7;
+
+for ($i = 1; $i &lt;= 10; $i++) {
+    $resultado = $numero * $i;
+    echo "$numero x $i = $resultado\n";
+}
+</pre>
+
+<pre class="term">$ php tabuada.php
+7 x 1 = 7
+7 x 2 = 14
+7 x 3 = 21
+7 x 4 = 28
+7 x 5 = 35
+7 x 6 = 42
+7 x 7 = 49
+7 x 8 = 56
+7 x 9 = 63
+7 x 10 = 70</pre>
+
+<p>Para ter a tabuada de outro número, basta mudar <code>$numero</code>. E se você quiser várias tabuadas de uma vez?</p>
+
+<h3>Um <code>for</code> dentro de outro: a tabela de multiplicação</h3>
+<p>Colocando um laço dentro de outro, o de dentro roda <strong>inteiro</strong> a cada volta do de fora. É assim que se percorre uma tabela: o de fora anda pelas linhas, o de dentro pelas colunas.</p>
+
+<pre class="file" data-file="tabela.php">&lt;?php
+for ($linha = 1; $linha &lt;= 5; $linha++) {
+    for ($coluna = 1; $coluna &lt;= 5; $coluna++) {
+        echo str_pad($linha * $coluna, 4, " ", STR_PAD_LEFT);
+    }
+    echo "\n";
+}
+</pre>
+
+<dl class="anatomy">
+  <dt>for ($linha = 1; …)</dt><dd>O laço de fora: 5 voltas, uma por linha.</dd>
+  <dt>for ($coluna = 1; …)</dt><dd>O laço de dentro: a cada linha, 5 voltas, uma por coluna. No total, 5 × 5 = 25 contas. Os dois contadores precisam ter <strong>nomes diferentes</strong>.</dd>
+  <dt>str_pad(…, 4, " ", STR_PAD_LEFT)</dt><dd>Completa o número com espaços à esquerda até ter 4 caracteres, para as colunas ficarem alinhadas (veja <a href="funcoes-string.html">Funções de String</a>).</dd>
+  <dt>echo "\n";</dt><dd>Fica no laço de fora, depois do de dentro: pula a linha quando as 5 colunas terminam.</dd>
+</dl>
+
+<pre class="term">$ php tabela.php
+   1   2   3   4   5
+   2   4   6   8  10
+   3   6   9  12  15
+   4   8  12  16  20
+   5  10  15  20  25</pre>
+
+<hr>
+
+<h2>Na página web: as opções de 1 a 31</h2>
+<p>Um uso muito comum do <code>for</code> em sites: gerar listas de números para formulários. A Ana quer perguntar o dia do aniversário dos clientes com um <code>&lt;select&gt;</code>. Escrever 31 linhas de <code>&lt;option&gt;</code> à mão seria cansativo; o <code>for</code> escreve por ela. Dentro do HTML, use a forma alternativa <code>for (…): … endfor;</code> (a mesma ideia do <code>endforeach</code>, explicada em <a href="foreach.html">foreach</a>):</p>
+
+<div class="tryphp" data-modo="web" data-url="/index.php?dia=15" data-goal="out:&lt;option value=&quot;31&quot;&gt;31&lt;/option&gt;">
+<p class="try-task"><strong>Missão:</strong> a página abriu como se alguém tivesse escolhido o dia 15. Abra a lista na aba <strong>Resultado</strong>: o dia <strong>31</strong> está faltando! Corrija a condição do <code>for</code> para as opções irem de 1 até 31. Depois escolha um dia e clique em Enviar.</p>
+<pre class="script">&lt;?php
+$dia = isset($_GET["dia"]) ? (int) $_GET["dia"] : null;
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Aniversário&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;form method="get"&gt;
+  &lt;label&gt;Dia do seu aniversário:
+    &lt;select name="dia"&gt;
+&lt;?php for ($d = 1; $d &lt; 31; $d++): ?&gt;
+      &lt;option value="&lt;?= $d ?&gt;"&gt;&lt;?= $d ?&gt;&lt;/option&gt;
+&lt;?php endfor; ?&gt;
+    &lt;/select&gt;
+  &lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($dia !== null): ?&gt;
+&lt;p&gt;Você faz aniversário no dia &lt;?= $dia ?&gt;.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+<pre class="solucao">&lt;?php
+$dia = isset($_GET["dia"]) ? (int) $_GET["dia"] : null;
+?&gt;
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Aniversário&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;form method="get"&gt;
+  &lt;label&gt;Dia do seu aniversário:
+    &lt;select name="dia"&gt;
+&lt;?php for ($d = 1; $d &lt;= 31; $d++): ?&gt;
+      &lt;option value="&lt;?= $d ?&gt;"&gt;&lt;?= $d ?&gt;&lt;/option&gt;
+&lt;?php endfor; ?&gt;
+    &lt;/select&gt;
+  &lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;?php if ($dia !== null): ?&gt;
+&lt;p&gt;Você faz aniversário no dia &lt;?= $dia ?&gt;.&lt;/p&gt;
+&lt;?php endif; ?&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+</div>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Trecho</th><th>O que faz</th></tr>
+<tr><td><code>$_GET["dia"]</code></td><td>O dia escolhido, que chega pelo endereço (<code>?dia=15</code>) quando o formulário é enviado (veja <a href="get-post.html">$_GET e $_POST</a>).</td></tr>
+<tr><td><code>(int)</code></td><td>Transforma o que chegou em número inteiro. Além de converter, isso protege a página: qualquer texto estranho vira um número, e número não tem como esconder HTML malicioso (veja <a href="conversao-tipos.html">Conversão de Tipos</a>).</td></tr>
+<tr><td><code>&lt;?php for (…): ?&gt;</code> … <code>&lt;?php endfor; ?&gt;</code></td><td>O HTML entre os dois é repetido a cada volta, com o <code>$d</code> da vez.</td></tr>
+<tr><td><code>value="&lt;?= $d ?&gt;"</code></td><td>O valor enviado pelo formulário. O texto entre <code>&gt;</code> e <code>&lt;/option&gt;</code> é o que o usuário vê.</td></tr>
+</table>
+</div>
+
+<p>Com o servidor embutido, a Ana conferiu o HTML que o PHP gera (com <code>?dia=15</code> no endereço, como se o formulário tivesse sido enviado):</p>
+
+<pre class="term">$ curl -s "localhost:8000/aniversario.php?dia=15" | head -14
+&lt;!doctype html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Aniversário&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;form method="get"&gt;
+  &lt;label&gt;Dia do seu aniversário:
+    &lt;select name="dia"&gt;
+      &lt;option value="1"&gt;1&lt;/option&gt;
+      &lt;option value="2"&gt;2&lt;/option&gt;
+      &lt;option value="3"&gt;3&lt;/option&gt;
+      &lt;option value="4"&gt;4&lt;/option&gt;
+      &lt;option value="5"&gt;5&lt;/option&gt;
+      &lt;option value="6"&gt;6&lt;/option&gt;
+      &lt;option value="7"&gt;7&lt;/option&gt;
+$ curl -s "localhost:8000/aniversario.php?dia=15" | tail -6
+  &lt;/label&gt;
+  &lt;button&gt;Enviar&lt;/button&gt;
+&lt;/form&gt;
+&lt;p&gt;Você faz aniversário no dia 15.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>O mesmo truque serve para os meses (1 a 12), os anos (<code>for ($a = 2026; $a &gt;= 1920; $a--)</code>, do mais recente para o mais antigo) ou as quantidades de um produto no carrinho.</p>
+
+<hr>
+
+<h2><code>for</code> com arrays</h2>
+<p>Como os índices de um array comum são 0, 1, 2…, um <code>for</code> pode percorrê-lo contando de 0 até o tamanho menos 1. O tamanho vem de <code>count()</code> ("contar"):</p>
+
+<pre class="file" data-file="array-for.php">&lt;?php
+$compras = ["pão", "leite", "café"];
+
+for ($i = 0; $i &lt; count($compras); $i++) {
+    echo "$i: $compras[$i]\n";
+}
+</pre>
+
+<pre class="term">$ php array-for.php
+0: pão
+1: leite
+2: café</pre>
+
+<p>Repare na condição: <code>$i &lt; count($compras)</code>, com <strong>menor</strong>, não "menor ou igual". O array tem 3 itens, mas o último índice é 2. Usar <code>&lt;=</code> é o erro mais comum com <code>for</code> em arrays.</p>
+
+<div class="tip">
+<strong>Para percorrer um array, prefira o <code>foreach</code></strong>
+<p>O <code>for</code> só funciona em arrays com índices 0, 1, 2… sem buracos. O <a href="foreach.html">foreach</a> funciona com qualquer array (inclusive os associativos, com nomes), não precisa de <code>count</code> e não tem como errar o último índice. Use o <code>for</code> com arrays quando precisar de algo que só o contador dá, como andar de 2 em 2 posições ou comparar cada item com o seguinte (<code>$a[$i]</code> e <code>$a[$i + 1]</code>).</p>
+</div>
+
+<hr>
+
+<h2>Detalhes do <code>for</code></h2>
+
+<h3>Mais de uma variável: vírgulas dentro das partes</h3>
+<p>Dentro de cada parte, você pode separar várias expressões com <strong>vírgula</strong>. Aqui, uma variável sobe enquanto a outra desce, até se cruzarem:</p>
+
+<pre class="file" data-file="virgulas2.php">&lt;?php
+for ($i = 0, $j = 10; $i &lt; $j; $i += 3, $j -= 3) {
+    echo "i = $i, j = $j\n";
+}
+</pre>
+
+<pre class="term">$ php virgulas2.php
+i = 0, j = 10
+i = 3, j = 7</pre>
+
+<p>Na terceira volta, <code>$i</code> seria 6 e <code>$j</code> seria 4: a condição <code>6 &lt; 4</code> falha. As vírgulas separam expressões <strong>dentro</strong> de uma parte; os pontos e vírgulas separam <strong>as partes</strong>.</p>
+
+<h3>Partes vazias</h3>
+<p>As três partes são opcionais. <code>for (; $i &lt;= 5; )</code> é igual a um <code>while ($i &lt;= 5)</code>, e <code>for (;;)</code>, sem nada, repete para sempre (como <code>while (true)</code>), dependendo de um <code>break</code> para sair (veja <a href="break-continue.html">break e continue</a>). Existem, mas deixam o código mais difícil de ler: se você precisa deles, provavelmente um <code>while</code> fica mais claro.</p>
+
+<hr>
+
+<h2><code>for</code> × <code>while</code></h2>
+<p>Todo <code>for</code> pode ser escrito como <code>while</code>. A mesma contagem de 1 a 5, nos dois:</p>
+
+<pre class="file" data-file="comparar.php">&lt;?php
+// com for: as três partes juntas, numa linha
+for ($i = 1; $i &lt;= 5; $i++) {
+    echo $i, " ";
+}
+
+// com while: as mesmas três partes, espalhadas
+$i = 1;                 // início
+while ($i &lt;= 5) {       // condição
+    echo $i, " ";
+    $i++;               // passo
+}
+</pre>
+
+<p>Os dois mostram <code>1 2 3 4 5</code>. A diferença é organização: no <code>for</code>, quem lê vê de uma vez quantas voltas o laço dá. No <code>while</code>, o passo fica lá embaixo, e é fácil esquecê-lo (e criar um laço infinito).</p>
+
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Situação</th><th>Use</th><th>Exemplo</th></tr>
+<tr><td>Você sabe quantas vezes vai repetir, ou conta de um número a outro</td><td><code>for</code></td><td>Tabuada, dias de 1 a 31, contagem regressiva</td></tr>
+<tr><td>Percorrer todos os itens de um array</td><td><code>foreach</code></td><td>Lista de compras, produtos, alunos</td></tr>
+<tr><td>Repetir enquanto algo for verdade, sem saber quantas vezes</td><td><code>while</code></td><td>Ler um arquivo até o fim, perguntar até a resposta ser válida</td></tr>
+<tr><td>Executar pelo menos uma vez e depois testar</td><td><code>do-while</code></td><td>Mostrar um menu e repetir enquanto a opção não for "sair"</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2 id="erros">Quando dá errado</h2>
+
+<div class="cenario">
+<strong><code>Warning: Undefined array key 3</code>: uma volta a mais</strong>
+<pre class="file" data-file="fora-limite.php">&lt;?php
+$compras = ["pão", "leite", "café"];
+
+for ($i = 0; $i &lt;= count($compras); $i++) {
+    echo "$i: $compras[$i]\n";
+}
+</pre>
+<pre class="term">$ php fora-limite.php
+0: pão
+1: leite
+2: café
+
+Warning: Undefined array key 3 in /home/ana/site/fora-limite.php on line 5
+3: </pre>
+<p><strong>O que significa:</strong> "chave 3 do array indefinida". O array tem 3 itens (índices 0, 1, 2); com <code>&lt;=</code>, o laço tentou a posição 3, que não existe. Esse erro de "um a mais" (ou "um a menos") é tão comum que tem nome em inglês: <em>off-by-one</em>.</p>
+<p><strong>Como consertar:</strong> com índices que começam em 0, use <code>$i &lt; count($array)</code>. Ou use <code>foreach</code>, que não tem esse problema.</p>
+</div>
+
+<div class="cenario">
+<strong>O corpo rodou uma vez só, com o valor final (ponto e vírgula a mais)</strong>
+<pre class="file" data-file="pontovirgula.php">&lt;?php
+for ($i = 1; $i &lt;= 3; $i++);
+{
+    echo "Volta $i\n";
+}
+</pre>
+<pre class="term">$ php pontovirgula.php
+Volta 4</pre>
+<p><strong>O que aconteceu:</strong> o <code>;</code> logo depois do <code>)</code> é um corpo <strong>vazio</strong>. O laço contou de 1 a 4 sem fazer nada; depois, o bloco <code>{ … }</code> rodou uma vez, como código comum, com <code>$i</code> valendo 4. Não há aviso: para o PHP, é código válido.</p>
+<p><strong>Como consertar:</strong> nunca ponha <code>;</code> entre o <code>)</code> do <code>for</code> e a <code>{</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>Vírgulas no lugar dos pontos e vírgulas: <code>unexpected token ")", expecting ";"</code></strong>
+<pre class="file" data-file="virgulas.php">&lt;?php
+for ($i = 1, $i &lt;= 3, $i++) {
+    echo "Volta $i\n";
+}
+</pre>
+<pre class="term">$ php virgulas.php
+
+Parse error: syntax error, unexpected token ")", expecting ";" in /home/ana/site/virgulas.php on line 2</pre>
+<p><strong>O que significa:</strong> o PHP leu tudo como a parte do <strong>início</strong> (vírgulas separam expressões dentro de uma parte) e, ao chegar no <code>)</code>, ainda esperava o <code>;</code> que separa o início da condição.</p>
+<p><strong>Como consertar:</strong> as três partes são separadas por <strong>ponto e vírgula</strong>: <code>for ($i = 1; $i &lt;= 3; $i++)</code>.</p>
+</div>
+
+<div class="cenario">
+<strong>O laço não para: o passo anda para o lado errado</strong>
+<pre class="file" data-file="errado.php">&lt;?php
+for ($i = 10; $i &gt;= 1; $i++) {
+    echo $i, "\n";
+}
+</pre>
+<pre class="term">$ php errado.php | head -5
+10
+11
+12
+13
+14                     « e continuaria para sempre: o head parou o programa na 5ª linha</pre>
+<p><strong>O que aconteceu:</strong> a intenção era contar de 10 até 1, mas o passo é <code>$i++</code> (sobe). Como <code>$i</code> só cresce, <code>$i &gt;= 1</code> é sempre verdade. O <code>| head -5</code> mostra só as 5 primeiras linhas e encerra o programa; sem ele, a tela encheria de números até você apertar <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+<p><strong>Como consertar:</strong> confira se o passo leva o contador <strong>na direção</strong> que faz a condição ficar falsa: contando para baixo, <code>$i--</code>. Mais sobre laços infinitos em <a href="while.html">while e do-while</a>.</p>
+</div>
+
+<hr>
+
+<h2>Referência</h2>
+<div class="table-wrap">
+<table class="ref">
+<tr><th>Forma</th><th>O que faz</th></tr>
+<tr><td><code>for (início; condição; passo) { … }</code></td><td>Início roda uma vez; condição antes de cada volta; passo depois de cada volta.</td></tr>
+<tr><td><code>for ($i = 1; $i &lt;= 10; $i++)</code></td><td>De 1 a 10.</td></tr>
+<tr><td><code>for ($i = 10; $i &gt;= 1; $i--)</code></td><td>De 10 a 1.</td></tr>
+<tr><td><code>for ($i = 0; $i &lt;= 100; $i += 5)</code></td><td>De 0 a 100, de 5 em 5.</td></tr>
+<tr><td><code>for ($i = 0; $i &lt; count($a); $i++)</code></td><td>Todas as posições de um array 0, 1, 2… (prefira <code>foreach</code>).</td></tr>
+<tr><td><code>for ($i = 0, $j = 10; …; $i++, $j--)</code></td><td>Várias expressões numa parte, separadas por vírgula.</td></tr>
+<tr><td><code>for (…): … endfor;</code></td><td>Sintaxe alternativa, para templates HTML.</td></tr>
+<tr><td><code>break</code> / <code>continue</code></td><td>Sair do laço / pular para a próxima volta (veja <a href="break-continue.html">break e continue</a>).</td></tr>
+</table>
+</div>
+
+<hr>
+
+<h2>Exercícios</h2>
+
+<div class="exercise">
+<h3>1. De 1 a 100</h3>
+<p>Complete para contar de 1 até 100:</p>
+<div class="ex-code">for ($i = 1; <input data-answer="$i &lt;= 100|$i&lt;=100|$i &lt; 101" aria-label="condição">; $i++) { echo $i; }</div>
+</div>
+
+<div class="exercise">
+<h3>2. Contagem regressiva</h3>
+<p>Complete o passo para contar de 10 até 0:</p>
+<div class="ex-code">for ($i = 10; $i &gt;= 0; <input data-answer="$i--|--$i|$i -= 1|$i-=1" aria-label="passo">) { echo $i; }</div>
+</div>
+
+<div class="exercise">
+<h3>3. De 3 em 3</h3>
+<p>Complete o passo para mostrar 0, 3, 6, 9, 12:</p>
+<div class="ex-code">for ($i = 0; $i &lt;= 12; <input data-answer="$i += 3|$i+=3|$i = $i + 3" aria-label="passo">) { echo $i; }</div>
+</div>
+
+<div class="mc" data-answer="2">
+<p class="mc-q">4. Quantas vezes o corpo de <code>for ($i = 0; $i &lt; 5; $i++)</code> roda?</p>
+<label><input type="radio" name="q4"> 4</label>
+<label><input type="radio" name="q4"> 5</label>
+<label><input type="radio" name="q4"> 6</label>
+<label><input type="radio" name="q4"> Infinitas</label>
+</div>
+
+<div class="mc" data-answer="4">
+<p class="mc-q">5. Quanto vale <code>$i</code> depois de <code>for ($i = 1; $i &lt;= 3; $i++) { }</code>?</p>
+<label><input type="radio" name="q5"> 1</label>
+<label><input type="radio" name="q5"> 3</label>
+<label><input type="radio" name="q5"> Não existe: dá <code>Undefined variable</code></label>
+<label><input type="radio" name="q5"> 4</label>
+</div>
+
+<div class="mc" data-answer="1">
+<p class="mc-q">6. Em que ordem as partes do <code>for</code> rodam a cada volta (depois do início)?</p>
+<label><input type="radio" name="q6"> Condição → corpo → passo</label>
+<label><input type="radio" name="q6"> Passo → condição → corpo</label>
+<label><input type="radio" name="q6"> Corpo → condição → passo</label>
+<label><input type="radio" name="q6"> Condição → passo → corpo</label>
+</div>
+
+<h3>Missão final</h3>
+<div class="tryphp" data-goal="out:9 x 10 = 90,out:9 x 1 = 9,outre:9 x 10 = 90[\s\S]*9 x 1 = 9,src:\bfor\s*\(,semerro">
+<p class="try-task"><strong>Missão:</strong> escreva um <code>for</code> que mostre a tabuada do 9 <strong>de trás para frente</strong>: começando em <code>9 x 10 = 90</code> e terminando em <code>9 x 1 = 9</code>, uma conta por linha.</p>
+<pre class="script">&lt;?php
+$numero = 9;
+
+// escreva o for aqui
+</pre>
+<pre class="solucao">&lt;?php
+$numero = 9;
+
+for ($i = 10; $i &gt;= 1; $i--) {
+    echo "$numero x $i = ", $numero * $i, "\n";
+}
+</pre>
+</div>
+
+<hr>
+
+<h2>Resumo</h2>
+<ul>
+  <li><code>for (início; condição; passo)</code>: o início roda uma vez; a condição é testada antes de cada volta; o passo roda depois de cada volta.</li>
+  <li>Para contar para trás, inverta a condição (<code>&gt;=</code>) <strong>e</strong> o passo (<code>$i--</code>). Para pular, use <code>$i += N</code>.</li>
+  <li>Laços dentro de laços percorrem tabelas; cada um com o seu contador.</li>
+  <li>No HTML, <code>for (…): … endfor;</code> gera listas como as opções de 1 a 31 de um <code>&lt;select&gt;</code>.</li>
+  <li>Em arrays, <code>$i &lt; count($a)</code> (nunca <code>&lt;=</code>); mas, para percorrer arrays, o <code>foreach</code> é melhor.</li>
+  <li><code>for</code> quando você sabe quantas vezes; <code>while</code> quando depende de uma condição; <code>foreach</code> para arrays.</li>
+</ul>
+
+<div class="pager"></div>
+
+</div>
+</main>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>
