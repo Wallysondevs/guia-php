@@ -46,6 +46,7 @@ node tools/testar-missoes.js pagina.html     # só estas páginas (-v mostra as 
 node tools/testar-missoes.js --nativo pagina.html   # compara também com o PHP nativo (precisa do laboratório)
 node tools/sim.js programa.php               # roda um programa como o editor
 node tools/sim.js index.php --web            # idem, no modo web
+bash tools/checar-privacidade.sh             # páginas e histórico; lista extra: PROIBIDO=lista.txt
 ```
 
 Para testar no navegador, sirva a raiz do site e abra `/tools/demo.html`.
